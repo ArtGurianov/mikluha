@@ -51,8 +51,19 @@ RUN pnpm run build:production
 # ---------------------------------------------------------------------------
 # Stage 3: production runtime — Nginx serving the static /out only.
 # No Node.js, no Sanity credentials, no source code.
+#
+# Deliberately the *stable* branch tag, not a patch version or a digest. 1.27
+# was a mainline branch, which stops getting patches as soon as the next one
+# opens. And because the scheduled nightly rebuild re-runs this Dockerfile from
+# scratch, a branch tag picks up nginx patch releases on its own — a pinned
+# digest would freeze the runtime until someone remembered to bump it, and
+# nothing here would ever remind them. Exact reproducibility buys little for a
+# server that only hands out static files whose content is meant to change
+# daily. The risk a floating tag carries — a bad patch landing between two
+# builds of identical source — is what the candidate healthcheck covers
+# (scripts/healthcheck.ts runs before traffic switches, see RUNBOOK.md).
 # ---------------------------------------------------------------------------
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.30-alpine AS runtime
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/out /usr/share/nginx/html
