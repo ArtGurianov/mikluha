@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Step 3 of the production build pipeline (PRD sections 29, 49.1, 34.3).
+ * Step 3 of the production build pipeline.
  *
  * Validates the materialized content snapshot BEFORE `next build` runs:
  *  - referential integrity (every reference points at a real, listed document)
@@ -12,6 +12,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { REQUIRED_LEGAL_SLUGS, RESERVED_SLUGS, SLUG_RE } from "../lib/legal";
 import { isStaging } from "../lib/site";
 import { resolveBookingDetails } from "../lib/tours";
 import type { ContentSnapshot } from "../lib/cms/types";
@@ -64,15 +65,31 @@ async function main() {
     if (slugs.has(`report:${r.slug}`)) fail(`Duplicate report slug: ${r.slug}`);
     slugs.add(`report:${r.slug}`);
   }
-  const ALLOWED_LEGAL_SLUGS = new Set(["booking-terms", "privacy-policy"]);
+  // Legal pages get a static route each from app/[legalSlug]/, so any slug is
+  // allowed — but that route sits at the site root, so a slug must still be
+  // servable and must not shadow an existing section or build artifact. The
+  // Studio rejects both while typing; this is the backstop for documents
+  // written through the API.
   for (const p of content.legalPages) {
     if (slugs.has(`legal:${p.slug}`)) fail(`Duplicate legal page slug: ${p.slug}`);
     slugs.add(`legal:${p.slug}`);
-    if (!ALLOWED_LEGAL_SLUGS.has(p.slug)) {
+    if (!SLUG_RE.test(p.slug)) {
       fail(
-        `LegalPage "${p.slug}" has no matching Next.js route — only ${[...ALLOWED_LEGAL_SLUGS].join(", ")} exist ` +
-          `(app/booking-terms/, app/privacy-policy/). Sanity Studio should already block this slug value.`,
+        `LegalPage slug "${p.slug}" cannot be served as a URL — use lowercase latin letters, digits and hyphens ` +
+          `(for example public-offer).`,
       );
+    }
+    if ((RESERVED_SLUGS as readonly string[]).includes(p.slug)) {
+      fail(`LegalPage slug "${p.slug}" would shadow an existing route or build artifact — rename it.`);
+    }
+  }
+
+  // Which documents MUST exist is a separate question from which slugs are
+  // allowed: the booking flow links to the booking terms, so a release without
+  // them links nowhere. Everything else is the owner's call.
+  for (const requiredSlug of REQUIRED_LEGAL_SLUGS) {
+    if (!content.legalPages.some((p) => p.slug === requiredSlug)) {
+      fail(`Missing required legal page "${requiredSlug}" — the booking flow links to it.`);
     }
   }
 
@@ -93,25 +110,36 @@ async function main() {
     }
   }
 
-  // --- launchReady production gate (PRD 29, 49.1) -------------------------
+  // --- launchReady production gate ----------------------------------------
+  // A production release must never carry placeholder payment details: the
+  // demo QR sends real money to a test account and the demo phone reaches
+  // nobody. Every blocker is collected up front so the operator gets the whole
+  // list in one build rather than discovering them one failed build at a time.
+  const demoBlockers: string[] = [];
+  if (content.siteSettings.booking.isDemo) {
+    demoBlockers.push('siteSettings.booking is still marked "Демо-данные" (default QR / prepayment / organizer)');
+  }
+  if (content.siteSettings.company.isDemo) {
+    demoBlockers.push('siteSettings.company is still marked "Демо-данные" (legal name / ИНН / ОГРН / phone)');
+  }
+  for (const d of content.departures) {
+    if (d.isDemo) demoBlockers.push(`departure ${d.id} is still marked "Демо-данные"`);
+  }
+  for (const rv of content.reviews) {
+    if (rv.isDemo) demoBlockers.push(`review ${rv.id} is still marked "Демо-данные"`);
+  }
+  for (const o of content.organizers) {
+    if (o.isDemo) demoBlockers.push(`organizer ${o.id} is still marked "Демо-данные"`);
+  }
+  if (!PHONE_RE.test(content.siteSettings.company.phone)) {
+    demoBlockers.push(
+      `siteSettings.company.phone "${content.siteSettings.company.phone}" is not a valid +7XXXXXXXXXX number`,
+    );
+  }
+
   if (content.siteSettings.launchReady) {
-    if (content.siteSettings.booking.isDemo) {
-      fail("launchReady=true but siteSettings.booking.isDemo=true");
-    }
-    if (content.siteSettings.company.isDemo) {
-      fail("launchReady=true but siteSettings.company.isDemo=true");
-    }
-    for (const d of content.departures) {
-      if (d.isDemo) fail(`launchReady=true but departure ${d.id} has isDemo=true`);
-    }
-    for (const rv of content.reviews) {
-      if (rv.isDemo) fail(`launchReady=true but review ${rv.id} has isDemo=true`);
-    }
-    for (const o of content.organizers) {
-      if (o.isDemo) fail(`launchReady=true but organizer ${o.id} has isDemo=true`);
-    }
-    if (!PHONE_RE.test(content.siteSettings.company.phone)) {
-      fail(`launchReady=true but company phone is not a valid +7XXXXXXXXXX number`);
+    for (const blocker of demoBlockers) {
+      fail(`Production release blocked — ${blocker}. Replace it in Sanity Studio and republish.`);
     }
   } else if (isStaging) {
     warn(
@@ -119,8 +147,12 @@ async function main() {
     );
   } else {
     fail(
-      "siteSettings.launchReady=false — a production build (DEPLOY_ENV=production, the default) MUST NOT proceed until " +
-        "launchReady is set to true (PRD §29/§49). Set DEPLOY_ENV=staging for a demo/preview build instead.",
+      'Production release blocked — "Сайт готов к публичному запуску" (siteSettings.launchReady) is off, ' +
+        "so this content is still considered demo data. Turn it on in Sanity Studio once the real details are in place, " +
+        "or build with DEPLOY_ENV=staging for a demo/preview release." +
+        (demoBlockers.length > 0
+          ? `\n   Still to replace before it can be turned on:\n${demoBlockers.map((b) => `     - ${b}`).join("\n")}`
+          : ""),
     );
   }
 

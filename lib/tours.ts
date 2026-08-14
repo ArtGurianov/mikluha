@@ -201,9 +201,10 @@ export interface BookingDepartureInfo {
 /**
  * Contact-only — deliberately has no prepaymentAmount/qr fields. Without a
  * resolved OPEN departure there's nothing concrete to pay for, so the
- * booking modal must never show a QR/amount for an unspecified trip (PRD
- * §16/§6); making this type contact-only turns that into a structural
- * guarantee instead of a convention the modal has to uphold on its own.
+ * booking modal must never show a QR/amount for an unspecified trip — a
+ * visitor could otherwise transfer money against a departure that does not
+ * exist. Making this type contact-only turns that into a structural guarantee
+ * instead of a convention the modal has to uphold on its own.
  */
 export interface BookingFallback {
   organizerName?: string;

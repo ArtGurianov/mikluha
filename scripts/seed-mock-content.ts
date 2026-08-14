@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Idempotent dev-only import of the mock/demo content set (PRD section 34.1)
+ * Idempotent dev-only import of the mock/demo content set
  * into a REAL Sanity dataset, for testing the Studio + content model against
  * something other than production. NOT part of the production build pipeline
  * and NEVER runs automatically.

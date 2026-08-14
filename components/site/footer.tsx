@@ -12,8 +12,6 @@ export function Footer({
 }) {
   const { company, socials } = siteSettings;
   const year = new Date().getFullYear();
-  const bookingTerms = legalPages.find((p) => p.slug === "booking-terms");
-  const privacyPolicy = legalPages.find((p) => p.slug === "privacy-policy");
 
   return (
     <footer id="contacts" className="border-t border-border bg-secondary text-secondary-foreground">
@@ -56,16 +54,18 @@ export function Footer({
               Канал в MAX
             </a>
           )}
-          {bookingTerms && (
-            <Link href={`/${bookingTerms.slug}/`} className="text-secondary-foreground/90 underline-offset-4 hover:underline">
-              Условия бронирования
+          {/* Every legal page the CMS has, titled by the document — so a new
+              one (оферта, возврат, памятка) appears here on publish, with no
+              code change and no hardcoded label to fall out of sync. */}
+          {legalPages.map((page) => (
+            <Link
+              key={page.id}
+              href={`/${page.slug}/`}
+              className="text-secondary-foreground/90 underline-offset-4 hover:underline"
+            >
+              {page.title}
             </Link>
-          )}
-          {privacyPolicy && (
-            <Link href={`/${privacyPolicy.slug}/`} className="text-secondary-foreground/90 underline-offset-4 hover:underline">
-              Политика конфиденциальности
-            </Link>
-          )}
+          ))}
         </div>
       </div>
       <div className="border-t border-secondary-foreground/15 px-4 py-4 text-center text-xs text-secondary-foreground/70 sm:px-6">

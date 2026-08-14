@@ -17,7 +17,7 @@
 | `SANITY_PROJECT_ID`, `SANITY_DATASET` | какой Sanity-проект/датасет использовать |
 | `SANITY_API_TOKEN` | read-токен для build-time чтения published-контента |
 | `SANITY_API_VERSION` | версия Sanity API (см. `.env.example`) |
-| `DEPLOY_ENV` | `production` или `staging` — управляет индексируемостью (см. PRD §44) |
+| `DEPLOY_ENV` | `production` или `staging` — управляет индексируемостью |
 
 Если `SANITY_PROJECT_ID`/`SANITY_DATASET` не заданы, сборка идёт на локальных mock-данных из `lib/cms/fixtures/` — удобно для preview-сборок без доступа к реальному проекту.
 
@@ -47,7 +47,7 @@ pnpm run cms:types:check   # то же + падает, если закоммич
 optional — что именно означает отсутствующее поле, решает `lib/cms/normalize.ts`
 (см. `lib/cms/normalize.test.ts`).
 
-## Production build pipeline (PRD §34.2)
+## Production build pipeline
 
 ```bash
 pnpm run build:production
@@ -67,7 +67,7 @@ pnpm run build:production
 
 ## Плановый ежедневный rebuild
 
-`nextDeparture`/`nextBookableDeparture` вычисляются во время сборки (PRD §30) — без планового rebuild прошедшие даты не «протухнут» сами.
+`nextDeparture`/`nextBookableDeparture` вычисляются во время сборки — без планового rebuild прошедшие даты не «протухнут» сами.
 
 Пример host `cron`/systemd timer на VPS (не на самом сайте, credential не должен попадать в публичный образ):
 
@@ -82,9 +82,9 @@ pnpm run build:production
 
 Собирать с `DEPLOY_ENV=staging` — сайт получит `robots.txt: Disallow: /`, `noindex,nofollow` и canonical/OG-теги на нейтральном `https://staging.invalid` (или на `SITE_URL`, если задан), а не на боевом домене. Использовать отдельный Sanity dataset (`staging`) при необходимости.
 
-**Важно:** `pnpm run build:production` без `DEPLOY_ENV=staging` требует `siteSettings.launchReady = true` и упадёт с ошибкой на демо-контенте (это осознанный gate, PRD §29/§49 — «production build MUST блокироваться, если launchReady != true»). Локальные/preview-сборки на фикстурах или недоготовленном контенте всегда нужно гнать как `DEPLOY_ENV=staging pnpm run build:production`.
+**Важно:** `pnpm run build:production` без `DEPLOY_ENV=staging` требует `siteSettings.launchReady = true` и упадёт с ошибкой на демо-контенте — это осознанный gate (см. `docs/DECISIONS.md` #4): демо-QR отправляет реальные деньги на тестовый счёт, а демо-телефон никуда не дозванивается. Локальные/preview-сборки на фикстурах или недоготовленном контенте всегда нужно гнать как `DEPLOY_ENV=staging pnpm run build:production`.
 
-## Candidate HTTP healthcheck (PRD §34.3)
+## Candidate HTTP healthcheck
 
 После `build:production` и до переключения трафика — поднять candidate-контейнер и прогнать:
 
@@ -96,7 +96,7 @@ HEALTHCHECK_BASE_URL=http://localhost:8080 pnpm run healthcheck
 
 ## Pre-launch checklist
 
-См. PRD §54.1 — коротко: реальные реквизиты/контакты/QR, `isDemo=false` везде, `siteSettings.launchReady=true`, чистый `build:production` без ошибок валидации.
+Коротко: реальные реквизиты/контакты/QR, `isDemo=false` везде, `siteSettings.launchReady=true`, чистый `build:production` без ошибок валидации. Полный список для организатора — в `CONTENT-GUIDE.md`; `validate:content` сам перечислит всё, что осталось заменить.
 
 ## Ручной seed mock-данных (только для dev/staging датасета)
 

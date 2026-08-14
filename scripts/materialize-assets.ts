@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Step 2 of the production build pipeline (see PRD section 34.2 and 42).
+ * Step 2 of the production build pipeline.
  *
  * Reads .cms-cache/content.json (written by sync-sanity-content.ts, still
  * containing "unresolved" images as {alt, sourceRef}), downloads/reads each

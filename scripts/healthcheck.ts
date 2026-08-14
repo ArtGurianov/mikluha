@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Candidate HTTP healthcheck (PRD §34.3) — run against a running candidate
+ * Candidate HTTP healthcheck — run against a running candidate
  * container/server BEFORE it is allowed to become production. Distinct from
  * validate-static-export.ts, which inspects the /out files directly; this
  * script exercises the actual HTTP server (Nginx routing, 404 handling,

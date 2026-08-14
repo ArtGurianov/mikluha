@@ -5,7 +5,7 @@
  * the raw documents came from Sanity or from local fixtures.
  *
  * Deliberately NOT filtering on `isListed` here: it's a soft visibility flag
- * (PRD §23/§26/§27), not a publication state, and a hidden tour/departure may
+ *, not a publication state, and a hidden tour/departure may
  * still be legitimately referenced by a report/review that IS listed. All
  * public rendering call sites (lib/tours.ts, OrganizerSection, ...) already
  * filter on `isListed` themselves — filtering twice, once here and once

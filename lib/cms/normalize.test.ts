@@ -106,8 +106,8 @@ test("absent isListed/isDemo flags resolve conservatively", () => {
     "fixtures",
   );
 
-  // Only an explicit `true` publishes a document (PRD §30) or clears the
-  // launch gate (PRD §29) — an absent flag must never do either implicitly.
+  // Only an explicit `true` publishes a document or clears the launch gate —
+  // an absent flag must never do either implicitly. See DECISIONS.md #8.
   assert.equal(content.tours[0].isListed, false);
   assert.equal(content.siteSettings.launchReady, false);
 });

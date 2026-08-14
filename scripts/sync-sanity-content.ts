@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Step 1 of the production build pipeline (see PRD section 34.2).
+ * Step 1 of the production build pipeline.
  *
  * Fetches the published content set — from live Sanity if SANITY_PROJECT_ID /
  * SANITY_DATASET env vars are set, otherwise from the local fixtures in

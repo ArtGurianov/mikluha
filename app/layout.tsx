@@ -7,6 +7,7 @@ import { Footer } from "@/components/site/footer";
 import { Header } from "@/components/site/header";
 import { getContent } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
+import { getLegalPagesSorted } from "@/lib/legal";
 import { deployEnv, isStaging, resolveCanonicalBase } from "@/lib/site";
 import { getAllBookableDepartures, getBookingFallback, getTodayInTimezone } from "@/lib/tours";
 
@@ -41,7 +42,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   const content = getContent();
-  const { siteSettings, legalPages } = content;
+  const { siteSettings } = content;
+  const legalPages = getLegalPagesSorted(content);
   const today = getTodayInTimezone(siteSettings.timezone);
   const bookableDepartures = getAllBookableDepartures(content, today);
   const bookingFallback = getBookingFallback(content);

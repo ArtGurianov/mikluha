@@ -1,11 +1,25 @@
 import { defineField, defineType } from "sanity";
 
-// The Next.js app currently only has routes for these two pages
-// (app/booking-terms/, app/privacy-policy/) — see PRD §21.1. Any other slug
-// would publish successfully in Sanity but 404 on the site and fail the
-// production build's route-completeness check, so it's constrained here
-// instead of surfacing as a confusing build failure later.
-const ALLOWED_SLUGS = ["booking-terms", "privacy-policy"] as const;
+// Any slug is allowed — app/[legalSlug]/ generates a static route per document,
+// so the organizer can publish an offer, refund policy or traveller's memo
+// without a code release. Only two things are rejected: a slug the router
+// cannot serve, and one that would shadow an existing route or build artifact.
+// Kept in sync with lib/legal.ts, which is where the build-time check reads
+// them from (the Studio bundle cannot import from outside sanity/).
+const RESERVED_SLUGS = [
+  "tours",
+  "reports",
+  "_next",
+  "generated",
+  "api",
+  "index",
+  "404",
+  "robots.txt",
+  "sitemap.xml",
+  "icon.png",
+  "apple-icon.png",
+];
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const legalPage = defineType({
   name: "legalPage",
@@ -22,16 +36,25 @@ export const legalPage = defineType({
       name: "slug",
       title: "Адрес страницы (slug)",
       type: "slug",
-      description: "На сайте сейчас существуют только эти два маршрута — другой адрес не будет работать.",
+      description:
+        "Адрес страницы на сайте: например booking-terms → /booking-terms/. " +
+        "Только латиница в нижнем регистре, цифры и дефис. После публикации менять не рекомендуется — " +
+        "старый адрес перестанет открываться.",
       options: { source: "title", maxLength: 96 },
       validation: (rule) =>
         rule
           .required()
-          .custom((value) =>
-            value?.current && !(ALLOWED_SLUGS as readonly string[]).includes(value.current)
-              ? `Адрес должен быть одним из: ${ALLOWED_SLUGS.join(", ")}`
-              : true,
-          ),
+          .custom((value) => {
+            const slug = value?.current;
+            if (!slug) return true;
+            if (!SLUG_RE.test(slug)) {
+              return "Только латиница в нижнем регистре, цифры и дефис — например public-offer";
+            }
+            if (RESERVED_SLUGS.includes(slug)) {
+              return `Адрес «${slug}» занят разделом сайта — выберите другой`;
+            }
+            return true;
+          }),
     }),
     defineField({
       name: "content",

@@ -1,5 +1,5 @@
 /**
- * The CMS integration boundary (PRD §39).
+ * The CMS integration boundary.
  *
  * `Raw*` = what Sanity actually returns. These are NOT hand-written: they are
  * derived from lib/cms/generated/sanity.types.ts, which `npm run cms:types`

@@ -20,7 +20,7 @@ import type {
  * types (see ./types.ts) reflect that honestly, so everything a rendered page
  * genuinely cannot do without is asserted here — at the very start of the
  * build, with the offending document named, rather than as a `undefined is not
- * an object` somewhere inside a React tree (PRD §48).
+ * an object` somewhere inside a React tree.
  */
 function required<T>(value: T | undefined | null, what: string): T {
   if (value === undefined || value === null) {
@@ -54,9 +54,11 @@ function maybeImage(ref: RawImageRef | undefined): UnresolvedImageAsset | undefi
  * `isListed`/`isDemo`/`launchReady` are all optional booleans in the stored
  * document (their Studio `initialValue` is a create-time default, not a
  * guarantee). Both flags are resolved against their conservative reading:
- * only an explicit `true` publishes a document (PRD §30) or marks it as demo
- * content / launch-ready (PRD §29) — an absent flag never silently exposes
- * something or waves a build past the launch gate.
+ * only an explicit `true` publishes a document, marks it as demo content, or
+ * declares the site launch-ready. Public visibility fails closed: a document
+ * that lost the field to a schema migration, a bad import script or an API
+ * write is hidden rather than suddenly public, and a build never slips past
+ * the launch gate because a flag was missing rather than set.
  */
 function flag(value: boolean | undefined): boolean {
   return value === true;

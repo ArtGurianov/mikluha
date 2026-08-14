@@ -16,8 +16,9 @@ export function BookingModal() {
 
   // Without a resolved OPEN departure there is nothing concrete to pay for —
   // show contact info only, never a QR/prepayment amount for an unspecified
-  // trip (PRD §16: modal MUST know the selected Departure; §6: no payment CTA
-  // without a bookable departure).
+  // trip. A visitor who scans a QR here would be transferring money against a
+  // departure that has no date, no price and no organizer assigned to it.
+  // BookingFallback (lib/tours.ts) enforces this by carrying contacts only.
   const prepaymentAmount = selected?.prepaymentAmount;
   const qr = selected?.qr;
   const organizerName = selected?.organizerName ?? fallback.organizerName;

@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Step 5 of the production build pipeline (PRD section 34.3) — runs after
+ * Step 5 of the production build pipeline — runs after
  * `next build` against the generated /out directory, before it is allowed to
  * become the candidate for the HTTP healthcheck / production switch.
  */

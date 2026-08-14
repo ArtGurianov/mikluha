@@ -1,5 +1,5 @@
 /**
- * Custom next/image loader for static export (PRD §32/§42).
+ * Custom next/image loader for static export.
  *
  * Every CMS image URL in this app already points at one of five pre-generated
  * local variants — /generated/cms/<hash>/<thumbnail|card|gallery|hero|lightbox>.webp
