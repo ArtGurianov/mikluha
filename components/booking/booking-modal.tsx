@@ -55,6 +55,7 @@ export function BookingModal() {
                 alt={qr.alt || "QR-код для предоплаты"}
                 width={qr.width}
                 height={qr.height}
+                sizes="224px"
                 className="h-auto w-full"
               />
             </div>

@@ -16,8 +16,12 @@ RUN pnpm install --frozen-lockfile
 #
 # Sanity credentials are passed as build ARGs — they exist only in this
 # ephemeral build stage/layer and are never copied into the runtime image.
-# Omit them entirely to build against the committed lib/cms/fixtures mock
-# content instead of a live Sanity dataset.
+# Omitting them builds against the committed lib/cms/fixtures mock content
+# instead of a live Sanity dataset — but that content has launchReady=false,
+# so it also needs `--build-arg DEPLOY_ENV=staging` (the default below is
+# "production", which validate:content deliberately refuses to build from
+# demo content — PRD §29/§49). A real production image needs both real
+# Sanity credentials AND DEPLOY_ENV left at its "production" default.
 # ---------------------------------------------------------------------------
 FROM deps AS build
 WORKDIR /app

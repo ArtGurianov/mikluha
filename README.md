@@ -13,6 +13,8 @@ pnpm dev
 
 Без переменных `SANITY_PROJECT_ID`/`SANITY_DATASET` сборка и dev-сервер используют локальный mock-контент из `lib/cms/fixtures/` — реальный Sanity-проект для запуска не нужен. Чтобы подключить настоящий Sanity, см. `.env.example`.
 
+Этот mock-контент имеет `siteSettings.launchReady = false`, поэтому `pnpm run build:production` без `DEPLOY_ENV=staging` намеренно упадёт на шаге `validate:content` (production-релиз не может собираться из демо-данных — см. «Production build» ниже и `RUNBOOK.md`). Для `pnpm dev` это не проблема — `validate:content` в dev-путь не входит.
+
 ## Структура
 
 ```text
@@ -28,6 +30,8 @@ scripts/        build-time pipeline: sync-cms → materialize-assets → validat
 ```bash
 pnpm run build:production
 ```
+
+Требует `siteSettings.launchReady = true` (реальный контент из Sanity, не фикстуры). Для demo/preview-сборки без готового контента — `DEPLOY_ENV=staging pnpm run build:production`.
 
 Подробности пайплайна, деплой на Coolify/VPS и плановый rebuild — см. `RUNBOOK.md`.
 Памятка для организатора по работе с Sanity Studio — `CONTENT-GUIDE.md`.
