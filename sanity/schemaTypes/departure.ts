@@ -53,10 +53,24 @@ export const departure = defineType({
     }),
     defineField({
       name: "price",
-      title: "Полная стоимость, ₽",
+      title: "Стоимость поездки, ₽",
       type: "number",
       group: "booking",
-      description: "Опционально. Целое число рублей.",
+      description:
+        "Цена за одного человека, целое число рублей. Задаётся для каждого выезда отдельно — " +
+        "одно и то же направление в разные даты может стоить по-разному. Показывается крупно " +
+        "на карточке поездки. Обязательна, если набор открыт.",
+      validation: (rule) =>
+        rule
+          .integer()
+          .positive()
+          .custom((value, context) => {
+            const status = (context.document as { bookingStatus?: string } | undefined)?.bookingStatus;
+            if (status === "OPEN" && value === undefined) {
+              return "Укажите стоимость — выезд с открытым набором не может быть опубликован без цены";
+            }
+            return true;
+          }),
     }),
     defineField({
       name: "prepaymentAmount",

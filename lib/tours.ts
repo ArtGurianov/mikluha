@@ -181,6 +181,33 @@ export function getListedTours(content: ContentSnapshot): TourDTO[] {
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+/** A future departure together with the tour it belongs to — one card in the catalogue. */
+export interface UpcomingDeparture {
+  departure: DepartureDTO;
+  tour: TourDTO;
+}
+
+/**
+ * Every future departure of every listed tour, soonest first.
+ *
+ * The public catalogue lists departures rather than tours because price and
+ * status belong to a date, not to a destination: the same tour can run at
+ * 32 000 ₽ in September and 34 000 ₽ in October. CANCELLED ones are left out —
+ * they stay in the CMS for history and for the reports that link to them, but
+ * a cancelled trip is not something a visitor can join.
+ */
+export function getUpcomingDepartures(content: ContentSnapshot, today: string): UpcomingDeparture[] {
+  const tourById = new Map(getListedTours(content).map((t) => [t.id, t]));
+
+  return content.departures
+    .filter(
+      (d) => d.isListed && d.bookingStatus !== "CANCELLED" && d.startDate >= today && tourById.has(d.tourId),
+    )
+    .sort(sortByStartDateAsc)
+    .map((departure) => ({ departure, tour: tourById.get(departure.tourId)! }));
+}
+
+
 // ---------------------------------------------------------------------------
 // Data for the client-side Booking Modal (section 16-20): a small, serializable
 // slice of the content snapshot with the booking fallback chain already applied.

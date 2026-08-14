@@ -9,6 +9,7 @@ import { ReviewsSection } from "@/components/home/reviews-section";
 import { DepartureStatusBadge } from "@/components/site/departure-status-badge";
 import { PortableTextContent } from "@/components/site/portable-text";
 import { getContent } from "@/lib/cms/content";
+import { formatRub } from "@/lib/format";
 import { jsonLdScript } from "@/lib/json-ld";
 import {
   formatDepartureDateRange,
@@ -101,20 +102,41 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
           )}
         </div>
 
-        <aside className="h-fit space-y-4 rounded-xl border border-border bg-card p-6">
-          {nextDeparture ? (
-            <>
-              <p className="text-sm text-muted-foreground">Ближайший выезд</p>
-              <p className="font-heading text-lg font-semibold text-foreground">
-                {formatDepartureDateRange(nextDeparture.startDate, nextDeparture.endDate)}
+        <aside className="h-fit overflow-hidden rounded-xl border border-border bg-card">
+          <div className="space-y-4 p-6">
+            {nextDeparture ? (
+              <>
+                <p className="text-sm text-muted-foreground">Ближайший выезд</p>
+                <p className="font-heading text-lg font-semibold text-foreground">
+                  {formatDepartureDateRange(nextDeparture.startDate, nextDeparture.endDate)}
+                </p>
+                <p className="text-sm text-muted-foreground">{formatDurationLabel(nextDeparture.startDate, nextDeparture.endDate)}</p>
+                <DepartureStatusBadge status={nextDeparture.bookingStatus} />
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Дата следующего тура скоро появится</p>
+            )}
+          </div>
+
+          <div className="border-t border-border bg-muted/40 p-6">
+            {nextDeparture?.price !== undefined ? (
+              <p className="flex items-baseline gap-2">
+                <span className="font-heading text-3xl font-semibold tracking-tight text-foreground tabular-nums">
+                  {formatRub(nextDeparture.price)}
+                </span>
+                <span className="text-sm text-muted-foreground">за человека</span>
               </p>
-              <p className="text-sm text-muted-foreground">{formatDurationLabel(nextDeparture.startDate, nextDeparture.endDate)}</p>
-              <DepartureStatusBadge status={nextDeparture.bookingStatus} />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Дата следующего тура скоро появится</p>
-          )}
-          <BookingButton tourId={tour.id} className="w-full" />
+            ) : (
+              <p className="text-base font-medium text-muted-foreground">
+                {nextDeparture ? "Цену уточняйте у организатора" : "Цена станет известна вместе с датой"}
+              </p>
+            )}
+            <BookingButton
+              departureId={nextDeparture?.bookingStatus === "OPEN" ? nextDeparture.id : undefined}
+              tourId={tour.id}
+              className="mt-4 w-full"
+            />
+          </div>
         </aside>
       </div>
 

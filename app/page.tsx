@@ -5,7 +5,7 @@ import { ReportsSection } from "@/components/home/reports-section";
 import { ReviewsSection } from "@/components/home/reviews-section";
 import { ToursSection } from "@/components/home/tours-section";
 import { getContent } from "@/lib/cms/content";
-import { getAllReviewsSorted, getTodayInTimezone } from "@/lib/tours";
+import { getAllReviewsSorted, getListedTours, getTodayInTimezone, getUpcomingDepartures } from "@/lib/tours";
 
 export default function HomePage() {
   const content = getContent();
@@ -14,7 +14,8 @@ export default function HomePage() {
   return (
     <>
       <Hero siteSettings={content.siteSettings} />
-      <ToursSection content={content} today={today} />
+      {/* Client-side filtering, so it gets only the two slices it needs rather than the whole snapshot. */}
+      <ToursSection upcoming={getUpcomingDepartures(content, today)} tours={getListedTours(content)} />
       <ReportsSection content={content} />
       <OrganizerSection organizers={content.organizers} />
       <ReviewsSection reviews={getAllReviewsSorted(content)} />

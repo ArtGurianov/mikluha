@@ -97,6 +97,11 @@ async function main() {
   for (const d of content.departures) {
     if (d.bookingStatus !== "OPEN") continue;
     const resolved = resolveBookingDetails(content, d);
+    if (d.price === undefined) {
+      // Unlike the QR/prepayment/organizer below, price has no siteSettings
+      // fallback — it is per-date by definition, so nothing can stand in for it.
+      fail(`OPEN departure ${d.id} has no price — a departure open for booking must show what it costs`);
+    }
     if (resolved.prepaymentAmount === undefined) {
       fail(`OPEN departure ${d.id} has no prepaymentAmount, even after siteSettings fallback`);
     }

@@ -4,11 +4,17 @@ import * as React from "react";
 
 import type { BookingDepartureInfo, BookingFallback } from "./types";
 
+/** What the visitor clicked: a specific date, a tour in general, or nothing in particular. */
+export interface BookingTarget {
+  departureId?: string;
+  tourId?: string;
+}
+
 interface BookingContextValue {
   isOpen: boolean;
   selected: BookingDepartureInfo | null;
   fallback: BookingFallback;
-  open: (tourId?: string) => void;
+  open: (target?: BookingTarget) => void;
   close: () => void;
 }
 
@@ -27,10 +33,24 @@ export function BookingModalProvider({ children, departures, fallback }: Booking
   const [selected, setSelected] = React.useState<BookingDepartureInfo | null>(null);
 
   const open = React.useCallback(
-    (tourId?: string) => {
-      const pool = tourId ? departures.filter((d) => d.tourId === tourId) : departures;
-      const next = [...pool].sort((a, b) => a.startDate.localeCompare(b.startDate))[0] ?? null;
-      setSelected(next);
+    (target?: BookingTarget) => {
+      // A card for one specific date books that date. A generic CTA ("Забронировать"
+      // in the header, or on a tour page) has no date in mind, so it falls back to
+      // the soonest bookable departure — of that tour if one was named, otherwise
+      // of the whole site. A departureId that is not in `departures` means it is no
+      // longer OPEN, in which case the modal shows contacts only rather than a
+      // stale price.
+      const byId = target?.departureId
+        ? (departures.find((d) => d.id === target.departureId) ?? null)
+        : null;
+      if (byId) {
+        setSelected(byId);
+        setIsOpen(true);
+        return;
+      }
+
+      const pool = target?.tourId ? departures.filter((d) => d.tourId === target.tourId) : departures;
+      setSelected([...pool].sort((a, b) => a.startDate.localeCompare(b.startDate))[0] ?? null);
       setIsOpen(true);
     },
     [departures],
