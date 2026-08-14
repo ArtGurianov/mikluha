@@ -23,7 +23,8 @@ import type { RawDocument, RawImageRef } from "../lib/cms/types";
 const ALLOW_PRODUCTION = process.argv.includes("--allow-production");
 const LOCAL_REF_PREFIX = "local:";
 
-function isImageRef(node: unknown): node is RawImageRef {
+/** Narrows to an image that actually carries an asset ref — the only kind this script rewrites. */
+function isImageRef(node: unknown): node is RawImageRef & { asset: { _ref: string } } {
   return (
     !!node &&
     typeof node === "object" &&

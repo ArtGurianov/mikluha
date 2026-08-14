@@ -21,6 +21,7 @@ pnpm dev
 app/            Next.js App Router (страницы, layout, robots/sitemap)
 components/     UI-компоненты (components/ui — shadcn/ui примитивы)
 lib/            бизнес-логика, CMS-адаптер (lib/cms), фикстуры моков
+                lib/cms/generated/ — типы из Sanity TypeGen, руками не редактируются
 sanity/         Sanity Studio: схемы, структура, конфиг (не отдельный пакет)
 scripts/        build-time pipeline: sync-cms → materialize-assets → validate → validate:out
 ```

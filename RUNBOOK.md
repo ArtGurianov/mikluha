@@ -28,12 +28,35 @@ pnpm install
 pnpm dev   # predev сам прогонит sync:cms + materialize:assets на фикстурах
 ```
 
+## Типы контента (Sanity TypeGen)
+
+`lib/cms/generated/sanity.types.ts` генерируется из `sanity/schemaTypes/*` и GROQ-запросов
+в `lib/cms/queries.ts`. Файл **закоммичен** — изменение схемы должно быть видно в diff как
+изменение контентного контракта. Руками его не редактируют.
+
+```bash
+pnpm run cms:types         # перегенерировать после правки схемы или запроса
+pnpm run cms:types:check   # то же + падает, если закоммиченный файл устарел
+```
+
+Каждый запрос обязан быть обёрнут в `defineQuery` — TypeGen ищет именно их и, кроме типов
+результата, генерирует module augmentation, благодаря которому `client.fetch(query)`
+типизируется по реальной схеме (без неё он возвращает `any`, и расхождение схемы с кодом
+проходит незамеченным). Извлечение схемы идёт с `--enforce-required-fields`, но Sanity не
+хранит `validation`-правила в документах, поэтому большая часть полей всё равно приходит
+optional — что именно означает отсутствующее поле, решает `lib/cms/normalize.ts`
+(см. `lib/cms/normalize.test.ts`).
+
 ## Production build pipeline (PRD §34.2)
 
 ```bash
 pnpm run build:production
-# = clean && sync:cms && materialize:assets && validate:content && build && validate:out
+# = clean && cms:types && lint && test && sync:cms && materialize:assets
+#   && validate:content && build && validate:out
 ```
+
+`cms:types` идёт первым шагом: сборка всегда компилируется против актуальной схемы, а не
+против того, что было закоммичено. Сеть для этого шага не нужна — схема читается локально.
 
 Любая ошибка на любом шаге должна ломать именно этот build, не трогая уже работающий production-релиз — это обеспечивается тем, что Docker build стадии независимы, и `docker build` просто падает, не подменяя текущий запущенный container.
 

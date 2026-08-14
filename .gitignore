@@ -27,6 +27,11 @@
 /app/apple-icon.png
 /sanity-studio-out/
 
+# Intermediate artifact of `sanity schema extract` (npm run cms:types). The
+# generated types it feeds — lib/cms/generated/sanity.types.ts — ARE committed,
+# so schema changes show up as a reviewable diff of the content contract.
+/sanity/schema.json
+
 # misc
 .DS_Store
 *.pem

@@ -1,139 +1,56 @@
 /**
- * Shapes shared between the build-time Sanity adapter (scripts/sync-sanity-content.mjs)
- * and the Next.js app. Raw* types mirror what GROQ returns (and what the local
- * fixtures in lib/cms/fixtures/*.json are written to match); normalized DTOs are
- * what pages/components actually consume, with assets resolved to local paths.
+ * The CMS integration boundary (PRD §39).
+ *
+ * `Raw*` = what Sanity actually returns. These are NOT hand-written: they are
+ * derived from lib/cms/generated/sanity.types.ts, which `npm run cms:types`
+ * generates from sanity/schemaTypes/* plus the GROQ queries in ./queries.ts.
+ * Hand-writing them let the schema and the types drift apart silently (a
+ * `report.gallery` typed as required while the schema allowed it missing), and
+ * `client.fetch()` on an unbranded query string returns `any`, so nothing
+ * caught it. Regenerate instead of editing.
+ *
+ * `*DTO` = the internal, CMS-agnostic shapes the app renders, with assets
+ * resolved to local paths. These stay hand-written on purpose: they are the
+ * seam that lets the CMS be replaced without touching UI components.
+ *
+ * Raw -> DTO conversion (and every optional-field decision it implies) lives
+ * in ./normalize.ts.
  */
+import type {
+  DeparturesQueryResult,
+  LegalPagesQueryResult,
+  OrganizersQueryResult,
+  ReportsQueryResult,
+  ReviewsQueryResult,
+  SiteSettingsQueryResult,
+  ToursQueryResult,
+} from "./generated/sanity.types";
 
 export type BookingStatus = "OPEN" | "CLOSED" | "CANCELLED";
-
-export interface SanitySlug {
-  current: string;
-}
-
-export interface SanityReference {
-  _ref: string;
-  _type: "reference";
-}
 
 /** Portable Text content. Treated opaquely and rendered via @portabletext/react. */
 export type PortableTextBlocks = Record<string, unknown>[];
 
+/**
+ * Structural view of a Sanity image field. `asset` is optional in the generated
+ * types for every image in the schema — an image object can exist with only its
+ * `alt`/hotspot filled in, or with a since-deleted asset — and only some image
+ * fields declare an `alt` at all. normalize.ts is what resolves both cases.
+ */
 export interface RawImageRef {
   _type: "image";
-  asset: { _ref: string; _type: "reference" };
+  asset?: { _ref: string; _type?: "reference" };
   alt?: string;
 }
 
-export interface RawSeo {
-  title?: string;
-  description?: string;
-  image?: RawImageRef;
-}
-
-export interface RawTour {
-  _id: string;
-  _type: "tour";
-  title: string;
-  slug: SanitySlug;
-  shortDescription: string;
-  description?: PortableTextBlocks;
-  coverImage: RawImageRef;
-  gallery?: RawImageRef[];
-  isListed: boolean;
-  sortOrder?: number;
-  seo?: RawSeo;
-}
-
-export interface RawDeparture {
-  _id: string;
-  _type: "departure";
-  tour: SanityReference;
-  startDate: string;
-  endDate: string;
-  bookingStatus: BookingStatus;
-  price?: number;
-  prepaymentAmount?: number;
-  paymentQr?: RawImageRef;
-  organizers?: SanityReference[];
-  isListed: boolean;
-  isDemo: boolean;
-}
-
-export interface RawReport {
-  _id: string;
-  _type: "report";
-  title: string;
-  slug: SanitySlug;
-  tour: SanityReference;
-  departure?: SanityReference;
-  date?: string;
-  coverImage: RawImageRef;
-  /** Sanity's `min(1)` validator is a Studio-only affordance, not a data-layer guarantee — treat as optional. */
-  gallery?: RawImageRef[];
-  description?: string;
-  sortOrder?: number;
-}
-
-export interface RawReview {
-  _id: string;
-  _type: "review";
-  image: RawImageRef;
-  authorName?: string;
-  tour?: SanityReference;
-  description?: string;
-  sortOrder?: number;
-  isListed: boolean;
-  isDemo: boolean;
-}
-
-export interface RawOrganizer {
-  _id: string;
-  _type: "organizer";
-  name: string;
-  phone: string;
-  photo?: RawImageRef;
-  bio?: string;
-  isListed: boolean;
-  isDemo: boolean;
-}
-
-export interface RawLegalPage {
-  _id: string;
-  _type: "legalPage";
-  title: string;
-  slug: SanitySlug;
-  content: PortableTextBlocks;
-  updatedAt?: string;
-}
-
-export interface RawSiteSettings {
-  _id: "siteSettings";
-  _type: "siteSettings";
-  siteName: string;
-  siteUrl: string;
-  timezone: string;
-  logo?: RawImageRef;
-  favicon?: RawImageRef;
-  hero: { title: string; subtitle?: string; image: RawImageRef };
-  booking: {
-    defaultQr?: RawImageRef;
-    defaultPrepaymentAmount?: number;
-    defaultOrganizer?: SanityReference;
-    isDemo: boolean;
-  };
-  socials?: { maxChannelUrl?: string };
-  company: {
-    legalName: string;
-    inn: string;
-    ogrn: string;
-    phone: string;
-    email?: string;
-    isDemo: boolean;
-  };
-  seo: { title: string; description: string; ogImage?: RawImageRef };
-  launchReady: boolean;
-}
+export type RawTour = ToursQueryResult[number];
+export type RawDeparture = DeparturesQueryResult[number];
+export type RawReport = ReportsQueryResult[number];
+export type RawReview = ReviewsQueryResult[number];
+export type RawOrganizer = OrganizersQueryResult[number];
+export type RawLegalPage = LegalPagesQueryResult[number];
+/** The query is `[0]`-indexed, so it is nullable; sync-sanity-content.ts fails the build on a missing singleton. */
+export type RawSiteSettings = NonNullable<SiteSettingsQueryResult>;
 
 export type RawDocument =
   | RawTour
