@@ -1,0 +1,86 @@
+[
+  {
+    "_id": "report-altai-june-2026",
+    "_type": "report",
+    "title": "Поход на Алтай — июнь 2026",
+    "slug": { "current": "altai-june-2026" },
+    "tour": { "_ref": "tour-altai", "_type": "reference" },
+    "departure": { "_ref": "departure-altai-2026-06", "_type": "reference" },
+    "coverImage": {
+      "_type": "image",
+      "asset": { "_ref": "local:report-altai-cover.jpg", "_type": "reference" },
+      "alt": "Группа на маршруте по Алтаю, июнь 2026"
+    },
+    "gallery": [
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-altai-1.jpg", "_type": "reference" },
+        "alt": "Утро в лагере на Алтае"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-altai-2.jpg", "_type": "reference" },
+        "alt": "Переход через горную реку"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-altai-3.jpg", "_type": "reference" },
+        "alt": "Вид с перевала"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-altai-4.jpg", "_type": "reference" },
+        "alt": "Костёр вечером"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-altai-5.jpg", "_type": "reference" },
+        "alt": "Групповое фото на фоне вершин"
+      }
+    ],
+    "description": "Пять дней, три перевала и одна большая гроза, которую пережидали в лагере с чаем. Дошли все — маршрут получился именно таким, каким задумывался.",
+    "sortOrder": 10
+  },
+  {
+    "_id": "report-stolby-july-2026",
+    "_type": "report",
+    "title": "Столбы — июль 2026",
+    "slug": { "current": "stolby-july-2026" },
+    "tour": { "_ref": "tour-stolby", "_type": "reference" },
+    "departure": { "_ref": "departure-stolby-2026-07", "_type": "reference" },
+    "coverImage": {
+      "_type": "image",
+      "asset": { "_ref": "local:report-stolby-cover.jpg", "_type": "reference" },
+      "alt": "Группа у скальных останцов, июль 2026"
+    },
+    "gallery": [
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-stolby-1.jpg", "_type": "reference" },
+        "alt": "Тропа к останцам"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-stolby-2.jpg", "_type": "reference" },
+        "alt": "Вид на Енисей"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-stolby-3.jpg", "_type": "reference" },
+        "alt": "Лагерь в тайге"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-stolby-4.jpg", "_type": "reference" },
+        "alt": "Свободное лазание по скале"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:report-stolby-5.jpg", "_type": "reference" },
+        "alt": "Закат над тайгой"
+      }
+    ],
+    "description": "Компактный выезд выходного дня: успели и на скалы залезть, и у костра посидеть, и домой вернуться отдохнувшими, а не вымотанными.",
+    "sortOrder": 20
+  }
+]

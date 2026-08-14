@@ -1,0 +1,144 @@
+[
+  {
+    "_id": "tour-altai",
+    "_type": "tour",
+    "title": "Горный Алтай",
+    "slug": { "current": "altai" },
+    "shortDescription": "Пешие маршруты среди снежных вершин, альпийских лугов и бирюзовых рек — небольшой группой, с ночёвками в палатках у костра.",
+    "description": [
+      {
+        "_type": "block",
+        "_key": "a1",
+        "style": "normal",
+        "children": [
+          {
+            "_type": "span",
+            "_key": "a1s1",
+            "text": "Горный Алтай — один из самых атмосферных регионов России для пешего похода: ледники, кедровые леса, перевалы и деревни, где время идёт медленнее. Маршрут проходит без гонки за километражем — мы идём в комфортном темпе, чтобы у каждого было время осмотреться."
+          }
+        ]
+      },
+      {
+        "_type": "block",
+        "_key": "a2",
+        "style": "normal",
+        "children": [
+          {
+            "_type": "span",
+            "_key": "a2s1",
+            "text": "Группа — до 10-12 человек. Ночуем в палатках, готовим на костре, вместе разбираем и собираем лагерь. Опыт похода не обязателен, важна только базовая физическая подготовка."
+          }
+        ]
+      }
+    ],
+    "coverImage": {
+      "_type": "image",
+      "asset": { "_ref": "local:altai-cover.jpg", "_type": "reference" },
+      "alt": "Горные вершины Алтая на закате"
+    },
+    "gallery": [
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:altai-gallery-1.jpg", "_type": "reference" },
+        "alt": "Тропа среди альпийских лугов Алтая"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:altai-gallery-2.jpg", "_type": "reference" },
+        "alt": "Бирюзовое озеро в горах Алтая"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:altai-gallery-3.jpg", "_type": "reference" },
+        "alt": "Группа туристов на перевале"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:altai-gallery-4.jpg", "_type": "reference" },
+        "alt": "Лагерь у реки на Алтае"
+      }
+    ],
+    "isListed": true,
+    "sortOrder": 10,
+    "seo": {
+      "title": "Горный Алтай — походы небольшими группами",
+      "description": "Пешие походы на Горный Алтай: даты выездов, статус набора и фотоотчёты прошлых поездок.",
+      "image": {
+        "_type": "image",
+        "asset": { "_ref": "local:altai-cover.jpg", "_type": "reference" },
+        "alt": "Горный Алтай"
+      }
+    }
+  },
+  {
+    "_id": "tour-stolby",
+    "_type": "tour",
+    "title": "Красноярские Столбы",
+    "slug": { "current": "krasnoyarsk-stolby" },
+    "shortDescription": "Скальные останцы, тайга и виды на Енисей в пешей доступности от города — короткий, но насыщенный выезд выходного дня.",
+    "description": [
+      {
+        "_type": "block",
+        "_key": "s1",
+        "style": "normal",
+        "children": [
+          {
+            "_type": "span",
+            "_key": "s1s1",
+            "text": "«Столбы» — заповедник в тайге под Красноярском со скальными столбами причудливых форм. Формат короче алтайского: идеально, если хочется быстро выбраться из города без долгого отпуска."
+          }
+        ]
+      },
+      {
+        "_type": "block",
+        "_key": "s2",
+        "style": "normal",
+        "children": [
+          {
+            "_type": "span",
+            "_key": "s2s1",
+            "text": "Ночуем в оборудованном лагере, днём — треккинг по тропам заповедника и свободное лазание по нижним скалам для желающих."
+          }
+        ]
+      }
+    ],
+    "coverImage": {
+      "_type": "image",
+      "asset": { "_ref": "local:stolby-cover.jpg", "_type": "reference" },
+      "alt": "Скальные столбы в тайге под Красноярском"
+    },
+    "gallery": [
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:stolby-gallery-1.jpg", "_type": "reference" },
+        "alt": "Тропа заповедника Красноярские Столбы"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:stolby-gallery-2.jpg", "_type": "reference" },
+        "alt": "Вид на Енисей со скалы"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:stolby-gallery-3.jpg", "_type": "reference" },
+        "alt": "Лагерь в тайге"
+      },
+      {
+        "_type": "image",
+        "asset": { "_ref": "local:stolby-gallery-4.jpg", "_type": "reference" },
+        "alt": "Группа на скальном останце"
+      }
+    ],
+    "isListed": true,
+    "sortOrder": 20,
+    "seo": {
+      "title": "Красноярские Столбы — выезд выходного дня",
+      "description": "Короткий пеший выезд к скальным останцам заповедника «Красноярские Столбы»: даты, статус набора, фотоотчёты.",
+      "image": {
+        "_type": "image",
+        "asset": { "_ref": "local:stolby-cover.jpg", "_type": "reference" },
+        "alt": "Красноярские Столбы"
+      }
+    }
+  }
+]

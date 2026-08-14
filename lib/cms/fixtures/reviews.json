@@ -1,0 +1,70 @@
+[
+  {
+    "_id": "review-1",
+    "_type": "review",
+    "image": {
+      "_type": "image",
+      "asset": { "_ref": "local:review-1.jpg", "_type": "reference" },
+      "alt": "Скриншот отзыва об алтайском походе"
+    },
+    "authorName": "Марина",
+    "tour": { "_ref": "tour-altai", "_type": "reference" },
+    "sortOrder": 10,
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "review-2",
+    "_type": "review",
+    "image": {
+      "_type": "image",
+      "asset": { "_ref": "local:review-2.jpg", "_type": "reference" },
+      "alt": "Скриншот переписки с клиентом"
+    },
+    "tour": { "_ref": "tour-stolby", "_type": "reference" },
+    "sortOrder": 20,
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "review-3",
+    "_type": "review",
+    "image": {
+      "_type": "image",
+      "asset": { "_ref": "local:review-3.jpg", "_type": "reference" },
+      "alt": "Скриншот отзыва о поездке"
+    },
+    "authorName": "Дмитрий",
+    "tour": { "_ref": "tour-altai", "_type": "reference" },
+    "sortOrder": 30,
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "review-4",
+    "_type": "review",
+    "image": {
+      "_type": "image",
+      "asset": { "_ref": "local:review-4.jpg", "_type": "reference" },
+      "alt": "Скриншот отзыва о выезде на Столбы"
+    },
+    "authorName": "Ольга",
+    "tour": { "_ref": "tour-stolby", "_type": "reference" },
+    "sortOrder": 40,
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "review-5",
+    "_type": "review",
+    "image": {
+      "_type": "image",
+      "asset": { "_ref": "local:review-5.jpg", "_type": "reference" },
+      "alt": "Скриншот благодарности от участника"
+    },
+    "authorName": "Игорь",
+    "sortOrder": 50,
+    "isListed": true,
+    "isDemo": true
+  }
+]

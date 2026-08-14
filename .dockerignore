@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+.cms-cache
+public/generated/cms
+app/icon.png
+app/apple-icon.png
+sanity-studio-out
+.git
+.env*
+!.env.example
+*.log
+.DS_Store

@@ -1,0 +1,88 @@
+[
+  {
+    "_id": "departure-altai-2026-06",
+    "_type": "departure",
+    "tour": { "_ref": "tour-altai", "_type": "reference" },
+    "startDate": "2026-06-15",
+    "endDate": "2026-06-19",
+    "bookingStatus": "CLOSED",
+    "price": 32000,
+    "prepaymentAmount": 5000,
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "departure-altai-2026-08-cancelled",
+    "_type": "departure",
+    "tour": { "_ref": "tour-altai", "_type": "reference" },
+    "startDate": "2026-08-20",
+    "endDate": "2026-08-24",
+    "bookingStatus": "CANCELLED",
+    "price": 32000,
+    "prepaymentAmount": 5000,
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "departure-altai-2026-09",
+    "_type": "departure",
+    "tour": { "_ref": "tour-altai", "_type": "reference" },
+    "startDate": "2026-09-12",
+    "endDate": "2026-09-16",
+    "bookingStatus": "OPEN",
+    "price": 34000,
+    "prepaymentAmount": 5000,
+    "organizers": [{ "_ref": "organizer-alexey", "_type": "reference" }],
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "departure-altai-2026-10",
+    "_type": "departure",
+    "tour": { "_ref": "tour-altai", "_type": "reference" },
+    "startDate": "2026-10-10",
+    "endDate": "2026-10-14",
+    "bookingStatus": "OPEN",
+    "price": 34000,
+    "prepaymentAmount": 5000,
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "departure-stolby-2026-07",
+    "_type": "departure",
+    "tour": { "_ref": "tour-stolby", "_type": "reference" },
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-03",
+    "bookingStatus": "CLOSED",
+    "price": 14000,
+    "prepaymentAmount": 3000,
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "departure-stolby-2026-08",
+    "_type": "departure",
+    "tour": { "_ref": "tour-stolby", "_type": "reference" },
+    "startDate": "2026-08-28",
+    "endDate": "2026-08-30",
+    "bookingStatus": "CLOSED",
+    "price": 14000,
+    "prepaymentAmount": 3000,
+    "isListed": true,
+    "isDemo": true
+  },
+  {
+    "_id": "departure-stolby-2026-09",
+    "_type": "departure",
+    "tour": { "_ref": "tour-stolby", "_type": "reference" },
+    "startDate": "2026-09-25",
+    "endDate": "2026-09-27",
+    "bookingStatus": "OPEN",
+    "price": 15000,
+    "prepaymentAmount": 3000,
+    "organizers": [{ "_ref": "organizer-alexey", "_type": "reference" }],
+    "isListed": true,
+    "isDemo": true
+  }
+]
