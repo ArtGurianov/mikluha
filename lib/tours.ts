@@ -105,7 +105,9 @@ export function formatDepartureDateRange(startDate: string, endDate: string): st
   const end = new Date(`${endDate}T00:00:00Z`);
 
   const dayFormatter = new Intl.DateTimeFormat("ru-RU", { day: "numeric", timeZone: "UTC" });
-  const monthFormatter = new Intl.DateTimeFormat("ru-RU", { month: "long", timeZone: "UTC" });
+  // day+month (no year) keeps the genitive month form ("30 августа"), unlike
+  // a month-only formatter which returns the nominative ("август").
+  const dayMonthFormatter = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", timeZone: "UTC" });
   const fullFormatter = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
   const sameMonth = start.getUTCMonth() === end.getUTCMonth() && start.getUTCFullYear() === end.getUTCFullYear();
@@ -115,7 +117,7 @@ export function formatDepartureDateRange(startDate: string, endDate: string): st
     return `${dayFormatter.format(start)}–${fullFormatter.format(end)}`;
   }
   if (sameYear) {
-    return `${dayFormatter.format(start)} ${monthFormatter.format(start)} — ${fullFormatter.format(end)}`;
+    return `${dayMonthFormatter.format(start)} — ${fullFormatter.format(end)}`;
   }
   return `${fullFormatter.format(start)} — ${fullFormatter.format(end)}`;
 }

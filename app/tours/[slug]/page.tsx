@@ -9,6 +9,7 @@ import { ReviewsSection } from "@/components/home/reviews-section";
 import { DepartureStatusBadge } from "@/components/site/departure-status-badge";
 import { PortableTextContent } from "@/components/site/portable-text";
 import { getContent } from "@/lib/cms/content";
+import { jsonLdScript } from "@/lib/json-ld";
 import {
   formatDepartureDateRange,
   formatDurationLabel,
@@ -76,12 +77,12 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
       {eventJsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdScript(eventJsonLd) }}
         />
       )}
 
       <div className="relative flex h-[55vh] min-h-96 items-end text-white">
-        <Image src={tour.coverImage.variants.hero} alt={tour.coverImage.alt} fill priority className="object-cover" />
+        <Image src={tour.coverImage.variants.hero} alt={tour.coverImage.alt} fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
         <h1 className="font-heading relative z-10 mx-auto w-full max-w-6xl px-4 pb-10 text-4xl font-semibold sm:px-6 sm:text-5xl">
           {tour.title}

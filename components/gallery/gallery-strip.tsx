@@ -29,6 +29,9 @@ export function GalleryStrip({ images, onSelect, className }: GalleryStripProps)
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     const track = trackRef.current;
     if (!track) return;
+    // Keep receiving move/up events for this pointer even if it leaves the
+    // track bounds mid-drag (fast mouse movement, etc).
+    track.setPointerCapture(event.pointerId);
     dragState.current = { startX: event.clientX, scrollLeft: track.scrollLeft, dragging: true, moved: false };
   }
 
@@ -53,7 +56,7 @@ export function GalleryStrip({ images, onSelect, className }: GalleryStripProps)
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
-        onPointerLeave={endDrag}
+        onPointerCancel={endDrag}
       >
         {images.map((image, index) => (
           <button

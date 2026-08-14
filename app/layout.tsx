@@ -6,7 +6,8 @@ import { BookingModalProvider } from "@/components/booking/booking-provider";
 import { Footer } from "@/components/site/footer";
 import { Header } from "@/components/site/header";
 import { getContent } from "@/lib/cms/content";
-import { deployEnv, isStaging } from "@/lib/site";
+import { jsonLdScript } from "@/lib/json-ld";
+import { deployEnv, isStaging, resolveCanonicalBase } from "@/lib/site";
 import { getAllBookableDepartures, getBookingFallback, getTodayInTimezone } from "@/lib/tours";
 
 import "./globals.css";
@@ -21,9 +22,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const canonicalCoverImage = siteSettings.seo.ogImage?.variants.hero ?? tours[0]?.coverImage.variants.hero;
 
   return {
-    metadataBase: new URL(siteSettings.siteUrl),
+    metadataBase: new URL(resolveCanonicalBase(siteSettings.siteUrl)),
     title: { default: siteSettings.seo.title, template: `%s — ${siteSettings.siteName}` },
     description: siteSettings.seo.description,
+    alternates: { canonical: "/" },
     robots: isStaging ? { index: false, follow: false } : { index: true, follow: true },
     openGraph: {
       title: siteSettings.seo.title,
@@ -44,12 +46,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   const bookableDepartures = getAllBookableDepartures(content, today);
   const bookingFallback = getBookingFallback(content);
 
+  const canonicalBase = resolveCanonicalBase(siteSettings.siteUrl);
   const organizationJsonLd = {
     "@context": "https://schema.org",
     "@type": "TravelAgency",
     name: siteSettings.siteName,
-    url: siteSettings.siteUrl,
-    ...(siteSettings.logo ? { logo: `${siteSettings.siteUrl}${siteSettings.logo.variants.card}` } : {}),
+    url: canonicalBase,
+    ...(siteSettings.logo ? { logo: `${canonicalBase}${siteSettings.logo.variants.card}` } : {}),
     telephone: siteSettings.company.phone,
     ...(siteSettings.company.email ? { email: siteSettings.company.email } : {}),
   };
@@ -59,7 +62,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col font-sans">
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdScript(organizationJsonLd) }}
         />
         <BookingModalProvider departures={bookableDepartures} fallback={bookingFallback}>
           <Header siteSettings={siteSettings} />

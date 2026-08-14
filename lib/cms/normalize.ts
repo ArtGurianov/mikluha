@@ -66,7 +66,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "sanity" | "fixt
       departureId: r.departure?._ref,
       date: linkedDeparture?.startDate ?? r.date,
       coverImage: image(r.coverImage),
-      gallery: r.gallery.map(image),
+      gallery: (r.gallery ?? []).map(image),
       description: r.description,
       sortOrder: r.sortOrder ?? 0,
     };

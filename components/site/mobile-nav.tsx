@@ -2,22 +2,19 @@
 
 import { Menu } from "lucide-react";
 import Link from "next/link";
-import * as React from "react";
 
 import { BookingButton } from "@/components/booking/booking-button";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 import { navLinks } from "./nav-links";
 
 export function MobileNav() {
-  const [open, setOpen] = React.useState(false);
-
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <Button variant="ghost" size="icon" className="md:hidden" aria-label="Открыть меню" onClick={() => setOpen(true)}>
+    <Sheet>
+      <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Открыть меню" />}>
         <Menu />
-      </Button>
+      </SheetTrigger>
       <SheetContent side="right" className="w-3/4 max-w-xs">
         <SheetHeader>
           <SheetTitle>Меню</SheetTitle>

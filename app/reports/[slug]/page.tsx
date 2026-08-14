@@ -51,13 +51,15 @@ export default async function ReportPage(props: PageProps<"/reports/[slug]">) {
   return (
     <article>
       <div className="relative flex h-[45vh] min-h-80 items-end text-white">
-        <Image src={report.coverImage.variants.hero} alt={report.coverImage.alt} fill priority className="object-cover" />
+        <Image src={report.coverImage.variants.hero} alt={report.coverImage.alt} fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
         <div className="relative z-10 mx-auto w-full max-w-4xl space-y-1 px-4 pb-10 sm:px-6">
-          {tour && (
+          {tour && tour.isListed ? (
             <Link href={`/tours/${tour.slug}/`} className="text-sm font-medium tracking-wide text-white/80 uppercase hover:underline">
               {tour.title}
             </Link>
+          ) : (
+            tour && <p className="text-sm font-medium tracking-wide text-white/80 uppercase">{tour.title}</p>
           )}
           {report.date && <p className="text-sm text-white/70">{formatSingleDate(report.date)}</p>}
           <h1 className="font-heading text-3xl font-semibold sm:text-4xl">{report.title}</h1>

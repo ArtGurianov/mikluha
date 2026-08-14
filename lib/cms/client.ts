@@ -1,4 +1,5 @@
 import { createClient, type SanityClient } from "@sanity/client";
+import { createImageUrlBuilder } from "@sanity/image-url";
 
 export interface SanityEnv {
   projectId: string;
@@ -32,12 +33,8 @@ export function createSanityContentClient(env: SanityEnv): SanityClient {
   });
 }
 
+/** Original (unresized) source asset URL — materialize-assets.ts downloads once and resizes locally itself. */
 export function sanityImageUrl(env: SanityEnv, assetRef: string): string {
-  // asset _ref format: image-<id>-<width>x<height>-<format>
-  const match = /^image-([a-zA-Z0-9]+)-(\d+)x(\d+)-(\w+)$/.exec(assetRef);
-  if (!match) {
-    throw new Error(`Unrecognized Sanity image asset ref: ${assetRef}`);
-  }
-  const [, id, , , format] = match;
-  return `https://cdn.sanity.io/images/${env.projectId}/${env.dataset}/${id}.${format}`;
+  const builder = createImageUrlBuilder({ projectId: env.projectId, dataset: env.dataset });
+  return builder.image({ asset: { _ref: assetRef } }).url();
 }

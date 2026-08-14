@@ -57,7 +57,19 @@ pnpm run build:production
 
 ## Staging
 
-Собирать с `DEPLOY_ENV=staging` — сайт получит `robots.txt: Disallow: /` и `noindex,nofollow`. Использовать отдельный Sanity dataset (`staging`) при необходимости.
+Собирать с `DEPLOY_ENV=staging` — сайт получит `robots.txt: Disallow: /`, `noindex,nofollow` и canonical/OG-теги на нейтральном `https://staging.invalid` (или на `SITE_URL`, если задан), а не на боевом домене. Использовать отдельный Sanity dataset (`staging`) при необходимости.
+
+**Важно:** `pnpm run build:production` без `DEPLOY_ENV=staging` требует `siteSettings.launchReady = true` и упадёт с ошибкой на демо-контенте (это осознанный gate, PRD §29/§49 — «production build MUST блокироваться, если launchReady != true»). Локальные/preview-сборки на фикстурах или недоготовленном контенте всегда нужно гнать как `DEPLOY_ENV=staging pnpm run build:production`.
+
+## Candidate HTTP healthcheck (PRD §34.3)
+
+После `build:production` и до переключения трафика — поднять candidate-контейнер и прогнать:
+
+```bash
+HEALTHCHECK_BASE_URL=http://localhost:8080 pnpm run healthcheck
+```
+
+Проверяет `/`, `/robots.txt`, `/sitemap.xml`, один опубликованный `/tours/<slug>/`, один `/reports/<slug>/` (если есть), один локальный CMS-asset и что неизвестный URL отдаёт `404` с брендированной страницей. Ненулевой exit code — кандидат не должен становиться production.
 
 ## Pre-launch checklist
 

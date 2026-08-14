@@ -19,7 +19,6 @@ export function Header({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
               width={40}
               height={40}
               className="size-10 shrink-0 rounded-full object-cover"
-              priority
             />
           )}
           <span className="truncate font-heading text-lg font-semibold tracking-tight text-foreground">

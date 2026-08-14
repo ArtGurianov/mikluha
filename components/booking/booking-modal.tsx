@@ -14,8 +14,12 @@ import { useBookingModal } from "./booking-provider";
 export function BookingModal() {
   const { isOpen, selected, fallback, close } = useBookingModal();
 
-  const prepaymentAmount = selected?.prepaymentAmount ?? fallback.prepaymentAmount;
-  const qr = selected?.qr ?? fallback.qr;
+  // Without a resolved OPEN departure there is nothing concrete to pay for —
+  // show contact info only, never a QR/prepayment amount for an unspecified
+  // trip (PRD §16: modal MUST know the selected Departure; §6: no payment CTA
+  // without a bookable departure).
+  const prepaymentAmount = selected?.prepaymentAmount;
+  const qr = selected?.qr;
   const organizerName = selected?.organizerName ?? fallback.organizerName;
   const organizerPhone = selected?.organizerPhone ?? fallback.organizerPhone;
 

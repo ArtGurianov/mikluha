@@ -12,6 +12,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { isStaging } from "../lib/site";
 import { resolveBookingDetails } from "../lib/tours";
 import type { ContentSnapshot } from "../lib/cms/types";
 
@@ -63,9 +64,16 @@ async function main() {
     if (slugs.has(`report:${r.slug}`)) fail(`Duplicate report slug: ${r.slug}`);
     slugs.add(`report:${r.slug}`);
   }
+  const ALLOWED_LEGAL_SLUGS = new Set(["booking-terms", "privacy-policy"]);
   for (const p of content.legalPages) {
     if (slugs.has(`legal:${p.slug}`)) fail(`Duplicate legal page slug: ${p.slug}`);
     slugs.add(`legal:${p.slug}`);
+    if (!ALLOWED_LEGAL_SLUGS.has(p.slug)) {
+      fail(
+        `LegalPage "${p.slug}" has no matching Next.js route — only ${[...ALLOWED_LEGAL_SLUGS].join(", ")} exist ` +
+          `(app/booking-terms/, app/privacy-policy/). Sanity Studio should already block this slug value.`,
+      );
+    }
   }
 
   // --- OPEN departures must always resolve to a complete booking flow ----
@@ -105,9 +113,14 @@ async function main() {
     if (!PHONE_RE.test(content.siteSettings.company.phone)) {
       fail(`launchReady=true but company phone is not a valid +7XXXXXXXXXX number`);
     }
-  } else {
+  } else if (isStaging) {
     warn(
-      "siteSettings.launchReady=false — building in demo mode. This build must not be published as the public production release.",
+      "siteSettings.launchReady=false — building in demo/staging mode. This build must not be published as the public production release.",
+    );
+  } else {
+    fail(
+      "siteSettings.launchReady=false — a production build (DEPLOY_ENV=production, the default) MUST NOT proceed until " +
+        "launchReady is set to true (PRD §29/§49). Set DEPLOY_ENV=staging for a demo/preview build instead.",
     );
   }
 

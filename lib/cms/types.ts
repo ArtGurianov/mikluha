@@ -69,7 +69,8 @@ export interface RawReport {
   departure?: SanityReference;
   date?: string;
   coverImage: RawImageRef;
-  gallery: RawImageRef[];
+  /** Sanity's `min(1)` validator is a Studio-only affordance, not a data-layer guarantee — treat as optional. */
+  gallery?: RawImageRef[];
   description?: string;
   sortOrder?: number;
 }

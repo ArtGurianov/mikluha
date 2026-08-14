@@ -71,15 +71,35 @@ async function resolveImage(sourceRef: string): Promise<Resolved> {
     await mkdir(outDir, { recursive: true });
 
     const metadata = await sharp(buffer).metadata();
+    const sourceWidth = metadata.width ?? Infinity;
     const variants = {} as ImageVariants;
+
+    // Variants are ascending by width. Once a variant's target width reaches
+    // the source's actual width, `withoutEnlargement` caps every larger
+    // nominal variant at that same native size, so its encoded bytes are
+    // identical to the first such variant. We still copy that buffer to each
+    // variant's own <name>.webp file (never re-encode it) — the custom image
+    // loader (lib/image-loader.ts) reconstructs a variant's URL purely from
+    // its name, so every <hash>/<name>.webp path MUST physically exist.
+    let nativeSizeBuffer: Buffer | null = null;
 
     for (const variant of VARIANTS) {
       const outFile = path.join(outDir, `${variant.name}.webp`);
-      await sharp(buffer)
+
+      if (nativeSizeBuffer) {
+        await writeFile(outFile, nativeSizeBuffer);
+        variants[variant.name] = `/generated/cms/${hash}/${variant.name}.webp`;
+        continue;
+      }
+
+      const encoded = await sharp(buffer)
         .resize({ width: variant.width, withoutEnlargement: true })
         .webp({ quality: 82 })
-        .toFile(outFile);
+        .toBuffer();
+      await writeFile(outFile, encoded);
       variants[variant.name] = `/generated/cms/${hash}/${variant.name}.webp`;
+
+      if (variant.width >= sourceWidth) nativeSizeBuffer = encoded;
     }
 
     return { width: metadata.width ?? 0, height: metadata.height ?? 0, variants };
