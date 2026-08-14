@@ -10,6 +10,8 @@ interface BookingButtonProps extends VariantProps<typeof buttonVariants> {
   departureId?: string;
   tourId?: string;
   label?: string;
+  /** Renders the button but refuses the click — used to keep card footers the same height when there is nothing to book. */
+  disabled?: boolean;
   className?: string;
 }
 
@@ -17,6 +19,7 @@ export function BookingButton({
   departureId,
   tourId,
   label = "Забронировать место",
+  disabled,
   variant,
   size,
   className,
@@ -24,7 +27,13 @@ export function BookingButton({
   const { open } = useBookingModal();
 
   return (
-    <Button variant={variant} size={size} className={className} onClick={() => open({ departureId, tourId })}>
+    <Button
+      variant={variant}
+      size={size}
+      disabled={disabled}
+      className={className}
+      onClick={() => open({ departureId, tourId })}
+    >
       {label}
     </Button>
   );

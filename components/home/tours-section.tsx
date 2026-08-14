@@ -60,7 +60,7 @@ export function ToursSection({ upcoming, tours }: ToursSectionProps) {
         </div>
 
         <div
-          className="scrollbar-none -mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
+          className="scrollbar-none -mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6"
           role="group"
           aria-label="Фильтр по направлениям"
         >
@@ -77,18 +77,28 @@ export function ToursSection({ upcoming, tours }: ToursSectionProps) {
             </FilterChip>
           ))}
         </div>
-      </div>
 
-      <div
-        ref={stripRef}
-        className="scrollbar-none flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-2 sm:px-6 lg:mx-auto lg:max-w-[calc(72rem+1px)]"
-      >
-        {visible.map(({ departure, tour }) => (
-          <TripCard key={departure.id} tour={tour} departure={departure} />
-        ))}
-        {placeholders.map((tour) => (
-          <TripCard key={`placeholder-${tour.id}`} tour={tour} />
-        ))}
+        {/*
+          The strip lives inside the page container so its first card lines up
+          with the heading at every width. It then cancels the container's
+          gutter with a negative margin and re-applies the same value as
+          padding *inside* the scroll box — that keeps the leading alignment,
+          gives the last card the same breathing room at the end of the scroll,
+          and lets cards run to the container edge instead of stopping short of
+          it. scroll-px matches so snapping settles on the padded edge, not
+          under it.
+        */}
+        <div
+          ref={stripRef}
+          className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-2 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6"
+        >
+          {visible.map(({ departure, tour }) => (
+            <TripCard key={departure.id} tour={tour} departure={departure} />
+          ))}
+          {placeholders.map((tour) => (
+            <TripCard key={`placeholder-${tour.id}`} tour={tour} />
+          ))}
+        </div>
       </div>
     </section>
   );

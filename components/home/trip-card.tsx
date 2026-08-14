@@ -83,11 +83,14 @@ export function TripCard({ tour, departure }: TripCardProps) {
           </p>
         )}
 
-        {isBookable && (
-          <div className="relative z-10 mt-4">
-            <BookingButton departureId={departure.id} size="sm" />
-          </div>
-        )}
+        {/*
+          Always rendered, disabled when there is nothing to book: dropping it
+          made closed and undated cards shorter than the rest, so a row of
+          cards no longer lined up along the bottom.
+        */}
+        <div className="relative z-10 mt-4">
+          <BookingButton departureId={departure?.id} disabled={!isBookable} size="sm" />
+        </div>
       </div>
     </Card>
   );
