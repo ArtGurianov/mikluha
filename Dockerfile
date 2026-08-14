@@ -12,7 +12,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
-# Stage 2: clean production build (PRD section 34.2 pipeline)
+# Stage 2: clean production build
 #
 # Sanity credentials are passed as build ARGs — they exist only in this
 # ephemeral build stage/layer and are never copied into the runtime image.
@@ -20,8 +20,8 @@ RUN pnpm install --frozen-lockfile
 # instead of a live Sanity dataset — but that content has launchReady=false,
 # so it also needs `--build-arg DEPLOY_ENV=staging` (the default below is
 # "production", which validate:content deliberately refuses to build from
-# demo content — PRD §29/§49). A real production image needs both real
-# Sanity credentials AND DEPLOY_ENV left at its "production" default.
+# demo content). A real production image needs both real Sanity credentials
+# AND DEPLOY_ENV left at its "production" default.
 # ---------------------------------------------------------------------------
 FROM deps AS build
 WORKDIR /app
@@ -41,12 +41,12 @@ ENV SANITY_PROJECT_ID=$SANITY_PROJECT_ID \
 
 COPY . .
 
-RUN pnpm run clean \
- && pnpm run sync:cms \
- && pnpm run materialize:assets \
- && pnpm run validate:content \
- && pnpm run build \
- && pnpm run validate:out
+# The one and only definition of the release pipeline lives in package.json.
+# Spelling the steps out again here let the two drift apart silently: the image
+# build kept running an older list and quietly skipped cms:types, lint and test
+# — including the schema-drift gate that is the whole point of regenerating
+# types before compiling. Call the script, never re-list its steps.
+RUN pnpm run build:production
 
 # ---------------------------------------------------------------------------
 # Stage 3: production runtime — Nginx serving the static /out only.

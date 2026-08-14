@@ -6,6 +6,7 @@ public/generated/cms
 app/icon.png
 app/apple-icon.png
 sanity-studio-out
+sanity/schema.json
 .git
 .env*
 !.env.example
