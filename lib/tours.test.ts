@@ -20,7 +20,7 @@ function image(alt: string): ImageAsset {
 }
 
 function organizer(id: string, overrides: Partial<OrganizerDTO> = {}): OrganizerDTO {
-  return { id, name: "Организатор", phone: "+79990000000", isListed: true, isDemo: false, ...overrides };
+  return { id, name: "Организатор", phone: "+79039075547", isListed: true, isDemo: false, ...overrides };
 }
 
 function departure(overrides: Partial<DepartureDTO>): DepartureDTO {
@@ -48,7 +48,7 @@ function baseContent(overrides: Partial<ContentSnapshot> = {}): ContentSnapshot 
       hero: { title: "t", image: image("hero") },
       booking: { isDemo: false },
       socials: {},
-      company: { legalName: "ООО", inn: "1", ogrn: "1", phone: "+79990000000", isDemo: false },
+      company: { legalName: "ООО Миклуха Маклай", inn: "4205435867", ogrn: "1264200007631", phone: "+79039075547", isDemo: false },
       seo: { title: "t", description: "d" },
       launchReady: false,
     },

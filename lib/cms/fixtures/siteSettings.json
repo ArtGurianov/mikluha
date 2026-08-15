@@ -25,19 +25,19 @@
       "alt": "Тестовый QR-код для предоплаты"
     },
     "defaultPrepaymentAmount": 5000,
-    "defaultOrganizer": { "_ref": "organizer-alexey", "_type": "reference" },
-    "isDemo": true
+    "defaultOrganizer": { "_ref": "organizer-arthur", "_type": "reference" },
+    "isDemo": false
   },
   "socials": {
     "maxChannelUrl": "https://max.ru/miklukha-maklay-test"
   },
   "company": {
-    "legalName": "ИП Тестов Тест Тестович",
-    "inn": "000000000000",
-    "ogrn": "000000000000000",
-    "phone": "+79990000000",
-    "email": "test@example.com",
-    "isDemo": true
+    "legalName": "ООО Миклуха Маклай",
+    "inn": "4205435867",
+    "ogrn": "1264200007631",
+    "phone": "+79039075547",
+    "email": "artgurianov@protonmail.com",
+    "isDemo": false
   },
   "seo": {
     "title": "Миклуха Маклай — треккинг и походы в горы",
@@ -48,5 +48,5 @@
       "alt": "Миклуха Маклай"
     }
   },
-  "launchReady": false
+  "launchReady": true
 }

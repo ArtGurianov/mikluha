@@ -53,7 +53,7 @@ function siteSettings(overrides: Partial<RawSiteSettings> = {}): RawSiteSettings
     siteUrl: "https://example.com",
     timezone: "Europe/Moscow",
     hero: { title: "Заголовок", image: imageRef("hero") },
-    company: { legalName: "ИП", inn: "1", ogrn: "1", phone: "+79990000000" },
+    company: { legalName: "ООО Миклуха Маклай", inn: "4205435867", ogrn: "1264200007631", phone: "+79039075547" },
     seo: { title: "t", description: "d" },
     ...overrides,
   } as RawSiteSettings;
