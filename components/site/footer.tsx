@@ -17,7 +17,6 @@ export function Footer({
     <footer id="contacts" className="border-t border-border bg-secondary text-secondary-foreground">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-2">
         <div className="space-y-2">
-          <p className="font-heading text-lg font-semibold">{siteSettings.siteName}</p>
           <p className="text-sm text-secondary-foreground/80">{company.legalName}</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 pt-2 text-sm text-secondary-foreground/80">
             <dt>ИНН:</dt>
