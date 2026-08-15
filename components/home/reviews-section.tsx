@@ -36,9 +36,7 @@ export function ReviewsSection({ reviews }: { reviews: ReviewDTO[] }) {
               sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 25vw"
               className="h-auto w-full object-cover transition-transform duration-300 hover:scale-105"
             />
-            {review.authorName && (
-              <p className="p-2 text-left text-xs text-muted-foreground">{review.authorName}</p>
-            )}
+            <p className="p-2 text-left text-xs text-muted-foreground">{review.authorName}</p>
           </button>
         ))}
       </div>

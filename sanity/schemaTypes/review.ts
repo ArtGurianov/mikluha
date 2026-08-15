@@ -19,7 +19,7 @@ export const review = defineType({
       name: "authorName",
       title: "Имя автора",
       type: "string",
-      description: "Опционально.",
+      validation: (rule) => rule.required(),
     }),
     defineField({
       name: "tour",
@@ -59,7 +59,7 @@ export const review = defineType({
     select: { authorName: "authorName", tourTitle: "tour.title", media: "image" },
     prepare({ authorName, tourTitle, media }) {
       return {
-        title: authorName || "Без имени",
+        title: authorName,
         subtitle: tourTitle,
         media,
       };

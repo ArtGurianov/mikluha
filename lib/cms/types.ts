@@ -151,7 +151,7 @@ export interface ReportDTO<TImage = ImageAsset> {
 export interface ReviewDTO<TImage = ImageAsset> {
   id: string;
   image: TImage;
-  authorName?: string;
+  authorName: string;
   tourId?: string;
   description?: string;
   sortOrder: number;
