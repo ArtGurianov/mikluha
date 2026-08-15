@@ -65,19 +65,22 @@ export function BookingModal() {
           <div className="w-full space-y-2 rounded-lg bg-muted p-4 text-center text-sm">
             <p className="text-muted-foreground">После предоплаты сообщите организатору{organizerName ? ` (${organizerName})` : ""}:</p>
             {organizerPhone ? (
-              <a href={telHref(organizerPhone)} className="block text-base font-semibold text-foreground underline-offset-4 hover:underline">
-                {organizerPhone}
-              </a>
+              <div className="flex items-center justify-center gap-2">
+                <a href={telHref(organizerPhone)} className="text-base font-semibold text-foreground underline-offset-4 hover:underline">
+                  {organizerPhone}
+                </a>
+                <a
+                  href={telHref(organizerPhone)}
+                  className="inline-flex items-center justify-center rounded hover:bg-background/50 p-1 transition-colors"
+                  title="Позвонить"
+                >
+                  <Phone className="h-5 w-5 text-foreground" />
+                </a>
+              </div>
             ) : (
               <p className="text-muted-foreground">Телефон организатора уточняется</p>
             )}
           </div>
-
-          {organizerPhone && (
-            <a href={telHref(organizerPhone)} className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
-              <Phone /> Позвонить организатору
-            </a>
-          )}
 
           <p className="text-center text-xs text-muted-foreground">
             Место считается забронированным после подтверждения организатором.
