@@ -115,7 +115,7 @@ export const siteSettings = defineType({
       fields: [
         defineField({ name: "legalName", title: "Название / ФИО ИП", type: "string", validation: (rule) => rule.required() }),
         defineField({ name: "inn", title: "ИНН", type: "string", validation: (rule) => rule.required() }),
-        defineField({ name: "ogrn", title: "ОГРН / ОГРНИП", type: "string", validation: (rule) => rule.required() }),
+        defineField({ name: "ogrn", title: "ОГРН", type: "string", validation: (rule) => rule.required() }),
         defineField({ name: "phone", title: "Телефон компании", type: "string", validation: (rule) => rule.required() }),
         defineField({ name: "email", title: "Email", type: "string" }),
         defineField({
