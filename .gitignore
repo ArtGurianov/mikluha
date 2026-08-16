@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+/.pnpm-store/
+/sanity/node_modules
+/sanity/.sanity
 /.pnp
 .pnp.*
 .yarn/*

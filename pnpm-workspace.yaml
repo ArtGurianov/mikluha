@@ -1,3 +1,6 @@
+packages:
+  - sanity
+
 ignoredBuiltDependencies:
   - unrs-resolver
 
