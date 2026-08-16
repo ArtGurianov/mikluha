@@ -2,11 +2,18 @@ backend:
   name: github
   repo: ArtGurianov/mikluha
   branch: main
+  auth_methods: [oauth]
   base_url: https://cms-auth.CHANGE-ME.example # TODO: set to the deployed oauth-broker origin
   site_domain: CHANGE-ME.example # TODO: production domain, e.g. miklukha-maklay.ru
 
 site_url: https://miklukha-maklay.ru
-locale: ru
+
+# Inline Markdown images would bypass the build-time image materializer and
+# make public pages depend on object storage. Structured image/gallery fields
+# cover every supported image use case, so the editor offers code blocks only.
+field_defaults:
+  richtext:
+    editor_components: [code-block]
 
 media_libraries:
   aws_s3:
@@ -16,7 +23,6 @@ media_libraries:
     endpoint: https://s3.cloud.ru
     prefix: cms/
     public_url: https://s3.cloud.ru/CHANGE-ME # TODO: match the bucket name above
-    acl: false # rely on a bucket-policy public-read rule, not per-object ACL headers
 
 singletons:
   - name: site_settings
@@ -166,8 +172,8 @@ collections:
     sortable_fields: [startDate]
     fields:
       - {name: tour, label: Направление, widget: relation, collection: tours, value_field: "{{slug}}", search_fields: [title], display_fields: [title]}
-      - {name: startDate, label: "Дата начала", widget: datetime, date_format: "yyyy-MM-dd", time_format: false, picker_utc: true}
-      - {name: endDate, label: "Дата окончания", widget: datetime, date_format: "yyyy-MM-dd", time_format: false, picker_utc: true}
+      - {name: startDate, label: "Дата начала", widget: datetime, type: date, input_timezone: utc}
+      - {name: endDate, label: "Дата окончания", widget: datetime, type: date, input_timezone: utc}
       - name: bookingStatus
         label: "Статус набора"
         widget: select
@@ -207,7 +213,7 @@ collections:
         hint: "Адрес отчёта на сайте: /reports/<slug>/. Только латиница в нижнем регистре, цифры и дефис."
       - {name: tour, label: Направление, widget: relation, collection: tours, value_field: "{{slug}}", search_fields: [title], display_fields: [title]}
       - {name: departure, label: "Связанный выезд", widget: relation, collection: departures, value_field: "{{slug}}", search_fields: [tour, startDate], display_fields: [tour, startDate], required: false, hint: "Если указан, дата отчёта берётся из выезда автоматически."}
-      - {name: date, label: "Дата поездки", widget: datetime, date_format: "yyyy-MM-dd", time_format: false, picker_utc: true, required: false, hint: "Заполняйте только если нет связанного выезда."}
+      - {name: date, label: "Дата поездки", widget: datetime, type: date, input_timezone: utc, required: false, hint: "Заполняйте только если нет связанного выезда."}
       - name: coverImage
         label: Обложка
         widget: object
@@ -296,4 +302,4 @@ collections:
         pattern: ["^[a-z0-9]+(-[a-z0-9]+)*$", "Только латиница в нижнем регистре, цифры и дефис — например public-offer"]
         hint: "Адрес страницы на сайте: например booking-terms → /booking-terms/. Только латиница в нижнем регистре, цифры и дефис. После публикации менять не рекомендуется — старый адрес перестанет открываться. Занятые разделами сайта адреса (tours, reports, api, _next, generated, index, 404, robots.txt, sitemap.xml, icon.png, apple-icon.png) недоступны — сборка их отклонит."
       - {name: content, label: "Текст страницы", widget: markdown}
-      - {name: updatedAt, label: "Дата обновления текста", widget: datetime, date_format: "yyyy-MM-dd", time_format: false, picker_utc: true, required: false}
+      - {name: updatedAt, label: "Дата обновления текста", widget: datetime, type: date, input_timezone: utc, required: false}

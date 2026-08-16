@@ -18,11 +18,25 @@ import { resolveBookingDetails } from "../lib/tours";
 import type { ContentSnapshot } from "../lib/cms/types";
 
 const CACHE_FILE = path.resolve(process.cwd(), ".cms-cache", "content.json");
-const ADMIN_CONFIG_FILE = path.resolve(process.cwd(), "public/admin/config.yml");
 const PHONE_RE = /^\+7\d{10}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const errors: string[] = [];
 const warnings: string[] = [];
+
+function isCalendarDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 function fail(message: string) {
   errors.push(message);
@@ -32,44 +46,58 @@ function warn(message: string) {
   warnings.push(message);
 }
 
-/**
- * public/admin/config.yml ships with `CHANGE-ME` placeholders (cloud.ru
- * bucket/key, the oauth-broker's domain) until the operator wires up the CMS
- * — see RUNBOOK.md. Nothing else in the build pipeline reads this file (it's
- * plain YAML served as a static asset, not part of the content snapshot), so
- * without this check a build would happily ship a production `/admin` whose
- * sign-in button points at a non-existent host. Staging builds are allowed to
- * carry placeholders — they're not the public release.
- */
-async function checkAdminConfigPlaceholders() {
-  const configText = await readFile(ADMIN_CONFIG_FILE, "utf-8");
-  if (configText.includes("CHANGE-ME") && !isStaging) {
-    fail(
-      `Production release blocked — public/admin/config.yml still has CHANGE-ME placeholder(s). ` +
-        `Fill in the cloud.ru media library and oauth-broker settings (see RUNBOOK.md), or build with ` +
-        `DEPLOY_ENV=staging for a demo/preview release.`,
-    );
-  }
-}
-
 async function main() {
-  await checkAdminConfigPlaceholders();
-
   const raw = await readFile(CACHE_FILE, "utf-8");
   const content = JSON.parse(raw) as ContentSnapshot;
 
   const tourIds = new Set(content.tours.map((t) => t.id));
+  const departureById = new Map(content.departures.map((d) => [d.id, d]));
   const organizerIds = new Set(content.organizers.map((o) => o.id));
+
+  if (!isHttpsUrl(content.siteSettings.siteUrl)) fail(`siteSettings.siteUrl must be an absolute HTTPS URL`);
+  if (content.siteSettings.socials.maxChannelUrl && !isHttpsUrl(content.siteSettings.socials.maxChannelUrl)) {
+    fail(`siteSettings.socials.maxChannelUrl must be an absolute HTTPS URL`);
+  }
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: content.siteSettings.timezone }).format();
+  } catch {
+    fail(`siteSettings.timezone "${content.siteSettings.timezone}" is not a valid IANA timezone`);
+  }
+  const defaultPrepayment = content.siteSettings.booking.defaultPrepaymentAmount;
+  if (defaultPrepayment !== undefined && (!Number.isInteger(defaultPrepayment) || defaultPrepayment < 0)) {
+    fail(`siteSettings.booking.defaultPrepaymentAmount must be a non-negative integer`);
+  }
 
   // --- referential integrity ---------------------------------------------
   for (const d of content.departures) {
     if (!tourIds.has(d.tourId)) fail(`Departure ${d.id} references unknown tour ${d.tourId}`);
+    if (!isCalendarDate(d.startDate) || !isCalendarDate(d.endDate)) {
+      fail(`Departure ${d.id} has an invalid date; startDate/endDate must be YYYY-MM-DD`);
+    } else if (d.endDate < d.startDate) {
+      fail(`Departure ${d.id} ends before it starts (${d.startDate} → ${d.endDate})`);
+    }
+    if (!("OPEN" === d.bookingStatus || "CLOSED" === d.bookingStatus || "CANCELLED" === d.bookingStatus)) {
+      fail(`Departure ${d.id} has unknown bookingStatus "${d.bookingStatus}"`);
+    }
+    for (const [label, amount] of [["price", d.price], ["prepaymentAmount", d.prepaymentAmount]] as const) {
+      if (amount !== undefined && (!Number.isInteger(amount) || amount < 0)) {
+        fail(`Departure ${d.id} ${label} must be a non-negative integer`);
+      }
+    }
     for (const orgId of d.organizerIds) {
       if (!organizerIds.has(orgId)) fail(`Departure ${d.id} references unknown organizer ${orgId}`);
     }
   }
   for (const r of content.reports) {
     if (!tourIds.has(r.tourId)) fail(`Report ${r.id} references unknown tour ${r.tourId}`);
+    if (r.departureId) {
+      const departure = departureById.get(r.departureId);
+      if (!departure) fail(`Report ${r.id} references unknown departure ${r.departureId}`);
+      else if (departure.tourId !== r.tourId) {
+        fail(`Report ${r.id} links tour ${r.tourId} but departure ${r.departureId} belongs to ${departure.tourId}`);
+      }
+    }
+    if (r.date && !isCalendarDate(r.date)) fail(`Report ${r.id} date must be a real YYYY-MM-DD calendar date`);
   }
   for (const rv of content.reviews) {
     if (rv.tourId && !tourIds.has(rv.tourId)) fail(`Review ${rv.id} references unknown tour ${rv.tourId}`);
@@ -115,6 +143,9 @@ async function main() {
     }
     if ((RESERVED_SLUGS as readonly string[]).includes(p.slug)) {
       fail(`LegalPage slug "${p.slug}" would shadow an existing route or build artifact — rename it.`);
+    }
+    if (p.updatedAt && !isCalendarDate(p.updatedAt)) {
+      fail(`LegalPage ${p.id} updatedAt must be a real YYYY-MM-DD calendar date`);
     }
   }
 

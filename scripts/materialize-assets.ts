@@ -17,6 +17,13 @@ import path from "node:path";
 import yaml from "js-yaml";
 import sharp from "sharp";
 
+import {
+  createAssetSourcePolicy,
+  parseAllowedRemoteAssetUrl,
+  resolveLocalAssetPath,
+  type AssetSourcePolicy,
+  type CmsMediaConfig,
+} from "../lib/cms/asset-source";
 import type { ImageVariants, UnresolvedContentSnapshot } from "../lib/cms/types";
 
 const CACHE_FILE = path.resolve(process.cwd(), ".cms-cache", "content.json");
@@ -24,6 +31,8 @@ const CONTENT_ASSETS_DIR = path.resolve(process.cwd(), "content/assets");
 const GENERATED_DIR = path.resolve(process.cwd(), "public/generated/cms");
 const APP_DIR = path.resolve(process.cwd(), "app");
 const ADMIN_CONFIG_FILE = path.resolve(process.cwd(), "public/admin/config.yml");
+const MAX_ASSET_BYTES = 25 * 1024 * 1024;
+const ASSET_FETCH_TIMEOUT_MS = 30_000;
 
 const VARIANTS: Array<{ name: keyof ImageVariants; width: number }> = [
   { name: "thumbnail", width: 400 },
@@ -41,43 +50,52 @@ const VARIANTS: Array<{ name: keyof ImageVariants; width: number }> = [
  * bad edit or a compromised content file could make the build download
  * arbitrary bytes from anywhere into the release image.
  */
-async function loadAllowedAssetHostPrefixes(): Promise<string[]> {
+async function loadAssetSourcePolicy(): Promise<AssetSourcePolicy> {
   const configText = await readFile(ADMIN_CONFIG_FILE, "utf-8");
-  const config = yaml.load(configText) as {
-    media_libraries?: { aws_s3?: { endpoint?: string; bucket?: string; public_url?: string } };
-  };
-  const s3 = config.media_libraries?.aws_s3;
-  if (!s3) return [];
-
-  // Trailing slash matters: Sveltia always joins with `/`
-  // (`${public_url}/${key}`), so without it "https://s3.cloud.ru/mybucket"
-  // would also admit "https://s3.cloud.ru/mybucket-attacker/x.jpg".
-  const prefixes: string[] = [];
-  if (s3.public_url) prefixes.push(`${s3.public_url.replace(/\/+$/, "")}/`);
-  if (s3.endpoint && s3.bucket) prefixes.push(`${s3.endpoint.replace(/\/+$/, "")}/${s3.bucket}/`);
-  return prefixes;
+  return createAssetSourcePolicy(yaml.load(configText) as CmsMediaConfig, CONTENT_ASSETS_DIR);
 }
 
-async function loadSourceBuffer(sourceRef: string, allowedPrefixes: string[]): Promise<Buffer> {
+async function readLimitedResponse(response: Response, sourceRef: string): Promise<Buffer> {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
+    throw new Error(`CMS asset ${sourceRef} is larger than the ${MAX_ASSET_BYTES / 1024 / 1024} MB build limit.`);
+  }
+  if (!response.body) throw new Error(`CMS asset ${sourceRef} returned an empty response body.`);
+
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = response.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_ASSET_BYTES) {
+        await reader.cancel();
+        throw new Error(`CMS asset ${sourceRef} exceeded the ${MAX_ASSET_BYTES / 1024 / 1024} MB build limit.`);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, size);
+}
+
+async function loadSourceBuffer(sourceRef: string, policy: AssetSourcePolicy): Promise<Buffer> {
   if (sourceRef.startsWith("local:")) {
-    const filename = sourceRef.slice("local:".length);
-    return readFile(path.join(CONTENT_ASSETS_DIR, filename));
+    return readFile(await resolveLocalAssetPath(sourceRef, policy));
   }
 
-  // Anything else is a real asset URL — the cloud.ru object the Sveltia media
-  // library uploaded to and wrote directly into the content file.
-  if (!allowedPrefixes.some((prefix) => sourceRef.startsWith(prefix))) {
-    throw new Error(
-      `Refusing to download "${sourceRef}" — it doesn't match the configured media library host ` +
-        `(public/admin/config.yml media_libraries.aws_s3). Fix the content file or the config.`,
-    );
-  }
-
-  const response = await fetch(sourceRef);
+  const url = parseAllowedRemoteAssetUrl(sourceRef, policy);
+  const response = await fetch(url, {
+    redirect: "error",
+    signal: AbortSignal.timeout(ASSET_FETCH_TIMEOUT_MS),
+  });
   if (!response.ok) {
     throw new Error(`Failed to download CMS asset ${sourceRef}: HTTP ${response.status}`);
   }
-  return Buffer.from(await response.arrayBuffer());
+  return readLimitedResponse(response, sourceRef);
 }
 
 interface Resolved {
@@ -88,12 +106,12 @@ interface Resolved {
 
 const resolvedCache = new Map<string, Promise<Resolved>>();
 
-async function resolveImage(sourceRef: string, allowedPrefixes: string[]): Promise<Resolved> {
+async function resolveImage(sourceRef: string, policy: AssetSourcePolicy): Promise<Resolved> {
   const cached = resolvedCache.get(sourceRef);
   if (cached) return cached;
 
   const promise = (async (): Promise<Resolved> => {
-    const buffer = await loadSourceBuffer(sourceRef, allowedPrefixes);
+    const buffer = await loadSourceBuffer(sourceRef, policy);
     const hash = createHash("sha256").update(buffer).update(sourceRef).digest("hex").slice(0, 16);
     const outDir = path.join(GENERATED_DIR, hash);
     await mkdir(outDir, { recursive: true });
@@ -186,10 +204,10 @@ function applyResolved(node: unknown, cache: Map<string, Resolved>) {
   }
 }
 
-async function materializeBrandIcons(iconSourceRef: string | undefined, allowedPrefixes: string[]) {
+async function materializeBrandIcons(iconSourceRef: string | undefined, policy: AssetSourcePolicy) {
   if (!iconSourceRef) return;
 
-  const buffer = await loadSourceBuffer(iconSourceRef, allowedPrefixes);
+  const buffer = await loadSourceBuffer(iconSourceRef, policy);
 
   await sharp(buffer)
     .resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -208,7 +226,7 @@ async function materializeBrandIcons(iconSourceRef: string | undefined, allowedP
 async function main() {
   const raw = await readFile(CACHE_FILE, "utf-8");
   const snapshot = JSON.parse(raw) as UnresolvedContentSnapshot;
-  const allowedPrefixes = await loadAllowedAssetHostPrefixes();
+  const policy = await loadAssetSourcePolicy();
 
   const iconSourceRef = snapshot.siteSettings.favicon?.sourceRef ?? snapshot.siteSettings.logo?.sourceRef;
 
@@ -219,7 +237,7 @@ async function main() {
 
   const cache = new Map<string, Resolved>();
   for (const ref of refs) {
-    cache.set(ref, await resolveImage(ref, allowedPrefixes));
+    cache.set(ref, await resolveImage(ref, policy));
   }
 
   applyResolved(snapshot, cache);
@@ -227,7 +245,7 @@ async function main() {
   await writeFile(CACHE_FILE, JSON.stringify(snapshot, null, 2), "utf-8");
   console.log(`[materialize-assets] wrote ${refs.size} image(s) to ${path.relative(process.cwd(), GENERATED_DIR)}/`);
 
-  await materializeBrandIcons(iconSourceRef, allowedPrefixes);
+  await materializeBrandIcons(iconSourceRef, policy);
 }
 
 main().catch((error) => {

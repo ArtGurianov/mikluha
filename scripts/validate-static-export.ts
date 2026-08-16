@@ -7,11 +7,16 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
+import yaml from "js-yaml";
+
+import { createAssetSourcePolicy, type CmsMediaConfig } from "../lib/cms/asset-source";
 import type { ContentSnapshot } from "../lib/cms/types";
 
 const ROOT = process.cwd();
 const OUT_DIR = path.join(ROOT, "out");
 const CACHE_FILE = path.join(ROOT, ".cms-cache", "content.json");
+const ADMIN_CONFIG_FILE = path.join(ROOT, "public/admin/config.yml");
+const CONTENT_ASSETS_DIR = path.join(ROOT, "content/assets");
 
 const errors: string[] = [];
 function fail(message: string) {
@@ -27,16 +32,12 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-// Every CMS image must have been materialized to a local /generated/cms path
-// by scripts/materialize-assets.ts before `next build` runs — a leaked
-// cloud.ru URL means that step was skipped for something.
-const FORBIDDEN_HOST_RE = /s3\.cloud\.ru/i;
 // .yml is deliberately excluded: /out/admin/config.yml legitimately names the
-// cloud.ru host (it's the CMS media library's own config, not a materialized
-// page), so scanning it would make FORBIDDEN_HOST_RE fail on every build.
-// Don't add it here without also excluding public/admin/config.yml specifically.
+// configured storage URLs (it's the CMS media library's own config, not a
+// materialized page). Don't add it without excluding that config specifically.
 const SCANNABLE_EXT = new Set([".html", ".js", ".json", ".xml", ".txt"]);
 const ASSET_REF_RE = /\/generated\/cms\/[\w-]+\/[\w-]+\.(?:webp|png|jpg|jpeg|ico)/g;
+const REMOTE_IMAGE_RE = /<img\b[^>]*\bsrc=["']https?:\/\//i;
 
 async function walk(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true, recursive: true } as never);
@@ -90,14 +91,25 @@ async function main() {
 
   const files = await walk(OUT_DIR);
   const referencedAssets = new Set<string>();
+  const adminConfig = yaml.load(await readFile(ADMIN_CONFIG_FILE, "utf-8")) as CmsMediaConfig;
+  const forbiddenRemoteBases = createAssetSourcePolicy(adminConfig, CONTENT_ASSETS_DIR).remoteBases.map(
+    (url) => url.href,
+  );
 
   for (const file of files) {
     const ext = path.extname(file);
     if (!SCANNABLE_EXT.has(ext)) continue;
     const text = await readFile(file, "utf-8");
 
-    if (FORBIDDEN_HOST_RE.test(text)) {
-      fail(`Found a cloud.ru object storage URL in ${path.relative(ROOT, file)} — production artifact must be fully local`);
+    const leakedBase = forbiddenRemoteBases.find((base) => text.includes(base));
+    if (leakedBase) {
+      fail(
+        `Found configured CMS storage URL ${leakedBase} in ${path.relative(ROOT, file)} — ` +
+          `production artifact must be fully local`,
+      );
+    }
+    if (ext === ".html" && REMOTE_IMAGE_RE.test(text)) {
+      fail(`Found a remote <img> source in ${path.relative(ROOT, file)} — public pages must use materialized local assets`);
     }
 
     for (const match of text.matchAll(ASSET_REF_RE)) {

@@ -76,6 +76,11 @@ test("an optional image with no uploaded asset degrades to undefined instead of 
   assert.equal(content.siteSettings.logo, undefined);
 });
 
+test("a required image object saved as null fails with the document field name", () => {
+  const broken = tour({ coverImage: null });
+  assert.throws(() => normalizeContentSet(contentSet({ tours: [broken] }), "git"), /tour "altai" coverImage/);
+});
+
 test("a report published without a gallery normalizes to an empty list", () => {
   // `gallery` is a `min: 1` list in the CMS but not required, so a document
   // can exist without one — this used to crash normalization.

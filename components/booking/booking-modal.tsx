@@ -3,11 +3,9 @@
 import { Phone } from "lucide-react";
 import Image from "next/image";
 
-import { buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatRub, telHref } from "@/lib/format";
 import { formatDepartureDateRange } from "@/lib/tours";
-import { cn } from "@/lib/utils";
 
 import { useBookingModal } from "./booking-provider";
 

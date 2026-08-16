@@ -27,107 +27,107 @@ export type BookingStatus = "OPEN" | "CLOSED" | "CANCELLED";
  * a Sveltia image widget could — normalize.ts is what resolves that.
  */
 export interface RawImageRef {
-  image?: string;
-  alt?: string;
+  image?: string | null;
+  alt?: string | null;
 }
 
 export interface RawTour {
-  title: string;
+  title: string | null;
   /** Also the user-facing route slug (`/tours/<slug>/`), explicit and ASCII-validated — see lib/legal.ts's SLUG_RE. */
-  slug: string;
-  shortDescription: string;
-  description?: string;
-  coverImage: RawImageRef;
-  gallery?: RawImageRef[];
-  isListed?: boolean;
-  sortOrder?: number;
-  seo?: { title?: string; description?: string; image?: RawImageRef };
+  slug: string | null;
+  shortDescription: string | null;
+  description?: string | null;
+  coverImage: RawImageRef | null;
+  gallery?: RawImageRef[] | null;
+  isListed?: boolean | null;
+  sortOrder?: number | null;
+  seo?: { title?: string | null; description?: string | null; image?: RawImageRef | null } | null;
   /** Filename (without extension) — the collection's `slug` template output (`{{fields.slug}}`, so this always equals `slug` above). Injected by sync-content.ts, not a real YAML field. */
   _slug: string;
 }
 
 export interface RawDeparture {
-  tour: string;
-  startDate: string;
-  endDate: string;
-  bookingStatus: BookingStatus;
-  price?: number;
-  prepaymentAmount?: number;
-  paymentQr?: RawImageRef;
-  organizers?: string[];
-  isListed?: boolean;
-  isDemo?: boolean;
+  tour: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  bookingStatus: BookingStatus | null;
+  price?: number | null;
+  prepaymentAmount?: number | null;
+  paymentQr?: RawImageRef | null;
+  organizers?: string[] | null;
+  isListed?: boolean | null;
+  isDemo?: boolean | null;
   _slug: string;
 }
 
 export interface RawReport {
-  title: string;
+  title: string | null;
   /** Also the user-facing route slug (`/reports/<slug>/`), explicit and ASCII-validated — see lib/legal.ts's SLUG_RE. */
-  slug: string;
-  tour: string;
-  departure?: string;
-  date?: string;
-  coverImage: RawImageRef;
-  gallery?: RawImageRef[];
-  description?: string;
-  sortOrder?: number;
+  slug: string | null;
+  tour: string | null;
+  departure?: string | null;
+  date?: string | null;
+  coverImage: RawImageRef | null;
+  gallery?: RawImageRef[] | null;
+  description?: string | null;
+  sortOrder?: number | null;
   _slug: string;
 }
 
 export interface RawReview {
-  image: RawImageRef;
-  authorName: string;
-  tour?: string;
-  description?: string;
-  sortOrder?: number;
-  isListed?: boolean;
-  isDemo?: boolean;
+  image: RawImageRef | null;
+  authorName: string | null;
+  tour?: string | null;
+  description?: string | null;
+  sortOrder?: number | null;
+  isListed?: boolean | null;
+  isDemo?: boolean | null;
   _slug: string;
 }
 
 export interface RawOrganizer {
-  name: string;
-  phone: string;
-  photo?: RawImageRef;
-  bio?: string;
-  isListed?: boolean;
-  isDemo?: boolean;
+  name: string | null;
+  phone: string | null;
+  photo?: RawImageRef | null;
+  bio?: string | null;
+  isListed?: boolean | null;
+  isDemo?: boolean | null;
   _slug: string;
 }
 
 export interface RawLegalPage {
-  title: string;
+  title: string | null;
   /** Also the user-facing route slug, unlike other collections' `_slug` — see lib/legal.ts. */
-  slug: string;
-  content: string;
-  updatedAt?: string;
+  slug: string | null;
+  content: string | null;
+  updatedAt?: string | null;
   _slug: string;
 }
 
 export interface RawSiteSettings {
-  siteName: string;
-  siteUrl: string;
-  timezone: string;
-  logo?: RawImageRef;
-  favicon?: RawImageRef;
-  hero?: { title: string; subtitle?: string; image: RawImageRef };
+  siteName: string | null;
+  siteUrl: string | null;
+  timezone: string | null;
+  logo?: RawImageRef | null;
+  favicon?: RawImageRef | null;
+  hero?: { title: string | null; subtitle?: string | null; image: RawImageRef | null } | null;
   booking?: {
-    defaultQr?: RawImageRef;
-    defaultPrepaymentAmount?: number;
-    defaultOrganizer?: string;
-    isDemo?: boolean;
-  };
-  socials?: { maxChannelUrl?: string };
+    defaultQr?: RawImageRef | null;
+    defaultPrepaymentAmount?: number | null;
+    defaultOrganizer?: string | null;
+    isDemo?: boolean | null;
+  } | null;
+  socials?: { maxChannelUrl?: string | null } | null;
   company?: {
-    legalName: string;
-    inn: string;
-    ogrn: string;
-    phone: string;
-    email?: string;
-    isDemo?: boolean;
-  };
-  seo?: { title: string; description: string; ogImage?: RawImageRef };
-  launchReady?: boolean;
+    legalName: string | null;
+    inn: string | null;
+    ogrn: string | null;
+    phone: string | null;
+    email?: string | null;
+    isDemo?: boolean | null;
+  } | null;
+  seo?: { title: string | null; description: string | null; ogImage?: RawImageRef | null } | null;
+  launchReady?: boolean | null;
 }
 
 export type RawDocument =

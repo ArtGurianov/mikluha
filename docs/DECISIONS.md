@@ -43,7 +43,7 @@ Storage. Побочный эффект: URL контентно-адресуем�
 
 ## 3. Каждая сборка начинается с чистых generated-каталогов
 
-`npm run clean` удаляет `.next`, `out`, `public/generated/cms`, `.cms-cache`.
+`pnpm run clean` удаляет `.next`, `out`, `public/generated/cms`, `.cms-cache`.
 
 **Почему:** ассеты удалённого/заменённого контента не должны переезжать в
 следующий релиз. Ephemeral-файловая система Docker-сборки — вторая линия

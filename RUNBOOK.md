@@ -43,8 +43,8 @@ pnpm dev   # predev сам прогонит vendor:admin + sync:content + materi
 
 ```bash
 pnpm run build:production
-# = clean && vendor:admin && lint && test && sync:content && materialize:assets
-#   && validate:content && build && validate:out
+# = clean && validate:cms-config && vendor:admin && lint && test && sync:content
+#   && materialize:assets && validate:content && build && validate:out
 ```
 
 `vendor:admin` копирует Sveltia CMS (`node_modules/@sveltia/cms/dist/sveltia-cms.js`) в
@@ -64,6 +64,7 @@ GitHub требует обмена authorization code на token с client secre
 1. Создать GitHub OAuth App: Settings → Developer settings → OAuth Apps → New OAuth App.
    Authorization callback URL: `https://<cms-auth-домен>/callback`.
 2. Задеплоить `oauth-broker/` как отдельное Coolify application (`oauth-broker/Dockerfile`),
+   оставив build context в корне репозитория (Dockerfile сам копирует файлы из `oauth-broker/`),
    переменные окружения:
 
    | Переменная | Назначение |
@@ -87,9 +88,14 @@ GitHub требует обмена authorization code на token с client secre
 1. Создать bucket в cloud.ru Evolution Object Storage; настроить bucket policy на публичное
    чтение (`GetObject`) объектов под префиксом `cms/` — `scripts/materialize-assets.ts` скачивает
    их по прямой ссылке во время сборки. Листинг публично не открывать.
-2. Выдать редакторам scoped-ключ с правом только `PutObject` под тем же префиксом (без
-   delete/list).
-3. В `public/admin/config.yml` → `media_libraries.aws_s3` указать `access_key_id` (не секретный)
+2. Настроить CORS bucket для каждого origin, с которого открывается `/admin`: методы `GET`, `PUT`, `HEAD`, заголовки `*`,
+   `ExposeHeaders: ETag`. Без этого браузер заблокирует подписанные запросы Sveltia ещё на
+   preflight.
+3. Выдать редакторам scoped-ключ с `ListBucket` на bucket (ограничив список префиксом `cms/`) и
+   `GetObject`/`PutObject` только на `cms/*`, без `DeleteObject`. Sveltia сначала запрашивает
+   список объектов медиатеки, поэтому ключ только с `PutObject` не работает.
+4. В `public/admin/config.yml` → `media_libraries.aws_s3` указать `access_key_id` в формате
+   cloud.ru `<tenant_id>:<key_id>` (не секретный)
    и `bucket`. **Secret access key в конфиг не пишется** — каждый редактор вводит его один раз в
    интерфейсе Sveltia при первой загрузке файла; хранится только в его браузере.
 

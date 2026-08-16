@@ -6,7 +6,6 @@ public/generated/cms
 public/admin/sveltia-cms.js
 app/icon.png
 app/apple-icon.png
-oauth-broker
 .git
 .env*
 !.env.example

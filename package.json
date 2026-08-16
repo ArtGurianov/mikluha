@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "npm run vendor:admin && npm run sync:content && npm run materialize:assets",
+    "predev": "pnpm run vendor:admin && pnpm run sync:content && pnpm run materialize:assets",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -11,12 +11,13 @@
     "test": "tsx --test \"lib/**/*.test.ts\"",
     "clean": "rm -rf .next out public/generated/cms .cms-cache",
     "vendor:admin": "tsx scripts/vendor-admin-cms.ts",
+    "validate:cms-config": "tsx scripts/validate-cms-config.ts",
     "sync:content": "tsx scripts/sync-content.ts",
     "materialize:assets": "tsx scripts/materialize-assets.ts",
     "validate:content": "tsx scripts/validate-content.ts",
     "validate:out": "tsx scripts/validate-static-export.ts",
     "healthcheck": "tsx scripts/healthcheck.ts",
-    "build:production": "npm run clean && npm run vendor:admin && npm run lint && npm run test && npm run sync:content && npm run materialize:assets && npm run validate:content && npm run build && npm run validate:out"
+    "build:production": "pnpm run clean && pnpm run validate:cms-config && pnpm run vendor:admin && pnpm run lint && pnpm run test && pnpm run sync:content && pnpm run materialize:assets && pnpm run validate:content && pnpm run build && pnpm run validate:out"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -41,6 +42,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "ajv": "^8.20.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",

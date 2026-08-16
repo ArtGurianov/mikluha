@@ -6,7 +6,7 @@
  * script exercises the actual HTTP server (Nginx routing, 404 handling,
  * content-type, etc).
  *
- * Usage: HEALTHCHECK_BASE_URL=http://localhost:8080 npm run healthcheck
+ * Usage: HEALTHCHECK_BASE_URL=http://localhost:8080 pnpm run healthcheck
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
