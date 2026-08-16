@@ -18,6 +18,7 @@ import { resolveBookingDetails } from "../lib/tours";
 import type { ContentSnapshot } from "../lib/cms/types";
 
 const CACHE_FILE = path.resolve(process.cwd(), ".cms-cache", "content.json");
+const ADMIN_CONFIG_FILE = path.resolve(process.cwd(), "public/admin/config.yml");
 const PHONE_RE = /^\+7\d{10}$/;
 
 const errors: string[] = [];
@@ -31,7 +32,29 @@ function warn(message: string) {
   warnings.push(message);
 }
 
+/**
+ * public/admin/config.yml ships with `CHANGE-ME` placeholders (cloud.ru
+ * bucket/key, the oauth-broker's domain) until the operator wires up the CMS
+ * — see RUNBOOK.md. Nothing else in the build pipeline reads this file (it's
+ * plain YAML served as a static asset, not part of the content snapshot), so
+ * without this check a build would happily ship a production `/admin` whose
+ * sign-in button points at a non-existent host. Staging builds are allowed to
+ * carry placeholders — they're not the public release.
+ */
+async function checkAdminConfigPlaceholders() {
+  const configText = await readFile(ADMIN_CONFIG_FILE, "utf-8");
+  if (configText.includes("CHANGE-ME") && !isStaging) {
+    fail(
+      `Production release blocked — public/admin/config.yml still has CHANGE-ME placeholder(s). ` +
+        `Fill in the cloud.ru media library and oauth-broker settings (see RUNBOOK.md), or build with ` +
+        `DEPLOY_ENV=staging for a demo/preview release.`,
+    );
+  }
+}
+
 async function main() {
+  await checkAdminConfigPlaceholders();
+
   const raw = await readFile(CACHE_FILE, "utf-8");
   const content = JSON.parse(raw) as ContentSnapshot;
 
@@ -60,16 +83,27 @@ async function main() {
   for (const t of content.tours) {
     if (slugs.has(`tour:${t.slug}`)) fail(`Duplicate tour slug: ${t.slug}`);
     slugs.add(`tour:${t.slug}`);
+    if (!SLUG_RE.test(t.slug)) {
+      fail(`Tour slug "${t.slug}" cannot be served as a URL — use lowercase latin letters, digits and hyphens (for example altai).`);
+    }
   }
   for (const r of content.reports) {
     if (slugs.has(`report:${r.slug}`)) fail(`Duplicate report slug: ${r.slug}`);
     slugs.add(`report:${r.slug}`);
+    if (!SLUG_RE.test(r.slug)) {
+      fail(
+        `Report slug "${r.slug}" cannot be served as a URL — use lowercase latin letters, digits and hyphens ` +
+          `(for example altai-june-2026).`,
+      );
+    }
   }
   // Legal pages get a static route each from app/[legalSlug]/, so any slug is
   // allowed — but that route sits at the site root, so a slug must still be
-  // servable and must not shadow an existing section or build artifact. The
-  // Studio rejects both while typing; this is the backstop for documents
-  // written through the API.
+  // servable and must not shadow an existing section or build artifact. Tours
+  // and reports sit under a fixed /tours//reports/ prefix, so they only need
+  // the URL-safety check above, not a reserved-word check. The CMS rejects
+  // both while typing (public/admin/config.yml field `pattern`s); this is the
+  // backstop for documents written or hand-edited outside it.
   for (const p of content.legalPages) {
     if (slugs.has(`legal:${p.slug}`)) fail(`Duplicate legal page slug: ${p.slug}`);
     slugs.add(`legal:${p.slug}`);
@@ -144,7 +178,7 @@ async function main() {
 
   if (content.siteSettings.launchReady) {
     for (const blocker of demoBlockers) {
-      fail(`Production release blocked — ${blocker}. Replace it in Sanity Studio and republish.`);
+      fail(`Production release blocked — ${blocker}. Replace it in the CMS and commit.`);
     }
   } else if (isStaging) {
     warn(
@@ -153,7 +187,7 @@ async function main() {
   } else {
     fail(
       'Production release blocked — "Сайт готов к публичному запуску" (siteSettings.launchReady) is off, ' +
-        "so this content is still considered demo data. Turn it on in Sanity Studio once the real details are in place, " +
+        "so this content is still considered demo data. Turn it on in the CMS once the real details are in place, " +
         "or build with DEPLOY_ENV=staging for a demo/preview release." +
         (demoBlockers.length > 0
           ? `\n   Still to replace before it can be turned on:\n${demoBlockers.map((b) => `     - ${b}`).join("\n")}`

@@ -1,4 +1,4 @@
-import { PortableTextContent } from "@/components/site/portable-text";
+import { MarkdownContent } from "@/components/site/markdown-content";
 import type { LegalPageDTO } from "@/lib/cms/types";
 import { formatSingleDate } from "@/lib/tours";
 
@@ -10,7 +10,7 @@ export function LegalPageView({ page }: { page: LegalPageDTO }) {
         <p className="mt-2 text-sm text-muted-foreground">Обновлено: {formatSingleDate(page.updatedAt)}</p>
       )}
       <div className="mt-8">
-        <PortableTextContent value={page.content} />
+        <MarkdownContent value={page.content} />
       </div>
     </article>
   );

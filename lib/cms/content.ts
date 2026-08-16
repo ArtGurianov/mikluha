@@ -8,7 +8,7 @@ const CACHE_PATH = path.join(process.cwd(), ".cms-cache", "content.json");
 function loadSnapshot(): ContentSnapshot {
   if (!fs.existsSync(CACHE_PATH)) {
     throw new Error(
-      "CMS content cache not found (.cms-cache/content.json). Run `npm run sync:cms && npm run materialize:assets` first " +
+      "CMS content cache not found (.cms-cache/content.json). Run `npm run sync:content && npm run materialize:assets` first " +
         "(this happens automatically before `npm run dev`, and is part of `npm run build:production`).",
     );
   }

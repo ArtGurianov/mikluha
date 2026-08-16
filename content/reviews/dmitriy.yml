@@ -1,0 +1,8 @@
+image:
+  image: "local:review-3.jpg"
+  alt: Скриншот отзыва о поездке
+authorName: Дмитрий
+tour: altai
+sortOrder: 30
+isListed: true
+isDemo: true

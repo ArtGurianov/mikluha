@@ -27,7 +27,14 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-const FORBIDDEN_HOST_RE = /(api\.|apicdn\.|cdn\.)?sanity\.io|sanity-cdn\.com/i;
+// Every CMS image must have been materialized to a local /generated/cms path
+// by scripts/materialize-assets.ts before `next build` runs — a leaked
+// cloud.ru URL means that step was skipped for something.
+const FORBIDDEN_HOST_RE = /s3\.cloud\.ru/i;
+// .yml is deliberately excluded: /out/admin/config.yml legitimately names the
+// cloud.ru host (it's the CMS media library's own config, not a materialized
+// page), so scanning it would make FORBIDDEN_HOST_RE fail on every build.
+// Don't add it here without also excluding public/admin/config.yml specifically.
 const SCANNABLE_EXT = new Set([".html", ".js", ".json", ".xml", ".txt"]);
 const ASSET_REF_RE = /\/generated\/cms\/[\w-]+\/[\w-]+\.(?:webp|png|jpg|jpeg|ico)/g;
 
@@ -90,7 +97,7 @@ async function main() {
     const text = await readFile(file, "utf-8");
 
     if (FORBIDDEN_HOST_RE.test(text)) {
-      fail(`Found a Sanity API/CDN URL in ${path.relative(ROOT, file)} — production artifact must be fully local`);
+      fail(`Found a cloud.ru object storage URL in ${path.relative(ROOT, file)} — production artifact must be fully local`);
     }
 
     for (const match of text.matchAll(ASSET_REF_RE)) {

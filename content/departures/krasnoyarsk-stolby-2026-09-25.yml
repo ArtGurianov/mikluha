@@ -1,0 +1,10 @@
+tour: krasnoyarsk-stolby
+startDate: "2026-09-25"
+endDate: "2026-09-27"
+bookingStatus: OPEN
+price: 15000
+prepaymentAmount: 3000
+organizers:
+  - artur
+isListed: true
+isDemo: true

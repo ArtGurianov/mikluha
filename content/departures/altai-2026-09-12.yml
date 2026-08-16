@@ -1,0 +1,10 @@
+tour: altai
+startDate: "2026-09-12"
+endDate: "2026-09-16"
+bookingStatus: OPEN
+price: 34000
+prepaymentAmount: 5000
+organizers:
+  - artur
+isListed: true
+isDemo: true

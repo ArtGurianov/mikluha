@@ -1,0 +1,8 @@
+image:
+  image: "local:review-2.jpg"
+  alt: Скриншот переписки с клиентом
+authorName: Александр
+tour: krasnoyarsk-stolby
+sortOrder: 20
+isListed: true
+isDemo: true

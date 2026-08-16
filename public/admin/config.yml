@@ -1,0 +1,299 @@
+backend:
+  name: github
+  repo: ArtGurianov/mikluha
+  branch: main
+  base_url: https://cms-auth.CHANGE-ME.example # TODO: set to the deployed oauth-broker origin
+  site_domain: CHANGE-ME.example # TODO: production domain, e.g. miklukha-maklay.ru
+
+site_url: https://miklukha-maklay.ru
+locale: ru
+
+media_libraries:
+  aws_s3:
+    access_key_id: CHANGE-ME # TODO: cloud.ru access key ID (not secret — see RUNBOOK.md)
+    bucket: CHANGE-ME # TODO: cloud.ru bucket name
+    region: ru-central-1
+    endpoint: https://s3.cloud.ru
+    prefix: cms/
+    public_url: https://s3.cloud.ru/CHANGE-ME # TODO: match the bucket name above
+    acl: false # rely on a bucket-policy public-read rule, not per-object ACL headers
+
+singletons:
+  - name: site_settings
+    label: Настройки сайта
+    file: content/site-settings.yml
+    format: yml
+    fields:
+      - {name: siteName, label: "Название сайта / бренда", widget: string}
+      - {name: siteUrl, label: "Адрес сайта", widget: string, hint: "Например https://miklukha-maklay.ru"}
+      - {name: timezone, label: "Часовой пояс", widget: string, default: "Europe/Moscow", hint: "Используется для расчёта ближайшего выезда во время сборки сайта, например Europe/Moscow"}
+      - name: logo
+        label: Логотип
+        widget: object
+        required: false
+        fields:
+          - {name: image, label: Файл, widget: image}
+          - {name: alt, label: Alt, widget: string, required: false}
+      - name: favicon
+        label: Favicon
+        widget: object
+        required: false
+        hint: "Опционально: если не задан, используется логотип."
+        fields:
+          - {name: image, label: Файл, widget: image}
+          - {name: alt, label: Alt, widget: string, required: false}
+      - name: hero
+        label: "Главный экран (Hero)"
+        widget: object
+        fields:
+          - {name: title, label: Заголовок, widget: string}
+          - {name: subtitle, label: Подзаголовок, widget: text, required: false}
+          - name: image
+            label: "Фоновое изображение"
+            widget: object
+            fields:
+              - {name: image, label: Файл, widget: image}
+              - {name: alt, label: Alt, widget: string, required: false}
+      - name: booking
+        label: "Бронирование по умолчанию"
+        widget: object
+        hint: "Значения по умолчанию для Booking Modal, если у конкретного выезда не заданы свои QR / сумма / организатор."
+        fields:
+          - name: defaultQr
+            label: "QR-код по умолчанию"
+            widget: object
+            required: false
+            fields:
+              - {name: image, label: Файл, widget: image}
+              - {name: alt, label: Alt, widget: string, required: false}
+          - {name: defaultPrepaymentAmount, label: "Сумма предоплаты по умолчанию, ₽", widget: number, required: false, value_type: int}
+          - {name: defaultOrganizer, label: "Организатор по умолчанию", widget: relation, collection: organizers, value_field: "{{slug}}", search_fields: [name], display_fields: [name], required: false}
+          - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите, пока QR/сумма/организатор по умолчанию тестовые."}
+      - name: socials
+        label: "Соцсети и мессенджеры"
+        widget: object
+        fields:
+          - {name: maxChannelUrl, label: "Ссылка на канал MAX", widget: string, required: false, hint: "Опционально. Отображается вне Booking Modal, например в Footer."}
+      - name: company
+        label: "Реквизиты организации"
+        widget: object
+        fields:
+          - {name: legalName, label: "Название / ФИО ИП", widget: string}
+          - {name: inn, label: ИНН, widget: string}
+          - {name: ogrn, label: ОГРН, widget: string}
+          - {name: phone, label: "Телефон компании", widget: string}
+          - {name: email, label: Email, widget: string, required: false}
+          - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите, пока реквизиты тестовые. Блокирует публичный запуск сайта."}
+      - name: seo
+        label: "SEO по умолчанию"
+        widget: object
+        fields:
+          - {name: title, label: "Заголовок сайта (title)", widget: string}
+          - {name: description, label: "Описание сайта", widget: text}
+          - name: ogImage
+            label: "OG-изображение по умолчанию"
+            widget: object
+            required: false
+            fields:
+              - {name: image, label: Файл, widget: image}
+              - {name: alt, label: Alt, widget: string, required: false}
+      - name: launchReady
+        label: "Сайт готов к публичному запуску"
+        widget: boolean
+        default: false
+        hint: "Включайте только после того, как все реквизиты, контакты, QR и отзывы заменены на реальные (см. памятку организатора)."
+
+collections:
+  - name: tours
+    label: Туры
+    label_singular: Тур
+    folder: content/tours
+    extension: yml
+    format: yml
+    slug: "{{fields.slug}}"
+    create: true
+    fields:
+      - {name: title, label: Название, widget: string, hint: "Например: «Горный Алтай»"}
+      - name: slug
+        label: "Адрес страницы (slug)"
+        widget: string
+        pattern: ["^[a-z0-9]+(-[a-z0-9]+)*$", "Только латиница в нижнем регистре, цифры и дефис — например altai"]
+        hint: "Адрес направления на сайте: /tours/<slug>/. Только латиница в нижнем регистре, цифры и дефис. После публикации менять не рекомендуется — старый адрес перестанет открываться."
+      - {name: shortDescription, label: "Краткое описание", widget: text, pattern: ["^[\\s\\S]{1,220}$", "До 220 символов"], hint: "Показывается на карточке направления на главной странице."}
+      - {name: description, label: "Полное описание", widget: markdown, required: false}
+      - name: coverImage
+        label: Обложка
+        widget: object
+        fields:
+          - {name: image, label: Файл, widget: image}
+          - {name: alt, label: "Альтернативный текст (alt)", widget: string}
+      - name: gallery
+        label: "Галерея фото"
+        widget: list
+        required: false
+        field:
+          name: item
+          label: Фото
+          widget: object
+          fields:
+            - {name: image, label: Файл, widget: image}
+            - {name: alt, label: "Альтернативный текст (alt)", widget: string}
+      - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true, hint: "Выключите, чтобы временно скрыть направление из публичного каталога."}
+      - {name: sortOrder, label: "Порядок сортировки", widget: number, default: 0, value_type: int, hint: "Чем меньше число, тем выше направление в списке."}
+      - name: seo
+        label: SEO
+        widget: object
+        required: false
+        fields:
+          - {name: title, label: "SEO-заголовок", widget: string, required: false}
+          - {name: description, label: "SEO-описание", widget: text, required: false}
+          - name: image
+            label: "OG-изображение"
+            widget: object
+            required: false
+            fields:
+              - {name: image, label: Файл, widget: image}
+              - {name: alt, label: Alt, widget: string, required: false}
+
+  - name: departures
+    label: Выезды
+    label_singular: Выезд
+    folder: content/departures
+    extension: yml
+    format: yml
+    slug: "{{fields.tour}}-{{fields.startDate}}"
+    create: true
+    sortable_fields: [startDate]
+    fields:
+      - {name: tour, label: Направление, widget: relation, collection: tours, value_field: "{{slug}}", search_fields: [title], display_fields: [title]}
+      - {name: startDate, label: "Дата начала", widget: datetime, date_format: "yyyy-MM-dd", time_format: false, picker_utc: true}
+      - {name: endDate, label: "Дата окончания", widget: datetime, date_format: "yyyy-MM-dd", time_format: false, picker_utc: true}
+      - name: bookingStatus
+        label: "Статус набора"
+        widget: select
+        default: OPEN
+        options:
+          - {label: "Набор открыт", value: OPEN}
+          - {label: "Набор закрыт", value: CLOSED}
+          - {label: "Поездка отменена", value: CANCELLED}
+      - {name: price, label: "Стоимость поездки, ₽", widget: number, required: false, value_type: int, hint: "Цена за одного человека, целое число рублей. Обязательна, если набор открыт."}
+      - {name: prepaymentAmount, label: "Сумма предоплаты, ₽", widget: number, required: false, value_type: int, hint: "Если не заполнено, используется значение по умолчанию из «Настроек сайта»."}
+      - name: paymentQr
+        label: "QR-код предоплаты"
+        widget: object
+        required: false
+        hint: "Если не загружен, используется QR по умолчанию из «Настроек сайта»."
+        fields:
+          - {name: image, label: Файл, widget: image}
+          - {name: alt, label: Alt, widget: string, required: false}
+      - {name: organizers, label: Организаторы, widget: relation, collection: organizers, value_field: "{{slug}}", search_fields: [name], display_fields: [name], multiple: true, required: false, hint: "Если список пуст, используется организатор по умолчанию из «Настроек сайта»."}
+      - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true}
+      - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите для тестовых выездов. Такие выезды блокируют публичный запуск сайта, пока не будут заменены."}
+
+  - name: reports
+    label: Отчёты
+    label_singular: "Отчёт о поездке"
+    folder: content/reports
+    extension: yml
+    format: yml
+    slug: "{{fields.slug}}"
+    create: true
+    fields:
+      - {name: title, label: Название, widget: string}
+      - name: slug
+        label: "Адрес страницы (slug)"
+        widget: string
+        pattern: ["^[a-z0-9]+(-[a-z0-9]+)*$", "Только латиница в нижнем регистре, цифры и дефис — например altai-june-2026"]
+        hint: "Адрес отчёта на сайте: /reports/<slug>/. Только латиница в нижнем регистре, цифры и дефис."
+      - {name: tour, label: Направление, widget: relation, collection: tours, value_field: "{{slug}}", search_fields: [title], display_fields: [title]}
+      - {name: departure, label: "Связанный выезд", widget: relation, collection: departures, value_field: "{{slug}}", search_fields: [tour, startDate], display_fields: [tour, startDate], required: false, hint: "Если указан, дата отчёта берётся из выезда автоматически."}
+      - {name: date, label: "Дата поездки", widget: datetime, date_format: "yyyy-MM-dd", time_format: false, picker_utc: true, required: false, hint: "Заполняйте только если нет связанного выезда."}
+      - name: coverImage
+        label: Обложка
+        widget: object
+        fields:
+          - {name: image, label: Файл, widget: image}
+          - {name: alt, label: Alt, widget: string}
+      - name: gallery
+        label: "Галерея фото"
+        widget: list
+        min: 1
+        field:
+          name: item
+          label: Фото
+          widget: object
+          fields:
+            - {name: image, label: Файл, widget: image}
+            - {name: alt, label: Alt, widget: string}
+      - {name: description, label: Описание, widget: text, required: false}
+      - {name: sortOrder, label: "Порядок сортировки", widget: number, default: 0, value_type: int}
+
+  - name: reviews
+    label: Отзывы
+    label_singular: Отзыв
+    folder: content/reviews
+    extension: yml
+    format: yml
+    # Deliberately Cyrillic (default `slug.encoding: unicode`), unlike
+    # tours/reports/legal_pages: this slug is never a URL, only an opaque
+    # filename other documents' `organizers`/`tour` relation fields reference —
+    # `encoding: ascii` would strip an all-Cyrillic authorName to nothing and
+    # fall back to a random id instead, which is worse. Git and the filesystem
+    # handle UTF-8 filenames fine.
+    slug: "{{fields.authorName}}"
+    create: true
+    fields:
+      - name: image
+        label: "Изображение отзыва"
+        widget: object
+        hint: "Обычно — скриншот переписки с клиентом."
+        fields:
+          - {name: image, label: Файл, widget: image}
+          - {name: alt, label: Alt, widget: string}
+      - {name: authorName, label: "Имя автора", widget: string}
+      - {name: tour, label: "Связанное направление", widget: relation, collection: tours, value_field: "{{slug}}", search_fields: [title], display_fields: [title], required: false, hint: Опционально.}
+      - {name: description, label: Комментарий, widget: text, required: false, hint: "Опционально, если нужно продублировать текстом."}
+      - {name: sortOrder, label: "Порядок сортировки", widget: number, default: 0, value_type: int}
+      - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true}
+      - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите для тестовых отзывов. Блокирует публичный запуск сайта, пока не будет заменено."}
+
+  - name: organizers
+    label: Организаторы
+    label_singular: Организатор
+    folder: content/organizers
+    extension: yml
+    format: yml
+    # Deliberately Cyrillic — see the same note on the `reviews` collection above.
+    slug: "{{fields.name}}"
+    create: true
+    fields:
+      - {name: name, label: Имя, widget: string}
+      - {name: phone, label: Телефон, widget: string, pattern: ["^\\+7\\d{10}$", "Введите телефон в формате +7XXXXXXXXXX"], hint: "В формате +7XXXXXXXXXX. Используется в Booking Modal и как ссылка tel:."}
+      - name: photo
+        label: Фотография
+        widget: object
+        required: false
+        fields:
+          - {name: image, label: Файл, widget: image}
+          - {name: alt, label: Alt, widget: string, required: false}
+      - {name: bio, label: "О себе", widget: text, required: false, hint: "Биография, опыт, философия поездок."}
+      - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true}
+      - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите для тестового организатора. Блокирует публичный запуск сайта, пока не будет заменено."}
+
+  - name: legal_pages
+    label: "Правовые страницы"
+    label_singular: "Правовая страница"
+    folder: content/legal
+    extension: yml
+    format: yml
+    slug: "{{fields.slug}}"
+    create: true
+    fields:
+      - {name: title, label: Заголовок, widget: string}
+      - name: slug
+        label: "Адрес страницы (slug)"
+        widget: string
+        pattern: ["^[a-z0-9]+(-[a-z0-9]+)*$", "Только латиница в нижнем регистре, цифры и дефис — например public-offer"]
+        hint: "Адрес страницы на сайте: например booking-terms → /booking-terms/. Только латиница в нижнем регистре, цифры и дефис. После публикации менять не рекомендуется — старый адрес перестанет открываться. Занятые разделами сайта адреса (tours, reports, api, _next, generated, index, 404, robots.txt, sitemap.xml, icon.png, apple-icon.png) недоступны — сборка их отклонит."
+      - {name: content, label: "Текст страницы", widget: markdown}
+      - {name: updatedAt, label: "Дата обновления текста", widget: datetime, date_format: "yyyy-MM-dd", time_format: false, picker_utc: true, required: false}

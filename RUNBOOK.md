@@ -5,69 +5,104 @@
 ## Архитектура
 
 - Публичный сайт — pure static export (`output: 'export'`), обслуживается Nginx из `/out`.
-- Sanity (Content Lake + Studio) — источник контента только во время сборки. Runtime публичного сайта от Sanity не зависит.
-- Один Coolify application: `miklukha-web`, `Dockerfile` в корне репозитория (multi-stage: deps → build → nginx runtime).
+- Контент — YAML-файлы в `content/`, часть этого репозитория. Редактируется через `/admin`
+  (Sveltia CMS: статический JS-бандл, коммитит прямо в GitHub) или руками. Runtime публичного
+  сайта от CMS не зависит — но сама *сборка* не полностью офлайн: текстовый контент читается с
+  диска, а вот картинки, загруженные через `/admin` (не `local:`-ссылки на демо-ассеты),
+  `scripts/materialize-assets.ts` скачивает с cloud.ru — см. предупреждение ниже.
+- Два Coolify application:
+  - `miklukha-web` — сам сайт, `Dockerfile` в корне репозитория (multi-stage: deps → build →
+    nginx runtime).
+  - `miklukha-cms-auth` — GitHub OAuth token-exchange broker для `/admin` (см. «CMS: авторизация
+    редакторов» ниже), `oauth-broker/Dockerfile`.
 
 ## Переменные окружения (build-time only)
 
-Задаются в Coolify как build ARGs / secrets, не должны попадать в рантайм-образ:
+Задаются в Coolify как build ARGs, не должны попадать в рантайм-образ:
 
 | Переменная | Назначение |
 |---|---|
-| `SANITY_PROJECT_ID`, `SANITY_DATASET` | какой Sanity-проект/датасет использовать |
-| `SANITY_API_TOKEN` | read-токен для build-time чтения published-контента |
-| `SANITY_API_VERSION` | версия Sanity API (см. `.env.example`) |
 | `DEPLOY_ENV` | `production` или `staging` — управляет индексируемостью |
+| `SITE_URL` | Только при `DEPLOY_ENV=staging`: canonical/OG base URL для staging-хоста |
 
-Если `SANITY_PROJECT_ID`/`SANITY_DATASET` не заданы, сборка идёт на локальных mock-данных из `lib/cms/fixtures/` — удобно для preview-сборок без доступа к реальному проекту.
+Никаких CMS-credentials на этапе сборки не требуется — контент уже лежит в собранном репозитории.
+Но как только хотя бы одно изображение загружено через `/admin`, доступность cloud.ru становится
+жёсткой зависимостью самой сборки (не рантайма сайта — см. `docs/DECISIONS.md` #1): `next build`
+не начнётся, пока `materialize-assets` не скачает и не порежет на WEBP-варианты каждую такую
+картинку. Если пересборка упала на этом шаге — сначала проверить доступность cloud.ru, а не
+GitHub/Coolify.
 
 ## Локальная разработка
 
 ```bash
 pnpm install
-pnpm dev   # predev сам прогонит sync:cms + materialize:assets на фикстурах
+pnpm dev   # predev сам прогонит vendor:admin + sync:content + materialize:assets
 ```
-
-## Типы контента (Sanity TypeGen)
-
-`lib/cms/generated/sanity.types.ts` генерируется из `sanity/schemaTypes/*` и GROQ-запросов
-в `lib/cms/queries.ts`. Файл **закоммичен** — изменение схемы должно быть видно в diff как
-изменение контентного контракта. Руками его не редактируют.
-
-```bash
-pnpm run cms:types         # перегенерировать после правки схемы или запроса
-pnpm run cms:types:check   # то же + падает, если закоммиченный файл устарел
-```
-
-Каждый запрос обязан быть обёрнут в `defineQuery` — TypeGen ищет именно их и, кроме типов
-результата, генерирует module augmentation, благодаря которому `client.fetch(query)`
-типизируется по реальной схеме (без неё он возвращает `any`, и расхождение схемы с кодом
-проходит незамеченным). Извлечение схемы идёт с `--enforce-required-fields`, но Sanity не
-хранит `validation`-правила в документах, поэтому большая часть полей всё равно приходит
-optional — что именно означает отсутствующее поле, решает `lib/cms/normalize.ts`
-(см. `lib/cms/normalize.test.ts`).
 
 ## Production build pipeline
 
 ```bash
 pnpm run build:production
-# = clean && cms:types && lint && test && sync:cms && materialize:assets
+# = clean && vendor:admin && lint && test && sync:content && materialize:assets
 #   && validate:content && build && validate:out
 ```
 
-`cms:types` идёт первым шагом: сборка всегда компилируется против актуальной схемы, а не
-против того, что было закоммичено. Сеть для этого шага не нужна — схема читается локально.
+`vendor:admin` копирует Sveltia CMS (`node_modules/@sveltia/cms/dist/sveltia-cms.js`) в
+`public/admin/` — идёт первым шагом, чтобы `/admin` всегда собирался против установленной версии
+пакета (сам бандл в репозиторий не коммитится, см. `.gitignore`).
 
 Любая ошибка на любом шаге должна ломать именно этот build, не трогая уже работающий production-релиз — это обеспечивается тем, что Docker build стадии независимы, и `docker build` просто падает, не подменяя текущий запущенный container.
 
-## Sanity webhook → rebuild
+## CMS: авторизация редакторов (GitHub OAuth + broker)
 
-1. В Sanity создать webhook: on publish/unpublish (или любой mutation) → HTTP POST на Coolify deploy webhook URL.
-2. В заголовке `Authorization: Bearer <Coolify deploy token>` — токен хранится только в конфигурации webhook в Sanity, не в репозитории.
+Sveltia CMS хранит контент через GitHub API (`backend.name: github` в `public/admin/config.yml`).
+GitHub требует обмена authorization code на token с client secret — это не может выполняться в
+браузере, поэтому нужен маленький внешний сервис (`oauth-broker/`), который держит секрет.
+
+Разовая настройка:
+
+1. Создать GitHub OAuth App: Settings → Developer settings → OAuth Apps → New OAuth App.
+   Authorization callback URL: `https://<cms-auth-домен>/callback`.
+2. Задеплоить `oauth-broker/` как отдельное Coolify application (`oauth-broker/Dockerfile`),
+   переменные окружения:
+
+   | Переменная | Назначение |
+   |---|---|
+   | `GITHUB_CLIENT_ID` | Client ID созданного OAuth App |
+   | `GITHUB_CLIENT_SECRET` | Client secret — существует только здесь и в GitHub, никогда не в репозитории |
+   | `ALLOWED_DOMAINS` | **обязательно.** Домен(ы) сайта, которым разрешено использовать broker (через запятую, `*` как wildcard), например `miklukha-maklay.ru`. `*` разворачивается в «один и более символов» — `*.example.com` матчит `cms.example.com`, но НЕ голый `example.com`; перечисляйте оба явно, если нужны оба. Broker — сервис, держащий GitHub OAuth client secret и выдающий токены с правом записи в репозиторий, поэтому без явного allowlist он вообще отказывается запускаться. |
+
+3. В `public/admin/config.yml` указать `backend.base_url` (origin задеплоенного broker) и
+   `backend.site_domain` (продовый домен сайта).
+
+Ротация секрета — пересоздать client secret в GitHub OAuth App, обновить `GITHUB_CLIENT_SECRET` и
+передеплоить `miklukha-cms-auth`; `GITHUB_CLIENT_ID` и `public/admin/config.yml` не меняются.
+
+## CMS: медиатека (cloud.ru Object Storage)
+
+Загрузка изображений через `/admin` идёт напрямую в cloud.ru Object Storage (S3-совместимое
+хранилище), не в сам репозиторий — так `content/` остаётся текстовым и лёгким для просмотра
+диффов.
+
+1. Создать bucket в cloud.ru Evolution Object Storage; настроить bucket policy на публичное
+   чтение (`GetObject`) объектов под префиксом `cms/` — `scripts/materialize-assets.ts` скачивает
+   их по прямой ссылке во время сборки. Листинг публично не открывать.
+2. Выдать редакторам scoped-ключ с правом только `PutObject` под тем же префиксом (без
+   delete/list).
+3. В `public/admin/config.yml` → `media_libraries.aws_s3` указать `access_key_id` (не секретный)
+   и `bucket`. **Secret access key в конфиг не пишется** — каждый редактор вводит его один раз в
+   интерфейсе Sveltia при первой загрузке файла; хранится только в его браузере.
+
+## GitHub push → rebuild
+
+Коммит в `main` (в том числе через `/admin`) → стандартный Coolify Git-deploy webhook на
+`miklukha-web` → пересборка. Отдельного webhook-конфига в CMS настраивать не нужно — это уже
+GitHub-репозиторий, который Coolify отслеживает напрямую.
 
 ## Плановый ежедневный rebuild
 
-`nextDeparture`/`nextBookableDeparture` вычисляются во время сборки — без планового rebuild прошедшие даты не «протухнут» сами.
+`nextDeparture`/`nextBookableDeparture` вычисляются во время сборки — без нового коммита в
+`content/` прошедшие даты не «протухнут» сами.
 
 Пример host `cron`/systemd timer на VPS (не на самом сайте, credential не должен попадать в публичный образ):
 
@@ -80,9 +115,9 @@ pnpm run build:production
 
 ## Staging
 
-Собирать с `DEPLOY_ENV=staging` — сайт получит `robots.txt: Disallow: /`, `noindex,nofollow` и canonical/OG-теги на нейтральном `https://staging.invalid` (или на `SITE_URL`, если задан), а не на боевом домене. Использовать отдельный Sanity dataset (`staging`) при необходимости.
+Собирать с `DEPLOY_ENV=staging` — сайт получит `robots.txt: Disallow: /`, `noindex,nofollow` и canonical/OG-теги на нейтральном `https://staging.invalid` (или на `SITE_URL`, если задан), а не на боевом домене.
 
-**Важно:** `pnpm run build:production` без `DEPLOY_ENV=staging` требует `siteSettings.launchReady = true` и упадёт с ошибкой на демо-контенте — это осознанный gate (см. `docs/DECISIONS.md` #4): демо-QR отправляет реальные деньги на тестовый счёт, а демо-телефон никуда не дозванивается. Локальные/preview-сборки на фикстурах или недоготовленном контенте всегда нужно гнать как `DEPLOY_ENV=staging pnpm run build:production`.
+**Важно:** `pnpm run build:production` без `DEPLOY_ENV=staging` требует `siteSettings.launchReady = true` и упадёт с ошибкой на демо-контенте — это осознанный gate (см. `docs/DECISIONS.md` #4): демо-QR отправляет реальные деньги на тестовый счёт, а демо-телефон никуда не дозванивается. Локальные/preview-сборки на недоготовленном контенте всегда нужно гнать как `DEPLOY_ENV=staging pnpm run build:production`.
 
 ## Candidate HTTP healthcheck
 
@@ -97,11 +132,3 @@ HEALTHCHECK_BASE_URL=http://localhost:8080 pnpm run healthcheck
 ## Pre-launch checklist
 
 Коротко: реальные реквизиты/контакты/QR, `isDemo=false` везде, `siteSettings.launchReady=true`, чистый `build:production` без ошибок валидации. Полный список для организатора — в `CONTENT-GUIDE.md`; `validate:content` сам перечислит всё, что осталось заменить.
-
-## Ручной seed mock-данных (только для dev/staging датасета)
-
-```bash
-SANITY_PROJECT_ID=... SANITY_DATASET=staging SANITY_API_TOKEN=<write token> pnpm run seed:mock
-```
-
-Скрипт отказывается работать с датасетом, не похожим на dev/staging/test, без флага `--allow-production`.

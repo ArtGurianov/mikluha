@@ -2,29 +2,28 @@
 /**
  * Step 2 of the production build pipeline.
  *
- * Reads .cms-cache/content.json (written by sync-sanity-content.ts, still
- * containing "unresolved" images as {alt, sourceRef}), downloads/reads each
- * unique source image exactly once, generates local responsive WEBP variants
- * under public/generated/cms/<hash>/, and rewrites the cache file in place so
- * every image becomes {alt, width, height, variants}. Also derives the site
+ * Reads .cms-cache/content.json (written by sync-content.ts, still containing
+ * "unresolved" images as {alt, sourceRef}), downloads/reads each unique
+ * source image exactly once, generates local responsive WEBP variants under
+ * public/generated/cms/<hash>/, and rewrites the cache file in place so every
+ * image becomes {alt, width, height, variants}. Also derives the site
  * favicon / apple touch icon from siteSettings.favicon (falling back to
  * siteSettings.logo) into app/icon.png and app/apple-icon.png.
  */
-import "dotenv/config";
-
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import yaml from "js-yaml";
 import sharp from "sharp";
 
-import { readSanityEnv, sanityImageUrl } from "../lib/cms/client";
 import type { ImageVariants, UnresolvedContentSnapshot } from "../lib/cms/types";
 
 const CACHE_FILE = path.resolve(process.cwd(), ".cms-cache", "content.json");
-const FIXTURES_ASSETS_DIR = path.resolve(process.cwd(), "lib/cms/fixtures/assets");
+const CONTENT_ASSETS_DIR = path.resolve(process.cwd(), "content/assets");
 const GENERATED_DIR = path.resolve(process.cwd(), "public/generated/cms");
 const APP_DIR = path.resolve(process.cwd(), "app");
+const ADMIN_CONFIG_FILE = path.resolve(process.cwd(), "public/admin/config.yml");
 
 const VARIANTS: Array<{ name: keyof ImageVariants; width: number }> = [
   { name: "thumbnail", width: 400 },
@@ -34,20 +33,49 @@ const VARIANTS: Array<{ name: keyof ImageVariants; width: number }> = [
   { name: "lightbox", width: 2600 },
 ];
 
-async function loadSourceBuffer(sourceRef: string): Promise<Buffer> {
+/**
+ * A content file's `sourceRef` can be anything someone typed or hand-edited —
+ * only the URL prefix Sveltia's own S3 media library would actually produce
+ * (`public_url`, falling back to `endpoint/bucket`, both read from
+ * public/admin/config.yml) is allowed through `fetch()` here. Without this, a
+ * bad edit or a compromised content file could make the build download
+ * arbitrary bytes from anywhere into the release image.
+ */
+async function loadAllowedAssetHostPrefixes(): Promise<string[]> {
+  const configText = await readFile(ADMIN_CONFIG_FILE, "utf-8");
+  const config = yaml.load(configText) as {
+    media_libraries?: { aws_s3?: { endpoint?: string; bucket?: string; public_url?: string } };
+  };
+  const s3 = config.media_libraries?.aws_s3;
+  if (!s3) return [];
+
+  // Trailing slash matters: Sveltia always joins with `/`
+  // (`${public_url}/${key}`), so without it "https://s3.cloud.ru/mybucket"
+  // would also admit "https://s3.cloud.ru/mybucket-attacker/x.jpg".
+  const prefixes: string[] = [];
+  if (s3.public_url) prefixes.push(`${s3.public_url.replace(/\/+$/, "")}/`);
+  if (s3.endpoint && s3.bucket) prefixes.push(`${s3.endpoint.replace(/\/+$/, "")}/${s3.bucket}/`);
+  return prefixes;
+}
+
+async function loadSourceBuffer(sourceRef: string, allowedPrefixes: string[]): Promise<Buffer> {
   if (sourceRef.startsWith("local:")) {
     const filename = sourceRef.slice("local:".length);
-    return readFile(path.join(FIXTURES_ASSETS_DIR, filename));
+    return readFile(path.join(CONTENT_ASSETS_DIR, filename));
   }
 
-  const env = readSanityEnv();
-  if (!env) {
-    throw new Error(`Cannot resolve remote asset ref "${sourceRef}" without SANITY_PROJECT_ID/SANITY_DATASET set.`);
+  // Anything else is a real asset URL — the cloud.ru object the Sveltia media
+  // library uploaded to and wrote directly into the content file.
+  if (!allowedPrefixes.some((prefix) => sourceRef.startsWith(prefix))) {
+    throw new Error(
+      `Refusing to download "${sourceRef}" — it doesn't match the configured media library host ` +
+        `(public/admin/config.yml media_libraries.aws_s3). Fix the content file or the config.`,
+    );
   }
-  const url = sanityImageUrl(env, sourceRef);
-  const response = await fetch(url);
+
+  const response = await fetch(sourceRef);
   if (!response.ok) {
-    throw new Error(`Failed to download Sanity asset ${sourceRef}: HTTP ${response.status}`);
+    throw new Error(`Failed to download CMS asset ${sourceRef}: HTTP ${response.status}`);
   }
   return Buffer.from(await response.arrayBuffer());
 }
@@ -60,12 +88,12 @@ interface Resolved {
 
 const resolvedCache = new Map<string, Promise<Resolved>>();
 
-async function resolveImage(sourceRef: string): Promise<Resolved> {
+async function resolveImage(sourceRef: string, allowedPrefixes: string[]): Promise<Resolved> {
   const cached = resolvedCache.get(sourceRef);
   if (cached) return cached;
 
   const promise = (async (): Promise<Resolved> => {
-    const buffer = await loadSourceBuffer(sourceRef);
+    const buffer = await loadSourceBuffer(sourceRef, allowedPrefixes);
     const hash = createHash("sha256").update(buffer).update(sourceRef).digest("hex").slice(0, 16);
     const outDir = path.join(GENERATED_DIR, hash);
     await mkdir(outDir, { recursive: true });
@@ -158,10 +186,10 @@ function applyResolved(node: unknown, cache: Map<string, Resolved>) {
   }
 }
 
-async function materializeBrandIcons(iconSourceRef: string | undefined) {
+async function materializeBrandIcons(iconSourceRef: string | undefined, allowedPrefixes: string[]) {
   if (!iconSourceRef) return;
 
-  const buffer = await loadSourceBuffer(iconSourceRef);
+  const buffer = await loadSourceBuffer(iconSourceRef, allowedPrefixes);
 
   await sharp(buffer)
     .resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -180,6 +208,7 @@ async function materializeBrandIcons(iconSourceRef: string | undefined) {
 async function main() {
   const raw = await readFile(CACHE_FILE, "utf-8");
   const snapshot = JSON.parse(raw) as UnresolvedContentSnapshot;
+  const allowedPrefixes = await loadAllowedAssetHostPrefixes();
 
   const iconSourceRef = snapshot.siteSettings.favicon?.sourceRef ?? snapshot.siteSettings.logo?.sourceRef;
 
@@ -190,7 +219,7 @@ async function main() {
 
   const cache = new Map<string, Resolved>();
   for (const ref of refs) {
-    cache.set(ref, await resolveImage(ref));
+    cache.set(ref, await resolveImage(ref, allowedPrefixes));
   }
 
   applyResolved(snapshot, cache);
@@ -198,7 +227,7 @@ async function main() {
   await writeFile(CACHE_FILE, JSON.stringify(snapshot, null, 2), "utf-8");
   console.log(`[materialize-assets] wrote ${refs.size} image(s) to ${path.relative(process.cwd(), GENERATED_DIR)}/`);
 
-  await materializeBrandIcons(iconSourceRef);
+  await materializeBrandIcons(iconSourceRef, allowedPrefixes);
 }
 
 main().catch((error) => {

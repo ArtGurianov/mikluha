@@ -14,43 +14,34 @@ RUN pnpm install --frozen-lockfile
 # ---------------------------------------------------------------------------
 # Stage 2: clean production build
 #
-# Sanity credentials are passed as build ARGs — they exist only in this
-# ephemeral build stage/layer and are never copied into the runtime image.
-# Omitting them builds against the committed lib/cms/fixtures mock content
-# instead of a live Sanity dataset — but that content has launchReady=false,
-# so it also needs `--build-arg DEPLOY_ENV=staging` (the default below is
-# "production", which validate:content deliberately refuses to build from
-# demo content). A real production image needs both real Sanity credentials
-# AND DEPLOY_ENV left at its "production" default.
+# Content lives in content/ (this checked-out repo) — the build reads it
+# straight off disk, no CMS credentials of any kind needed here. The only
+# build-time switch left is DEPLOY_ENV, which controls indexability/canonical
+# URLs, not the content source. Its default ("production") requires
+# siteSettings.launchReady=true; the committed content/ (still demo data)
+# needs `--build-arg DEPLOY_ENV=staging` until real content replaces it.
 # ---------------------------------------------------------------------------
 FROM deps AS build
 WORKDIR /app
 
-ARG SANITY_PROJECT_ID
-ARG SANITY_DATASET
-ARG SANITY_API_TOKEN
-ARG SANITY_API_VERSION=2025-01-01
 ARG DEPLOY_ENV=production
+ARG SITE_URL
 
-ENV SANITY_PROJECT_ID=$SANITY_PROJECT_ID \
-    SANITY_DATASET=$SANITY_DATASET \
-    SANITY_API_TOKEN=$SANITY_API_TOKEN \
-    SANITY_API_VERSION=$SANITY_API_VERSION \
-    DEPLOY_ENV=$DEPLOY_ENV \
+ENV DEPLOY_ENV=$DEPLOY_ENV \
+    SITE_URL=$SITE_URL \
     NEXT_TELEMETRY_DISABLED=1
 
 COPY . .
 
 # The one and only definition of the release pipeline lives in package.json.
 # Spelling the steps out again here let the two drift apart silently: the image
-# build kept running an older list and quietly skipped cms:types, lint and test
-# — including the schema-drift gate that is the whole point of regenerating
-# types before compiling. Call the script, never re-list its steps.
+# build kept running an older list and quietly skipped whole steps (lint, test)
+# that build:production had since grown. Call the script, never re-list its steps.
 RUN pnpm run build:production
 
 # ---------------------------------------------------------------------------
 # Stage 3: production runtime — Nginx serving the static /out only.
-# No Node.js, no Sanity credentials, no source code.
+# No Node.js, no CMS credentials, no source code.
 #
 # Deliberately the *stable* branch tag, not a patch version or a digest. 1.27
 # was a mainline branch, which stops getting patches as soon as the next one

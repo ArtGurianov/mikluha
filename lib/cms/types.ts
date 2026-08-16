@@ -1,13 +1,12 @@
 /**
  * The CMS integration boundary.
  *
- * `Raw*` = what Sanity actually returns. These are NOT hand-written: they are
- * derived from lib/cms/generated/sanity.types.ts, which `npm run cms:types`
- * generates from sanity/schemaTypes/* plus the GROQ queries in ./queries.ts.
- * Hand-writing them let the schema and the types drift apart silently (a
- * `report.gallery` typed as required while the schema allowed it missing), and
- * `client.fetch()` on an unbranded query string returns `any`, so nothing
- * caught it. Regenerate instead of editing.
+ * `Raw*` = the shape a Sveltia CMS content file actually has on disk once
+ * parsed from YAML by scripts/sync-content.ts. These are hand-written and kept
+ * in sync by hand with public/admin/config.yml's field list — there is no
+ * schema-extraction/typegen step for a Git-based CMS, so a field renamed in
+ * one place and not the other only shows up as a normalize.ts crash naming the
+ * offending document, same as it always did for a genuinely missing field.
  *
  * `*DTO` = the internal, CMS-agnostic shapes the app renders, with assets
  * resolved to local paths. These stay hand-written on purpose: they are the
@@ -16,41 +15,120 @@
  * Raw -> DTO conversion (and every optional-field decision it implies) lives
  * in ./normalize.ts.
  */
-import type {
-  DeparturesQueryResult,
-  LegalPagesQueryResult,
-  OrganizersQueryResult,
-  ReportsQueryResult,
-  ReviewsQueryResult,
-  SiteSettingsQueryResult,
-  ToursQueryResult,
-} from "./generated/sanity.types";
 
 export type BookingStatus = "OPEN" | "CLOSED" | "CANCELLED";
 
-/** Portable Text content. Treated opaquely and rendered via @portabletext/react. */
-export type PortableTextBlocks = Record<string, unknown>[];
-
 /**
- * Structural view of a Sanity image field. `asset` is optional in the generated
- * types for every image in the schema — an image object can exist with only its
- * `alt`/hotspot filled in, or with a since-deleted asset — and only some image
- * fields declare an `alt` at all. normalize.ts is what resolves both cases.
+ * An image field as Sveltia's `image` + `alt` object pair writes it: `image`
+ * is either a real asset URL (the cloud.ru object the media library uploaded
+ * to) or, for the seed/demo content in content/, a `local:<filename>` ref
+ * resolved from content/assets/ by scripts/materialize-assets.ts. Optional
+ * fields can exist with only `alt` filled in (or nothing at all), same as
+ * a Sveltia image widget could — normalize.ts is what resolves that.
  */
 export interface RawImageRef {
-  _type: "image";
-  asset?: { _ref: string; _type?: "reference" };
+  image?: string;
   alt?: string;
 }
 
-export type RawTour = ToursQueryResult[number];
-export type RawDeparture = DeparturesQueryResult[number];
-export type RawReport = ReportsQueryResult[number];
-export type RawReview = ReviewsQueryResult[number];
-export type RawOrganizer = OrganizersQueryResult[number];
-export type RawLegalPage = LegalPagesQueryResult[number];
-/** The query is `[0]`-indexed, so it is nullable; sync-sanity-content.ts fails the build on a missing singleton. */
-export type RawSiteSettings = NonNullable<SiteSettingsQueryResult>;
+export interface RawTour {
+  title: string;
+  /** Also the user-facing route slug (`/tours/<slug>/`), explicit and ASCII-validated — see lib/legal.ts's SLUG_RE. */
+  slug: string;
+  shortDescription: string;
+  description?: string;
+  coverImage: RawImageRef;
+  gallery?: RawImageRef[];
+  isListed?: boolean;
+  sortOrder?: number;
+  seo?: { title?: string; description?: string; image?: RawImageRef };
+  /** Filename (without extension) — the collection's `slug` template output (`{{fields.slug}}`, so this always equals `slug` above). Injected by sync-content.ts, not a real YAML field. */
+  _slug: string;
+}
+
+export interface RawDeparture {
+  tour: string;
+  startDate: string;
+  endDate: string;
+  bookingStatus: BookingStatus;
+  price?: number;
+  prepaymentAmount?: number;
+  paymentQr?: RawImageRef;
+  organizers?: string[];
+  isListed?: boolean;
+  isDemo?: boolean;
+  _slug: string;
+}
+
+export interface RawReport {
+  title: string;
+  /** Also the user-facing route slug (`/reports/<slug>/`), explicit and ASCII-validated — see lib/legal.ts's SLUG_RE. */
+  slug: string;
+  tour: string;
+  departure?: string;
+  date?: string;
+  coverImage: RawImageRef;
+  gallery?: RawImageRef[];
+  description?: string;
+  sortOrder?: number;
+  _slug: string;
+}
+
+export interface RawReview {
+  image: RawImageRef;
+  authorName: string;
+  tour?: string;
+  description?: string;
+  sortOrder?: number;
+  isListed?: boolean;
+  isDemo?: boolean;
+  _slug: string;
+}
+
+export interface RawOrganizer {
+  name: string;
+  phone: string;
+  photo?: RawImageRef;
+  bio?: string;
+  isListed?: boolean;
+  isDemo?: boolean;
+  _slug: string;
+}
+
+export interface RawLegalPage {
+  title: string;
+  /** Also the user-facing route slug, unlike other collections' `_slug` — see lib/legal.ts. */
+  slug: string;
+  content: string;
+  updatedAt?: string;
+  _slug: string;
+}
+
+export interface RawSiteSettings {
+  siteName: string;
+  siteUrl: string;
+  timezone: string;
+  logo?: RawImageRef;
+  favicon?: RawImageRef;
+  hero?: { title: string; subtitle?: string; image: RawImageRef };
+  booking?: {
+    defaultQr?: RawImageRef;
+    defaultPrepaymentAmount?: number;
+    defaultOrganizer?: string;
+    isDemo?: boolean;
+  };
+  socials?: { maxChannelUrl?: string };
+  company?: {
+    legalName: string;
+    inn: string;
+    ogrn: string;
+    phone: string;
+    email?: string;
+    isDemo?: boolean;
+  };
+  seo?: { title: string; description: string; ogImage?: RawImageRef };
+  launchReady?: boolean;
+}
 
 export type RawDocument =
   | RawTour
@@ -92,10 +170,10 @@ export interface ImageAsset {
 
 /**
  * Placeholder for an image that has been normalized but not yet downloaded /
- * resized to local variants. `sourceRef` is either `local:<fixture-filename>`
- * (dev/fixture mode) or a Sanity asset `_ref` (live mode). Produced by
- * scripts/sync-sanity-content.ts, consumed and resolved into `ImageAsset` by
- * scripts/materialize-assets.ts.
+ * resized to local variants. `sourceRef` is either `local:<filename>`
+ * (seed/demo assets in content/assets/) or a real asset URL (cloud.ru, once
+ * uploaded through the CMS). Produced by scripts/sync-content.ts, consumed
+ * and resolved into `ImageAsset` by scripts/materialize-assets.ts.
  */
 export interface UnresolvedImageAsset {
   alt: string;
@@ -113,7 +191,8 @@ export interface TourDTO<TImage = ImageAsset> {
   slug: string;
   title: string;
   shortDescription: string;
-  description?: PortableTextBlocks;
+  /** Markdown. */
+  description?: string;
   coverImage: TImage;
   gallery: TImage[];
   isListed: boolean;
@@ -173,7 +252,8 @@ export interface LegalPageDTO {
   id: string;
   slug: string;
   title: string;
-  content: PortableTextBlocks;
+  /** Markdown. */
+  content: string;
   updatedAt?: string;
 }
 
@@ -205,7 +285,7 @@ export interface SiteSettingsDTO<TImage = ImageAsset> {
 
 export interface ContentSnapshot<TImage = ImageAsset> {
   generatedAt: string;
-  source: "sanity" | "fixtures";
+  source: "git";
   siteSettings: SiteSettingsDTO<TImage>;
   tours: TourDTO<TImage>[];
   departures: DepartureDTO<TImage>[];
@@ -215,5 +295,5 @@ export interface ContentSnapshot<TImage = ImageAsset> {
   legalPages: LegalPageDTO[];
 }
 
-/** Shape written by sync-sanity-content.ts, before asset materialization. */
+/** Shape written by sync-content.ts, before asset materialization. */
 export type UnresolvedContentSnapshot = ContentSnapshot<UnresolvedImageAsset>;

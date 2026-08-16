@@ -40,7 +40,7 @@ function departure(overrides: Partial<DepartureDTO>): DepartureDTO {
 function baseContent(overrides: Partial<ContentSnapshot> = {}): ContentSnapshot {
   return {
     generatedAt: new Date().toISOString(),
-    source: "fixtures",
+    source: "git",
     siteSettings: {
       siteName: "Тест",
       siteUrl: "https://example.com",

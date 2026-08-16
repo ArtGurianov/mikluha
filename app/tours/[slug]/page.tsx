@@ -7,7 +7,7 @@ import { Gallery } from "@/components/gallery/gallery";
 import { ReportCard } from "@/components/home/report-card";
 import { ReviewsSection } from "@/components/home/reviews-section";
 import { DepartureStatusBadge } from "@/components/site/departure-status-badge";
-import { PortableTextContent } from "@/components/site/portable-text";
+import { MarkdownContent } from "@/components/site/markdown-content";
 import { getContent } from "@/lib/cms/content";
 import { formatRub } from "@/lib/format";
 import { jsonLdScript } from "@/lib/json-ld";
@@ -92,7 +92,7 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
 
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-8">
-          {tour.description && <PortableTextContent value={tour.description} />}
+          {tour.description && <MarkdownContent value={tour.description} />}
 
           {tour.gallery.length > 0 && (
             <div className="space-y-3">

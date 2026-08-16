@@ -3,10 +3,10 @@ node_modules
 out
 .cms-cache
 public/generated/cms
+public/admin/sveltia-cms.js
 app/icon.png
 app/apple-icon.png
-sanity-studio-out
-sanity/schema.json
+oauth-broker
 .git
 .env*
 !.env.example

@@ -1,6 +1,6 @@
-packages:
-  - sanity
-
+# oauth-broker/ is a separate deployable (its own Dockerfile, zero npm
+# dependencies) and deliberately not a workspace member — it doesn't share
+# tooling with the Next.js app and shouldn't affect this install.
 ignoredBuiltDependencies:
   - unrs-resolver
 

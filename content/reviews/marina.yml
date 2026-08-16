@@ -1,0 +1,8 @@
+image:
+  image: "local:review-1.jpg"
+  alt: Скриншот отзыва об алтайском походе
+authorName: Марина
+tour: altai
+sortOrder: 10
+isListed: true
+isDemo: true
