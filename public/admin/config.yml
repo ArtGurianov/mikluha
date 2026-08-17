@@ -2,9 +2,9 @@ backend:
   name: github
   repo: ArtGurianov/mikluha
   branch: main
-  auth_methods: [oauth]
-  base_url: https://cms-auth.CHANGE-ME.example # TODO: set to the deployed oauth-broker origin
-  site_domain: CHANGE-ME.example # TODO: production domain, e.g. miklukha-maklay.ru
+  # The CMS talks to GitHub directly from the browser. Each editor uses a
+  # fine-grained PAT scoped only to this repository (Contents: read/write).
+  auth_methods: [token]
 
 site_url: https://miklukha-maklay.ru
 

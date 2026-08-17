@@ -33,5 +33,6 @@ media layers.
 
 `next build` produces the website in `out/`. The same export contains the CMS
 frontend as static `/admin/index.html`, `/admin/config.yml` and
-`/admin/sveltia-cms.js`. GitHub OAuth token exchange remains a separate broker;
-neither the public site nor the CMS frontend requires a Node.js runtime.
+`/admin/sveltia-cms.js`. Editors authenticate directly to GitHub with individual
+fine-grained PATs scoped to this repository; there is no OAuth broker, shared
+CMS secret, serverless function or Node.js runtime.

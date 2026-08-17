@@ -2,7 +2,7 @@
 
 Сайт туристического агентства «Миклуха Маклай» — каталог направлений/выездов, фотоотчёты, отзывы и информационный Booking Modal (QR + предоплата + телефон организатора, без сбора пользовательских данных). Архитектурные инварианты и причины, по которым они такие — `docs/DECISIONS.md`.
 
-Next.js App Router + TypeScript, pure static export (`output: 'export'`), shadcn/ui поверх Tailwind CSS v4. Контент — YAML-файлы в `content/` (этот репозиторий), редактируются через `/admin` (Sveltia CMS, коммитит прямо в GitHub) или руками. И сайт, и `/admin` входят в один статический `/out`; Node.js в runtime сайта нет. Медиа отдаются браузеру напрямую из Object Storage без build-time или runtime обработки.
+Next.js App Router + TypeScript, pure static export (`output: 'export'`), shadcn/ui поверх Tailwind CSS v4. Контент — YAML-файлы в `content/` (этот репозиторий), редактируются через `/admin` (Sveltia CMS, коммитит прямо в GitHub по fine-grained PAT) или руками. И сайт, и `/admin` входят в один статический `/out`; своего application/serverless runtime нет. Медиа отдаются браузеру напрямую из Object Storage без build-time или runtime обработки.
 
 ## Быстрый старт
 
@@ -22,7 +22,6 @@ app/            Next.js App Router (страницы, layout, robots/sitemap)
 components/     UI-компоненты (components/ui — shadcn/ui примитивы)
 content/        YAML-контент сайта
 lib/            бизнес-логика, CMS-адаптер (lib/cms)
-oauth-broker/   отдельный сервис: GitHub OAuth token exchange для /admin (свой Dockerfile)
 public/admin/   статический Sveltia CMS (index.html + config.yml; JS-бандл вендорится сборкой)
 public/media/   небольшие committed demo-WebP для staging
 scripts/        build-time pipeline: sync-content → validate → Next static export → validate:out

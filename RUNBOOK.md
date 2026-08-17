@@ -9,11 +9,8 @@
   (Sveltia CMS: статический JS-бандл, коммитит прямо в GitHub) или руками. И сайт, и CMS
   входят в статический `/out`; браузер получает WebP/WebM напрямую из cloud.ru Object Storage.
   Сборка не скачивает и не преобразует медиа.
-- Два Coolify application:
-  - `miklukha-web` — сам сайт, `Dockerfile` в корне репозитория (multi-stage: deps → build →
-    nginx runtime).
-  - `miklukha-cms-auth` — GitHub OAuth token-exchange broker для `/admin` (см. «CMS: авторизация
-    редакторов» ниже), `oauth-broker/Dockerfile`.
+- Один Coolify application `miklukha-web`: сайт и `/admin` собираются одним `Dockerfile`
+  (multi-stage: deps → build → nginx runtime). Отдельного CMS/OAuth runtime нет.
 
 ## Переменные окружения (build-time only)
 
@@ -49,31 +46,25 @@ pnpm run build:production
 
 Любая ошибка на любом шаге должна ломать именно этот build, не трогая уже работающий production-релиз — это обеспечивается тем, что Docker build стадии независимы, и `docker build` просто падает, не подменяя текущий запущенный container.
 
-## CMS: авторизация редакторов (GitHub OAuth + broker)
+## CMS: авторизация редакторов (GitHub fine-grained PAT)
 
-Sveltia CMS хранит контент через GitHub API (`backend.name: github` в `public/admin/config.yml`).
-GitHub требует обмена authorization code на token с client secret — это не может выполняться в
-браузере, поэтому нужен маленький внешний сервис (`oauth-broker/`), который держит секрет.
+Sveltia CMS хранит контент через GitHub API (`backend.name: github` в `public/admin/config.yml`)
+и обращается к нему прямо из браузера. `auth_methods: [token]` отключает OAuth-кнопку и исключает
+broker/client secret из архитектуры.
 
-Разовая настройка:
+Разовая настройка для каждого редактора:
 
-1. Создать GitHub OAuth App: Settings → Developer settings → OAuth Apps → New OAuth App.
-   Authorization callback URL: `https://<cms-auth-домен>/callback`.
-2. Задеплоить `oauth-broker/` как отдельное Coolify application (`oauth-broker/Dockerfile`),
-   оставив build context в корне репозитория (Dockerfile сам копирует файлы из `oauth-broker/`),
-   переменные окружения:
+1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens →
+   Generate new token.
+2. В `Repository access` выбрать `Only select repositories` → `ArtGurianov/mikluha`.
+3. В `Repository permissions` выдать только `Contents: Read and write`; остальные write-права
+   не нужны. Установить разумный срок действия.
+4. Открыть `/admin`, выбрать вход по token и вставить PAT. Sveltia хранит его только в локальном
+   хранилище этого браузера и отправляет непосредственно GitHub API.
 
-   | Переменная | Назначение |
-   |---|---|
-   | `GITHUB_CLIENT_ID` | Client ID созданного OAuth App |
-   | `GITHUB_CLIENT_SECRET` | Client secret — существует только здесь и в GitHub, никогда не в репозитории |
-   | `ALLOWED_DOMAINS` | **обязательно.** Домен(ы) сайта, которым разрешено использовать broker (через запятую, `*` как wildcard), например `miklukha-maklay.ru`. `*` разворачивается в «один и более символов» — `*.example.com` матчит `cms.example.com`, но НЕ голый `example.com`; перечисляйте оба явно, если нужны оба. Broker — сервис, держащий GitHub OAuth client secret и выдающий токены с правом записи в репозиторий, поэтому без явного allowlist он вообще отказывается запускаться. |
-
-3. В `public/admin/config.yml` указать `backend.base_url` (origin задеплоенного broker) и
-   `backend.site_domain` (продовый домен сайта).
-
-Ротация секрета — пересоздать client secret в GitHub OAuth App, обновить `GITHUB_CLIENT_SECRET` и
-передеплоить `miklukha-cms-auth`; `GITHUB_CLIENT_ID` и `public/admin/config.yml` не меняются.
+Токен нельзя писать в Git, `.env`, Coolify или передавать другому редактору. Для отзыва/ротации
+удалить PAT в GitHub и создать новый; пересборка или изменение CMS-конфига не нужны. Потеря
+доступа редактора к сайту также требует отозвать его PAT.
 
 ## CMS: медиатека (cloud.ru Object Storage)
 

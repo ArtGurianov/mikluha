@@ -19,7 +19,7 @@ const IMAGE_MAX_BYTES = 1024 * 1024;
 const VIDEO_MAX_BYTES = 10 * 1024 * 1024;
 
 interface CmsConfig extends CmsMediaConfig {
-  backend?: { auth_methods?: string[] };
+  backend?: { auth_methods?: string[]; base_url?: string; site_domain?: string };
   collections?: Array<{ fields?: unknown[] }>;
   field_defaults?: { richtext?: { editor_components?: string[] } };
   singletons?: Array<{ fields?: unknown[] }>;
@@ -66,12 +66,15 @@ async function main() {
 
   if (!isStaging && configText.includes("CHANGE-ME")) {
     errors.push(
-      "production config still contains CHANGE-ME placeholders; fill in OAuth and S3 settings or use DEPLOY_ENV=staging",
+      "production config still contains CHANGE-ME placeholders; fill in the S3 settings or use DEPLOY_ENV=staging",
     );
   }
 
-  if (config.backend?.auth_methods?.length !== 1 || config.backend.auth_methods[0] !== "oauth") {
-    errors.push("backend.auth_methods must be [oauth] so editors use the allowlisted OAuth broker, not browser-stored PATs");
+  if (config.backend?.auth_methods?.length !== 1 || config.backend.auth_methods[0] !== "token") {
+    errors.push("backend.auth_methods must be [token] so the static CMS uses direct GitHub PAT authentication");
+  }
+  if (config.backend?.base_url || config.backend?.site_domain) {
+    errors.push("backend.base_url and backend.site_domain must be absent; this deployment has no OAuth broker");
   }
 
   if (config.field_defaults?.richtext?.editor_components?.includes("image") !== false) {

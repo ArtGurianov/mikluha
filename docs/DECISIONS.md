@@ -15,10 +15,9 @@
 только файлы, без Node.js и CMS runtime. Текстовый контент уже находится в
 `/out`; WebP/WebM браузер запрашивает напрямую из Object Storage.
 
-Это же касается редакторской инфраструктуры (`/admin`, `oauth-broker`): она
-существует для того, чтобы **писать** контент, и не участвует в его
-**раздаче** посетителям — обе части можно (и нужно) оценивать по этому
-инварианту отдельно.
+`/admin` тоже является статическим бандлом. Sveltia обращается прямо к GitHub
+по отдельному repo-scoped PAT каждого редактора и прямо к Object Storage;
+OAuth broker, serverless function и общий CMS secret отсутствуют.
 
 **Где живёт:** `next.config.ts`, `Dockerfile` (stage 3 — только Nginx),
 `public/admin/`, `scripts/validate-static-export.ts` (проверяет наличие обоих

@@ -14,8 +14,6 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendored build artifact (scripts/vendor-admin-cms.ts) — never hand-edited.
     "public/admin/sveltia-cms.js",
-    // Separate deployable with its own runtime/tooling — see oauth-broker/Dockerfile.
-    "oauth-broker/**",
   ]),
 ]);
 
