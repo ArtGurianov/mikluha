@@ -87,7 +87,9 @@ GitHub требует обмена authorization code на token с client secre
 
 1. Создать bucket в cloud.ru Evolution Object Storage; настроить bucket policy на публичное
    чтение (`GetObject`) объектов под префиксом `cms/` — `scripts/materialize-assets.ts` скачивает
-   их по прямой ссылке во время сборки. Листинг публично не открывать.
+   их по прямой ссылке во время сборки. Листинг публично не открывать. Оставить
+   `media_libraries.aws_s3.acl: false` в CMS-конфиге: Sveltia иначе добавляет к загрузкам
+   `x-amz-acl: public-read`, который bucket с отключёнными ACL отклоняет.
 2. Настроить CORS bucket для каждого origin, с которого открывается `/admin`: методы `GET`, `PUT`, `HEAD`, заголовки `*`,
    `ExposeHeaders: ETag`. Без этого браузер заблокирует подписанные запросы Sveltia ещё на
    preflight.

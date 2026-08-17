@@ -7,6 +7,7 @@ export interface AssetSourcePolicy {
 }
 
 interface S3MediaLibraryConfig {
+  acl?: boolean | string;
   bucket?: string;
   endpoint?: string;
   prefix?: string;

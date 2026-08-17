@@ -23,6 +23,9 @@ media_libraries:
     endpoint: https://s3.cloud.ru
     prefix: cms/
     public_url: https://s3.cloud.ru/CHANGE-ME # TODO: match the bucket name above
+    # Sveltia 0.191.1 otherwise sends x-amz-acl: public-read. cloud.ru buckets
+    # with ACLs disabled reject that header; public reads come from bucket policy.
+    acl: false
 
 singletons:
   - name: site_settings

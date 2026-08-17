@@ -7,6 +7,7 @@ import Ajv from "ajv";
 import yaml from "js-yaml";
 
 import { createAssetSourcePolicy, type CmsMediaConfig } from "../lib/cms/asset-source";
+import { configForSveltiaSchema, type SveltiaSchema } from "../lib/cms/sveltia-schema";
 import { isStaging } from "../lib/site";
 
 const ROOT = process.cwd();
@@ -37,12 +38,12 @@ async function main() {
     readFile(SCHEMA_FILE, "utf-8"),
   ]);
   const config = yaml.load(configText) as CmsConfig;
-  const schema = JSON.parse(schemaText) as object;
+  const schema = JSON.parse(schemaText) as SveltiaSchema;
   const ajv = new Ajv({ allErrors: true, strict: false, validateFormats: false });
   const validate = ajv.compile(schema);
   const errors: string[] = [];
 
-  if (!validate(config)) {
+  if (!validate(configForSveltiaSchema(config, schema))) {
     for (const error of validate.errors ?? []) {
       const detail = error.params.additionalProperty
         ? ` (${String(error.params.additionalProperty)})`
@@ -62,7 +63,15 @@ async function main() {
   }
 
   if (config.field_defaults?.richtext?.editor_components?.includes("image") !== false) {
-    errors.push("field_defaults.richtext.editor_components must exclude image so Markdown cannot bypass asset materialization");
+    errors.push(
+      "field_defaults.richtext.editor_components must exclude image; MarkdownContent and validate:out enforce the asset boundary",
+    );
+  }
+
+  if (config.media_libraries?.aws_s3?.acl !== false) {
+    errors.push(
+      "media_libraries.aws_s3.acl must be false so uploads do not send x-amz-acl: public-read to an ACL-disabled bucket",
+    );
   }
 
   const fields: Array<Record<string, unknown>> = [];

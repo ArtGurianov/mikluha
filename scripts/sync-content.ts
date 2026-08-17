@@ -33,10 +33,13 @@ async function readCollection<T>(folder: string): Promise<(T & { _slug: string }
     throw error;
   }
 
-  const files = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".yml"))
-    .map((entry) => entry.name)
-    .sort();
+  const yamlEntries = entries.filter((entry) => entry.name.endsWith(".yml"));
+  for (const entry of yamlEntries) {
+    if (!entry.isFile() || entry.isSymbolicLink()) {
+      throw new Error(`content/${path.join(folder, entry.name)} must be a regular file inside content/.`);
+    }
+  }
+  const files = yamlEntries.map((entry) => entry.name).sort();
   return Promise.all(
     files.map(async (file) => {
       const raw = await readFile(path.join(dir, file), "utf-8");

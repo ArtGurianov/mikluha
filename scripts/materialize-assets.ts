@@ -88,10 +88,20 @@ async function loadSourceBuffer(sourceRef: string, policy: AssetSourcePolicy): P
   }
 
   const url = parseAllowedRemoteAssetUrl(sourceRef, policy);
-  const response = await fetch(url, {
-    redirect: "error",
-    signal: AbortSignal.timeout(ASSET_FETCH_TIMEOUT_MS),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      redirect: "error",
+      signal: AbortSignal.timeout(ASSET_FETCH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to download CMS asset ${sourceRef} before receiving an HTTP response: ${detail}. ` +
+        "Redirects are refused; ensure public_url points directly to the object host.",
+      { cause: error },
+    );
+  }
   if (!response.ok) {
     throw new Error(`Failed to download CMS asset ${sourceRef}: HTTP ${response.status}`);
   }
