@@ -107,19 +107,15 @@ GitHub требует обмена authorization code на token с client secre
 `miklukha-web` → пересборка. Отдельного webhook-конфига в CMS настраивать не нужно — это уже
 GitHub-репозиторий, который Coolify отслеживает напрямую.
 
-## Плановый ежедневный rebuild
+## Периодичность обновлений
 
-`nextDeparture`/`nextBookableDeparture` вычисляются во время сборки — без нового коммита в
-`content/` прошедшие даты не «протухнут» сами.
+Отдельный rebuild по `cron`/systemd timer не используется. Контент планируется обновлять не
+чаще раза в месяц, обычно раз в 2–3 месяца; каждый такой коммит в `main` уже запускает
+пересборку через Coolify webhook.
 
-Пример host `cron`/systemd timer на VPS (не на самом сайте, credential не должен попадать в публичный образ):
-
-```cron
-# каждый день в 00:15 по таймзоне siteSettings.timezone
-15 0 * * * curl -fsS -X POST -H "Authorization: Bearer $(cat /root/.secrets/coolify-deploy-token)" https://<coolify-host>/api/v1/deploy?uuid=<app-uuid>
-```
-
-`coolify-deploy-token` файл — `root`-only права, вне git и вне Docker build context.
+`nextDeparture`/`nextBookableDeparture` вычисляются во время сборки и между публикациями
+остаются снимком последнего релиза. Это принятый компромисс: перед публикацией редактор
+проверяет даты и статусы выездов, а автоматическая ежедневная актуализация не требуется.
 
 ## Staging
 

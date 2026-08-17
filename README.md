@@ -24,7 +24,7 @@ content/        контент сайта (YAML) + content/assets/ — demo-из
 lib/            бизнес-логика, CMS-адаптер (lib/cms)
 oauth-broker/   отдельный сервис: GitHub OAuth token exchange для /admin (свой Dockerfile)
 public/admin/   Sveltia CMS (index.html + config.yml; sveltia-cms.js вендорится сборкой)
-scripts/        build-time pipeline: sync-content → materialize-assets → validate → validate:out
+scripts/        build-time pipeline: sync-content → validate → materialize-assets → validate:out
 ```
 
 ## Production build
@@ -35,7 +35,7 @@ pnpm run build:production
 
 Требует `siteSettings.launchReady = true` (реальный контент в `content/`, не демо-данные). Для demo/preview-сборки без готового контента — `DEPLOY_ENV=staging pnpm run build:production`.
 
-Подробности пайплайна, деплой на Coolify/VPS, настройка CMS-авторизации и плановый rebuild — см. `RUNBOOK.md`.
+Подробности пайплайна, деплой на Coolify/VPS и настройка CMS-авторизации — см. `RUNBOOK.md`.
 Памятка для организатора по работе с CMS — `CONTENT-GUIDE.md`.
 
 ## Стек
