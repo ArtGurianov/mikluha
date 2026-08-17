@@ -1,8 +1,9 @@
 #!/usr/bin/env tsx
 /**
- * Step 3 of the production build pipeline.
+ * Step 2 of the production build pipeline.
  *
- * Validates the materialized content snapshot BEFORE `next build` runs:
+ * Validates the normalized content snapshot BEFORE asset materialization and
+ * `next build` run:
  *  - referential integrity (every reference points at a real, listed document)
  *  - the launchReady + isDemo production-readiness gate
  *  - that every OPEN departure has a complete booking flow after fallback
@@ -13,8 +14,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { REQUIRED_LEGAL_SLUGS, RESERVED_SLUGS, SLUG_RE } from "../lib/legal";
+import { findMarkdownPolicyViolations } from "../lib/cms/markdown-policy";
 import { isStaging } from "../lib/site";
-import { resolveBookingDetails } from "../lib/tours";
 import type { ContentSnapshot } from "../lib/cms/types";
 
 const CACHE_FILE = path.resolve(process.cwd(), ".cms-cache", "content.json");
@@ -46,13 +47,39 @@ function warn(message: string) {
   warnings.push(message);
 }
 
+function validateMarkdown(markdown: string, documentField: string) {
+  for (const violation of findMarkdownPolicyViolations(markdown)) {
+    const location = `${documentField} at ${violation.line}:${violation.column}`;
+    if (violation.kind === "image") {
+      fail(
+        `${location} contains an inline Markdown image (${violation.subject}); ` +
+          "use a structured CMS image field so the asset is materialized",
+      );
+    } else {
+      fail(
+        `${location} contains raw HTML (${violation.subject}); raw HTML is not supported in CMS Markdown fields`,
+      );
+    }
+  }
+}
+
 async function main() {
   const raw = await readFile(CACHE_FILE, "utf-8");
-  const content = JSON.parse(raw) as ContentSnapshot;
+  const content = JSON.parse(raw) as ContentSnapshot<unknown>;
 
   const tourIds = new Set(content.tours.map((t) => t.id));
   const departureById = new Map(content.departures.map((d) => [d.id, d]));
   const organizerIds = new Set(content.organizers.map((o) => o.id));
+
+  // Markdown is parsed with the same remark parser family as ReactMarkdown,
+  // so code examples are ignored while rendered image/HTML nodes are reported
+  // together, with their owning document, before expensive asset processing.
+  for (const tour of content.tours) {
+    if (tour.description) validateMarkdown(tour.description, `Tour ${tour.id} description`);
+  }
+  for (const page of content.legalPages) {
+    validateMarkdown(page.content, `LegalPage ${page.id} content`);
+  }
 
   if (!isHttpsUrl(content.siteSettings.siteUrl)) fail(`siteSettings.siteUrl must be an absolute HTTPS URL`);
   if (content.siteSettings.socials.maxChannelUrl && !isHttpsUrl(content.siteSettings.socials.maxChannelUrl)) {
@@ -161,22 +188,28 @@ async function main() {
   // --- OPEN departures must always resolve to a complete booking flow ----
   for (const d of content.departures) {
     if (d.bookingStatus !== "OPEN") continue;
-    const resolved = resolveBookingDetails(content, d);
+    const resolvedPrepayment = d.prepaymentAmount ?? content.siteSettings.booking.defaultPrepaymentAmount;
+    const resolvedQr = d.paymentQr ?? content.siteSettings.booking.defaultQr;
+    const departureOrganizer = content.organizers.find((organizer) => organizer.id === d.organizerIds[0]);
+    const fallbackOrganizer = content.organizers.find(
+      (organizer) => organizer.id === content.siteSettings.booking.defaultOrganizerId,
+    );
+    const resolvedOrganizer = departureOrganizer ?? fallbackOrganizer;
     if (d.price === undefined) {
       // Unlike the QR/prepayment/organizer below, price has no siteSettings
       // fallback — it is per-date by definition, so nothing can stand in for it.
       fail(`OPEN departure ${d.id} has no price — a departure open for booking must show what it costs`);
     }
-    if (resolved.prepaymentAmount === undefined) {
+    if (resolvedPrepayment === undefined) {
       fail(`OPEN departure ${d.id} has no prepaymentAmount, even after siteSettings fallback`);
     }
-    if (!resolved.qr) {
+    if (!resolvedQr) {
       fail(`OPEN departure ${d.id} has no payment QR, even after siteSettings fallback`);
     }
-    if (!resolved.organizer) {
+    if (!resolvedOrganizer) {
       fail(`OPEN departure ${d.id} has no organizer, even after siteSettings fallback`);
-    } else if (!PHONE_RE.test(resolved.organizer.phone)) {
-      fail(`OPEN departure ${d.id} resolves to organizer with invalid phone: ${resolved.organizer.phone}`);
+    } else if (!PHONE_RE.test(resolvedOrganizer.phone)) {
+      fail(`OPEN departure ${d.id} resolves to organizer with invalid phone: ${resolvedOrganizer.phone}`);
     }
   }
 

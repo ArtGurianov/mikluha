@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Step 2 of the production build pipeline.
+ * Step 3 of the production build pipeline.
  *
  * Reads .cms-cache/content.json (written by sync-content.ts, still containing
  * "unresolved" images as {alt, sourceRef}), downloads/reads each unique
