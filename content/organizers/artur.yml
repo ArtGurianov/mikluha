@@ -1,7 +1,7 @@
 name: Артур
 phone: "+79039075547"
 photo:
-  image: "local:organizer-artur.jpg"
+  image: "/media/demo/organizer-artur.webp"
   alt: Артур, организатор поездок
 bio: >-
   Хожу в горы больше 10 лет, из них последние пять — вожу небольшие группы на Алтай и Столбы.

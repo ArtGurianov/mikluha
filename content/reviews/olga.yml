@@ -1,5 +1,5 @@
 image:
-  image: "local:review-4.jpg"
+  image: "/media/demo/review-4.webp"
   alt: Скриншот отзыва о выезде на Столбы
 authorName: Ольга
 tour: krasnoyarsk-stolby

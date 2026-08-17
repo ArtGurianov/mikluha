@@ -11,12 +11,7 @@ import {
 } from "./tours";
 
 function image(alt: string): ImageAsset {
-  return {
-    alt,
-    width: 100,
-    height: 100,
-    variants: { thumbnail: "/t.webp", card: "/c.webp", gallery: "/g.webp", hero: "/h.webp", lightbox: "/l.webp" },
-  };
+  return { alt, src: "/media/demo/test.webp" };
 }
 
 function organizer(id: string, overrides: Partial<OrganizerDTO> = {}): OrganizerDTO {

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BookingButton } from "@/components/booking/booking-button";
 import { Gallery } from "@/components/gallery/gallery";
+import { CmsImage } from "@/components/media/cms-image";
 import { getContent } from "@/lib/cms/content";
 import {
   formatDepartureDateRange,
@@ -34,7 +34,7 @@ export async function generateMetadata(props: PageProps<"/reports/[slug]">): Pro
     title,
     description,
     alternates: { canonical: `/reports/${report.slug}/` },
-    openGraph: { title, description, images: [{ url: report.coverImage.variants.hero }] },
+    openGraph: { title, description, images: [{ url: report.coverImage.src }] },
   };
 }
 
@@ -51,7 +51,12 @@ export default async function ReportPage(props: PageProps<"/reports/[slug]">) {
   return (
     <article>
       <div className="relative flex h-[45vh] min-h-80 items-end text-white">
-        <Image src={report.coverImage.variants.hero} alt={report.coverImage.alt} fill priority sizes="100vw" className="object-cover" />
+        <CmsImage
+          image={report.coverImage}
+          loading="eager"
+          fetchPriority="high"
+          className="absolute inset-0 size-full object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
         <div className="relative z-10 mx-auto w-full max-w-4xl space-y-1 px-4 pb-10 sm:px-6">
           {tour && tour.isListed ? (

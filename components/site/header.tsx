@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { BookingButton } from "@/components/booking/booking-button";
+import { CmsImage } from "@/components/media/cms-image";
 import type { SiteSettingsDTO } from "@/lib/cms/types";
 
 import { MobileNav } from "./mobile-nav";
@@ -13,11 +13,8 @@ export function Header({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex min-w-0 items-center gap-2.5">
           {siteSettings.logo && (
-            <Image
-              src={siteSettings.logo.variants.thumbnail}
-              alt={siteSettings.logo.alt || siteSettings.siteName}
-              width={40}
-              height={40}
+            <CmsImage
+              image={{ ...siteSettings.logo, alt: siteSettings.logo.alt || siteSettings.siteName }}
               className="size-10 shrink-0 rounded-full object-cover"
             />
           )}

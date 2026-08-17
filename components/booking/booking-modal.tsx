@@ -1,8 +1,8 @@
 "use client";
 
 import { Phone } from "lucide-react";
-import Image from "next/image";
 
+import { CmsImage } from "@/components/media/cms-image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatRub, telHref } from "@/lib/format";
 import { formatDepartureDateRange } from "@/lib/tours";
@@ -49,12 +49,8 @@ export function BookingModal() {
 
           {qr && (
             <div className="w-full max-w-56 overflow-hidden rounded-lg border border-border bg-white p-2">
-              <Image
-                src={qr.variants.gallery}
-                alt={qr.alt || "QR-код для предоплаты"}
-                width={qr.width}
-                height={qr.height}
-                sizes="224px"
+              <CmsImage
+                image={{ ...qr, alt: qr.alt || "QR-код для предоплаты" }}
                 className="h-auto w-full"
               />
             </div>

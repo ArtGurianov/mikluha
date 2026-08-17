@@ -8,14 +8,17 @@ backend:
 
 site_url: https://miklukha-maklay.ru
 
-# Inline Markdown images would bypass the build-time image materializer and
-# make public pages depend on object storage. Structured image/gallery fields
-# cover every supported image use case, so the editor offers code blocks only.
+# Inline Markdown images bypass the typed media fields and their WebP policy.
+# Structured image/gallery fields cover every supported image use case, so the
+# editor offers code blocks only.
 field_defaults:
   richtext:
     editor_components: [code-block]
 
 media_libraries:
+  all:
+    # Default cap for the WebM field. Every image field overrides this to 1 MiB.
+    max_file_size: 10485760
   aws_s3:
     access_key_id: CHANGE-ME # TODO: cloud.ru access key ID (not secret — see RUNBOOK.md)
     bucket: CHANGE-ME # TODO: cloud.ru bucket name
@@ -41,15 +44,7 @@ singletons:
         widget: object
         required: false
         fields:
-          - {name: image, label: Файл, widget: image}
-          - {name: alt, label: Alt, widget: string, required: false}
-      - name: favicon
-        label: Favicon
-        widget: object
-        required: false
-        hint: "Опционально: если не задан, используется логотип."
-        fields:
-          - {name: image, label: Файл, widget: image}
+          - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
           - {name: alt, label: Alt, widget: string, required: false}
       - name: hero
         label: "Главный экран (Hero)"
@@ -61,8 +56,15 @@ singletons:
             label: "Фоновое изображение"
             widget: object
             fields:
-              - {name: image, label: Файл, widget: image}
+              - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
               - {name: alt, label: Alt, widget: string, required: false}
+          - name: video
+            label: "Фоновое видео WebM"
+            widget: object
+            required: false
+            hint: "Опционально, до 10 МБ. При выключенной анимации, ошибке загрузки или отсутствии видео показывается фоновое изображение."
+            fields:
+              - {name: file, label: "Файл WebM", widget: file, accept: ".webm,video/webm", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 10485760}}}
       - name: booking
         label: "Бронирование по умолчанию"
         widget: object
@@ -73,7 +75,7 @@ singletons:
             widget: object
             required: false
             fields:
-              - {name: image, label: Файл, widget: image}
+              - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
               - {name: alt, label: Alt, widget: string, required: false}
           - {name: defaultPrepaymentAmount, label: "Сумма предоплаты по умолчанию, ₽", widget: number, required: false, value_type: int}
           - {name: defaultOrganizer, label: "Организатор по умолчанию", widget: relation, collection: organizers, value_field: "{{slug}}", search_fields: [name], display_fields: [name], required: false}
@@ -104,7 +106,7 @@ singletons:
             widget: object
             required: false
             fields:
-              - {name: image, label: Файл, widget: image}
+              - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
               - {name: alt, label: Alt, widget: string, required: false}
       - name: launchReady
         label: "Сайт готов к публичному запуску"
@@ -134,18 +136,20 @@ collections:
         label: Обложка
         widget: object
         fields:
-          - {name: image, label: Файл, widget: image}
+          - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
           - {name: alt, label: "Альтернативный текст (alt)", widget: string}
       - name: gallery
         label: "Галерея фото"
         widget: list
         required: false
+        max: 10
+        hint: "Не более 10 фотографий. Чтобы добавить новую при заполненной галерее, сначала удалите одну из существующих."
         field:
           name: item
           label: Фото
           widget: object
           fields:
-            - {name: image, label: Файл, widget: image}
+            - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
             - {name: alt, label: "Альтернативный текст (alt)", widget: string}
       - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true, hint: "Выключите, чтобы временно скрыть направление из публичного каталога."}
       - {name: sortOrder, label: "Порядок сортировки", widget: number, default: 0, value_type: int, hint: "Чем меньше число, тем выше направление в списке."}
@@ -161,7 +165,7 @@ collections:
             widget: object
             required: false
             fields:
-              - {name: image, label: Файл, widget: image}
+              - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
               - {name: alt, label: Alt, widget: string, required: false}
 
   - name: departures
@@ -193,7 +197,7 @@ collections:
         required: false
         hint: "Если не загружен, используется QR по умолчанию из «Настроек сайта»."
         fields:
-          - {name: image, label: Файл, widget: image}
+          - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
           - {name: alt, label: Alt, widget: string, required: false}
       - {name: organizers, label: Организаторы, widget: relation, collection: organizers, value_field: "{{slug}}", search_fields: [name], display_fields: [name], multiple: true, required: false, hint: "Если список пуст, используется организатор по умолчанию из «Настроек сайта»."}
       - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true}
@@ -221,18 +225,20 @@ collections:
         label: Обложка
         widget: object
         fields:
-          - {name: image, label: Файл, widget: image}
+          - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
           - {name: alt, label: Alt, widget: string}
       - name: gallery
         label: "Галерея фото"
         widget: list
         min: 1
+        max: 10
+        hint: "От 1 до 10 фотографий. Чтобы добавить новую при заполненной галерее, сначала удалите одну из существующих."
         field:
           name: item
           label: Фото
           widget: object
           fields:
-            - {name: image, label: Файл, widget: image}
+            - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
             - {name: alt, label: Alt, widget: string}
       - {name: description, label: Описание, widget: text, required: false}
       - {name: sortOrder, label: "Порядок сортировки", widget: number, default: 0, value_type: int}
@@ -257,7 +263,7 @@ collections:
         widget: object
         hint: "Обычно — скриншот переписки с клиентом."
         fields:
-          - {name: image, label: Файл, widget: image}
+          - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
           - {name: alt, label: Alt, widget: string}
       - {name: authorName, label: "Имя автора", widget: string}
       - {name: tour, label: "Связанное направление", widget: relation, collection: tours, value_field: "{{slug}}", search_fields: [title], display_fields: [title], required: false, hint: Опционально.}
@@ -283,7 +289,7 @@ collections:
         widget: object
         required: false
         fields:
-          - {name: image, label: Файл, widget: image}
+          - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_library: {name: aws_s3, config: {max_file_size: 1048576}}}
           - {name: alt, label: Alt, widget: string, required: false}
       - {name: bio, label: "О себе", widget: text, required: false, hint: "Биография, опыт, философия поездок."}
       - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true}

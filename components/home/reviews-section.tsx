@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import * as React from "react";
 
 import { Lightbox } from "@/components/gallery/lightbox";
+import { CmsImage } from "@/components/media/cms-image";
 import type { ReviewDTO } from "@/lib/cms/types";
 
 export function ReviewsSection({ reviews }: { reviews: ReviewDTO[] }) {
@@ -28,13 +28,9 @@ export function ReviewsSection({ reviews }: { reviews: ReviewDTO[] }) {
             onClick={() => setLightboxIndex(index)}
             className="block w-full overflow-hidden rounded-xl bg-muted"
           >
-            <Image
-              src={review.image.variants.card}
-              alt={review.image.alt}
-              width={review.image.width}
-              height={review.image.height}
-              sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 25vw"
-              className="h-auto w-full object-cover transition-transform duration-300 hover:scale-105"
+            <CmsImage
+              image={review.image}
+              className="aspect-[3/2] w-full object-cover transition-transform duration-300 hover:scale-105"
             />
             <p className="p-2 text-left text-xs text-muted-foreground">{review.authorName}</p>
           </button>

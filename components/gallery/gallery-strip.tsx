@@ -1,9 +1,9 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import Image from "next/image";
 import * as React from "react";
 
+import { CmsImage } from "@/components/media/cms-image";
 import { Button } from "@/components/ui/button";
 import type { ImageAsset } from "@/lib/cms/types";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,7 @@ export function GalleryStrip({ images, onSelect, className }: GalleryStripProps)
       >
         {images.map((image, index) => (
           <button
-            key={image.variants.gallery + index}
+            key={image.src + index}
             type="button"
             data-gallery-item
             className="relative aspect-[4/3] w-[72%] shrink-0 snap-start overflow-hidden rounded-xl bg-muted sm:w-[42%] md:w-[30%] lg:w-[24%]"
@@ -72,14 +72,7 @@ export function GalleryStrip({ images, onSelect, className }: GalleryStripProps)
               onSelect(index);
             }}
           >
-            <Image
-              src={image.variants.gallery}
-              alt={image.alt}
-              fill
-              sizes="(max-width: 640px) 72vw, (max-width: 1024px) 30vw, 24vw"
-              className="object-cover"
-              loading="lazy"
-            />
+            <CmsImage image={image} className="absolute inset-0 size-full object-cover" />
           </button>
         ))}
       </div>

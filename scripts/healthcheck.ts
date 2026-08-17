@@ -44,8 +44,12 @@ async function main() {
   const firstTour = content.tours.find((t) => t.isListed);
   if (firstTour) {
     await check(`/tours/${firstTour.slug}/`, 200, `GET /tours/${firstTour.slug}/`);
-    const assetPath = firstTour.coverImage.variants.card;
-    await check(assetPath, 200, `GET ${assetPath} (local CMS asset)`);
+    const assetPath = firstTour.coverImage.src;
+    if (assetPath.startsWith("/")) {
+      await check(assetPath, 200, `GET ${assetPath} (tracked demo asset)`);
+    } else {
+      console.log(`[healthcheck] SKIP direct Object Storage asset (no media HEAD/GET policy): ${assetPath}`);
+    }
   } else {
     errors.push("No listed tour found in content snapshot to healthcheck — cannot verify /tours/<slug>/");
   }

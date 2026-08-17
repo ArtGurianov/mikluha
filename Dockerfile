@@ -43,14 +43,12 @@ RUN pnpm run build:production
 # Stage 3: production runtime — Nginx serving the static /out only.
 # No Node.js, no CMS credentials, no source code.
 #
-# Deliberately the *stable* branch tag, not a patch version or a digest. 1.27
-# was a mainline branch, which stops getting patches as soon as the next one
-# opens. And because the scheduled nightly rebuild re-runs this Dockerfile from
-# scratch, a branch tag picks up nginx patch releases on its own — a pinned
+# Deliberately the *stable* branch tag, not a patch version or a digest. A
+# content-triggered rebuild re-runs this Dockerfile from scratch, so the branch
+# tag picks up nginx patch releases — a pinned
 # digest would freeze the runtime until someone remembered to bump it, and
 # nothing here would ever remind them. Exact reproducibility buys little for a
-# server that only hands out static files whose content is meant to change
-# daily. The risk a floating tag carries — a bad patch landing between two
+# server that only hands out static files. The risk a floating tag carries — a bad patch landing between two
 # builds of identical source — is what the candidate healthcheck covers
 # (scripts/healthcheck.ts runs before traffic switches, see RUNBOOK.md).
 # ---------------------------------------------------------------------------

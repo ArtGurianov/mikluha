@@ -3,8 +3,6 @@ import remarkGfm from "remark-gfm";
 
 import { cn } from "@/lib/utils";
 
-const MATERIALIZED_IMAGE_RE = /^\/generated\/cms\/[a-f0-9]{16}\/(?:thumbnail|card|gallery|hero|lightbox)\.webp$/;
-
 const components: Components = {
   p: ({ children }) => <p className="leading-relaxed text-foreground/90">{children}</p>,
   h2: ({ children }) => <h2 className="font-heading pt-2 text-xl font-semibold text-foreground">{children}</h2>,
@@ -16,18 +14,11 @@ const components: Components = {
       {children}
     </a>
   ),
-  img: ({ alt, src }) => {
-    if (typeof src !== "string" || !MATERIALIZED_IMAGE_RE.test(src)) {
-      throw new Error(
-        `Unsupported inline Markdown image source "${typeof src === "string" ? src : ""}". ` +
-          "Use a structured CMS image field so the asset is materialized.",
-      );
-    }
-
-    // Width and height are not encoded in Markdown. These files have already
-    // passed through our local materializer; validate:out verifies they exist.
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt ?? ""} loading="lazy" decoding="async" />;
+  img: ({ src }) => {
+    throw new Error(
+      `Unsupported inline Markdown image source "${typeof src === "string" ? src : ""}". ` +
+        "Use a structured CMS image field.",
+    );
   },
 };
 

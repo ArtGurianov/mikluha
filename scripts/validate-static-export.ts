@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Step 5 of the production build pipeline — runs after
+ * Final step of the production build pipeline — runs after
  * `next build` against the generated /out directory, before it is allowed to
  * become the candidate for the HTTP healthcheck / production switch.
  */
@@ -9,14 +9,19 @@ import path from "node:path";
 
 import yaml from "js-yaml";
 
-import { createAssetSourcePolicy, type CmsMediaConfig } from "../lib/cms/asset-source";
+import {
+  assertImageSource,
+  assertVideoSource,
+  createAssetSourcePolicy,
+  type CmsMediaConfig,
+} from "../lib/cms/asset-source";
 import type { ContentSnapshot } from "../lib/cms/types";
+import { resolveCanonicalBase } from "../lib/site";
 
 const ROOT = process.cwd();
 const OUT_DIR = path.join(ROOT, "out");
 const CACHE_FILE = path.join(ROOT, ".cms-cache", "content.json");
 const ADMIN_CONFIG_FILE = path.join(ROOT, "public/admin/config.yml");
-const CONTENT_ASSETS_DIR = path.join(ROOT, "content/assets");
 
 const errors: string[] = [];
 function fail(message: string) {
@@ -32,12 +37,12 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-// .yml is deliberately excluded: /out/admin/config.yml legitimately names the
-// configured storage URLs (it's the CMS media library's own config, not a
-// materialized page). Don't add it without excluding that config specifically.
+// .yml is deliberately excluded: /out/admin/config.yml contains the editor's
+// Object Storage configuration, while this scan targets rendered public pages.
 const SCANNABLE_EXT = new Set([".html", ".js", ".json", ".xml", ".txt"]);
-const ASSET_REF_RE = /\/generated\/cms\/[\w-]+\/[\w-]+\.(?:webp|png|jpg|jpeg|ico)/g;
-const REMOTE_IMAGE_RE = /<img\b[^>]*\bsrc=["']https?:\/\//i;
+const DIRECT_MEDIA_REF_RE = /\b(?:src|poster|href|content)=["']([^"']+\.(?:webp|webm))["']/gi;
+const PROCESSED_IMAGE_RE = /\/_next\/image\?|\/generated\/cms\//i;
+const LEGACY_IMAGE_RE = /<(?:img|video)\b[^>]*(?:src|poster)=["'][^"']+\.(?:jpe?g|png)["']/i;
 
 async function walk(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true, recursive: true } as never);
@@ -70,9 +75,15 @@ async function main() {
   if (!(await exists(path.join(OUT_DIR, "404.html")))) {
     fail("/out/404.html is missing (branded 404 required by section 35/48)");
   }
+  for (const cmsFile of ["admin/index.html", "admin/config.yml", "admin/sveltia-cms.js"]) {
+    if (!(await exists(path.join(OUT_DIR, cmsFile)))) {
+      fail(`/out/${cmsFile} is missing — the CMS must ship as part of the static bundle`);
+    }
+  }
 
+  let content: ContentSnapshot | undefined;
   if (await exists(CACHE_FILE)) {
-    const content = JSON.parse(await readFile(CACHE_FILE, "utf-8")) as ContentSnapshot;
+    content = JSON.parse(await readFile(CACHE_FILE, "utf-8")) as ContentSnapshot;
     for (const tour of content.tours) {
       const routeFile = path.join(OUT_DIR, "tours", tour.slug, "index.html");
       if (!(await exists(routeFile))) fail(`Missing static route for tour "${tour.slug}": ${path.relative(ROOT, routeFile)}`);
@@ -90,41 +101,56 @@ async function main() {
   }
 
   const files = await walk(OUT_DIR);
-  const referencedAssets = new Set<string>();
+  const referencedMedia = new Set<string>();
   const adminConfig = yaml.load(await readFile(ADMIN_CONFIG_FILE, "utf-8")) as CmsMediaConfig;
-  const forbiddenRemoteBases = createAssetSourcePolicy(adminConfig, CONTENT_ASSETS_DIR).remoteBases.map(
-    (url) => url.href,
-  );
+  const mediaPolicy = createAssetSourcePolicy(adminConfig);
+  const canonicalOrigin = content ? new URL(resolveCanonicalBase(content.siteSettings.siteUrl)).origin : undefined;
 
   for (const file of files) {
     const ext = path.extname(file);
     if (!SCANNABLE_EXT.has(ext)) continue;
     const text = await readFile(file, "utf-8");
 
-    const leakedBase = forbiddenRemoteBases.find((base) => text.includes(base));
-    if (leakedBase) {
-      fail(
-        `Found configured CMS storage URL ${leakedBase} in ${path.relative(ROOT, file)} — ` +
-          `production artifact must be fully local`,
-      );
+    if (ext === ".html" && PROCESSED_IMAGE_RE.test(text)) {
+      fail(`Found an image-processing URL in ${path.relative(ROOT, file)} — media must be referenced directly`);
     }
-    if (ext === ".html" && REMOTE_IMAGE_RE.test(text)) {
-      fail(`Found a remote <img> source in ${path.relative(ROOT, file)} — public pages must use materialized local assets`);
+    if (ext === ".html" && LEGACY_IMAGE_RE.test(text)) {
+      fail(`Found a JPEG/PNG page asset in ${path.relative(ROOT, file)} — public media must be WebP/WebM`);
     }
 
-    for (const match of text.matchAll(ASSET_REF_RE)) {
-      referencedAssets.add(match[0]);
+    for (const match of text.matchAll(DIRECT_MEDIA_REF_RE)) {
+      referencedMedia.add(match[1]);
     }
   }
 
-  for (const assetPath of referencedAssets) {
-    const abs = path.join(OUT_DIR, assetPath);
-    if (!(await exists(abs))) {
-      fail(`Referenced local asset does not exist in /out: ${assetPath}`);
+  for (const mediaRef of referencedMedia) {
+    let policyRef = mediaRef;
+    try {
+      const absolute = new URL(mediaRef);
+      if (absolute.origin === canonicalOrigin && !absolute.search && !absolute.hash) {
+        policyRef = absolute.pathname;
+      }
+    } catch {
+      // Root-relative demo media is handled as-is by the policy below.
+    }
+
+    try {
+      if (policyRef.endsWith(".webm")) assertVideoSource(policyRef, mediaPolicy);
+      else assertImageSource(policyRef, mediaPolicy);
+    } catch (error) {
+      fail(`Static output references invalid direct media "${mediaRef}": ${(error as Error).message}`);
+      continue;
+    }
+
+    if (policyRef.startsWith("/")) {
+      const abs = path.join(OUT_DIR, policyRef);
+      if (!(await exists(abs))) {
+        fail(`Referenced local media does not exist in /out: ${policyRef}`);
+      }
     }
   }
 
-  console.log(`[validate-out] scanned ${files.length} files, ${referencedAssets.size} unique local CMS asset reference(s)`);
+  console.log(`[validate-out] scanned ${files.length} files, ${referencedMedia.size} unique direct media reference(s)`);
   report();
 }
 

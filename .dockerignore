@@ -4,8 +4,6 @@ out
 .cms-cache
 public/generated/cms
 public/admin/sveltia-cms.js
-app/icon.png
-app/apple-icon.png
 .git
 .env*
 !.env.example

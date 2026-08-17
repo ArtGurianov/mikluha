@@ -1,5 +1,4 @@
-import Image from "next/image";
-
+import { CmsImage } from "@/components/media/cms-image";
 import type { OrganizerDTO } from "@/lib/cms/types";
 import { telHref } from "@/lib/format";
 
@@ -18,11 +17,8 @@ export function OrganizerSection({ organizers }: { organizers: OrganizerDTO[] })
           {listed.map((organizer) => (
             <div key={organizer.id} className="flex flex-col gap-4 sm:flex-row sm:items-start">
               {organizer.photo && (
-                <Image
-                  src={organizer.photo.variants.card}
-                  alt={organizer.photo.alt}
-                  width={128}
-                  height={128}
+                <CmsImage
+                  image={organizer.photo}
                   className="size-28 shrink-0 rounded-full object-cover ring-1 ring-foreground/10"
                 />
               )}

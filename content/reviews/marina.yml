@@ -1,5 +1,5 @@
 image:
-  image: "local:review-1.jpg"
+  image: "/media/demo/review-1.webp"
   alt: Скриншот отзыва об алтайском походе
 authorName: Марина
 tour: altai

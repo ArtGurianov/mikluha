@@ -44,9 +44,6 @@ importers:
       shadcn:
         specifier: ^4.18.0
         version: 4.18.0(typescript@5.9.3)
-      sharp:
-        specifier: ^0.35.3
-        version: 0.35.3(@types/node@20.19.43)
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0

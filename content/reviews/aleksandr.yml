@@ -1,5 +1,5 @@
 image:
-  image: "local:review-2.jpg"
+  image: "/media/demo/review-2.webp"
   alt: Скриншот переписки с клиентом
 authorName: Александр
 tour: krasnoyarsk-stolby

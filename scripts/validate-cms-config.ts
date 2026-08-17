@@ -13,7 +13,10 @@ import { isStaging } from "../lib/site";
 const ROOT = process.cwd();
 const CONFIG_FILE = path.join(ROOT, "public/admin/config.yml");
 const SCHEMA_FILE = path.join(ROOT, "node_modules/@sveltia/cms/schema/sveltia-cms.json");
-const CONTENT_ASSETS_DIR = path.join(ROOT, "content/assets");
+const IMAGE_ACCEPT = ".webp,image/webp";
+const VIDEO_ACCEPT = ".webm,video/webm";
+const IMAGE_MAX_BYTES = 1024 * 1024;
+const VIDEO_MAX_BYTES = 10 * 1024 * 1024;
 
 interface CmsConfig extends CmsMediaConfig {
   backend?: { auth_methods?: string[] };
@@ -30,6 +33,15 @@ function collectFields(fields: unknown[], result: Array<Record<string, unknown>>
     if (Array.isArray(field.fields)) collectFields(field.fields, result);
     if (field.field && typeof field.field === "object") collectFields([field.field], result);
   }
+}
+
+function fieldMediaMax(field: Record<string, unknown>): number | undefined {
+  const mediaLibrary = field.media_library;
+  if (!mediaLibrary || typeof mediaLibrary !== "object" || Array.isArray(mediaLibrary)) return undefined;
+  const config = (mediaLibrary as Record<string, unknown>).config;
+  if (!config || typeof config !== "object" || Array.isArray(config)) return undefined;
+  const value = (config as Record<string, unknown>).max_file_size;
+  return typeof value === "number" ? value : undefined;
 }
 
 async function main() {
@@ -74,6 +86,10 @@ async function main() {
     );
   }
 
+  if (config.media_libraries?.all?.max_file_size !== VIDEO_MAX_BYTES) {
+    errors.push(`media_libraries.all.max_file_size must be ${VIDEO_MAX_BYTES} (10 MiB)`);
+  }
+
   const fields: Array<Record<string, unknown>> = [];
   for (const collection of [...(config.collections ?? []), ...(config.singletons ?? [])]) {
     collectFields(collection.fields ?? [], fields);
@@ -85,9 +101,28 @@ async function main() {
       );
     }
   }
+  for (const field of fields.filter((candidate) => candidate.widget === "image")) {
+    if (field.accept !== IMAGE_ACCEPT || field.choose_url !== false || fieldMediaMax(field) !== IMAGE_MAX_BYTES) {
+      errors.push(
+        `image field "${String(field.name)}" must accept only WebP, disable arbitrary URL entry, and cap uploads at 1 MiB`,
+      );
+    }
+  }
+  for (const field of fields.filter((candidate) => candidate.widget === "file")) {
+    if (field.accept !== VIDEO_ACCEPT || field.choose_url !== false || fieldMediaMax(field) !== VIDEO_MAX_BYTES) {
+      errors.push(
+        `file field "${String(field.name)}" must accept only WebM, disable arbitrary URL entry, and cap uploads at 10 MiB`,
+      );
+    }
+  }
+  for (const field of fields.filter((candidate) => candidate.name === "gallery")) {
+    if (field.widget !== "list" || field.max !== 10) {
+      errors.push(`gallery field must be a list capped at 10 images`);
+    }
+  }
 
   try {
-    const policy = createAssetSourcePolicy(config, CONTENT_ASSETS_DIR);
+    const policy = createAssetSourcePolicy(config);
     if (policy.remoteBases.length === 0) errors.push("no usable aws_s3 public_url or endpoint/bucket asset prefix is configured");
   } catch (error) {
     errors.push((error as Error).message);

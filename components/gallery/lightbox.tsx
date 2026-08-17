@@ -1,9 +1,9 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import Image from "next/image";
 import * as React from "react";
 
+import { CmsImage } from "@/components/media/cms-image";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { ImageAsset } from "@/lib/cms/types";
@@ -61,14 +61,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
         <DialogTitle className="sr-only">{image.alt || "Просмотр фотографии"}</DialogTitle>
 
         <div className="relative flex h-full w-full items-center justify-center">
-          <Image
-            src={image.variants.lightbox}
-            alt={image.alt}
-            width={image.width}
-            height={image.height}
-            className="max-h-[86vh] max-w-full object-contain"
-            priority
-          />
+          <CmsImage image={image} loading="eager" className="max-h-[86vh] max-w-full object-contain" />
 
           {images.length > 1 && (
             <>

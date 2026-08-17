@@ -2,28 +2,38 @@
 /**
  * Step 2 of the production build pipeline.
  *
- * Validates the normalized content snapshot BEFORE asset materialization and
- * `next build` run:
+ * Validates the normalized content snapshot BEFORE `next build`:
  *  - referential integrity (every reference points at a real, listed document)
  *  - the launchReady + isDemo production-readiness gate
  *  - that every OPEN departure has a complete booking flow after fallback
  *
  * Exits non-zero (failing the build) on any violation.
  */
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
+import yaml from "js-yaml";
+
+import {
+  assertImageSource,
+  assertVideoSource,
+  createAssetSourcePolicy,
+  type CmsMediaConfig,
+} from "../lib/cms/asset-source";
+import type { ContentSnapshot, ImageAsset } from "../lib/cms/types";
 import { REQUIRED_LEGAL_SLUGS, RESERVED_SLUGS, SLUG_RE } from "../lib/legal";
 import { findMarkdownPolicyViolations } from "../lib/cms/markdown-policy";
 import { isStaging } from "../lib/site";
-import type { ContentSnapshot } from "../lib/cms/types";
 
 const CACHE_FILE = path.resolve(process.cwd(), ".cms-cache", "content.json");
+const ADMIN_CONFIG_FILE = path.resolve(process.cwd(), "public/admin/config.yml");
+const PUBLIC_DIR = path.resolve(process.cwd(), "public");
 const PHONE_RE = /^\+7\d{10}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const errors: string[] = [];
 const warnings: string[] = [];
+const localMediaRefs = new Set<string>();
 
 function isCalendarDate(value: string): boolean {
   if (!DATE_RE.test(value)) return false;
@@ -53,7 +63,7 @@ function validateMarkdown(markdown: string, documentField: string) {
     if (violation.kind === "image") {
       fail(
         `${location} contains an inline Markdown image (${violation.subject}); ` +
-          "use a structured CMS image field so the asset is materialized",
+          "use a structured CMS image field so its WebP policy is enforced",
       );
     } else {
       fail(
@@ -63,9 +73,23 @@ function validateMarkdown(markdown: string, documentField: string) {
   }
 }
 
+function validateImage(image: ImageAsset | undefined, documentField: string, policy: ReturnType<typeof createAssetSourcePolicy>) {
+  if (!image) return;
+  try {
+    assertImageSource(image.src, policy);
+    if (image.src.startsWith("/")) localMediaRefs.add(image.src);
+  } catch (error) {
+    fail(`${documentField}: ${(error as Error).message}`);
+  }
+}
+
 async function main() {
-  const raw = await readFile(CACHE_FILE, "utf-8");
-  const content = JSON.parse(raw) as ContentSnapshot<unknown>;
+  const [raw, adminConfigText] = await Promise.all([
+    readFile(CACHE_FILE, "utf-8"),
+    readFile(ADMIN_CONFIG_FILE, "utf-8"),
+  ]);
+  const content = JSON.parse(raw) as ContentSnapshot;
+  const mediaPolicy = createAssetSourcePolicy(yaml.load(adminConfigText) as CmsMediaConfig);
 
   const tourIds = new Set(content.tours.map((t) => t.id));
   const departureById = new Map(content.departures.map((d) => [d.id, d]));
@@ -80,6 +104,48 @@ async function main() {
   for (const page of content.legalPages) {
     validateMarkdown(page.content, `LegalPage ${page.id} content`);
   }
+
+  validateImage(content.siteSettings.logo, "siteSettings.logo", mediaPolicy);
+  validateImage(content.siteSettings.hero.image, "siteSettings.hero.image", mediaPolicy);
+  validateImage(content.siteSettings.booking.defaultQr, "siteSettings.booking.defaultQr", mediaPolicy);
+  validateImage(content.siteSettings.seo.ogImage, "siteSettings.seo.ogImage", mediaPolicy);
+  if (content.siteSettings.hero.video) {
+    try {
+      assertVideoSource(content.siteSettings.hero.video.src, mediaPolicy);
+      if (content.siteSettings.hero.video.src.startsWith("/")) {
+        localMediaRefs.add(content.siteSettings.hero.video.src);
+      }
+    } catch (error) {
+      fail(`siteSettings.hero.video: ${(error as Error).message}`);
+    }
+  }
+  for (const tour of content.tours) {
+    validateImage(tour.coverImage, `Tour ${tour.id} coverImage`, mediaPolicy);
+    validateImage(tour.seo?.image, `Tour ${tour.id} seo.image`, mediaPolicy);
+    tour.gallery.forEach((image, index) => validateImage(image, `Tour ${tour.id} gallery[${index}]`, mediaPolicy));
+    if (tour.gallery.length > 10) fail(`Tour ${tour.id} gallery has ${tour.gallery.length} images; maximum is 10`);
+  }
+  for (const departure of content.departures) {
+    validateImage(departure.paymentQr, `Departure ${departure.id} paymentQr`, mediaPolicy);
+  }
+  for (const report of content.reports) {
+    validateImage(report.coverImage, `Report ${report.id} coverImage`, mediaPolicy);
+    report.gallery.forEach((image, index) => validateImage(image, `Report ${report.id} gallery[${index}]`, mediaPolicy));
+    if (report.gallery.length > 10) fail(`Report ${report.id} gallery has ${report.gallery.length} images; maximum is 10`);
+  }
+  for (const review of content.reviews) validateImage(review.image, `Review ${review.id} image`, mediaPolicy);
+  for (const organizer of content.organizers) {
+    validateImage(organizer.photo, `Organizer ${organizer.id} photo`, mediaPolicy);
+  }
+  await Promise.all(
+    [...localMediaRefs].map(async (mediaRef) => {
+      try {
+        await access(path.join(PUBLIC_DIR, mediaRef.slice(1)));
+      } catch {
+        fail(`local media does not exist in public/: ${mediaRef}`);
+      }
+    }),
+  );
 
   if (!isHttpsUrl(content.siteSettings.siteUrl)) fail(`siteSettings.siteUrl must be an absolute HTTPS URL`);
   if (content.siteSettings.socials.maxChannelUrl && !isHttpsUrl(content.siteSettings.socials.maxChannelUrl)) {

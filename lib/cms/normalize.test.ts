@@ -13,7 +13,7 @@ import type { RawContentSet, RawImageRef, RawReport, RawSiteSettings, RawTour } 
  */
 
 function imageRef(alt = "alt"): RawImageRef {
-  return { image: "local:x.jpg", alt };
+  return { image: "/media/demo/x.webp", alt };
 }
 
 function tour(overrides: Partial<RawTour> = {}): RawTour {
@@ -114,4 +114,17 @@ test("an absent siteSettings.booking object means 'no defaults', not a crash", (
   assert.equal(content.siteSettings.booking.defaultQr, undefined);
   assert.equal(content.siteSettings.booking.defaultPrepaymentAmount, undefined);
   assert.equal(content.siteSettings.booking.isDemo, false);
+});
+
+test("an optional Hero video becomes a direct WebM source", () => {
+  const content = normalizeContentSet(
+    contentSet({
+      siteSettings: siteSettings({
+        hero: { title: "Заголовок", image: imageRef("hero"), video: { file: "https://media.example/cms/hero.webm" } },
+      }),
+    }),
+    "git",
+  );
+
+  assert.equal(content.siteSettings.hero.video?.src, "https://media.example/cms/hero.webm");
 });

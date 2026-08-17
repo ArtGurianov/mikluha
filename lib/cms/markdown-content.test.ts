@@ -6,26 +6,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { MarkdownContent } from "../../components/site/markdown-content";
 
-test("MarkdownContent rejects an image that bypassed asset materialization", () => {
+test("MarkdownContent rejects an image that bypasses structured CMS fields", () => {
   assert.throws(
     () => renderToStaticMarkup(createElement(MarkdownContent, { value: "![alt](local:photo.jpg)" })),
     /Unsupported inline Markdown image source "local:photo.jpg"/,
   );
 });
 
-test("MarkdownContent permits a materialized local image", () => {
-  const html = renderToStaticMarkup(
-    createElement(MarkdownContent, { value: "![alt](/generated/cms/0123456789abcdef/card.webp)" }),
-  );
-
-  assert.match(html, /src="\/generated\/cms\/0123456789abcdef\/card\.webp"/);
-});
-
-test("MarkdownContent rejects traversal hidden behind the materialized prefix", () => {
+test("MarkdownContent also rejects direct WebP references", () => {
   assert.throws(
     () =>
       renderToStaticMarkup(
-        createElement(MarkdownContent, { value: "![alt](/generated/cms/../private/photo.webp)" }),
+        createElement(MarkdownContent, { value: "![alt](/media/demo/hero.webp)" }),
       ),
     /Unsupported inline Markdown image source/,
   );

@@ -4,10 +4,9 @@
  *
  * Reads the Git-committed content set from content/ (written either by hand or
  * through the Sveltia CMS admin panel, which commits directly to this repo via
- * the GitHub API), normalizes it, and writes an intermediate snapshot to
- * .cms-cache/content.json. Images are left "unresolved" (alt + sourceRef) at
- * this stage; scripts/materialize-assets.ts downloads/resizes them and
- * rewrites the same file into its final, fully-resolved form.
+ * the GitHub API), normalizes it, and writes the final snapshot to
+ * .cms-cache/content.json. Media remains as direct Object Storage or tracked
+ * demo URLs; no build step downloads or transforms it.
  */
 import { lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";

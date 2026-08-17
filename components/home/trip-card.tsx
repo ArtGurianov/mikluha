@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { BookingButton } from "@/components/booking/booking-button";
+import { CmsImage } from "@/components/media/cms-image";
 import { DepartureStatusBadge } from "@/components/site/departure-status-badge";
 import { Card } from "@/components/ui/card";
 import type { DepartureDTO, TourDTO } from "@/lib/cms/types";
@@ -29,12 +29,9 @@ export function TripCard({ tour, departure }: TripCardProps) {
   return (
     <Card className="group/card relative flex w-[82%] shrink-0 snap-start flex-col overflow-hidden py-0 transition-colors hover:border-foreground/25 sm:w-[46%] lg:w-[31%]">
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-        <Image
-          src={tour.coverImage.variants.card}
-          alt={tour.coverImage.alt}
-          fill
-          sizes="(max-width: 639px) 82vw, (max-width: 1023px) 46vw, 31vw"
-          className="object-cover transition-transform duration-300 group-hover/card:scale-105"
+        <CmsImage
+          image={tour.coverImage}
+          className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover/card:scale-105"
         />
         {departure && (
           <div className="absolute inset-x-0 top-0 flex justify-end p-3">

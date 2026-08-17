@@ -20,7 +20,7 @@ const manrope = Manrope({
 
 export async function generateMetadata(): Promise<Metadata> {
   const { siteSettings, tours } = getContent();
-  const canonicalCoverImage = siteSettings.seo.ogImage?.variants.hero ?? tours[0]?.coverImage.variants.hero;
+  const canonicalCoverImage = siteSettings.seo.ogImage?.src ?? tours[0]?.coverImage.src;
 
   return {
     metadataBase: new URL(resolveCanonicalBase(siteSettings.siteUrl)),
@@ -54,7 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     "@type": "TravelAgency",
     name: siteSettings.siteName,
     url: canonicalBase,
-    ...(siteSettings.logo ? { logo: `${canonicalBase}${siteSettings.logo.variants.card}` } : {}),
+    ...(siteSettings.logo ? { logo: new URL(siteSettings.logo.src, canonicalBase).href } : {}),
     telephone: siteSettings.company.phone,
     ...(siteSettings.company.email ? { email: siteSettings.company.email } : {}),
   };

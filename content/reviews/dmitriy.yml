@@ -1,5 +1,5 @@
 image:
-  image: "local:review-3.jpg"
+  image: "/media/demo/review-3.webp"
   alt: Скриншот отзыва о поездке
 authorName: Дмитрий
 tour: altai

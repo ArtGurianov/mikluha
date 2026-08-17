@@ -9,8 +9,8 @@ import type {
   SeoDTO,
   SiteSettingsDTO,
   TourDTO,
-  UnresolvedContentSnapshot,
-  UnresolvedImageAsset,
+  ContentSnapshot,
+  ImageAsset,
 } from "./types";
 
 /**
@@ -44,9 +44,9 @@ function optionalString(value: string | undefined | null): string | undefined {
  * can be saved with only its alt text filled in, and the underlying asset can
  * be deleted from storage out from under a document that still references it.
  */
-function image(ref: RawImageRef | undefined | null, what: string): UnresolvedImageAsset {
-  const sourceRef = requiredString(ref?.image, `${what} (image has no uploaded asset)`);
-  return { alt: ref?.alt?.trim() || "", sourceRef };
+function image(ref: RawImageRef | undefined | null, what: string): ImageAsset {
+  const src = requiredString(ref?.image, `${what} (image has no uploaded asset)`);
+  return { alt: ref?.alt?.trim() || "", src };
 }
 
 /**
@@ -55,9 +55,9 @@ function image(ref: RawImageRef | undefined | null, what: string): UnresolvedIma
  * instance) is covered by scripts/validate-content.ts, which reports the
  * business consequence rather than a missing-asset stack trace.
  */
-function maybeImage(ref: RawImageRef | undefined | null): UnresolvedImageAsset | undefined {
+function maybeImage(ref: RawImageRef | undefined | null): ImageAsset | undefined {
   if (!ref?.image) return undefined;
-  return { alt: ref.alt?.trim() || "", sourceRef: ref.image };
+  return { alt: ref.alt?.trim() || "", src: ref.image };
 }
 
 /**
@@ -103,13 +103,13 @@ function normalizeSeo(
     | { title?: string | null; description?: string | null; image?: RawImageRef | null }
     | undefined
     | null,
-): SeoDTO<UnresolvedImageAsset> | undefined {
+): SeoDTO<ImageAsset> | undefined {
   if (!seo) return undefined;
   return { title: optionalString(seo.title), description: optionalString(seo.description), image: maybeImage(seo.image) };
 }
 
-export function normalizeContentSet(raw: RawContentSet, source: "git"): UnresolvedContentSnapshot {
-  const tours: TourDTO<UnresolvedImageAsset>[] = raw.tours.map((t) => ({
+export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentSnapshot {
+  const tours: TourDTO<ImageAsset>[] = raw.tours.map((t) => ({
     id: requireSlugConsistency(t, "Tour"),
     slug: requiredString(t.slug, `tour "${t._slug}" slug`),
     title: requiredString(t.title, `tour "${t._slug}" title`),
@@ -122,7 +122,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): Unresolv
     seo: normalizeSeo(t.seo),
   }));
 
-  const departures: DepartureDTO<UnresolvedImageAsset>[] = raw.departures.map((d) => ({
+  const departures: DepartureDTO<ImageAsset>[] = raw.departures.map((d) => ({
     id: d._slug,
     tourId: requiredString(d.tour, `departure "${d._slug}" tour`),
     startDate: requiredString(d.startDate, `departure "${d._slug}" startDate`),
@@ -138,7 +138,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): Unresolv
 
   const departureById = new Map(departures.map((d) => [d.id, d]));
 
-  const reports: ReportDTO<UnresolvedImageAsset>[] = raw.reports.map((r) => {
+  const reports: ReportDTO<ImageAsset>[] = raw.reports.map((r) => {
     const departureId = optionalString(r.departure);
     const linkedDeparture = departureId ? departureById.get(departureId) : undefined;
     return {
@@ -155,7 +155,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): Unresolv
     };
   });
 
-  const reviews: ReviewDTO<UnresolvedImageAsset>[] = raw.reviews.map((rv) => ({
+  const reviews: ReviewDTO<ImageAsset>[] = raw.reviews.map((rv) => ({
     id: rv._slug,
     image: image(rv.image, `review "${rv._slug}" image`),
     authorName: requiredString(rv.authorName, `review "${rv._slug}" authorName`),
@@ -166,7 +166,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): Unresolv
     isDemo: flag(rv.isDemo),
   }));
 
-  const organizers: OrganizerDTO<UnresolvedImageAsset>[] = raw.organizers.map((o) => ({
+  const organizers: OrganizerDTO<ImageAsset>[] = raw.organizers.map((o) => ({
     id: o._slug,
     name: requiredString(o.name, `organizer "${o._slug}" name`),
     phone: requiredString(o.phone, `organizer "${o._slug}" phone`),
@@ -193,16 +193,16 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): Unresolv
   const seo = required(s.seo, "siteSettings.seo");
   const booking = s.booking ?? {};
 
-  const siteSettings: SiteSettingsDTO<UnresolvedImageAsset> = {
+  const siteSettings: SiteSettingsDTO<ImageAsset> = {
     siteName: requiredString(s.siteName, "siteSettings.siteName"),
     siteUrl: requiredString(s.siteUrl, "siteSettings.siteUrl"),
     timezone: requiredString(s.timezone, "siteSettings.timezone"),
     logo: maybeImage(s.logo),
-    favicon: maybeImage(s.favicon),
     hero: {
       title: requiredString(hero.title, "siteSettings.hero.title"),
       subtitle: optionalString(hero.subtitle),
       image: image(hero.image, "siteSettings.hero.image"),
+      video: hero.video?.file ? { src: hero.video.file } : undefined,
     },
     booking: {
       defaultQr: maybeImage(booking.defaultQr),

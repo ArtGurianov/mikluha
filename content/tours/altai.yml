@@ -12,16 +12,16 @@ description: >-
   Группа — до 10-12 человек. Ночуем в палатках, готовим на костре, вместе разбираем и собираем
   лагерь. Опыт похода не обязателен, важна только базовая физическая подготовка.
 coverImage:
-  image: "local:altai-cover.jpg"
+  image: "/media/demo/altai-cover.webp"
   alt: Горные вершины Алтая на закате
 gallery:
-  - image: "local:altai-gallery-1.jpg"
+  - image: "/media/demo/altai-gallery-1.webp"
     alt: Тропа среди альпийских лугов Алтая
-  - image: "local:altai-gallery-2.jpg"
+  - image: "/media/demo/altai-gallery-2.webp"
     alt: Бирюзовое озеро в горах Алтая
-  - image: "local:altai-gallery-3.jpg"
+  - image: "/media/demo/altai-gallery-3.webp"
     alt: Группа туристов на перевале
-  - image: "local:altai-gallery-4.jpg"
+  - image: "/media/demo/altai-gallery-4.webp"
     alt: Лагерь у реки на Алтае
 isListed: true
 sortOrder: 10
@@ -29,5 +29,5 @@ seo:
   title: Горный Алтай — походы небольшими группами
   description: "Пешие походы на Горный Алтай: даты выездов, статус набора и фотоотчёты прошлых поездок."
   image:
-    image: "local:altai-cover.jpg"
+    image: "/media/demo/altai-cover.webp"
     alt: Горный Алтай

@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 
 import { BookingButton } from "@/components/booking/booking-button";
 import { Gallery } from "@/components/gallery/gallery";
 import { ReportCard } from "@/components/home/report-card";
 import { ReviewsSection } from "@/components/home/reviews-section";
+import { CmsImage } from "@/components/media/cms-image";
 import { DepartureStatusBadge } from "@/components/site/departure-status-badge";
 import { MarkdownContent } from "@/components/site/markdown-content";
 import { getContent } from "@/lib/cms/content";
@@ -35,7 +35,7 @@ export async function generateMetadata(props: PageProps<"/tours/[slug]">): Promi
 
   const title = tour.seo?.title ?? tour.title;
   const description = tour.seo?.description ?? tour.shortDescription;
-  const image = tour.seo?.image?.variants.hero ?? tour.coverImage.variants.hero;
+  const image = tour.seo?.image?.src ?? tour.coverImage.src;
 
   return {
     title,
@@ -68,7 +68,7 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
           nextDeparture.bookingStatus === "CANCELLED"
             ? "https://schema.org/EventCancelled"
             : "https://schema.org/EventScheduled",
-        image: [tour.coverImage.variants.hero],
+        image: [tour.coverImage.src],
         description: tour.shortDescription,
       }
     : null;
@@ -83,7 +83,12 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
       )}
 
       <div className="relative flex h-[55vh] min-h-96 items-end text-white">
-        <Image src={tour.coverImage.variants.hero} alt={tour.coverImage.alt} fill priority sizes="100vw" className="object-cover" />
+        <CmsImage
+          image={tour.coverImage}
+          loading="eager"
+          fetchPriority="high"
+          className="absolute inset-0 size-full object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
         <h1 className="font-heading relative z-10 mx-auto w-full max-w-6xl px-4 pb-10 text-4xl font-semibold sm:px-6 sm:text-5xl">
           {tour.title}

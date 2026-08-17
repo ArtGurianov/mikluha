@@ -6,10 +6,9 @@
 
 - Публичный сайт — pure static export (`output: 'export'`), обслуживается Nginx из `/out`.
 - Контент — YAML-файлы в `content/`, часть этого репозитория. Редактируется через `/admin`
-  (Sveltia CMS: статический JS-бандл, коммитит прямо в GitHub) или руками. Runtime публичного
-  сайта от CMS не зависит — но сама *сборка* не полностью офлайн: текстовый контент читается с
-  диска, а вот картинки, загруженные через `/admin` (не `local:`-ссылки на демо-ассеты),
-  `scripts/materialize-assets.ts` скачивает с cloud.ru — см. предупреждение ниже.
+  (Sveltia CMS: статический JS-бандл, коммитит прямо в GitHub) или руками. И сайт, и CMS
+  входят в статический `/out`; браузер получает WebP/WebM напрямую из cloud.ru Object Storage.
+  Сборка не скачивает и не преобразует медиа.
 - Два Coolify application:
   - `miklukha-web` — сам сайт, `Dockerfile` в корне репозитория (multi-stage: deps → build →
     nginx runtime).
@@ -25,26 +24,23 @@
 | `DEPLOY_ENV` | `production` или `staging` — управляет индексируемостью |
 | `SITE_URL` | Только при `DEPLOY_ENV=staging`: canonical/OG base URL для staging-хоста |
 
-Никаких CMS-credentials на этапе сборки не требуется — контент уже лежит в собранном репозитории.
-Но как только хотя бы одно изображение загружено через `/admin`, доступность cloud.ru становится
-жёсткой зависимостью самой сборки (не рантайма сайта — см. `docs/DECISIONS.md` #1): `next build`
-не начнётся, пока `materialize-assets` не скачает и не порежет на WEBP-варианты каждую такую
-картинку. Если пересборка упала на этом шаге — сначала проверить доступность cloud.ru, а не
-GitHub/Coolify.
+Никаких CMS-credentials и доступности cloud.ru на этапе сборки не требуется: YAML уже лежит в
+репозитории, а прямые URL проходят только синтаксическую проверку. Доступность Object Storage
+нужна браузерам посетителей в runtime.
 
 ## Локальная разработка
 
 ```bash
 pnpm install
-pnpm dev   # predev сам прогонит vendor:admin + sync:content + materialize:assets
+pnpm dev   # predev сам прогонит vendor:admin + sync:content
 ```
 
 ## Production build pipeline
 
 ```bash
 pnpm run build:production
-# = clean && validate:cms-config && vendor:admin && lint && test && sync:content
-#   && materialize:assets && validate:content && build && validate:out
+# = clean && validate:cms-config && vendor:admin && lint && test
+#   && sync:content && validate:content && build && validate:out
 ```
 
 `vendor:admin` копирует Sveltia CMS (`node_modules/@sveltia/cms/dist/sveltia-cms.js`) в
@@ -86,8 +82,8 @@ GitHub требует обмена authorization code на token с client secre
 диффов.
 
 1. Создать bucket в cloud.ru Evolution Object Storage; настроить bucket policy на публичное
-   чтение (`GetObject`) объектов под префиксом `cms/` — `scripts/materialize-assets.ts` скачивает
-   их по прямой ссылке во время сборки. Листинг публично не открывать. Оставить
+   чтение (`GetObject`) объектов под префиксом `cms/`: эти URL используются прямо в статических
+   страницах. Листинг публично не открывать. Оставить
    `media_libraries.aws_s3.acl: false` в CMS-конфиге: Sveltia иначе добавляет к загрузкам
    `x-amz-acl: public-read`, который bucket с отключёнными ACL отклоняет.
 2. Настроить CORS bucket для каждого origin, с которого открывается `/admin`: методы `GET`, `PUT`, `HEAD`, заголовки `*`,
@@ -100,6 +96,20 @@ GitHub требует обмена authorization code на token с client secre
    cloud.ru `<tenant_id>:<key_id>` (не секретный)
    и `bucket`. **Secret access key в конфиг не пишется** — каждый редактор вводит его один раз в
    интерфейсе Sveltia при первой загрузке файла; хранится только в его браузере.
+
+CMS принимает только WebP-изображения до 1 МиБ и WebM-видео до 10 МиБ. В галереях тура и
+отчёта максимум 10 фотографий: при заполненном списке сначала удалить существующую. Эти лимиты
+применяет браузерная форма Sveltia. Ручное редактирование YAML намеренно остаётся аварийным
+обходом лимита размера; сборка не делает сетевой `HEAD`/`GET` и потому не перепроверяет размер
+удалённого объекта. Формат, storage-префикс и лимит количества в галерее сборка проверяет.
+
+Фоновое видео главной страницы добавляется в «Настройки сайта» → «Главный экран (Hero)» →
+«Фоновое видео WebM». Оно опционально; фоновое изображение остаётся poster/fallback, а при
+включённом системном сокращении анимации видео скрывается.
+
+Favicon и Apple Touch Icon загружаются не в CMS/Object Storage, а один раз коммитятся в
+репозиторий как `app/favicon.ico` и `app/apple-icon.png`. Next.js копирует их в статический
+export и добавляет metadata-теги автоматически; никакого materializer для этого нет.
 
 ## GitHub push → rebuild
 
@@ -131,7 +141,7 @@ GitHub-репозиторий, который Coolify отслеживает н�
 HEALTHCHECK_BASE_URL=http://localhost:8080 pnpm run healthcheck
 ```
 
-Проверяет `/`, `/robots.txt`, `/sitemap.xml`, один опубликованный `/tours/<slug>/`, один `/reports/<slug>/` (если есть), один локальный CMS-asset и что неизвестный URL отдаёт `404` с брендированной страницей. Ненулевой exit code — кандидат не должен становиться production.
+Проверяет `/`, `/robots.txt`, `/sitemap.xml`, один опубликованный `/tours/<slug>/`, один `/reports/<slug>/` (если есть), один локальный demo-asset (если он используется) и что неизвестный URL отдаёт `404` с брендированной страницей. Удалённые медиа намеренно не запрашиваются. Ненулевой exit code — кандидат не должен становиться production.
 
 ## Pre-launch checklist
 

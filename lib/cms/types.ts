@@ -19,12 +19,9 @@
 export type BookingStatus = "OPEN" | "CLOSED" | "CANCELLED";
 
 /**
- * An image field as Sveltia's `image` + `alt` object pair writes it: `image`
- * is either a real asset URL (the cloud.ru object the media library uploaded
- * to) or, for the seed/demo content in content/, a `local:<filename>` ref
- * resolved from content/assets/ by scripts/materialize-assets.ts. Optional
- * fields can exist with only `alt` filled in (or nothing at all), same as
- * a Sveltia image widget could — normalize.ts is what resolves that.
+ * An image field as Sveltia's `image` + `alt` object pair writes it. `image`
+ * is either a direct Object Storage URL or a tracked `/media/demo/*.webp`
+ * fallback. No build step downloads or transforms it.
  */
 export interface RawImageRef {
   image?: string | null;
@@ -109,8 +106,12 @@ export interface RawSiteSettings {
   siteUrl: string | null;
   timezone: string | null;
   logo?: RawImageRef | null;
-  favicon?: RawImageRef | null;
-  hero?: { title: string | null; subtitle?: string | null; image: RawImageRef | null } | null;
+  hero?: {
+    title: string | null;
+    subtitle?: string | null;
+    image: RawImageRef | null;
+    video?: { file?: string | null } | null;
+  } | null;
   booking?: {
     defaultQr?: RawImageRef | null;
     defaultPrepaymentAmount?: number | null;
@@ -153,31 +154,13 @@ export interface RawContentSet {
 // Normalized DTOs (what the Next.js app actually renders)
 // ---------------------------------------------------------------------------
 
-export interface ImageVariants {
-  thumbnail: string;
-  card: string;
-  gallery: string;
-  hero: string;
-  lightbox: string;
-}
-
 export interface ImageAsset {
   alt: string;
-  width: number;
-  height: number;
-  variants: ImageVariants;
+  src: string;
 }
 
-/**
- * Placeholder for an image that has been normalized but not yet downloaded /
- * resized to local variants. `sourceRef` is either `local:<filename>`
- * (seed/demo assets in content/assets/) or a real asset URL (cloud.ru, once
- * uploaded through the CMS). Produced by scripts/sync-content.ts, consumed
- * and resolved into `ImageAsset` by scripts/materialize-assets.ts.
- */
-export interface UnresolvedImageAsset {
-  alt: string;
-  sourceRef: string;
+export interface VideoAsset {
+  src: string;
 }
 
 export interface SeoDTO<TImage = ImageAsset> {
@@ -262,8 +245,7 @@ export interface SiteSettingsDTO<TImage = ImageAsset> {
   siteUrl: string;
   timezone: string;
   logo?: TImage;
-  favicon?: TImage;
-  hero: { title: string; subtitle?: string; image: TImage };
+  hero: { title: string; subtitle?: string; image: TImage; video?: VideoAsset };
   booking: {
     defaultQr?: TImage;
     defaultPrepaymentAmount?: number;
@@ -294,6 +276,3 @@ export interface ContentSnapshot<TImage = ImageAsset> {
   organizers: OrganizerDTO<TImage>[];
   legalPages: LegalPageDTO[];
 }
-
-/** Shape written by sync-content.ts, before asset materialization. */
-export type UnresolvedContentSnapshot = ContentSnapshot<UnresolvedImageAsset>;

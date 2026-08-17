@@ -11,16 +11,16 @@ description: >-
   Ночуем в оборудованном лагере, днём — треккинг по тропам заповедника и свободное лазание по
   нижним скалам для желающих.
 coverImage:
-  image: "local:stolby-cover.jpg"
+  image: "/media/demo/stolby-cover.webp"
   alt: Скальные столбы в тайге под Красноярском
 gallery:
-  - image: "local:stolby-gallery-1.jpg"
+  - image: "/media/demo/stolby-gallery-1.webp"
     alt: Тропа заповедника Красноярские Столбы
-  - image: "local:stolby-gallery-2.jpg"
+  - image: "/media/demo/stolby-gallery-2.webp"
     alt: Вид на Енисей со скалы
-  - image: "local:stolby-gallery-3.jpg"
+  - image: "/media/demo/stolby-gallery-3.webp"
     alt: Лагерь в тайге
-  - image: "local:stolby-gallery-4.jpg"
+  - image: "/media/demo/stolby-gallery-4.webp"
     alt: Группа на скальном останце
 isListed: true
 sortOrder: 20
@@ -28,5 +28,5 @@ seo:
   title: Красноярские Столбы — выезд выходного дня
   description: "Короткий пеший выезд к скальным останцам заповедника «Красноярские Столбы»: даты, статус набора, фотоотчёты."
   image:
-    image: "local:stolby-cover.jpg"
+    image: "/media/demo/stolby-cover.webp"
     alt: Красноярские Столбы
