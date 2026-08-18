@@ -9,7 +9,7 @@
   (Sveltia CMS: статический JS-бандл, коммитит прямо в GitHub) или руками. И сайт, и CMS
   входят в статический `/out`; браузер получает WebP/WebM напрямую из cloud.ru Object Storage.
   Сборка не скачивает и не преобразует медиа.
-- Один Coolify application `miklukha-web`: сайт и `/admin` собираются одним `Dockerfile`
+- Один Coolify application `miklukha`: сайт и `/admin` собираются одним `Dockerfile`
   (multi-stage: deps → build → nginx runtime). Отдельного CMS/OAuth runtime нет.
 
 ## Переменные окружения (build-time only)

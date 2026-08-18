@@ -36,11 +36,17 @@ function collectFields(fields: unknown[], result: Array<Record<string, unknown>>
 }
 
 function fieldMediaMax(field: Record<string, unknown>): number | undefined {
-  const mediaLibrary = field.media_library;
-  if (!mediaLibrary || typeof mediaLibrary !== "object" || Array.isArray(mediaLibrary)) return undefined;
-  const config = (mediaLibrary as Record<string, unknown>).config;
-  if (!config || typeof config !== "object" || Array.isArray(config)) return undefined;
-  const value = (config as Record<string, unknown>).max_file_size;
+  // Sveltia reads a field's upload size cap from `media_libraries.all.max_file_size`
+  // (the same property `ExternalAssetsPanel` uses for cloud/stock uploads), not from
+  // a field-level `media_library: { name, config }` override: setting `media_library`
+  // on the field shadows the site-wide `media_libraries.aws_s3` entry with an object
+  // that lacks access_key_id/bucket/region, which makes Sveltia's aws_s3.isEnabled()
+  // check silently return false and disables the field's dropzone/upload UI entirely.
+  const mediaLibraries = field.media_libraries;
+  if (!mediaLibraries || typeof mediaLibraries !== "object" || Array.isArray(mediaLibraries)) return undefined;
+  const all = (mediaLibraries as Record<string, unknown>).all;
+  if (!all || typeof all !== "object" || Array.isArray(all)) return undefined;
+  const value = (all as Record<string, unknown>).max_file_size;
   return typeof value === "number" ? value : undefined;
 }
 
