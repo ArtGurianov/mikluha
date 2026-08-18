@@ -61,3 +61,56 @@ test("media policy accepts only direct WebP images and WebM videos", () => {
   assert.throws(() => assertVideoSource("https://media.example.com/photos/cms/hero.mp4", policy), /must use \.webm/);
   assert.throws(() => assertImageSource("/media/demo/../private.webp", policy), /tracked/);
 });
+
+// cloud.ru Evolution Object Storage only answers CORS preflight on the bucket's
+// domain-style host, so `endpoint` there is a virtual-hosted-style bucket host,
+// not the shared API host. See the pnpm patch note in RUNBOOK.md.
+const domainStylePolicy = createAssetSourcePolicy(
+  {
+    media_libraries: {
+      aws_s3: {
+        bucket: "mikluha",
+        endpoint: "https://mikluha-maklai.s3.cloud.ru",
+        force_path_style: false,
+        prefix: "cms/",
+        public_url: "https://mikluha-maklai.s3.cloud.ru",
+      },
+    },
+  },
+);
+
+test("force_path_style: false treats the endpoint as the bucket's own host, without the bucket segment", () => {
+  assert.deepEqual(
+    domainStylePolicy.remoteBases.map((url) => url.href),
+    ["https://mikluha-maklai.s3.cloud.ru/cms/", "https://mikluha-maklai.s3.cloud.ru/cms/"],
+  );
+});
+
+test("force_path_style: false accepts an object at the domain-style endpoint and rejects a path-style guess", () => {
+  assert.equal(
+    parseAllowedRemoteAssetUrl("https://mikluha-maklai.s3.cloud.ru/cms/cover.webp", domainStylePolicy).href,
+    "https://mikluha-maklai.s3.cloud.ru/cms/cover.webp",
+  );
+  assert.throws(
+    () => parseAllowedRemoteAssetUrl("https://mikluha-maklai.s3.cloud.ru/mikluha/cms/cover.webp", domainStylePolicy),
+    /outside the configured CMS media prefix/,
+  );
+});
+
+test("force_path_style unset (or true) keeps the bucket segment for a domain-style-looking endpoint", () => {
+  const pathStylePolicy = createAssetSourcePolicy(
+    {
+      media_libraries: {
+        aws_s3: {
+          bucket: "mikluha",
+          endpoint: "https://mikluha-maklai.s3.cloud.ru",
+          prefix: "cms/",
+        },
+      },
+    },
+  );
+
+  assert.deepEqual(pathStylePolicy.remoteBases.map((url) => url.href), [
+    "https://mikluha-maklai.s3.cloud.ru/mikluha/cms/",
+  ]);
+});

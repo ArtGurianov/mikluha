@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@sveltia/cms@0.191.1':
-    hash: f9726455698afbd9a907e292edf3518dd3f68d6a959fcc65400b81d1f53440c5
+    hash: a80d1dc8501ce57f551e37b1648b3963c32cc581eb51fca3168e6925e0511515
     path: patches/@sveltia__cms@0.191.1.patch
 
 importers:
@@ -61,7 +61,7 @@ importers:
     devDependencies:
       '@sveltia/cms':
         specifier: ^0.191.0
-        version: 0.191.1(patch_hash=f9726455698afbd9a907e292edf3518dd3f68d6a959fcc65400b81d1f53440c5)
+        version: 0.191.1(patch_hash=a80d1dc8501ce57f551e37b1648b3963c32cc581eb51fca3168e6925e0511515)
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.3
@@ -4088,7 +4088,7 @@ snapshots:
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
-  '@sveltia/cms@0.191.1(patch_hash=f9726455698afbd9a907e292edf3518dd3f68d6a959fcc65400b81d1f53440c5)': {}
+  '@sveltia/cms@0.191.1(patch_hash=a80d1dc8501ce57f551e37b1648b3963c32cc581eb51fca3168e6925e0511515)': {}
 
   '@swc/helpers@0.5.23':
     dependencies:

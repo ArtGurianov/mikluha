@@ -6,6 +6,7 @@ interface S3MediaLibraryConfig {
   acl?: boolean | string;
   bucket?: string;
   endpoint?: string;
+  force_path_style?: boolean;
   prefix?: string;
   public_url?: string;
 }
@@ -51,8 +52,16 @@ export function createAssetSourcePolicy(config: CmsMediaConfig): AssetSourcePoli
     remoteBases.push(appendUrlPath(directoryUrl(s3.public_url, "media_libraries.aws_s3.public_url"), prefix));
   }
   if (s3.endpoint && s3.bucket) {
+    const endpointBase = directoryUrl(s3.endpoint, "media_libraries.aws_s3.endpoint");
+
+    // Mirrors the patched Sveltia S3 URL builder (see the pnpm patch note in
+    // RUNBOOK.md): force_path_style: false treats `endpoint` itself as the
+    // bucket's virtual-hosted-style host, so `bucket` is not appended to the
+    // path. Any other value (including unset) keeps the path-style default.
     remoteBases.push(
-      appendUrlPath(directoryUrl(s3.endpoint, "media_libraries.aws_s3.endpoint"), s3.bucket, prefix),
+      s3.force_path_style === false
+        ? appendUrlPath(endpointBase, prefix)
+        : appendUrlPath(endpointBase, s3.bucket, prefix),
     );
   }
   return { remoteBases };

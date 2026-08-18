@@ -19,13 +19,24 @@ media_libraries:
   all:
     # Default cap for the WebM field. Every image field overrides this to 1 MiB.
     max_file_size: 10485760
+  # No git-based media folder is configured anywhere in this file, so the
+  # internal/repository media library is unusable regardless — this just makes
+  # that explicit instead of leaving it as an accidental side effect.
+  default: false
   aws_s3:
-    access_key_id: b426a543-2393-4011-9e4f-f318bf15f576:40ee298d1d4619d78449734ec71f0a5a # TODO: cloud.ru access key ID (not secret — see RUNBOOK.md)
-    bucket: mikluha # TODO: cloud.ru bucket name
+    access_key_id: b426a543-2393-4011-9e4f-f318bf15f576:40ee298d1d4619d78449734ec71f0a5a # cloud.ru access key ID (not secret — see RUNBOOK.md)
+    bucket: mikluha
     region: ru-central-1
-    endpoint: https://s3.cloud.ru
+    # cloud.ru Evolution Object Storage only answers CORS preflight on the
+    # bucket's domain-style host, not on the shared s3.cloud.ru API endpoint —
+    # see the pnpm patch note in RUNBOOK.md. force_path_style: false tells the
+    # patched Sveltia to treat `endpoint` itself as the bucket host
+    # (virtual-hosted-style: `${endpoint}/${key}`) instead of appending
+    # `${bucket}` to the path.
+    endpoint: https://mikluha-maklai.s3.cloud.ru
+    force_path_style: false
     prefix: cms/
-    public_url: https://mikluha.s3.cloud.ru/ # TODO: match the bucket name above
+    public_url: https://mikluha-maklai.s3.cloud.ru
     # Sveltia 0.191.1 otherwise sends x-amz-acl: public-read. cloud.ru buckets
     # with ACLs disabled reject that header; public reads come from bucket policy.
     acl: false

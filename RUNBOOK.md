@@ -79,14 +79,45 @@ broker/client secret из архитектуры.
    `x-amz-acl: public-read`, который bucket с отключёнными ACL отклоняет.
 2. Настроить CORS bucket для каждого origin, с которого открывается `/admin`: методы `GET`, `PUT`, `HEAD`, заголовки `*`,
    `ExposeHeaders: ETag`. Без этого браузер заблокирует подписанные запросы Sveltia ещё на
-   preflight.
+   preflight. **Важно:** cloud.ru Evolution Object Storage отвечает на CORS preflight только на
+   domain-style хосте бакета (`https://<bucket>.s3.cloud.ru`), а не на общем API-хосте
+   (`https://s3.cloud.ru/<bucket>/...`) — там preflight падает с `403 AccessDenied` независимо от
+   настроек CORS. Поэтому `media_libraries.aws_s3.endpoint` должен указывать на domain-style
+   хост (см. п. 4), а не на `https://s3.cloud.ru`.
 3. Выдать редакторам scoped-ключ с `ListBucket` на bucket (ограничив список префиксом `cms/`) и
    `GetObject`/`PutObject` только на `cms/*`, без `DeleteObject`. Sveltia сначала запрашивает
    список объектов медиатеки, поэтому ключ только с `PutObject` не работает.
 4. В `public/admin/config.yml` → `media_libraries.aws_s3` указать `access_key_id` в формате
-   cloud.ru `<tenant_id>:<key_id>` (не секретный)
-   и `bucket`. **Secret access key в конфиг не пишется** — каждый редактор вводит его один раз в
-   интерфейсе Sveltia при первой загрузке файла; хранится только в его браузере.
+   cloud.ru `<tenant_id>:<key_id>` (не секретный), `bucket`, а `endpoint` — domain-style хост
+   бакета (`https://<bucket-domain>.s3.cloud.ru`, **не** `https://s3.cloud.ru`) вместе с
+   `force_path_style: false`. **Secret access key в конфиг не пишется** — каждый редактор вводит
+   его один раз в интерфейсе Sveltia при первой загрузке файла; хранится только в его браузере.
+
+   Sveltia CMS 0.191.1 из коробки не поддерживает `force_path_style: false` вместе с кастомным
+   `endpoint` — при заданном `endpoint` она всегда строит path-style URL
+   (`${endpoint}/${bucket}/${key}`), что и приводит к `403` на cloud.ru. Это исправлено через
+   `pnpm patch` в `patches/@sveltia__cms@0.191.1.patch` (регистрируется в
+   `pnpm-workspace.yaml`, переживает `pnpm install`): при `force_path_style: false` и заданном
+   `endpoint` Sveltia теперь считает `endpoint` уже готовым host'ом бакета
+   (`${endpoint}/${key}`, без сегмента `bucket`) — как для LIST (`ListObjectsV2`), так и для
+   `PUT`-загрузки. Тот же патч также ослабляет AWS-специфичную проверку формата Secret Access
+   Key (`apiKeyPattern`) до любого непустого значения, поскольку cloud.ru не обязан
+   соответствовать историческому 40-символьному AWS-формату.
+
+   **Technical debt:** оба фикса завязаны на конкретную реализацию 0.191.1, а не на публичный
+   API Sveltia. При обновлении `@sveltia/cms` до новой версии **нельзя** просто переносить патч
+   механически (`pnpm patch @sveltia/cms@<new-version>` возьмёт новый код, но правки внутри —
+   это ручной diff по старым именам/веткам условий) — сначала проверить апстрим:
+   - `services/integrations/media-libraries/cloud/s3/aws-s3.js` → `apiKeyPattern` для `aws_s3`;
+   - `services/integrations/media-libraries/cloud/s3/core.js` → `buildObjectUrl`,
+     `listS3Objects`, `uploadToS3` (учитывают ли они `force_path_style` при заданном `endpoint`).
+
+   Если апстрим уже решил любую из этих двух проблем (снял AWS-специфичный regex secret'а,
+   поддержал virtual-hosted-style для кастомного `endpoint`) — соответствующий кусок патча нужно
+   **удалить**, а не переносить поверх нового кода: иначе патч либо перестанет применяться
+   (`pnpm install` упадёт на конфликте), либо, что хуже, тихо задублирует/переопределит уже
+   рабочую логику апстрима. Проверять по исходникам новой версии (`sourcesContent` в
+   `dist/sveltia-cms.js.map`, как в этом расследовании), не только по CHANGELOG.
 
 CMS принимает только WebP-изображения до 1 МиБ и WebM-видео до 10 МиБ. В галереях тура и
 отчёта максимум 10 фотографий: при заполненном списке сначала удалить существующую. Эти лимиты
