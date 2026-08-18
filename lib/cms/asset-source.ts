@@ -12,7 +12,12 @@ interface S3MediaLibraryConfig {
 }
 
 export interface CmsMediaConfig {
-  media_libraries?: { all?: { max_file_size?: number }; aws_s3?: S3MediaLibraryConfig };
+  media_libraries?: {
+    all?: { max_file_size?: number };
+    aws_s3?: S3MediaLibraryConfig;
+    default?: false;
+    stock_assets?: { providers?: string[] };
+  };
 }
 
 function directoryUrl(value: string, label: string): URL {

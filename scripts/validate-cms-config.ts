@@ -95,6 +95,13 @@ async function main() {
     );
   }
 
+  const stockProviders = config.media_libraries?.stock_assets?.providers;
+  if (!Array.isArray(stockProviders) || stockProviders.length !== 0) {
+    errors.push(
+      "media_libraries.stock_assets.providers must be [] — a hotlinked Picsum/Unsplash/Pexels/Pixabay pick passes the CMS picker but fails validate:content, which only allows media_libraries.aws_s3 URLs",
+    );
+  }
+
   if (config.media_libraries?.all?.max_file_size !== VIDEO_MAX_BYTES) {
     errors.push(`media_libraries.all.max_file_size must be ${VIDEO_MAX_BYTES} (10 MiB)`);
   }

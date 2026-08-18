@@ -23,6 +23,13 @@ media_libraries:
   # internal/repository media library is unusable regardless — this just makes
   # that explicit instead of leaving it as an accidental side effect.
   default: false
+  # Lorem Picsum/Unsplash/Pexels/Pixabay are on by default and hotlink an
+  # external URL straight into the field. validate:content only allows media
+  # URLs under media_libraries.aws_s3's configured host/prefix, so picking a
+  # stock photo passes the CMS UI but fails the build. An empty list hides the
+  # whole stock-photo section instead of leaving that trap in the picker.
+  stock_assets:
+    providers: []
   aws_s3:
     access_key_id: b426a543-2393-4011-9e4f-f318bf15f576:40ee298d1d4619d78449734ec71f0a5a # cloud.ru access key ID (not secret — see RUNBOOK.md)
     bucket: mikluha
