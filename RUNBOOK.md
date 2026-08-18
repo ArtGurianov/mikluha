@@ -133,18 +133,52 @@ Favicon и Apple Touch Icon загружаются не в CMS/Object Storage, �
 репозиторий как `app/favicon.ico` и `app/apple-icon.png`. Next.js копирует их в статический
 export и добавляет metadata-теги автоматически; никакого materializer для этого нет.
 
+## CMS: публикация (Editorial Workflow)
+
+`/admin` работает в Editorial Workflow (`public/admin/config.yml` → `publish_mode:
+editorial_workflow`), не в Simple Workflow: Save больше **не** коммитит прямо в `main`. Это
+per-entry workflow — своя ветка/PR на каждую отдельную запись, не на редакторскую сессию:
+
+1. Первый Save новой/изменённой записи создаёт ветку `cms/<collection>/<slug>` и открывает
+   GitHub PR как настоящий Draft PR (`draft: true`), с label `sveltia-cms/draft`.
+2. Каждый следующий Save той же записи добавляет ещё один commit в ту же ветку/PR. `main` при
+   этом не меняется, Coolify ничего не собирает — сколько бы раз редактор ни нажал Save.
+3. Статусы записи в UI (Draft → In Review → Ready) — это те же PR, с меняющимся label:
+   `sveltia-cms/draft` → `sveltia-cms/pending_review` → `sveltia-cms/pending_publish`.
+4. Publish мержит PR в `main`. `backend.squash_merges: true` в конфиге — PR мержится squash'ем
+   (весь Save-history записи схлопывается в один commit), не merge-коммитом; ветка `cms/...`
+   удаляется. Именно этот push и запускает Coolify build (см. «GitHub push → rebuild» ниже).
+
+**Ограничение:** workflow per-entry. Если за один заход отредактированы несколько разных
+записей (тур + два выезда + отчёт) — это отдельные ветки/PR, и Publish на каждую придётся
+делать отдельно: сколько записей опубликовано, столько и Coolify build'ов. Batch/«Publish all»
+в Sveltia сейчас не предусмотрен. Для типичного случая (много Save по одной записи, редко —
+Publish) это именно то поведение, ради которого включён Editorial Workflow: 1 запись → 1 PR →
+1 Publish → 1 build, независимо от числа промежуточных Save.
+
+`publish: true` (default) разрешает публикацию редактору — сейчас так и оставлено, отдельного
+review-gate нет. Если понадобится модель «редактор готовит → кто-то отдельный публикует», на
+нужной коллекции можно поставить `publish: false`.
+
+**Coolify:** обязательно проверить, что Preview Deployments выключены для `miklukha`. Sveltia
+открывает настоящий GitHub PR на каждую неопубликованную запись — если Coolify настроен
+разворачивать preview для каждого PR, это создаёт лишний build на каждый Draft и полностью
+сводит на нет смысл миграции на Editorial Workflow.
+
 ## GitHub push → rebuild
 
-Коммит в `main` (в том числе через `/admin`) → стандартный Coolify Git-deploy webhook на
-`miklukha` → пересборка. Отдельного webhook-конфига в CMS настраивать не нужно — это уже
-GitHub-репозиторий, который Coolify отслеживает напрямую.
+Push в `main` — либо ручной, либо squash-merge при Sveltia Publish (см. «CMS: публикация» выше)
+— → стандартный Coolify Git-deploy webhook на `miklukha` → пересборка. Отдельного
+webhook-конфига в CMS настраивать не нужно — это уже GitHub-репозиторий, который Coolify
+отслеживает напрямую.
 
 ## Локальный Git при двух писателях в `main`
 
-Sveltia коммитит контент прямо в `main` через GitHub API, поэтому local `main` регулярно
-отстаёт от remote — это ожидаемо, не признак конфликта. `git pull` (merge) в такой ситуации
-плодит лишние merge-коммиты; **`git push --force`/`-f` опасен** — может стереть content-коммиты,
-которые Sveltia сделала после последнего pull. Правильная операция — rebase, не merge и не force.
+Sveltia пишет в `main` через GitHub API — с Editorial Workflow это происходит на Publish
+(squash-merge PR), а не на каждый Save, но `main` всё равно можно застать позади remote в любой
+момент — это ожидаемо, не признак конфликта. `git pull` (merge) в такой ситуации плодит лишние
+merge-коммиты; **`git push --force`/`-f` опасен** — может стереть content-коммит, который
+Sveltia запушила после последнего pull. Правильная операция — rebase, не merge и не force.
 
 Разово для этого репозитория:
 

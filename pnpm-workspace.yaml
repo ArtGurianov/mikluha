@@ -5,4 +5,4 @@ onlyBuiltDependencies:
   - esbuild
 
 patchedDependencies:
-  '@sveltia/cms@0.191.1': patches/@sveltia__cms@0.191.1.patch
+  '@sveltia/cms@0.193.0': patches/@sveltia__cms@0.193.0.patch

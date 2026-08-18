@@ -5,9 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  '@sveltia/cms@0.191.1':
-    hash: a80d1dc8501ce57f551e37b1648b3963c32cc581eb51fca3168e6925e0511515
-    path: patches/@sveltia__cms@0.191.1.patch
+  '@sveltia/cms@0.193.0':
+    hash: 73e3724a2493914a2e1b4b9ba3692659e24e7cb2b1e19487d46de4764d9cdb2e
+    path: patches/@sveltia__cms@0.193.0.patch
 
 importers:
 
@@ -60,8 +60,8 @@ importers:
         version: 11.0.5
     devDependencies:
       '@sveltia/cms':
-        specifier: ^0.191.0
-        version: 0.191.1(patch_hash=a80d1dc8501ce57f551e37b1648b3963c32cc581eb51fca3168e6925e0511515)
+        specifier: ^0.193.0
+        version: 0.193.0(patch_hash=73e3724a2493914a2e1b4b9ba3692659e24e7cb2b1e19487d46de4764d9cdb2e)
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.3
@@ -804,8 +804,8 @@ packages:
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
 
-  '@sveltia/cms@0.191.1':
-    resolution: {integrity: sha512-3l2oRSY9NS5ut3XHEBFISO2QU6zgUqmP7CxOxHVXcOLXhjwYD1dvHPOUUe/wJ4RS47XNSzLmtUVG4RUIR25Qlw==}
+  '@sveltia/cms@0.193.0':
+    resolution: {integrity: sha512-f0BcCFxEs5ixffNvBW/NK+qPi79XmvB4zMA1T1SIuWCWFvnZudfihUQG5WD2NmgwMavjiOYk65op1LW4EECQyg==}
 
   '@swc/helpers@0.5.23':
     resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
@@ -4088,7 +4088,7 @@ snapshots:
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
-  '@sveltia/cms@0.191.1(patch_hash=a80d1dc8501ce57f551e37b1648b3963c32cc581eb51fca3168e6925e0511515)': {}
+  '@sveltia/cms@0.193.0(patch_hash=73e3724a2493914a2e1b4b9ba3692659e24e7cb2b1e19487d46de4764d9cdb2e)': {}
 
   '@swc/helpers@0.5.23':
     dependencies:

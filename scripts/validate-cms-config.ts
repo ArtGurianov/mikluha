@@ -19,9 +19,15 @@ const IMAGE_MAX_BYTES = 1024 * 1024;
 const VIDEO_MAX_BYTES = 10 * 1024 * 1024;
 
 interface CmsConfig extends CmsMediaConfig {
-  backend?: { auth_methods?: string[]; base_url?: string; site_domain?: string };
+  backend?: {
+    auth_methods?: string[];
+    base_url?: string;
+    site_domain?: string;
+    squash_merges?: boolean;
+  };
   collections?: Array<{ fields?: unknown[] }>;
   field_defaults?: { richtext?: { editor_components?: string[] } };
+  publish_mode?: string;
   singletons?: Array<{ fields?: unknown[] }>;
 }
 
@@ -81,6 +87,17 @@ async function main() {
   }
   if (config.backend?.base_url || config.backend?.site_domain) {
     errors.push("backend.base_url and backend.site_domain must be absent; this deployment has no OAuth broker");
+  }
+
+  if (config.publish_mode !== "editorial_workflow") {
+    errors.push(
+      "publish_mode must be editorial_workflow — Simple Workflow pushes every Save straight to main, triggering a Coolify build per Save instead of per Publish",
+    );
+  }
+  if (config.backend?.squash_merges !== true) {
+    errors.push(
+      "backend.squash_merges must be true — otherwise Editorial Workflow merges a PR's whole Save history into main as a merge commit instead of one squashed commit per entry",
+    );
   }
 
   if (config.field_defaults?.richtext?.editor_components?.includes("image") !== false) {
