@@ -1,0 +1,9 @@
+image:
+  image: https://mikluha-maklai.s3.cloud.ru/cms/noize.webp
+  alt: noize
+authorName: zzz
+tour: krasnoyarsk-stolby
+description: test
+sortOrder: 0
+isListed: true
+isDemo: true
