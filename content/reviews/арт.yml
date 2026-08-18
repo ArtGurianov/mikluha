@@ -1,0 +1,9 @@
+image:
+  image: https://mikluha-maklai.s3.cloud.ru/cms/logo.webp
+  alt: альт
+authorName: Арт
+tour: krasnoyarsk-stolby
+description: Коммент тест
+sortOrder: 1
+isListed: true
+isDemo: true
