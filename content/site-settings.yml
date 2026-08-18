@@ -2,19 +2,19 @@ siteName: Миклуха Маклай
 siteUrl: https://miklukha-maklai.ru
 timezone: Asia/Krasnoyarsk
 logo:
-  image: "/media/demo/brand-logo.webp"
+  image: /media/demo/brand-logo.webp
   alt: Миклуха Маклай
 hero:
   title: Маленькие группы. Большие горы.
-  subtitle: >-
-    Пешие походы и лагерные выезды на Алтай и Красноярские Столбы — с ночёвками у костра, без
-    гонки за километражем.
+  subtitle: Пешие походы и лагерные выезды на Алтай и Красноярские Столбы — с ночёвками у костра, без гонки за километражем.
   image:
-    image: "/media/demo/hero.webp"
+    image: /media/demo/hero.webp
     alt: Горы на закате
+  video:
+    file: https://mikluha-maklai.s3.cloud.ru/cms/mikluha.webm
 booking:
   defaultQr:
-    image: "/media/demo/qr-default.webp"
+    image: /media/demo/qr-default.webp
     alt: Тестовый QR-код для предоплаты
   defaultPrepaymentAmount: 5000
   defaultOrganizer: artur
@@ -23,17 +23,15 @@ socials:
   maxChannelUrl: https://max.ru/miklukha-maklai-test
 company:
   legalName: ООО Миклуха Маклай
-  inn: "4205435867"
-  ogrn: "1264200007631"
-  phone: "+79039075547"
+  inn: '4205435867'
+  ogrn: '1264200007631'
+  phone: '+79039075547'
   email: abgurianov@yandex.ru
   isDemo: false
 seo:
   title: Миклуха Маклай — треккинг и походы в горы
-  description: >-
-    Небольшие групповые поездки на Алтай и Красноярские Столбы: даты выездов, фотоотчёты прошлых
-    походов и честные условия бронирования.
+  description: 'Небольшие групповые поездки на Алтай и Красноярские Столбы: даты выездов, фотоотчёты прошлых походов и честные условия бронирования.'
   ogImage:
-    image: "/media/demo/hero.webp"
+    image: /media/demo/hero.webp
     alt: Миклуха Маклай
 launchReady: false
