@@ -6,7 +6,7 @@ backend:
   # fine-grained PAT scoped only to this repository (Contents: read/write).
   auth_methods: [token]
 
-site_url: https://miklukha-maklay.ru
+site_url: https://miklukha-maklai.ru
 
 # Inline Markdown images bypass the typed media fields and their WebP policy.
 # Structured image/gallery fields cover every supported image use case, so the
@@ -37,7 +37,7 @@ singletons:
     format: yml
     fields:
       - {name: siteName, label: "Название сайта / бренда", widget: string}
-      - {name: siteUrl, label: "Адрес сайта", widget: string, hint: "Например https://miklukha-maklay.ru"}
+      - {name: siteUrl, label: "Адрес сайта", widget: string, hint: "Например https://miklukha-maklai.ru"}
       - {name: timezone, label: "Часовой пояс", widget: string, default: "Europe/Moscow", hint: "Используется для расчёта ближайшего выезда во время сборки сайта, например Europe/Moscow"}
       - name: logo
         label: Логотип

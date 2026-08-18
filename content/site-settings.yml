@@ -1,5 +1,5 @@
 siteName: Миклуха Маклай
-siteUrl: https://miklukha-maklay.ru
+siteUrl: https://miklukha-maklai.ru
 timezone: Asia/Krasnoyarsk
 logo:
   image: "/media/demo/brand-logo.webp"
@@ -20,7 +20,7 @@ booking:
   defaultOrganizer: artur
   isDemo: false
 socials:
-  maxChannelUrl: https://max.ru/miklukha-maklay-test
+  maxChannelUrl: https://max.ru/miklukha-maklai-test
 company:
   legalName: ООО Миклуха Маклай
   inn: "4205435867"
