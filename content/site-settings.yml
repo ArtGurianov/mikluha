@@ -8,8 +8,8 @@ hero:
   title: Маленькие группы. Большие горы.
   subtitle: Пешие походы и лагерные выезды на Алтай и Красноярские Столбы — с ночёвками у костра, без гонки за километражем.
   image:
-    image: /media/demo/hero.webp
-    alt: Горы на закате
+    image: https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp
+    alt: катунь
   video:
     file: https://mikluha-maklai.s3.cloud.ru/cms/mikluha.webm
 booking:
