@@ -13,7 +13,7 @@ export function Hero({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
     <section className="relative flex min-h-[85vh] items-end overflow-hidden text-white sm:min-h-[92vh]">
       <HeroMedia image={hero.image} video={hero.video} />
       {/* Layered after the poster/video so it always sits on top of both. */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
+      <div className="absolute inset-0 bg-linear-to-br from-secondary/30 to-primary/30" />
 
       <div className="relative z-10 mx-auto w-full max-w-6xl space-y-5 px-4 pb-16 sm:px-6 sm:pb-24">
         <p className="text-sm font-semibold tracking-[0.2em] text-white/80 uppercase">{siteName}</p>
