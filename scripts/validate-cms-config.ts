@@ -23,6 +23,7 @@ interface CmsConfig extends CmsMediaConfig {
     auth_methods?: string[];
     base_url?: string;
     site_domain?: string;
+    skip_ci?: boolean;
     squash_merges?: boolean;
   };
   collections?: Array<{ fields?: unknown[] }>;
@@ -89,14 +90,19 @@ async function main() {
     errors.push("backend.base_url and backend.site_domain must be absent; this deployment has no OAuth broker");
   }
 
-  if (config.publish_mode !== "editorial_workflow") {
+  if (config.publish_mode !== undefined && config.publish_mode !== "" && config.publish_mode !== "simple") {
     errors.push(
-      "publish_mode must be editorial_workflow — Simple Workflow pushes every Save straight to main, triggering a Coolify build per Save instead of per Publish",
+      "publish_mode must be unset (or 'simple') — this project uses Simple Workflow + backend.skip_ci, not Editorial Workflow's per-entry branch/PR model",
     );
   }
-  if (config.backend?.squash_merges !== true) {
+  if (config.backend?.skip_ci !== true) {
     errors.push(
-      "backend.squash_merges must be true — otherwise Editorial Workflow merges a PR's whole Save history into main as a merge commit instead of one squashed commit per entry",
+      "backend.skip_ci must be true — otherwise every Save triggers its own Coolify build instead of accumulating in main until the editor clicks \"Опубликовать изменения\"",
+    );
+  }
+  if (config.backend?.squash_merges !== undefined) {
+    errors.push(
+      "backend.squash_merges must be unset — it only affects Editorial Workflow's PR-merge step, which Simple Workflow never runs; a lingering value is dead config",
     );
   }
 

@@ -159,3 +159,20 @@ PR-based editorial workflow, а не третий флаг на документ
 
 Заменить Docker на Coolify Static/Nixpacks можно, если появится способ держать
 конфигурацию web-сервера в репозитории, а не в UI.
+
+### CMS publish: Simple Workflow + `skip_ci`, не Editorial Workflow
+
+Кратко пробовали Sveltia Editorial Workflow (`publish_mode: editorial_workflow` +
+`backend.squash_merges`): каждая запись получала свою ветку/PR и Publish был per-entry.
+Отказались, потому что нужна была ровно обратная модель — один редактор делает Save по
+нескольким разным записям в рамках сессии и хочет одну явную кнопку публикации на всё сразу,
+а не отдельный Publish на каждую запись. Editorial Workflow такого batch/site-level publish не
+предоставляет.
+
+Текущая схема — Simple Workflow (без `publish_mode`) + `backend.skip_ci: true`: каждый Save
+коммитит прямо в `main` с `[skip ci]` в сообщении (кроме удалений), Coolify игнорирует такие
+push при автодеплое, а штатная кнопка тулбара «Опубликовать изменения» дёргает Coolify Deploy
+Webhook напрямую — не через git, поэтому работает даже если после последнего Save новых
+изменений не было. Дока и настройка — `RUNBOOK.md` → «CMS: публикация (Simple Workflow +
+`skip_ci`)». Trade-off: `skip_ci` — не настоящий draft, `main` уже содержит несопубликованные
+Save; ручной Coolify-deploy или любой не-skip коммит может выпустить их раньше времени.

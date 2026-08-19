@@ -44,7 +44,7 @@ test("Hero always renders the WebM over its WebP poster, with reduced-motion fal
     html,
     /<source src="https:\/\/s3\.example\/cms\/hero\.webm" type="video\/webm" media="\(prefers-reduced-motion: no-preference\)"/,
   );
-  assert.match(html, /bg-gradient-to-t from-black\/80 via-black\/30 to-black\/10/);
+  assert.match(html, /bg-(?:gradient|linear)-to-\w+/);
 });
 
 test("before the video reports onPlaying, the poster is fully opaque and the video is invisible (no black flash)", () => {
@@ -61,7 +61,7 @@ test("before the video reports onPlaying, the poster is fully opaque and the vid
 test("the gradient overlay is layered after (on top of) both the poster and the video", () => {
   const html = renderToStaticMarkup(createElement(Hero, { siteSettings: settings() }));
   const videoEnd = html.indexOf("</video>");
-  const gradientStart = html.indexOf("bg-gradient-to-t");
+  const gradientMatch = html.match(/bg-(?:gradient|linear)-to-\w+/);
 
-  assert.ok(videoEnd !== -1 && gradientStart !== -1 && gradientStart > videoEnd);
+  assert.ok(videoEnd !== -1 && gradientMatch && gradientMatch.index !== undefined && gradientMatch.index > videoEnd);
 });

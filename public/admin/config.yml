@@ -5,17 +5,12 @@ backend:
   # The CMS talks to GitHub directly from the browser. Each editor uses a
   # fine-grained PAT scoped only to this repository (Contents: read/write).
   auth_methods: [token]
-  # Editorial Workflow (below) opens one `cms/<collection>/<slug>` PR per
-  # entry and squash-merges it into main on Publish — one commit per entry
-  # instead of the whole PR's Save history, so main and the Coolify build
-  # queue only see one push per Publish. See RUNBOOK.md.
-  squash_merges: true
-
-# Simple Workflow (the default) commits every Save straight to `branch` above,
-# so each Save triggers its own Coolify build. Editorial Workflow instead
-# stages Saves as commits on a per-entry branch/PR and only touches `main`
-# (and triggers a build) on Publish. See RUNBOOK.md.
-publish_mode: editorial_workflow
+  # Simple Workflow (no publish_mode override below) commits every Save
+  # straight to `branch` above. skip_ci prefixes each of those commit
+  # messages with `[skip ci]` (except deletions, which Sveltia never skips)
+  # so Coolify's push-triggered auto-deploy ignores them — see RUNBOOK.md for
+  # the site-wide "Опубликовать изменения" toolbar button this unlocks.
+  skip_ci: true
 
 site_url: https://mikluha-maklai.ru
 
