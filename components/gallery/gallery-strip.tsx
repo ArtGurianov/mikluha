@@ -30,10 +30,9 @@ export function GalleryStrip({ images, captions, onSelect, className }: GalleryS
 
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     const track = trackRef.current;
-    if (!track) return;
-    // Keep receiving move/up events for this pointer even if it leaves the
-    // track bounds mid-drag (fast mouse movement, etc).
-    track.setPointerCapture(event.pointerId);
+    // Touch and pen already scroll the track natively (and get implicit pointer
+    // capture); drag-to-scroll is only needed for a mouse.
+    if (!track || event.pointerType !== "mouse") return;
     dragState.current = { startX: event.clientX, scrollLeft: track.scrollLeft, dragging: true, moved: false };
   }
 
@@ -42,11 +41,24 @@ export function GalleryStrip({ images, captions, onSelect, className }: GalleryS
     const track = trackRef.current;
     if (!state?.dragging || !track) return;
     const delta = event.clientX - state.startX;
-    if (Math.abs(delta) > 4) state.moved = true;
+
+    if (!state.moved) {
+      if (Math.abs(delta) <= 4) return;
+      state.moved = true;
+      // Capture only once this is genuinely a drag, never on a plain click:
+      // pointer capture retargets the following `click` to the capturing
+      // element, so capturing up front stopped every click from ever reaching
+      // the card button underneath. Here that retarget is what we want — it
+      // suppresses the click that ends a drag.
+      track.setPointerCapture(event.pointerId);
+    }
+
     track.scrollLeft = state.scrollLeft - delta;
   }
 
-  function endDrag() {
+  function endDrag(event: React.PointerEvent<HTMLDivElement>) {
+    const track = trackRef.current;
+    if (track?.hasPointerCapture(event.pointerId)) track.releasePointerCapture(event.pointerId);
     if (dragState.current) dragState.current.dragging = false;
   }
 
