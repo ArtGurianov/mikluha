@@ -11,6 +11,7 @@ import type {
   TourDTO,
   ContentSnapshot,
   ImageAsset,
+  VideoAsset,
 } from "./types";
 
 /**
@@ -58,6 +59,12 @@ function image(ref: RawImageRef | undefined | null, what: string): ImageAsset {
 function maybeImage(ref: RawImageRef | undefined | null): ImageAsset | undefined {
   if (!ref?.image) return undefined;
   return { alt: ref.alt?.trim() || "", src: ref.image };
+}
+
+/** The Hero background video is mandatory content, not an optional embellishment — see hero.video's `required: true` in public/admin/config.yml. */
+function video(ref: { file?: string | null } | undefined | null, what: string): VideoAsset {
+  const src = requiredString(ref?.file, `${what} (video has no uploaded asset)`);
+  return { src };
 }
 
 /**
@@ -202,7 +209,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
       title: requiredString(hero.title, "siteSettings.hero.title"),
       subtitle: optionalString(hero.subtitle),
       image: image(hero.image, "siteSettings.hero.image"),
-      video: hero.video?.file ? { src: hero.video.file } : undefined,
+      video: video(hero.video, "siteSettings.hero.video"),
     },
     booking: {
       defaultQr: maybeImage(booking.defaultQr),

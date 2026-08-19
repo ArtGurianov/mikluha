@@ -109,15 +109,13 @@ async function main() {
   validateImage(content.siteSettings.hero.image, "siteSettings.hero.image", mediaPolicy);
   validateImage(content.siteSettings.booking.defaultQr, "siteSettings.booking.defaultQr", mediaPolicy);
   validateImage(content.siteSettings.seo.ogImage, "siteSettings.seo.ogImage", mediaPolicy);
-  if (content.siteSettings.hero.video) {
-    try {
-      assertVideoSource(content.siteSettings.hero.video.src, mediaPolicy);
-      if (content.siteSettings.hero.video.src.startsWith("/")) {
-        localMediaRefs.add(content.siteSettings.hero.video.src);
-      }
-    } catch (error) {
-      fail(`siteSettings.hero.video: ${(error as Error).message}`);
+  try {
+    assertVideoSource(content.siteSettings.hero.video.src, mediaPolicy);
+    if (content.siteSettings.hero.video.src.startsWith("/")) {
+      localMediaRefs.add(content.siteSettings.hero.video.src);
     }
+  } catch (error) {
+    fail(`siteSettings.hero.video: ${(error as Error).message}`);
   }
   for (const tour of content.tours) {
     validateImage(tour.coverImage, `Tour ${tour.id} coverImage`, mediaPolicy);

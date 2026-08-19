@@ -1,36 +1,18 @@
 import Link from "next/link";
 
-import { CmsImage } from "@/components/media/cms-image";
 import { buttonVariants } from "@/components/ui/button";
 import type { SiteSettingsDTO } from "@/lib/cms/types";
 import { cn } from "@/lib/utils";
+
+import { HeroMedia } from "./hero-media";
 
 export function Hero({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
   const { hero, siteName } = siteSettings;
 
   return (
     <section className="relative flex min-h-[85vh] items-end overflow-hidden text-white sm:min-h-[92vh]">
-      <CmsImage
-        image={hero.image}
-        loading="eager"
-        fetchPriority="high"
-        className="absolute inset-0 size-full object-cover"
-      />
-      {hero.video && (
-        <video
-          className="absolute inset-0 size-full object-cover motion-reduce:hidden"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          poster={hero.image.src}
-          aria-hidden="true"
-          tabIndex={-1}
-        >
-          <source src={hero.video.src} type="video/webm" media="(prefers-reduced-motion: no-preference)" />
-        </video>
-      )}
+      <HeroMedia image={hero.image} video={hero.video} />
+      {/* Layered after the poster/video so it always sits on top of both. */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
 
       <div className="relative z-10 mx-auto w-full max-w-6xl space-y-5 px-4 pb-16 sm:px-6 sm:pb-24">

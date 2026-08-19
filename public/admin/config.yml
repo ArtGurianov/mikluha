@@ -90,8 +90,7 @@ singletons:
           - name: video
             label: "Фоновое видео WebM"
             widget: object
-            required: false
-            hint: "Опционально, до 10 МБ. При выключенной анимации, ошибке загрузки или отсутствии видео показывается фоновое изображение."
+            hint: "Обязательно, до 10 МБ. Фоновое изображение выше используется как постер, пока видео грузится, и как fallback при отключённой анимации или ошибке загрузки — но само видео должно быть загружено всегда."
             fields:
               - {name: file, label: "Файл WebM", widget: file, accept: ".webm,video/webm", choose_url: false, media_libraries: {all: {max_file_size: 10485760}}}
       - name: booking

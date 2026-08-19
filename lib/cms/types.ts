@@ -110,7 +110,7 @@ export interface RawSiteSettings {
     title: string | null;
     subtitle?: string | null;
     image: RawImageRef | null;
-    video?: { file?: string | null } | null;
+    video: { file?: string | null } | null;
   } | null;
   booking?: {
     defaultQr?: RawImageRef | null;
@@ -245,7 +245,7 @@ export interface SiteSettingsDTO<TImage = ImageAsset> {
   siteUrl: string;
   timezone: string;
   logo?: TImage;
-  hero: { title: string; subtitle?: string; image: TImage; video?: VideoAsset };
+  hero: { title: string; subtitle?: string; image: TImage; video: VideoAsset };
   booking: {
     defaultQr?: TImage;
     defaultPrepaymentAmount?: number;

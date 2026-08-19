@@ -40,7 +40,7 @@ function baseContent(overrides: Partial<ContentSnapshot> = {}): ContentSnapshot 
       siteName: "Тест",
       siteUrl: "https://example.com",
       timezone: "UTC",
-      hero: { title: "t", image: image("hero") },
+      hero: { title: "t", image: image("hero"), video: { src: "/media/demo/test.webm" } },
       booking: { isDemo: false },
       socials: {},
       company: { legalName: "ООО Миклуха Маклай", inn: "4205435867", ogrn: "1264200007631", phone: "+79039075547", isDemo: false },

@@ -44,7 +44,7 @@ function siteSettings(overrides: Partial<RawSiteSettings> = {}): RawSiteSettings
     siteName: "Тест",
     siteUrl: "https://example.com",
     timezone: "Europe/Moscow",
-    hero: { title: "Заголовок", image: imageRef("hero") },
+    hero: { title: "Заголовок", image: imageRef("hero"), video: { file: "https://media.example/cms/hero.webm" } },
     company: { legalName: "ООО Миклуха Маклай", inn: "4205435867", ogrn: "1264200007631", phone: "+79039075547" },
     seo: { title: "t", description: "d" },
     ...overrides,
@@ -116,15 +116,30 @@ test("an absent siteSettings.booking object means 'no defaults', not a crash", (
   assert.equal(content.siteSettings.booking.isDemo, false);
 });
 
-test("an optional Hero video becomes a direct WebM source", () => {
-  const content = normalizeContentSet(
-    contentSet({
-      siteSettings: siteSettings({
-        hero: { title: "Заголовок", image: imageRef("hero"), video: { file: "https://media.example/cms/hero.webm" } },
-      }),
-    }),
-    "git",
-  );
+test("a Hero video becomes a direct WebM source", () => {
+  const content = normalizeContentSet(contentSet(), "git");
 
-  assert.equal(content.siteSettings.hero.video?.src, "https://media.example/cms/hero.webm");
+  assert.equal(content.siteSettings.hero.video.src, "https://media.example/cms/hero.webm");
+});
+
+test("a required Hero video with no uploaded asset fails the build, naming the field", () => {
+  const broken = siteSettings({
+    hero: { title: "Заголовок", image: imageRef("hero"), video: {} },
+  });
+
+  assert.throws(
+    () => normalizeContentSet(contentSet({ siteSettings: broken }), "git"),
+    /siteSettings\.hero\.video/,
+  );
+});
+
+test("a Hero video object saved as null fails the build, naming the field", () => {
+  const broken = siteSettings({
+    hero: { title: "Заголовок", image: imageRef("hero"), video: null },
+  });
+
+  assert.throws(
+    () => normalizeContentSet(contentSet({ siteSettings: broken }), "git"),
+    /siteSettings\.hero\.video/,
+  );
 });

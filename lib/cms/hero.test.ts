@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Hero } from "../../components/home/hero";
 import type { SiteSettingsDTO } from "./types";
 
-function settings(video = true): SiteSettingsDTO {
+function settings(): SiteSettingsDTO {
   return {
     siteName: "Миклуха Маклай",
     siteUrl: "https://example.com",
@@ -15,7 +15,7 @@ function settings(video = true): SiteSettingsDTO {
     hero: {
       title: "Путешествия",
       image: { src: "/media/demo/hero.webp", alt: "Горы" },
-      video: video ? { src: "https://s3.example/cms/hero.webm" } : undefined,
+      video: { src: "https://s3.example/cms/hero.webm" },
     },
     booking: { isDemo: true },
     socials: {},
@@ -31,7 +31,7 @@ function settings(video = true): SiteSettingsDTO {
   };
 }
 
-test("Hero renders direct WebM over its WebP poster with reduced-motion fallback", () => {
+test("Hero always renders the WebM over its WebP poster, with reduced-motion fallback", () => {
   const html = renderToStaticMarkup(createElement(Hero, { siteSettings: settings() }));
 
   assert.match(html, /<video[^>]*autoPlay=""/);
@@ -47,9 +47,21 @@ test("Hero renders direct WebM over its WebP poster with reduced-motion fallback
   assert.match(html, /bg-gradient-to-t from-black\/80 via-black\/30 to-black\/10/);
 });
 
-test("Hero remains an image-only static section when video is absent", () => {
-  const html = renderToStaticMarkup(createElement(Hero, { siteSettings: settings(false) }));
+test("before the video reports onPlaying, the poster is fully opaque and the video is invisible (no black flash)", () => {
+  const html = renderToStaticMarkup(createElement(Hero, { siteSettings: settings() }));
+  const [, imgClass] = html.match(/<img[^>]*class="([^"]*)"/) ?? [];
+  const [, videoClass] = html.match(/<video[^>]*class="([^"]*)"/) ?? [];
 
-  assert.doesNotMatch(html, /<video/);
-  assert.match(html, /<img[^>]*src="\/media\/demo\/hero\.webp"/);
+  assert.ok(imgClass?.includes("opacity-100"), "poster should start fully opaque");
+  assert.ok(!imgClass?.includes("opacity-0"), "poster should not start transparent");
+  assert.ok(videoClass?.includes("opacity-0"), "video should start invisible until it's actually playing");
+  assert.ok(!videoClass?.includes("opacity-100"), "video should not start opaque");
+});
+
+test("the gradient overlay is layered after (on top of) both the poster and the video", () => {
+  const html = renderToStaticMarkup(createElement(Hero, { siteSettings: settings() }));
+  const videoEnd = html.indexOf("</video>");
+  const gradientStart = html.indexOf("bg-gradient-to-t");
+
+  assert.ok(videoEnd !== -1 && gradientStart !== -1 && gradientStart > videoEnd);
 });
