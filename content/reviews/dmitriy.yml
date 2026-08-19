@@ -1,8 +1,0 @@
-image:
-  image: "/media/demo/review-3.webp"
-  alt: Скриншот отзыва о поездке
-authorName: Дмитрий
-tour: altai
-sortOrder: 30
-isListed: true
-isDemo: true
