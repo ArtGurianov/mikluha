@@ -120,7 +120,7 @@ function FilterChip({
       variant={active ? "default" : "outline"}
       aria-pressed={active}
       onClick={onClick}
-      className={cn("shrink-0 rounded-full", !active && "bg-background")}
+      className={cn("shrink-0 rounded-full border-none shadow-none", !active && "bg-background")}
     >
       {children}
     </Button>

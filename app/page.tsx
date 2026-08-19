@@ -19,7 +19,7 @@ export default function HomePage() {
       <ReportsSection content={content} />
       <OrganizerSection organizers={content.organizers} />
       <ReviewsSection reviews={getAllReviewsSorted(content)} />
-      <CtaSection />
+      <CtaSection siteSettings={content.siteSettings} />
     </>
   );
 }
