@@ -20,7 +20,7 @@ booking:
   defaultOrganizer: artur
   isDemo: false
 socials:
-  maxChannelUrl: https://max.ru/miklukha-maklai-test
+  maxChannelUrl: https://max.ru/mikluha-maklai-test
 company:
   legalName: ООО Миклуха Маклай
   inn: '4205435867'

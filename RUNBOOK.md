@@ -9,7 +9,7 @@
   (Sveltia CMS: статический JS-бандл, коммитит прямо в GitHub) или руками. И сайт, и CMS
   входят в статический `/out`; браузер получает WebP/WebM напрямую из cloud.ru Object Storage.
   Сборка не скачивает и не преобразует медиа.
-- Один Coolify application `miklukha`: сайт и `/admin` собираются одним `Dockerfile`
+- Один Coolify application `mikluha`: сайт и `/admin` собираются одним `Dockerfile`
   (multi-stage: deps → build → nginx runtime). Отдельного CMS/OAuth runtime нет.
 
 ## Переменные окружения (build-time only)
@@ -160,7 +160,7 @@ Publish) это именно то поведение, ради которого 
 review-gate нет. Если понадобится модель «редактор готовит → кто-то отдельный публикует», на
 нужной коллекции можно поставить `publish: false`.
 
-**Coolify:** обязательно проверить, что Preview Deployments выключены для `miklukha`. Sveltia
+**Coolify:** обязательно проверить, что Preview Deployments выключены для `mikluha`. Sveltia
 открывает настоящий GitHub PR на каждую неопубликованную запись — если Coolify настроен
 разворачивать preview для каждого PR, это создаёт лишний build на каждый Draft и полностью
 сводит на нет смысл миграции на Editorial Workflow.
@@ -168,7 +168,7 @@ review-gate нет. Если понадобится модель «редакт�
 ## GitHub push → rebuild
 
 Push в `main` — либо ручной, либо squash-merge при Sveltia Publish (см. «CMS: публикация» выше)
-— → стандартный Coolify Git-deploy webhook на `miklukha` → пересборка. Отдельного
+— → стандартный Coolify Git-deploy webhook на `mikluha` → пересборка. Отдельного
 webhook-конфига в CMS настраивать не нужно — это уже GitHub-репозиторий, который Coolify
 отслеживает напрямую.
 
