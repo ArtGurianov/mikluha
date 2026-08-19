@@ -15,7 +15,7 @@ hero:
 booking:
   defaultQr:
     image: /media/demo/qr-default.webp
-    alt: Тестовый QR-код для предоплаты
+    alt: Тестовый QR-код для бронирования
   defaultPrepaymentAmount: 5000
   defaultOrganizer: artur
   isDemo: false

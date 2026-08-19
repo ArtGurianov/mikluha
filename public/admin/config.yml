@@ -100,7 +100,7 @@ singletons:
             fields:
               - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_libraries: {all: {max_file_size: 1048576}}}
               - {name: alt, label: Alt, widget: string, required: false}
-          - {name: defaultPrepaymentAmount, label: "Сумма предоплаты по умолчанию, ₽", widget: number, required: false, value_type: int}
+          - {name: defaultPrepaymentAmount, label: "Сумма бронирования по умолчанию, ₽", widget: number, required: false, value_type: int}
           - {name: defaultOrganizer, label: "Организатор по умолчанию", widget: relation, collection: organizers, value_field: "{{slug}}", search_fields: [name], display_fields: [name], required: false}
           - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите, пока QR/сумма/организатор по умолчанию тестовые."}
       - name: socials
@@ -213,9 +213,9 @@ collections:
           - {label: "Набор закрыт", value: CLOSED}
           - {label: "Поездка отменена", value: CANCELLED}
       - {name: price, label: "Стоимость поездки, ₽", widget: number, required: false, value_type: int, hint: "Цена за одного человека, целое число рублей. Обязательна, если набор открыт."}
-      - {name: prepaymentAmount, label: "Сумма предоплаты, ₽", widget: number, required: false, value_type: int, hint: "Если не заполнено, используется значение по умолчанию из «Настроек сайта»."}
+      - {name: prepaymentAmount, label: "Сумма бронирования, ₽", widget: number, required: false, value_type: int, hint: "Если не заполнено, используется значение по умолчанию из «Настроек сайта»."}
       - name: paymentQr
-        label: "QR-код предоплаты"
+        label: "QR-код бронирования"
         widget: object
         required: false
         hint: "Если не загружен, используется QR по умолчанию из «Настроек сайта»."

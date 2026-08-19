@@ -44,20 +44,20 @@ export function BookingModal() {
 
         <div className="flex flex-col items-center gap-4 py-2">
           {prepaymentAmount !== undefined && (
-            <p className="text-center text-lg font-semibold">Предоплата — {formatRub(prepaymentAmount)}</p>
+            <p className="text-center text-lg font-semibold">Бронирование — {formatRub(prepaymentAmount)}</p>
           )}
 
           {qr && (
             <div className="w-full max-w-56 overflow-hidden rounded-lg border border-border bg-white p-2">
               <CmsImage
-                image={{ ...qr, alt: qr.alt || "QR-код для предоплаты" }}
+                image={{ ...qr, alt: qr.alt || "QR-код для бронирования" }}
                 className="h-auto w-full"
               />
             </div>
           )}
 
           <div className="w-full space-y-2 rounded-lg bg-muted p-4 text-center text-sm">
-            <p className="text-muted-foreground">После предоплаты сообщите организатору{organizerName ? ` (${organizerName})` : ""}:</p>
+            <p className="text-muted-foreground">После бронирования сообщите организатору{organizerName ? ` (${organizerName})` : ""}:</p>
             {organizerPhone ? (
               <div className="flex items-center justify-center gap-2">
                 <a href={telHref(organizerPhone)} className="text-base font-semibold text-foreground underline-offset-4 hover:underline">
