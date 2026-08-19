@@ -47,7 +47,12 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton
-        className="flex h-[92vh] w-[96vw] max-w-5xl flex-col items-center justify-center gap-0 rounded-lg border-none bg-black/95 p-0 sm:max-w-5xl [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:bg-white/10 [&_[data-slot=dialog-close]]:hover:text-white"
+        // `dvh`, not `vh`: on iOS Safari `vh` is the *large* viewport (toolbars
+        // hidden), so a `vh` height runs underneath the visible browser chrome
+        // and hides the close button and the counter. The close button is
+        // absolutely positioned against the padding box, so container padding
+        // would not move it — it gets its own safe-area offset instead.
+        className="flex h-[92dvh] w-[96vw] max-w-5xl flex-col items-center justify-center gap-0 rounded-lg border-none bg-black/95 p-0 sm:max-w-5xl [&_[data-slot=dialog-close]]:top-[max(0.5rem,env(safe-area-inset-top))] [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:bg-white/10 [&_[data-slot=dialog-close]]:hover:text-white"
         onTouchStart={(event) => {
           touchStartX.current = event.touches[0]?.clientX ?? null;
         }}
@@ -60,8 +65,11 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
       >
         <DialogTitle className="sr-only">{image.alt || "Просмотр фотографии"}</DialogTitle>
 
-        <div className="relative flex h-full w-full items-center justify-center">
-          <CmsImage image={image} loading="eager" className="max-h-[86vh] max-w-full object-contain" />
+        {/* `flex-1 min-h-0`, not `h-full`: as a sibling of the counter, a
+            full-height image box always overflowed the container and pushed
+            the counter off-screen. */}
+        <div className="relative flex min-h-0 w-full flex-1 items-center justify-center">
+          <CmsImage image={image} loading="eager" className="max-h-full max-w-full object-contain" />
 
           {images.length > 1 && (
             <>
@@ -88,7 +96,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
         </div>
 
         {images.length > 1 && (
-          <p className="pb-3 text-sm tabular-nums text-white/80">
+          <p className="shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-sm tabular-nums text-white/80">
             {index + 1} / {images.length}
           </p>
         )}
