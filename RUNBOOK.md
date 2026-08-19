@@ -170,35 +170,58 @@ integration.js` → `skipCIConfigured`) — то есть она уже появ
 
 **Кнопка не создаёт git-коммит.** Это принципиально другой механизм, чем «коммит без
 skip-маркера», который можно было предположить заранее — проверено по
-`components/global/toolbar/items/publish-button.svelte`:
+`components/global/toolbar/items/publish-button.svelte` и подтверждено официальной
+документацией Sveltia (`sveltiacms.app/en/docs/deployments`):
 
-- если у редактора в Settings → Advanced задан **Deploy Hook URL** — кнопка делает `POST` на
-  этот URL (опционально с заголовком `Authorization`, тоже из Settings);
-- если Deploy Hook URL не задан — кнопка вызывает GitHub `repository_dispatch`
-  (`event_type: sveltia-cms-publish`) — это триггер для GitHub Actions, **Coolify его не слушает
-  вообще** (Coolify реагирует на обычный git push webhook, не на `repository_dispatch`).
+- если у редактора в Settings → Advanced задан Deploy Hook URL — кнопка делает `POST` на этот
+  URL;
+- **если Deploy Hook URL не задан (наш случай, и мы намеренно его не настраиваем)** — кнопка
+  вызывает GitHub `repository_dispatch` с `event_type: sveltia-cms-publish`.
 
-Это значит: **пока Deploy Hook URL не настроен, кнопка ничего не выкатывает на Coolify**, хотя
-GitHub API может ответить успехом и Sveltia пометит коммит как «опубликованный». Настройка
-обязательна и делается один раз в браузере каждого редактора (как PAT), не в `config.yml`:
+Сознательно выбран второй путь, а не Deploy Hook URL в браузере: Deploy Hook требовал бы хранить
+Coolify webhook URL и Bearer-токен в Settings **каждого редактора отдельно**, плюс кросс-origin
+`fetch` с `/admin` на хост Coolify упирается в CORS-неопределённость (Coolify не документирует
+поддержку browser-side запросов на `/api/v1/deploy`), а при отсутствии заголовка авторизации
+Sveltia делает запрос в режиме `no-cors` и **считает публикацию успешной, даже если Coolify
+ответил `401`** — то есть тихий false positive. `repository_dispatch` эту категорию проблем
+снимает полностью: секреты Coolify живут только в GitHub repository secrets, никогда не попадают
+в браузер редактора, а сам запрос — server-to-server (GitHub Actions → Coolify), без CORS.
+
+`repository_dispatch` вызывается через тот же editor-scoped GitHub API, которым Sveltia уже
+пользуется для commits — эндпоинту `POST /repos/{owner}/{repo}/dispatches` для fine-grained PAT
+достаточно permission `Contents: write` ([GitHub REST reference — Permissions required for
+fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)),
+которая у редакторского PAT уже есть (см. «CMS: авторизация редакторов» выше) — никаких
+дополнительных GitHub-прав редакторам выдавать не нужно.
+
+Событие принимает `.github/workflows/publish.yml` (`on: repository_dispatch`, `types:
+[sveltia-cms-publish]`) — единственный шаг делает `curl` на Coolify Deploy Webhook с
+Bearer-токеном. Разовая настройка репозитория (не редактора):
 
 1. В Coolify: приложение `mikluha` → Configuration → Webhooks → скопировать `Deploy Webhook
    (auth required)` URL (вид `https://<coolify-host>/api/v1/deploy?uuid=<uuid>&force=false`).
-2. Там же в Coolify: Keys & Tokens → API Tokens → создать токен с правом `deploy` — сохранить
-   значение `id|secret` (правило Bearer-заголовка).
-3. В Sveltia: `/admin` → Settings (⚙) → Advanced → «Хук развёртывания» → вставить URL из шага 1
-   в «URL хука» и `Bearer <токен из шага 2>` в «Заголовок авторизации».
+2. Там же в Coolify: Keys & Tokens → API Tokens → создать токен с правом `deploy` (без `root`,
+   `write`, `read:sensitive` и т. п.).
+3. В GitHub: репозиторий → Settings → Secrets and variables → Actions → добавить
+   `COOLIFY_WEBHOOK` (URL из шага 1) и `COOLIFY_TOKEN` (токен из шага 2).
+4. Закоммитить и запушить `.github/workflows/publish.yml` в `main` — `repository_dispatch`
+   срабатывает только для workflow-файлов, уже присутствующих в default branch на момент
+   события, поэтому этот шаг обязателен один раз при внедрении.
 
-**Непроверено вживую и требует E2E-теста с открытым DevTools Network:** запрос к Deploy Hook URL
-идёт напрямую из браузера редактора (кросс-origin fetch с `/admin` на хост Coolify). Если задан
-заголовок авторизации — это `cors`-запрос с preflight; если Coolify не отдаёт нужные
-`Access-Control-Allow-*` для произвольного origin на `/api/v1/deploy`, браузер заблокирует его
-до отправки, и кнопка покажет ошибку — это нормально видно в Network/Console. Хуже, если
-заголовок авторизации не задан: тогда запрос уходит в режиме `no-cors` (Sveltia сама так решает),
-Coolify ответит `401` без заголовка, но браузер из-за `no-cors` не может прочитать статус —
-Sveltia в этом случае **считает публикацию успешной**, хотя ничего не задеплоилось. Поэтому шаг 3
-выше (оба поля, не только URL) обязателен, и первую публикацию нужно проверять не по тосту в
-Sveltia, а по вкладке Deployments в Coolify.
+**Непроверено вживую и требует E2E-теста** (см. чеклист ниже): что `repository_dispatch`
+корректно доходит до Action, что `curl` внутри неё успешно аутентифицируется на Coolify и что
+это действительно запускает ровно один build. В отличие от прежнего Deploy Hook-в-браузере
+варианта, здесь при сбое видна причина в логах самого GitHub Action (упавший `curl` из-за
+`--fail-with-body`), а не тихий "успех" в интерфейсе Sveltia.
+
+### Save and Publish — publish одной записи, без общей кнопки
+
+У Sveltia также есть per-entry вариант: стрелка рядом с кнопкой Save в редакторе конкретной
+записи → **Save and Publish**. Он коммитит эту одну запись **без** `[skip ci]`, то есть выкатывает
+её сразу обычным push → Coolify Auto Deploy — независимо от `repository_dispatch`/Action выше.
+Удобно, если нужно опубликовать одну правку немедленно, не дожидаясь конца сессии и не трогая
+остальные накопленные `[skip ci]`-Save. Основной сценарий (см. цель миграции) — по-прежнему
+глобальная «Опубликовать изменения» в конце сессии.
 
 ### Как это выглядит для редактора
 
@@ -207,37 +230,67 @@ Sveltia, а по вкладке Deployments в Coolify.
 3. Нажать Save.
 4. Повторить для любых других записей.
 5. Save можно нажимать сколько угодно — production build не запускается (при условии, что
-   Coolify ≥ 4.1.0 и Deploy Hook настроен — см. выше).
+   Coolify ≥ 4.1.0 — см. выше).
 6. Когда вся редакторская сессия закончена — нажать «Опубликовать изменения» в тулбаре.
 7. Только после этого запускается ровно один Coolify build, включающий все накопленные Save.
 
 Save = сохранить в Git, не выкатывать production. Опубликовать изменения = выпустить весь
 текущий `main`, независимо от того, в скольких разных записях были правки — это не per-entry
-операция (в отличие от снятого Editorial Workflow), а site-level trigger.
+операция (в отличие от снятого Editorial Workflow), а site-level trigger через GitHub Action.
 
 **Важная семантика, которую нужно понимать: `skip_ci` — это не настоящий draft-branch.** После
 обычного Save изменения уже находятся в `main`, просто без build. Значит, **ручной Deploy в
-Coolify UI, коммит без skip-маркера (например, Delete — см. выше) или любой другой механизм
-запуска build выпустит все ранее сохранённые Save, даже если редактор не нажимал «Опубликовать
-изменения»**. Это осознанный trade-off этой схемы, принятый для `mikluha` вместо per-entry
-Editorial Workflow — обратное (гарантированная изоляция черновиков) стоило бы отдельных
+Coolify UI, Save and Publish, коммит без skip-маркера (например, Delete — см. ниже) или любой
+другой механизм запуска build выпустит все ранее сохранённые Save, даже если редактор не нажимал
+«Опубликовать изменения»**. Это осознанный trade-off этой схемы, принятый для `mikluha` вместо
+per-entry Editorial Workflow — обратное (гарантированная изоляция черновиков) стоило бы отдельных
 веток/PR за каждую запись, что и было в Editorial Workflow и не подошло по UX.
+
+> **Отдельно, жирным: удаление (Delete записи или медиа) в Sveltia никогда не получает
+> `[skip ci]`** — это намеренное поведение апстрима, не баг и не то, что стоит патчить: Sveltia
+> не даёт удалению остаться незамеченным CI, чтобы удалённый контент не продолжал жить
+> опубликованным. Практическое следствие: `Save A → Save B → Delete C` запушит **A, B и
+> удаление C** одним обычным (без `[skip ci]`) коммитом, который Coolify соберёт сразу — раньше,
+> чем редактор нажмёт «Опубликовать изменения». Модель — не строгая атомарная транзакция
+> «Save × N → один Publish», а «Save/update × N → batch publish, но Delete публикуется
+> немедленно». Для этого проекта это разумный компромисс (удаление обычно и означает «убрать с
+> сайта прямо сейчас»), патчить не планируется.
 
 ### Edge case: Publish без новых изменений
 
 Кнопка не зависит от git state вообще (см. выше — она не создаёт коммит), поэтому сценарий «Save
 A → Save B → Save C → сессия закончена → нажать Publish без дальнейших правок» работает без
-специальной логики: POST на Deploy Hook URL запускает Coolify build того, что сейчас лежит в
-`main`, вне зависимости от того, был ли только что новый Save. Пустой git-коммит создавать не
-нужно и не создаётся.
+специальной логики: `repository_dispatch` → Action → `curl` на Coolify Deploy Webhook запускает
+build того, что сейчас лежит в `main`, вне зависимости от того, был ли только что новый Save.
+Пустой git-коммит создавать не нужно и не создаётся.
+
+### E2E-чеклист (сделать один раз после того, как secrets и workflow-файл в `main`)
+
+| Шаг | Ожидание в GitHub | Ожидание в Coolify |
+|---|---|---|
+| Save записи A | новый коммит в `main`, сообщение начинается с `[skip ci]` | Deployments: ничего нового |
+| Save записи B (другой) | ещё коммит в `main`, `[skip ci]` | ничего нового |
+| Save записи C | ещё коммит в `main`, `[skip ci]` | ничего нового |
+| Нажать «Опубликовать изменения» | Actions → появился запуск `Publish site` (событие `repository_dispatch`, тип `sveltia-cms-publish`), шаг `Trigger Coolify deployment` зелёный | Deployments → появился ровно один новый deployment, содержащий A + B + C |
+
+Если шаг `Trigger Coolify deployment` красный — из-за `--fail-with-body` тело ответа Coolify
+попадёт прямо в лог Action (обычно `401`/`403` — неверный токен или URL, значит перепроверить
+`COOLIFY_WEBHOOK`/`COOLIFY_TOKEN`). Если Action вообще не запустился — проверить, что
+`.github/workflows/publish.yml` действительно есть в `main` (см. шаг 4 настройки выше) и что PAT
+редактора не потерял `Contents: write`.
+
+Отдельно проверить edge case из «жирного» предупреждения выше: Save A → Save B → **Delete**
+какой-нибудь записи, без нажатия «Опубликовать изменения». Ожидание: коммит удаления **без**
+`[skip ci]` → Coolify build запускается сразу, ещё до Publish, и включает A и B тоже.
 
 ## GitHub push → rebuild
 
 Каждый Save → push в `main` с `[skip ci]` в сообщении (кроме Delete) → Coolify получает
 push-событие как обычно, но не запускает build, если распознаёт маркер (см. «CMS: публикация»
 выше — версия Coolify критична). Отдельного webhook-конфига в CMS настраивать не нужно — это
-уже GitHub-репозиторий, который Coolify отслеживает напрямую через свой push-webhook; Deploy Hook
-URL из раздела выше — это отдельный, ручной API-эндпоинт Coolify, не связанный с этим webhook'ом.
+уже GitHub-репозиторий, который Coolify отслеживает напрямую через свой push-webhook. «Опубликовать
+изменения» идёт другим путём и с этим push-webhook'ом не связана вовсе — см. `repository_dispatch`
+→ `.github/workflows/publish.yml` → Coolify Deploy Webhook в «CMS: публикация» выше.
 
 ## Локальный Git при двух писателях в `main`
 

@@ -1,0 +1,28 @@
+name: Publish site
+
+# Fired by Sveltia CMS's global "Опубликовать изменения" toolbar button when
+# no Deploy Hook URL is configured in the editor's browser (see RUNBOOK.md ->
+# "CMS: публикация"). Sveltia's own editor PAT (Contents: Read and write) is
+# already sufficient to create this event — no extra GitHub permission is
+# needed. This workflow only relays the trigger to Coolify; it does not build
+# anything itself.
+on:
+  repository_dispatch:
+    types:
+      - sveltia-cms-publish
+
+concurrency:
+  group: mikluha-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deployment
+        run: |
+          curl \
+            --fail-with-body \
+            --request GET \
+            "${{ secrets.COOLIFY_WEBHOOK }}" \
+            --header "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}"

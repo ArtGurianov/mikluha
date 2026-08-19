@@ -171,8 +171,12 @@ PR-based editorial workflow, а не третий флаг на документ
 
 Текущая схема — Simple Workflow (без `publish_mode`) + `backend.skip_ci: true`: каждый Save
 коммитит прямо в `main` с `[skip ci]` в сообщении (кроме удалений), Coolify игнорирует такие
-push при автодеплое, а штатная кнопка тулбара «Опубликовать изменения» дёргает Coolify Deploy
-Webhook напрямую — не через git, поэтому работает даже если после последнего Save новых
-изменений не было. Дока и настройка — `RUNBOOK.md` → «CMS: публикация (Simple Workflow +
-`skip_ci`)». Trade-off: `skip_ci` — не настоящий draft, `main` уже содержит несопубликованные
-Save; ручной Coolify-deploy или любой не-skip коммит может выпустить их раньше времени.
+push при автодеплое, а штатная кнопка тулбара «Опубликовать изменения» шлёт GitHub
+`repository_dispatch` (штатное поведение Sveltia, когда Deploy Hook URL в браузере не настроен),
+который принимает `.github/workflows/publish.yml` и релеит на Coolify Deploy Webhook —
+не через git-коммит, поэтому работает даже если после последнего Save новых изменений не было.
+Намеренно не через Deploy Hook URL в Settings редактора: это избавляет от хранения Coolify
+credentials в браузере каждого редактора и от CORS-неопределённости browser→Coolify запроса.
+Дока и настройка — `RUNBOOK.md` → «CMS: публикация (Simple Workflow + `skip_ci`)». Trade-off:
+`skip_ci` — не настоящий draft, `main` уже содержит неопубликованные Save; ручной Coolify-deploy,
+Save and Publish или любой не-skip коммит (например, Delete) может выпустить их раньше времени.
