@@ -7,9 +7,10 @@ import { BookingButton } from "@/components/booking/booking-button";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
+import { MaxChannelButton } from "./max-channel-button";
 import { navLinks } from "./nav-links";
 
-export function MobileNav() {
+export function MobileNav({ maxChannelUrl }: { maxChannelUrl?: string }) {
   return (
     <Sheet>
       <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Открыть меню" />}>
@@ -23,6 +24,7 @@ export function MobileNav() {
           {navLinks.map((link) => (
             <SheetClose
               key={link.href}
+              nativeButton={false}
               render={<Link href={link.href} />}
               className="rounded-md px-2 py-2.5 text-base text-foreground hover:bg-muted"
             >
@@ -30,8 +32,9 @@ export function MobileNav() {
             </SheetClose>
           ))}
         </nav>
-        <div className="mt-auto p-4">
-          <BookingButton className="w-full" />
+        <div className="space-y-2 p-4 mt-6">
+          <BookingButton className="w-full text-2xl py-6" />
+          <MaxChannelButton href={maxChannelUrl} className="w-full text-2xl py-6" />
         </div>
       </SheetContent>
     </Sheet>

@@ -8,7 +8,7 @@ export function CtaSection() {
         <p className="max-w-xl text-primary-foreground/85">
           Забронируйте место предоплатой по QR-коду — место закрепляется за вами после подтверждения организатором.
         </p>
-        <BookingButton size="lg" variant="secondary" className="mt-2 text-base" />
+        <BookingButton variant="secondary" className="mt-2 h-auto px-6 py-3 text-2xl cursor-pointer" />
       </div>
     </section>
   );

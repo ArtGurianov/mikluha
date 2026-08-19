@@ -4,6 +4,7 @@ import { BookingButton } from "@/components/booking/booking-button";
 import { CmsImage } from "@/components/media/cms-image";
 import type { SiteSettingsDTO } from "@/lib/cms/types";
 
+import { MaxChannelButton } from "./max-channel-button";
 import { MobileNav } from "./mobile-nav";
 import { navLinks } from "./nav-links";
 
@@ -36,8 +37,12 @@ export function Header({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
         </nav>
 
         <div className="flex items-center gap-2">
-          <BookingButton size="sm" label="Забронировать" />
-          <MobileNav />
+          <MaxChannelButton
+            href={siteSettings.socials.maxChannelUrl}
+            className="hidden h-auto px-4 py-2 text-sm sm:inline-flex"
+          />
+          <BookingButton label="Забронировать" className="h-auto px-4 py-2 text-sm" />
+          <MobileNav maxChannelUrl={siteSettings.socials.maxChannelUrl} />
         </div>
       </div>
     </header>

@@ -7,14 +7,20 @@ import type { ImageAsset } from "@/lib/cms/types";
 import { GalleryStrip } from "./gallery-strip";
 import { Lightbox } from "./lightbox";
 
-export function Gallery({ images, className }: { images: ImageAsset[]; className?: string }) {
+interface GalleryProps {
+  images: ImageAsset[];
+  captions?: string[];
+  className?: string;
+}
+
+export function Gallery({ images, captions, className }: GalleryProps) {
   const [lightboxIndex, setLightboxIndex] = React.useState<number | null>(null);
 
   if (images.length === 0) return null;
 
   return (
     <>
-      <GalleryStrip images={images} onSelect={setLightboxIndex} className={className} />
+      <GalleryStrip images={images} captions={captions} onSelect={setLightboxIndex} className={className} />
       <Lightbox
         images={images}
         index={lightboxIndex}

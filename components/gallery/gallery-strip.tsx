@@ -10,11 +10,13 @@ import { cn } from "@/lib/utils";
 
 interface GalleryStripProps {
   images: ImageAsset[];
+  /** Optional per-image caption (e.g. a review's author name), parallel-indexed to `images`. */
+  captions?: string[];
   onSelect: (index: number) => void;
   className?: string;
 }
 
-export function GalleryStrip({ images, onSelect, className }: GalleryStripProps) {
+export function GalleryStrip({ images, captions, onSelect, className }: GalleryStripProps) {
   const trackRef = React.useRef<HTMLDivElement>(null);
   const dragState = React.useRef<{ startX: number; scrollLeft: number; dragging: boolean; moved: boolean } | null>(null);
 
@@ -63,7 +65,7 @@ export function GalleryStrip({ images, onSelect, className }: GalleryStripProps)
             key={image.src + index}
             type="button"
             data-gallery-item
-            className="relative aspect-[4/3] w-[72%] shrink-0 snap-start overflow-hidden rounded-xl bg-muted sm:w-[42%] md:w-[30%] lg:w-[24%]"
+            className="w-[72%] shrink-0 snap-start text-left sm:w-[42%] md:w-[30%] lg:w-[24%]"
             onClick={(event) => {
               if (dragState.current?.moved) {
                 event.preventDefault();
@@ -72,7 +74,10 @@ export function GalleryStrip({ images, onSelect, className }: GalleryStripProps)
               onSelect(index);
             }}
           >
-            <CmsImage image={image} className="absolute inset-0 size-full object-cover" />
+            <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted">
+              <CmsImage image={image} className="absolute inset-0 size-full object-cover" />
+            </div>
+            {captions?.[index] && <p className="p-2 text-xs text-muted-foreground">{captions[index]}</p>}
           </button>
         ))}
       </div>

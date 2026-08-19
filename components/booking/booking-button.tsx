@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, type buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { VariantProps } from "class-variance-authority";
 
 import { useBookingModal } from "./booking-provider";
@@ -31,7 +32,7 @@ export function BookingButton({
       variant={variant}
       size={size}
       disabled={disabled}
-      className={className}
+      className={cn("font-semibold", className)}
       onClick={() => open({ departureId, tourId })}
     >
       {label}
