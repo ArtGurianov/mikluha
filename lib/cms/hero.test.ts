@@ -34,12 +34,16 @@ function settings(): SiteSettingsDTO {
 test("Hero always renders the WebM over its WebP poster, with reduced-motion fallback", () => {
   const html = renderToStaticMarkup(createElement(Hero, { siteSettings: settings() }));
 
+  // `muted` + `playsInline` alongside `autoPlay` are what make iOS Safari
+  // autoplay inline at all, rather than refusing or going fullscreen.
   assert.match(html, /<video[^>]*autoPlay=""/);
   assert.match(html, /<video[^>]*muted=""/);
   assert.match(html, /<video[^>]*loop=""/);
   assert.match(html, /<video[^>]*playsInline=""/);
+  assert.match(html, /<video[^>]*preload="auto"/);
   assert.match(html, /poster="\/media\/demo\/hero\.webp"/);
-  assert.match(html, /motion-reduce:hidden/);
+  // Reduced motion is handled by never selecting a source (and pausing at
+  // runtime), so the video is simply never fetched for those readers.
   assert.match(
     html,
     /<source src="https:\/\/s3\.example\/cms\/hero\.webm" type="video\/webm" media="\(prefers-reduced-motion: no-preference\)"/,

@@ -40,9 +40,25 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/**
+ * Origin of a remote media URL, or `undefined` for the tracked
+ * `/media/demo/*` fallbacks — those are same-origin, nothing to preconnect to.
+ */
+function mediaOrigin(src: string): string | undefined {
+  try {
+    return new URL(src).origin;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   const content = getContent();
   const { siteSettings } = content;
+  // The Hero WebM is the heaviest thing the page fetches and the <video> only
+  // mounts after hydration, so get the TLS handshake to Object Storage out of
+  // the way while the document is still parsing.
+  const heroVideoOrigin = mediaOrigin(siteSettings.hero.video.src);
   const legalPages = getLegalPagesSorted(content);
   const today = getTodayInTimezone(siteSettings.timezone);
   const bookableDepartures = getAllBookableDepartures(content, today);
@@ -61,6 +77,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     <html lang="ru" className={`${manrope.variable} h-full antialiased`}>
+      <head>
+        {/* Deliberately without `crossOrigin`: the <video> carries no
+            `crossorigin` attribute, so it issues a no-CORS request — a
+            preconnect in CORS mode would warm a connection it never reuses. */}
+        {heroVideoOrigin && <link rel="preconnect" href={heroVideoOrigin} />}
+      </head>
       <body className="flex min-h-full flex-col font-sans">
         <script
           type="application/ld+json"
