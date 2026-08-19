@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { Hero } from "../../components/home/hero";
+import { HeroMedia } from "../../components/home/hero-media";
 import type { SiteSettingsDTO } from "./types";
 
 function settings(): SiteSettingsDTO {
@@ -60,6 +61,23 @@ test("before the video reports onPlaying, the poster is fully opaque and the vid
   assert.ok(!imgClass?.includes("opacity-0"), "poster should not start transparent");
   assert.ok(videoClass?.includes("opacity-0"), "video should start invisible until it's actually playing");
   assert.ok(!videoClass?.includes("opacity-100"), "video should not start opaque");
+});
+
+test("a lazy HeroMedia neither autoplays nor preloads, so two copies of one video never race", () => {
+  const props = { image: settings().hero.image, video: settings().hero.video };
+  const eager = renderToStaticMarkup(createElement(HeroMedia, props));
+  const lazy = renderToStaticMarkup(createElement(HeroMedia, { ...props, lazy: true }));
+
+  assert.match(eager, /<video[^>]*autoPlay=""/);
+  assert.match(eager, /<video[^>]*preload="auto"/);
+
+  // `autoPlay` would override `preload="none"` and fetch straight away, which
+  // is the whole thing the lazy instance exists to avoid.
+  assert.doesNotMatch(lazy, /<video[^>]*autoPlay=""/);
+  assert.match(lazy, /<video[^>]*preload="none"/);
+  // Everything iOS autoplay depends on still has to be there.
+  assert.match(lazy, /<video[^>]*muted=""/);
+  assert.match(lazy, /<video[^>]*playsInline=""/);
 });
 
 test("the gradient overlay is layered after (on top of) both the poster and the video", () => {
