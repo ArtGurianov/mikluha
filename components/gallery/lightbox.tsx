@@ -52,7 +52,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
         // and hides the close button and the counter. The close button is
         // absolutely positioned against the padding box, so container padding
         // would not move it — it gets its own safe-area offset instead.
-        className="flex h-[92dvh] w-[96vw] max-w-5xl flex-col items-center justify-center gap-0 rounded-lg border-none bg-black/95 p-0 sm:max-w-5xl [&_[data-slot=dialog-close]]:top-[max(0.5rem,env(safe-area-inset-top))] [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:bg-white/10 [&_[data-slot=dialog-close]]:hover:text-white"
+        className="flex h-[92dvh] w-[96vw] max-w-5xl flex-col items-center justify-center gap-0 rounded-lg border-none bg-black/95 p-0 pt-4 sm:max-w-5xl [&_[data-slot=dialog-close]]:top-[max(0.5rem,env(safe-area-inset-top))] [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:bg-white/10 [&_[data-slot=dialog-close]]:hover:text-white"
         onTouchStart={(event) => {
           touchStartX.current = event.touches[0]?.clientX ?? null;
         }}
@@ -96,7 +96,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
         </div>
 
         {images.length > 1 && (
-          <p className="shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-sm tabular-nums text-white/80">
+          <p className="shrink-0 py-1.5 text-sm tabular-nums text-white/80">
             {index + 1} / {images.length}
           </p>
         )}
