@@ -1,8 +1,0 @@
-image:
-  image: "/media/demo/review-1.webp"
-  alt: Скриншот отзыва об алтайском походе
-authorName: Марина
-tour: altai
-sortOrder: 10
-isListed: true
-isDemo: true
