@@ -20,13 +20,13 @@ booking:
   defaultOrganizer: artur
   isDemo: false
 socials:
-  maxChannelUrl: https://max.ru/mikluha-maklai-test
+  maxChannelUrl: https://max.ru/join/Ur79GmrtXjmTwzOtHf1i0yVn7snxvpZTV1XWwFoBY04
 company:
   legalName: ООО Миклуха Маклай
   inn: '4205435867'
   ogrn: '1264200007631'
   phone: '+79039075547'
-  email: abgurianov@yandex.ru
+  email: artur@mikluha-maklai.ru
   isDemo: false
 seo:
   title: Миклуха Маклай — треккинг и походы в горы

@@ -21,7 +21,7 @@ export function Footer({
           <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 pt-2 text-sm text-secondary-foreground/80">
             <dt>ИНН:</dt>
             <dd>{company.inn}</dd>
-            <dt>ОГРН/ОГРНИП:</dt>
+            <dt>ОГРН:</dt>
             <dd>{company.ogrn}</dd>
             <dt>Телефон:</dt>
             <dd>
