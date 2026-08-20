@@ -72,7 +72,7 @@ export function DepartureBookingCard({ departure, compact = false, className }: 
   }
 
   return (
-    <aside className={cn("h-fit overflow-hidden rounded-xl border border-border bg-card", className)}>
+    <aside className={cn("h-fit overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-secondary/80", className)}>
       <div className="space-y-4 p-6">
         {departure ? (
           <>
