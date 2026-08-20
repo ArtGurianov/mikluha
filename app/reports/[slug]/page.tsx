@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { BookingButton } from "@/components/booking/booking-button";
 import { Gallery } from "@/components/gallery/gallery";
+import { HeroMedia } from "@/components/home/hero-media";
 import { CmsImage } from "@/components/media/cms-image";
 import { getContent } from "@/lib/cms/content";
 import {
@@ -78,18 +79,20 @@ export default async function ReportPage(props: PageProps<"/reports/[slug]">) {
       </div>
 
       {tour && (
-        <section className="border-t border-border bg-muted/40">
-          <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 px-4 py-14 text-center sm:px-6">
-            <p className="font-heading text-2xl font-semibold text-foreground">Давай с нами?</p>
+        <section className="relative border-t border-border bg-primary text-primary-foreground">
+          <HeroMedia image={content.siteSettings.hero.image} video={content.siteSettings.hero.video} />
+          <div className="absolute inset-0 bg-linear-to-bl from-secondary/90 to-primary/70" />
+          <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center gap-3 px-4 py-14 text-center sm:px-6">
+            <p className="font-heading text-2xl font-semibold">Давай с нами?</p>
             {nextBookable ? (
-              <p className="text-muted-foreground">
+              <p className="text-primary-foreground/85">
                 Следующая поездка на {tour.title} —{" "}
-                <span className="font-medium text-foreground">
+                <span className="font-medium text-primary-foreground">
                   {formatDepartureDateRange(nextBookable.startDate, nextBookable.endDate)}
                 </span>
               </p>
             ) : (
-              <p className="text-muted-foreground">Дата следующего тура скоро появится</p>
+              <p className="text-primary-foreground/85">Дата следующего тура скоро появится</p>
             )}
             {nextBookable && (
               <BookingButton
