@@ -28,7 +28,7 @@ export function TripCard({ tour, departure }: TripCardProps) {
   const isBookable = departure?.bookingStatus === "OPEN";
 
   return (
-    <Card className="group/card relative flex w-[82%] shrink-0 snap-start flex-col overflow-hidden py-0 transition-colors hover:border-foreground/25 sm:w-[46%] lg:w-[31%]">
+    <Card className="group/card relative flex w-[82%] shrink-0 snap-start flex-col overflow-hidden py-0 transition-colors hover:border-foreground/25 sm:w-[46%] lg:w-[31%] shadow-xl shadow-secondary/80">
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
         <CmsImage
           image={tour.coverImage}

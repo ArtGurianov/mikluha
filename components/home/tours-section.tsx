@@ -90,7 +90,7 @@ export function ToursSection({ upcoming, tours }: ToursSectionProps) {
         */}
         <div
           ref={stripRef}
-          className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-2 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6"
+          className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-12 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6"
         >
           {visible.map(({ departure, tour }) => (
             <TripCard key={departure.id} tour={tour} departure={departure} />
