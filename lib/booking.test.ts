@@ -28,25 +28,10 @@ const departures: BookingDepartureInfo[] = [
   },
 ];
 
-test("a generic booking CTA stays neutral", () => {
-  assert.equal(selectBookingDeparture(departures), null);
-  assert.equal(selectBookingDeparture(departures, {}), null);
+test("booking resolves the exact departure named by the CTA", () => {
+  assert.equal(selectBookingDeparture(departures, "altai-november")?.id, "altai-november");
 });
 
-test("an exact departure takes precedence", () => {
-  assert.equal(
-    selectBookingDeparture(departures, {
-      departureId: "altai-november",
-      tourId: "krasnoyarsk",
-    })?.id,
-    "altai-november",
-  );
-});
-
-test("a tour CTA selects only that tour's nearest departure", () => {
-  assert.equal(selectBookingDeparture(departures, { tourId: "altai" })?.id, "altai-october");
-});
-
-test("an unknown exact departure never falls back to another trip", () => {
-  assert.equal(selectBookingDeparture(departures, { departureId: "closed-departure" }), null);
+test("an unknown departure never falls back to another trip", () => {
+  assert.equal(selectBookingDeparture(departures, "closed-departure"), null);
 });

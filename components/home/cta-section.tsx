@@ -1,5 +1,7 @@
-import { BookingButton } from "@/components/booking/booking-button";
+import { SectionLink } from "@/components/site/section-link";
+import { buttonVariants } from "@/components/ui/button";
 import type { SiteSettingsDTO } from "@/lib/cms/types";
+import { cn } from "@/lib/utils";
 import { HeroMedia } from "./hero-media";
 
 export function CtaSection({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
@@ -15,9 +17,14 @@ export function CtaSection({ siteSettings }: { siteSettings: SiteSettingsDTO }) 
       <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-16 text-center sm:px-6">
         <h2 className="font-heading text-2xl font-semibold sm:text-3xl">Готовы в горы?</h2>
         <p className="max-w-xl text-primary-foreground/85">
-          Забронируйте место по QR-коду — место закрепляется за вами после подтверждения организатором.
+          Выберите программу и подходящую дату — бронирование откроется для конкретного выезда.
         </p>
-        <BookingButton className="mt-4 h-auto px-6 py-3 text-2xl" />
+        <SectionLink
+          href="#tours"
+          className={cn(buttonVariants(), "mt-4 h-auto px-6 py-3 text-2xl font-semibold")}
+        >
+          Программы и даты
+        </SectionLink>
       </div>
     </section>
   );

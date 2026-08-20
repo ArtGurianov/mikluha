@@ -15,34 +15,45 @@ export function Footer({
 
   return (
     <footer id="contacts" className="border-t border-border bg-secondary text-secondary-foreground">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-2">
-        <div className="space-y-2">
-          <p className="text-sm text-secondary-foreground/80">{company.legalName}</p>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 pt-2 text-sm text-secondary-foreground/80">
-            <dt>ИНН:</dt>
-            <dd>{company.inn}</dd>
-            <dt>ОГРН:</dt>
-            <dd>{company.ogrn}</dd>
-            <dt>Телефон:</dt>
-            <dd>
-              <a href={telHref(company.phone)} className="underline-offset-4 hover:underline">
-                {company.phone}
-              </a>
-            </dd>
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:px-6 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0 space-y-2">
+          <p className="text-sm text-secondary-foreground/90">
+            {company.legalName}
+            <span className="ml-3 text-xs text-secondary-foreground/65">
+              © {year} {siteSettings.siteName}
+            </span>
+          </p>
+          <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary-foreground/75 sm:text-sm">
+            <div className="flex gap-1">
+              <dt>ИНН:</dt>
+              <dd>{company.inn}</dd>
+            </div>
+            <div className="flex gap-1">
+              <dt>ОГРН:</dt>
+              <dd>{company.ogrn}</dd>
+            </div>
+            <div className="flex gap-1">
+              <dt>Телефон:</dt>
+              <dd>
+                <a href={telHref(company.phone)} className="underline-offset-4 hover:underline">
+                  {company.phone}
+                </a>
+              </dd>
+            </div>
             {company.email && (
-              <>
+              <div className="flex min-w-0 gap-1">
                 <dt>Email:</dt>
-                <dd>
+                <dd className="min-w-0 break-all">
                   <a href={`mailto:${company.email}`} className="underline-offset-4 hover:underline">
                     {company.email}
                   </a>
                 </dd>
-              </>
+              </div>
             )}
           </dl>
         </div>
 
-        <div className="flex flex-col gap-2 text-sm md:items-end">
+        <nav aria-label="Дополнительные ссылки" className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm md:justify-end">
           {socials.maxChannelUrl && (
             <a
               href={socials.maxChannelUrl}
@@ -65,10 +76,7 @@ export function Footer({
               {page.title}
             </Link>
           ))}
-        </div>
-      </div>
-      <div className="border-t border-secondary-foreground/15 px-4 py-4 text-center text-xs text-secondary-foreground/70 sm:px-6">
-        © {year} {siteSettings.siteName}
+        </nav>
       </div>
     </footer>
   );

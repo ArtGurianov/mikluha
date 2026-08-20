@@ -2,15 +2,14 @@
 
 import * as React from "react";
 
-import { selectBookingDeparture, type BookingTarget } from "@/lib/booking";
+import { selectBookingDeparture } from "@/lib/booking";
 
-import type { BookingDepartureInfo, BookingFallback } from "./types";
+import type { BookingDepartureInfo } from "./types";
 
 interface BookingContextValue {
   isOpen: boolean;
   selected: BookingDepartureInfo | null;
-  fallback: BookingFallback;
-  open: (target?: BookingTarget) => void;
+  open: (departureId: string) => void;
   close: () => void;
 }
 
@@ -20,17 +19,18 @@ interface BookingModalProviderProps {
   children: React.ReactNode;
   /** Every OPEN, listed departure across the whole site, pre-resolved server-side. */
   departures: BookingDepartureInfo[];
-  /** Neutral siteSettings.booking defaults, used when no tour or date was selected. */
-  fallback: BookingFallback;
 }
 
-export function BookingModalProvider({ children, departures, fallback }: BookingModalProviderProps) {
+export function BookingModalProvider({ children, departures }: BookingModalProviderProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<BookingDepartureInfo | null>(null);
 
   const open = React.useCallback(
-    (target?: BookingTarget) => {
-      setSelected(selectBookingDeparture(departures, target));
+    (departureId: string) => {
+      const departure = selectBookingDeparture(departures, departureId);
+      if (!departure) return;
+
+      setSelected(departure);
       setIsOpen(true);
     },
     [departures],
@@ -39,8 +39,8 @@ export function BookingModalProvider({ children, departures, fallback }: Booking
   const close = React.useCallback(() => setIsOpen(false), []);
 
   const value = React.useMemo(
-    () => ({ isOpen, selected, fallback, open, close }),
-    [isOpen, selected, fallback, open, close],
+    () => ({ isOpen, selected, open, close }),
+    [isOpen, selected, open, close],
   );
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;

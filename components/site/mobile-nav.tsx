@@ -2,9 +2,9 @@
 
 import { Menu } from "lucide-react";
 
-import { BookingButton } from "@/components/booking/booking-button";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 import { MaxChannelButton } from "./max-channel-button";
 import { navLinks } from "./nav-links";
@@ -33,10 +33,13 @@ export function MobileNav({ maxChannelUrl }: { maxChannelUrl?: string }) {
           ))}
         </nav>
         <div className="space-y-2 p-4 mt-6">
-          <BookingButton
-            className="w-full text-2xl py-6"
-            label="Забронировать"
-          />
+          <SheetClose
+            nativeButton={false}
+            render={<SectionLink href="/#tours" />}
+            className={cn(buttonVariants(), "w-full py-6 text-2xl font-semibold")}
+          >
+            Программы и даты
+          </SheetClose>
           <MaxChannelButton href={maxChannelUrl} className="w-full text-2xl py-6" />
         </div>
       </SheetContent>

@@ -1,11 +1,12 @@
 import { Gallery } from "@/components/gallery/gallery";
 import type { ReviewDTO } from "@/lib/cms/types";
+import { cn } from "@/lib/utils";
 
-export function ReviewsSection({ reviews }: { reviews: ReviewDTO[] }) {
+export function ReviewsSection({ reviews, className }: { reviews: ReviewDTO[]; className?: string }) {
   if (reviews.length === 0) return null;
 
   return (
-    <section id="reviews" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <section id="reviews" className={cn("mx-auto max-w-6xl px-4 py-16 sm:px-6", className)}>
       <div className="mb-8 space-y-2">
         <h2 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Отзывы</h2>
         <p className="max-w-2xl text-muted-foreground">Отзывы участников поездок на Алтай и в Красноярск.</p>

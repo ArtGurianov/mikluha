@@ -9,7 +9,7 @@ import { getContent } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
 import { getLegalPagesSorted } from "@/lib/legal";
 import { deployEnv, isStaging, resolveCanonicalBase } from "@/lib/site";
-import { getAllBookableDepartures, getBookingFallback, getTodayInTimezone } from "@/lib/tours";
+import { getAllBookableDepartures, getTodayInTimezone } from "@/lib/tours";
 
 import "./globals.css";
 
@@ -62,7 +62,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   const legalPages = getLegalPagesSorted(content);
   const today = getTodayInTimezone(siteSettings.timezone);
   const bookableDepartures = getAllBookableDepartures(content, today);
-  const bookingFallback = getBookingFallback(content);
 
   const canonicalBase = resolveCanonicalBase(siteSettings.siteUrl);
   const organizationJsonLd = {
@@ -88,7 +87,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdScript(organizationJsonLd) }}
         />
-        <BookingModalProvider departures={bookableDepartures} fallback={bookingFallback}>
+        <BookingModalProvider departures={bookableDepartures}>
           <Header siteSettings={siteSettings} />
           <main className="flex-1">{children}</main>
           <Footer siteSettings={siteSettings} legalPages={legalPages} />

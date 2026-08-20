@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BookingButton } from "@/components/booking/booking-button";
 import { CmsImage } from "@/components/media/cms-image";
 import { DepartureStatusBadge } from "@/components/site/departure-status-badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { DepartureDTO, TourDTO } from "@/lib/cms/types";
 import { formatRub } from "@/lib/format";
@@ -86,11 +87,18 @@ export function TripCard({ tour, departure }: TripCardProps) {
           cards no longer lined up along the bottom.
         */}
         <div className="relative z-10 mt-4">
-          <BookingButton
-            departureId={departure?.id}
-            disabled={!isBookable}
-            className="h-auto w-full px-3 py-2 text-lg"
-          />
+          {departure ? (
+            <BookingButton
+              departureId={departure.id}
+              disabled={!isBookable}
+              label={isBookable ? "Забронировать место" : "Набор закрыт"}
+              className="h-auto w-full px-3 py-2 text-lg"
+            />
+          ) : (
+            <Button disabled className="h-auto w-full px-3 py-2 text-lg font-semibold">
+              Даты скоро
+            </Button>
+          )}
         </div>
       </div>
     </Card>

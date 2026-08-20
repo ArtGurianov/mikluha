@@ -10,32 +10,27 @@ import { formatDepartureDateRange } from "@/lib/tours";
 import { useBookingModal } from "./booking-provider";
 
 export function BookingModal() {
-  const { isOpen, selected, fallback, close } = useBookingModal();
+  const { isOpen, selected, close } = useBookingModal();
 
-  const prepaymentAmount = selected?.prepaymentAmount ?? fallback.prepaymentAmount;
-  const qr = selected?.qr ?? fallback.qr;
-  const organizerName = selected?.organizerName ?? fallback.organizerName;
-  const organizerPhone = selected?.organizerPhone ?? fallback.organizerPhone;
+  if (!selected) return null;
+
+  const prepaymentAmount = selected.prepaymentAmount;
+  const qr = selected.qr;
+  const organizerName = selected.organizerName;
+  const organizerPhone = selected.organizerPhone;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md" showCloseButton>
         <DialogHeader>
           <DialogTitle className="font-heading text-xl">Забронировать место</DialogTitle>
-          {selected ? (
-            <p className="text-base font-medium text-foreground">
-              {selected.tourTitle}
-              <br />
-              <span className="text-muted-foreground">
-                {formatDepartureDateRange(selected.startDate, selected.endDate)}
-              </span>
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Выберите подходящую поездку и дату в разделе «Туры» или свяжитесь с организатором по
-              телефону ниже.
-            </p>
-          )}
+          <p className="text-base font-medium text-foreground">
+            {selected.tourTitle}
+            <br />
+            <span className="text-muted-foreground">
+              {formatDepartureDateRange(selected.startDate, selected.endDate)}
+            </span>
+          </p>
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4 py-2">

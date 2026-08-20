@@ -91,7 +91,13 @@ export default async function ReportPage(props: PageProps<"/reports/[slug]">) {
             ) : (
               <p className="text-muted-foreground">Дата следующего тура скоро появится</p>
             )}
-            <BookingButton tourId={tour.id} size="lg" className="mt-2 h-auto px-6 py-3 text-2xl" />
+            {nextBookable && (
+              <BookingButton
+                departureId={nextBookable.id}
+                size="lg"
+                className="mt-2 h-auto px-6 py-3 text-2xl"
+              />
+            )}
           </div>
         </section>
       )}

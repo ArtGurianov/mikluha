@@ -7,9 +7,8 @@ import type { VariantProps } from "class-variance-authority";
 import { useBookingModal } from "./booking-provider";
 
 interface BookingButtonProps extends VariantProps<typeof buttonVariants> {
-  /** Books this exact date. Takes precedence over `tourId`. */
-  departureId?: string;
-  tourId?: string;
+  /** Every booking CTA must name the exact date it books. */
+  departureId: string;
   label?: string;
   /** Renders the button but refuses the click — used to keep card footers the same height when there is nothing to book. */
   disabled?: boolean;
@@ -18,7 +17,6 @@ interface BookingButtonProps extends VariantProps<typeof buttonVariants> {
 
 export function BookingButton({
   departureId,
-  tourId,
   label = "Забронировать место",
   disabled,
   variant,
@@ -33,7 +31,7 @@ export function BookingButton({
       size={size}
       disabled={disabled}
       className={cn("font-semibold", className)}
-      onClick={() => open({ departureId, tourId })}
+      onClick={() => open(departureId)}
     >
       {label}
     </Button>

@@ -1,8 +1,9 @@
 import Link from "next/link";
 
-import { BookingButton } from "@/components/booking/booking-button";
 import { CmsImage } from "@/components/media/cms-image";
+import { buttonVariants } from "@/components/ui/button";
 import type { SiteSettingsDTO } from "@/lib/cms/types";
+import { cn } from "@/lib/utils";
 
 import { MaxChannelButton } from "./max-channel-button";
 import { MobileNav } from "./mobile-nav";
@@ -42,7 +43,12 @@ export function Header({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
             href={siteSettings.socials.maxChannelUrl}
             className="hidden h-auto px-4 py-2 text-sm sm:inline-flex"
           />
-          <BookingButton label="Забронировать" className="h-auto px-4 py-2 text-sm" />
+          <SectionLink
+            href="/#tours"
+            className={cn(buttonVariants(), "h-auto px-4 py-2 text-sm font-semibold")}
+          >
+            Программы и даты
+          </SectionLink>
           <MobileNav maxChannelUrl={siteSettings.socials.maxChannelUrl} />
         </div>
       </div>

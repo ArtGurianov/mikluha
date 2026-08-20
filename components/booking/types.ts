@@ -1,1 +1,1 @@
-export type { BookingDepartureInfo, BookingFallback } from "@/lib/tours";
+export type { BookingDepartureInfo } from "@/lib/tours";

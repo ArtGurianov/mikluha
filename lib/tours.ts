@@ -224,13 +224,6 @@ export interface BookingDepartureInfo {
   organizerPhone?: string;
 }
 
-export interface BookingFallback {
-  prepaymentAmount?: number;
-  qr?: ImageAsset;
-  organizerName?: string;
-  organizerPhone?: string;
-}
-
 /** Every currently-bookable (OPEN, listed, future) departure across the whole site. */
 export function getAllBookableDepartures(content: ContentSnapshot, today: string): BookingDepartureInfo[] {
   return content.departures
@@ -250,15 +243,4 @@ export function getAllBookableDepartures(content: ContentSnapshot, today: string
         organizerPhone: resolved.organizer?.phone,
       };
     });
-}
-
-/** Neutral booking details from site settings, used when no tour or date was selected. */
-export function getBookingFallback(content: ContentSnapshot): BookingFallback {
-  const organizer = getOrganizerById(content, content.siteSettings.booking.defaultOrganizerId);
-  return {
-    prepaymentAmount: content.siteSettings.booking.defaultPrepaymentAmount,
-    qr: content.siteSettings.booking.defaultQr,
-    organizerName: organizer?.name,
-    organizerPhone: organizer?.phone,
-  };
 }

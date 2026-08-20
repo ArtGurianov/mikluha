@@ -137,3 +137,12 @@
     display: none;
   }
 }
+
+@media (width < 64rem) {
+  body:has([data-mobile-booking-dock])::after {
+    content: "";
+    display: block;
+    flex: 0 0 calc(9rem + env(safe-area-inset-bottom));
+    background: var(--secondary);
+  }
+}
