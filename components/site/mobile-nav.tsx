@@ -13,7 +13,7 @@ import { navLinks } from "./nav-links";
 export function MobileNav({ maxChannelUrl }: { maxChannelUrl?: string }) {
   return (
     <Sheet>
-      <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Открыть меню" />}>
+      <SheetTrigger render={<Button variant="secondary" size="icon" className="md:hidden" aria-label="Открыть меню" />}>
         <Menu />
       </SheetTrigger>
       <SheetContent side="right" className="w-3/4 max-w-xs">
@@ -33,7 +33,10 @@ export function MobileNav({ maxChannelUrl }: { maxChannelUrl?: string }) {
           ))}
         </nav>
         <div className="space-y-2 p-4 mt-6">
-          <BookingButton className="w-full text-2xl py-6" />
+          <BookingButton
+            className="w-full text-2xl py-6"
+            label="Забронировать"
+          />
           <MaxChannelButton href={maxChannelUrl} className="w-full text-2xl py-6" />
         </div>
       </SheetContent>

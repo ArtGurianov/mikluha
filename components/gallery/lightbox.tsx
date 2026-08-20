@@ -52,7 +52,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
         // and hides the close button and the counter. The close button is
         // absolutely positioned against the padding box, so container padding
         // would not move it — it gets its own safe-area offset instead.
-        className="flex h-[92dvh] w-[96vw] max-w-5xl flex-col items-center justify-center gap-0 rounded-lg border-none bg-black/95 p-0 pt-4 sm:max-w-5xl [&_[data-slot=dialog-close]]:top-[max(0.5rem,env(safe-area-inset-top))] [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:bg-white/10 [&_[data-slot=dialog-close]]:hover:text-white"
+        className="flex h-[92dvh] w-[96vw] max-w-5xl flex-col items-center justify-center gap-0 rounded-lg border-none bg-black/95 p-0 pt-4 sm:max-w-5xl [&_[data-slot=dialog-close]]:top-[max(0.5rem,env(safe-area-inset-top))] [&_[data-slot=dialog-close]]:text-white"
         onTouchStart={(event) => {
           touchStartX.current = event.touches[0]?.clientX ?? null;
         }}
@@ -74,19 +74,19 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
           {images.length > 1 && (
             <>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="icon"
                 aria-label="Предыдущее фото"
-                className="absolute left-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 hover:text-white"
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-white"
                 onClick={() => goTo(index - 1)}
               >
                 <ChevronLeft className="size-6" />
               </Button>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="icon"
                 aria-label="Следующее фото"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 hover:text-white"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white"
                 onClick={() => goTo(index + 1)}
               >
                 <ChevronRight className="size-6" />
