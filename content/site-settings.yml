@@ -5,18 +5,14 @@ logo:
   image: /media/demo/brand-logo.webp
   alt: Миклуха Маклай
 hero:
-  title: Маленькие группы. Большие горы.
-  subtitle: Пешие походы и лагерные выезды на Алтай и Красноярские Столбы — с ночёвками у костра, без гонки за километражем.
+  title: Алтай и Красноярск — путешествия из Кемерово
+  subtitle: Автобусные туры с экскурсиями, активным отдыхом и дружескими вечерами — от Телецкого озера и Чемальского тракта до Енисея и Красноярских Столбов.
   image:
     image: https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp
-    alt: катунь
+    alt: Катунь в Горном Алтае
   video:
     file: https://mikluha-maklai.s3.cloud.ru/cms/mikluha.webm
 booking:
-  defaultQr:
-    image: /media/demo/qr-default.webp
-    alt: Тестовый QR-код для бронирования
-  defaultPrepaymentAmount: 5000
   defaultOrganizer: artur
   isDemo: false
 socials:
@@ -29,9 +25,9 @@ company:
   email: artur@mikluha-maklai.ru
   isDemo: false
 seo:
-  title: Миклуха Маклай — треккинг и походы в горы
-  description: 'Небольшие групповые поездки на Алтай и Красноярские Столбы: даты выездов, фотоотчёты прошлых походов и честные условия бронирования.'
+  title: Миклуха Маклай — автобусные туры из Кемерово
+  description: 'Туры из Кемерово на Горный Алтай и в Красноярск: Телецкое озеро, Чемальский тракт, Столбы, экскурсии и активный отдых.'
   ogImage:
-    image: /media/demo/hero.webp
-    alt: Миклуха Маклай
+    image: https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp
+    alt: Путешествия с компанией «Миклуха Маклай»
 launchReady: false

@@ -43,8 +43,8 @@ export function ToursSection({ upcoming, tours }: ToursSectionProps) {
   if (tours.length === 0) {
     return (
       <section id="tours" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Ближайшие поездки</h2>
-        <p className="mt-2 text-muted-foreground">Направления скоро появятся.</p>
+        <h2 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Туры из Кемерово</h2>
+        <p className="mt-2 text-muted-foreground">Новые программы и даты скоро появятся.</p>
       </section>
     );
   }
@@ -53,9 +53,9 @@ export function ToursSection({ upcoming, tours }: ToursSectionProps) {
     <section id="tours" className="py-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mb-6 space-y-2">
-          <h2 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Ближайшие поездки</h2>
+          <h2 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Туры из Кемерово</h2>
           <p className="max-w-2xl text-muted-foreground">
-            Небольшие группы, конкретные даты и понятный статус набора — без сюрпризов.
+            Подробные программы по дням, даты выездов и актуальный статус набора.
           </p>
         </div>
 
@@ -65,7 +65,7 @@ export function ToursSection({ upcoming, tours }: ToursSectionProps) {
           aria-label="Фильтр по направлениям"
         >
           <FilterChip active={selectedTourId === ALL} onClick={() => selectTour(ALL)}>
-            Все направления
+            Все туры
           </FilterChip>
           {tours.map((tour) => (
             <FilterChip

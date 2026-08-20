@@ -209,6 +209,7 @@ collections:
         widget: select
         default: OPEN
         options:
+          - {label: "Детали уточняются", value: ANNOUNCED}
           - {label: "Набор открыт", value: OPEN}
           - {label: "Набор закрыт", value: CLOSED}
           - {label: "Поездка отменена", value: CANCELLED}

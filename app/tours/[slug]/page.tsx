@@ -148,7 +148,7 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
       {reports.length > 0 && (
         <section className="border-t border-border">
           <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-            <h2 className="font-heading mb-6 text-2xl font-semibold text-foreground">Отчёты об этом направлении</h2>
+            <h2 className="font-heading mb-6 text-2xl font-semibold text-foreground">Места в программе</h2>
             <div className="scrollbar-none flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2">
               {reports.map((report) => (
                 <ReportCard key={report.id} report={report} tourTitle={tour.title} />

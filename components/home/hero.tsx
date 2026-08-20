@@ -28,7 +28,7 @@ export function Hero({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
             href="#tours"
             className={cn(buttonVariants(), "h-auto px-6 py-2 text-2xl font-semibold")}
           >
-            Ближайшие туры
+            Программы и даты
           </Link>
           <MaxChannelButton href={socials.maxChannelUrl} className="h-auto px-6 py-2 text-2xl" />
         </div>

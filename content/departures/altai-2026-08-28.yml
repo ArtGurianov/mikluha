@@ -1,0 +1,8 @@
+tour: altai
+startDate: "2026-08-28"
+endDate: "2026-08-31"
+bookingStatus: ANNOUNCED
+organizers:
+  - artur
+isListed: true
+isDemo: false

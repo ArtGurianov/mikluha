@@ -167,7 +167,7 @@ async function main() {
     } else if (d.endDate < d.startDate) {
       fail(`Departure ${d.id} ends before it starts (${d.startDate} → ${d.endDate})`);
     }
-    if (!("OPEN" === d.bookingStatus || "CLOSED" === d.bookingStatus || "CANCELLED" === d.bookingStatus)) {
+    if (!("ANNOUNCED" === d.bookingStatus || "OPEN" === d.bookingStatus || "CLOSED" === d.bookingStatus || "CANCELLED" === d.bookingStatus)) {
       fail(`Departure ${d.id} has unknown bookingStatus "${d.bookingStatus}"`);
     }
     for (const [label, amount] of [["price", d.price], ["prepaymentAmount", d.prepaymentAmount]] as const) {

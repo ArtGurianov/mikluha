@@ -26,7 +26,9 @@ export function BookingModal() {
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md" showCloseButton>
         <DialogHeader>
-          <DialogTitle className="font-heading text-xl">Забронировать место</DialogTitle>
+          <DialogTitle className="font-heading text-xl">
+            {selected ? "Забронировать место" : "Уточнить поездку"}
+          </DialogTitle>
           {selected ? (
             <p className="text-base font-medium text-foreground">
               {selected.tourTitle}

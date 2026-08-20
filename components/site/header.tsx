@@ -41,7 +41,7 @@ export function Header({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
             href={siteSettings.socials.maxChannelUrl}
             className="hidden h-auto px-4 py-2 text-sm sm:inline-flex"
           />
-          <BookingButton label="Забронировать" className="h-auto px-4 py-2 text-sm" />
+          <BookingButton label="Уточнить поездку" className="h-auto px-4 py-2 text-sm" />
           <MobileNav maxChannelUrl={siteSettings.socials.maxChannelUrl} />
         </div>
       </div>

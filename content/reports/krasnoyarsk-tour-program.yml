@@ -1,0 +1,21 @@
+title: Красноярск — места по маршруту
+slug: krasnoyarsk-tour-program
+tour: krasnoyarsk-stolby
+coverImage:
+  image: "/media/demo/report-stolby-cover.webp"
+  alt: Скальные массивы Красноярских Столбов
+gallery:
+  - image: "/media/demo/report-stolby-1.webp"
+    alt: Тропа на Красноярских Столбах
+  - image: "/media/demo/report-stolby-2.webp"
+    alt: Вид на Енисей
+  - image: "/media/demo/report-stolby-3.webp"
+    alt: Тайга рядом с Красноярском
+  - image: "/media/demo/report-stolby-4.webp"
+    alt: Скалы Красноярских Столбов
+  - image: "/media/demo/report-stolby-5.webp"
+    alt: Природа Красноярского края
+description: >-
+  Маршрут объединяет исторический Красноярск, набережные Енисея и Дивногорска, Красноярскую ГЭС,
+  смотровую площадку «Царь-рыба», Столбы и парк флоры и фауны «Роев ручей».
+sortOrder: 20

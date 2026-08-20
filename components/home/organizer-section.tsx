@@ -10,7 +10,7 @@ export function OrganizerSection({ organizers }: { organizers: OrganizerDTO[] })
     <section id="organizer" className="border-y border-border bg-muted/40">
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="mb-8 space-y-2">
-          <h2 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Организатор</h2>
+          <h2 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">Организатор поездок</h2>
         </div>
 
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-2">

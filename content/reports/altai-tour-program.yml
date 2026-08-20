@@ -1,0 +1,21 @@
+title: Алтай — места по маршруту
+slug: altai-tour-program
+tour: altai
+coverImage:
+  image: "/media/demo/report-altai-cover.webp"
+  alt: Горный пейзаж Алтая
+gallery:
+  - image: "/media/demo/report-altai-1.webp"
+    alt: Природа Горного Алтая
+  - image: "/media/demo/report-altai-2.webp"
+    alt: Горная река на Алтае
+  - image: "/media/demo/report-altai-3.webp"
+    alt: Панорама Горного Алтая
+  - image: "/media/demo/report-altai-4.webp"
+    alt: Вечер в поездке по Алтаю
+  - image: "/media/demo/report-altai-5.webp"
+    alt: Путешествие по Горному Алтаю
+description: >-
+  В программе тура — Катунь, Тавдинские пещеры, Телецкое озеро, Чемальский тракт, остров Патмос,
+  Зубы Дракона, урочище Че-Чкыш и природные смотровые площадки.
+sortOrder: 10

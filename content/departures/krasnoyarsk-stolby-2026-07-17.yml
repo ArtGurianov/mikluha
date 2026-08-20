@@ -1,0 +1,8 @@
+tour: krasnoyarsk-stolby
+startDate: "2026-07-17"
+endDate: "2026-07-19"
+bookingStatus: CLOSED
+organizers:
+  - artur
+isListed: true
+isDemo: false
