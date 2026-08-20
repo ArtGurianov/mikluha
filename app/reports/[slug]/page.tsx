@@ -80,7 +80,7 @@ export default async function ReportPage(props: PageProps<"/reports/[slug]">) {
       {tour && (
         <section className="border-t border-border bg-muted/40">
           <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 px-4 py-14 text-center sm:px-6">
-            <p className="font-heading text-2xl font-semibold text-foreground">Хотите увидеть эти места?</p>
+            <p className="font-heading text-2xl font-semibold text-foreground">Понравилось?</p>
             {nextBookable ? (
               <p className="text-muted-foreground">
                 Следующая поездка на {tour.title} —{" "}

@@ -1,6 +1,6 @@
 export const navLinks = [
   { href: "/#tours", label: "Туры" },
-  { href: "/#organizer", label: "Организатор" },
+  { href: "/#reports", label: "Отчёты" },
   { href: "/#reviews", label: "Отзывы" },
   { href: "/#contacts", label: "Контакты" },
 ] as const;

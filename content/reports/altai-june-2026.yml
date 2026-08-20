@@ -1,0 +1,22 @@
+title: Поход на Алтай — июнь 2026
+slug: altai-june-2026
+tour: altai
+departure: altai-2026-06-15
+coverImage:
+  image: "/media/demo/report-altai-cover.webp"
+  alt: Группа на маршруте по Алтаю, июнь 2026
+gallery:
+  - image: "/media/demo/report-altai-1.webp"
+    alt: Утро в лагере на Алтае
+  - image: "/media/demo/report-altai-2.webp"
+    alt: Переход через горную реку
+  - image: "/media/demo/report-altai-3.webp"
+    alt: Вид с перевала
+  - image: "/media/demo/report-altai-4.webp"
+    alt: Костёр вечером
+  - image: "/media/demo/report-altai-5.webp"
+    alt: Групповое фото на фоне вершин
+description: >-
+  Пять дней, три перевала и одна большая гроза, которую пережидали в лагере с чаем. Дошли все —
+  маршрут получился именно таким, каким задумывался.
+sortOrder: 10
