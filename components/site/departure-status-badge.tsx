@@ -4,7 +4,6 @@ import { getBookingStatusLabel } from "@/lib/tours";
 import { cn } from "@/lib/utils";
 
 const statusClassName: Record<BookingStatus, string> = {
-  ANNOUNCED: "bg-primary/10 text-primary",
   OPEN: "bg-accent text-accent-foreground",
   CLOSED: "bg-muted text-muted-foreground",
   CANCELLED: "bg-destructive/10 text-destructive",

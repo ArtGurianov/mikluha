@@ -57,18 +57,17 @@ function baseContent(overrides: Partial<ContentSnapshot> = {}): ContentSnapshot 
   };
 }
 
-test("getNextDeparture excludes CANCELLED but keeps ANNOUNCED and CLOSED", () => {
+test("getNextDeparture excludes CANCELLED but keeps CLOSED", () => {
   const content = baseContent({
     departures: [
       departure({ id: "cancelled-soon", startDate: "2026-08-20", bookingStatus: "CANCELLED" }),
-      departure({ id: "announced-next", startDate: "2026-08-28", bookingStatus: "ANNOUNCED" }),
-      departure({ id: "closed-later", startDate: "2026-09-01", bookingStatus: "CLOSED" }),
+      departure({ id: "closed-next", startDate: "2026-08-28", bookingStatus: "CLOSED" }),
       departure({ id: "open-later", startDate: "2026-09-12", bookingStatus: "OPEN" }),
     ],
   });
 
   const result = getNextDeparture(content, "tour-1", "2026-08-14");
-  assert.equal(result?.id, "announced-next", "CANCELLED must never be the nearest departure, even if it's soonest");
+  assert.equal(result?.id, "closed-next", "CANCELLED must never be the nearest departure, even if it's soonest");
 });
 
 test("getNextBookableDeparture skips CLOSED to find the next OPEN one", () => {

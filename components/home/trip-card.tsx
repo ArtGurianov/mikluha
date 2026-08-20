@@ -87,7 +87,7 @@ export function TripCard({ tour, departure }: TripCardProps) {
         */}
         <div className="relative z-10 mt-4">
           <BookingButton
-            departureId={departure?.bookingStatus === "OPEN" ? departure.id : undefined}
+            departureId={departure?.id}
             disabled={!isBookable}
             className="h-auto w-full px-3 py-2 text-lg"
           />

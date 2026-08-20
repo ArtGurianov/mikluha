@@ -16,7 +16,7 @@
  * in ./normalize.ts.
  */
 
-export type BookingStatus = "ANNOUNCED" | "OPEN" | "CLOSED" | "CANCELLED";
+export type BookingStatus = "OPEN" | "CLOSED" | "CANCELLED";
 
 /**
  * An image field as Sveltia's `image` + `alt` object pair writes it. `image`

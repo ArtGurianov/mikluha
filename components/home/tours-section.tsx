@@ -65,7 +65,7 @@ export function ToursSection({ upcoming, tours }: ToursSectionProps) {
           aria-label="Фильтр по направлениям"
         >
           <FilterChip active={selectedTourId === ALL} onClick={() => selectTour(ALL)}>
-            Все туры
+            Все направления
           </FilterChip>
           {tours.map((tour) => (
             <FilterChip

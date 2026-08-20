@@ -91,8 +91,6 @@ export function resolveBookingDetails(content: ContentSnapshot, departure: Depar
 
 export function getBookingStatusLabel(status: BookingStatus): string {
   switch (status) {
-    case "ANNOUNCED":
-      return "Детали уточняются";
     case "OPEN":
       return "Набор открыт";
     case "CLOSED":
@@ -193,10 +191,9 @@ export interface UpcomingDeparture {
  * Every future departure of every listed tour, soonest first.
  *
  * The public catalogue lists departures rather than tours because price and
- * status belong to a date, not to a destination. ANNOUNCED dates stay visible
- * while their booking details are being confirmed. CANCELLED ones are left
- * out — they stay in the CMS for history and for galleries that link to them,
- * but a cancelled trip is not something a visitor can join.
+ * status belong to a date, not to a destination. CANCELLED ones are left out —
+ * they stay in the CMS for history and for galleries that link to them, but
+ * a cancelled trip is not something a visitor can join.
  */
 export function getUpcomingDepartures(content: ContentSnapshot, today: string): UpcomingDeparture[] {
   const tourById = new Map(getListedTours(content).map((t) => [t.id, t]));

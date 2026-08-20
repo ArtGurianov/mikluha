@@ -13,6 +13,10 @@ hero:
   video:
     file: https://mikluha-maklai.s3.cloud.ru/cms/mikluha.webm
 booking:
+  defaultQr:
+    image: /media/demo/qr-default.webp
+    alt: Тестовый QR-код для бронирования
+  defaultPrepaymentAmount: 5000
   defaultOrganizer: artur
   isDemo: false
 socials:

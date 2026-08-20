@@ -35,7 +35,7 @@ export function MobileNav({ maxChannelUrl }: { maxChannelUrl?: string }) {
         <div className="space-y-2 p-4 mt-6">
           <BookingButton
             className="w-full text-2xl py-6"
-            label="Уточнить поездку"
+            label="Забронировать"
           />
           <MaxChannelButton href={maxChannelUrl} className="w-full text-2xl py-6" />
         </div>

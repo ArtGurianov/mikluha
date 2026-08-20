@@ -19,14 +19,13 @@ interface BookingButtonProps extends VariantProps<typeof buttonVariants> {
 export function BookingButton({
   departureId,
   tourId,
-  label,
+  label = "Забронировать место",
   disabled,
   variant,
   size,
   className,
 }: BookingButtonProps) {
   const { open } = useBookingModal();
-  const resolvedLabel = label ?? (departureId ? "Забронировать место" : "Уточнить поездку");
 
   return (
     <Button
@@ -36,7 +35,7 @@ export function BookingButton({
       className={cn("font-semibold", className)}
       onClick={() => open({ departureId, tourId })}
     >
-      {resolvedLabel}
+      {label}
     </Button>
   );
 }
