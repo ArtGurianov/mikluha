@@ -12,13 +12,8 @@ import { useBookingModal } from "./booking-provider";
 export function BookingModal() {
   const { isOpen, selected, fallback, close } = useBookingModal();
 
-  // Without a resolved OPEN departure there is nothing concrete to pay for —
-  // show contact info only, never a QR/prepayment amount for an unspecified
-  // trip. A visitor who scans a QR here would be transferring money against a
-  // departure that has no date, no price and no organizer assigned to it.
-  // BookingFallback (lib/tours.ts) enforces this by carrying contacts only.
-  const prepaymentAmount = selected?.prepaymentAmount;
-  const qr = selected?.qr;
+  const prepaymentAmount = selected?.prepaymentAmount ?? fallback.prepaymentAmount;
+  const qr = selected?.qr ?? fallback.qr;
   const organizerName = selected?.organizerName ?? fallback.organizerName;
   const organizerPhone = selected?.organizerPhone ?? fallback.organizerPhone;
 
@@ -37,7 +32,8 @@ export function BookingModal() {
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Ближайшие даты уточняются — свяжитесь с организатором по телефону ниже.
+              Выберите подходящую поездку и дату в разделе «Туры» или свяжитесь с организатором по
+              телефону ниже.
             </p>
           )}
         </DialogHeader>

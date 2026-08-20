@@ -2,13 +2,9 @@
 
 import * as React from "react";
 
-import type { BookingDepartureInfo, BookingFallback } from "./types";
+import { selectBookingDeparture, type BookingTarget } from "@/lib/booking";
 
-/** What the visitor clicked: a specific date, a tour in general, or nothing in particular. */
-export interface BookingTarget {
-  departureId?: string;
-  tourId?: string;
-}
+import type { BookingDepartureInfo, BookingFallback } from "./types";
 
 interface BookingContextValue {
   isOpen: boolean;
@@ -24,7 +20,7 @@ interface BookingModalProviderProps {
   children: React.ReactNode;
   /** Every OPEN, listed departure across the whole site, pre-resolved server-side. */
   departures: BookingDepartureInfo[];
-  /** siteSettings.booking defaults, used when nothing OPEN can be found at all. */
+  /** Neutral siteSettings.booking defaults, used when no tour or date was selected. */
   fallback: BookingFallback;
 }
 
@@ -34,23 +30,7 @@ export function BookingModalProvider({ children, departures, fallback }: Booking
 
   const open = React.useCallback(
     (target?: BookingTarget) => {
-      // A card for one specific date books that date. A generic CTA ("Забронировать"
-      // in the header, or on a tour page) has no date in mind, so it falls back to
-      // the soonest bookable departure — of that tour if one was named, otherwise
-      // of the whole site. A departureId that is not in `departures` means it is no
-      // longer OPEN, in which case the modal shows contacts only rather than a
-      // stale price.
-      const byId = target?.departureId
-        ? (departures.find((d) => d.id === target.departureId) ?? null)
-        : null;
-      if (byId) {
-        setSelected(byId);
-        setIsOpen(true);
-        return;
-      }
-
-      const pool = target?.tourId ? departures.filter((d) => d.tourId === target.tourId) : departures;
-      setSelected([...pool].sort((a, b) => a.startDate.localeCompare(b.startDate))[0] ?? null);
+      setSelected(selectBookingDeparture(departures, target));
       setIsOpen(true);
     },
     [departures],

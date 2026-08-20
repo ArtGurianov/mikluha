@@ -224,15 +224,9 @@ export interface BookingDepartureInfo {
   organizerPhone?: string;
 }
 
-/**
- * Contact-only — deliberately has no prepaymentAmount/qr fields. Without a
- * resolved OPEN departure there's nothing concrete to pay for, so the
- * booking modal must never show a QR/amount for an unspecified trip — a
- * visitor could otherwise transfer money against a departure that does not
- * exist. Making this type contact-only turns that into a structural guarantee
- * instead of a convention the modal has to uphold on its own.
- */
 export interface BookingFallback {
+  prepaymentAmount?: number;
+  qr?: ImageAsset;
   organizerName?: string;
   organizerPhone?: string;
 }
@@ -258,10 +252,12 @@ export function getAllBookableDepartures(content: ContentSnapshot, today: string
     });
 }
 
-/** siteSettings.booking's default organizer contact, shown when no departure could be resolved at all. */
+/** Neutral booking details from site settings, used when no tour or date was selected. */
 export function getBookingFallback(content: ContentSnapshot): BookingFallback {
   const organizer = getOrganizerById(content, content.siteSettings.booking.defaultOrganizerId);
   return {
+    prepaymentAmount: content.siteSettings.booking.defaultPrepaymentAmount,
+    qr: content.siteSettings.booking.defaultQr,
     organizerName: organizer?.name,
     organizerPhone: organizer?.phone,
   };

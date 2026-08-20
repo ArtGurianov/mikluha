@@ -5,6 +5,7 @@ import type { ContentSnapshot, DepartureDTO, ImageAsset, OrganizerDTO } from "./
 import {
   formatDepartureDateRange,
   formatDurationLabel,
+  getBookingFallback,
   getNextBookableDeparture,
   getNextDeparture,
   resolveBookingDetails,
@@ -136,6 +137,25 @@ test("resolveBookingDetails: no fallback available leaves fields undefined (neve
   assert.equal(resolved.prepaymentAmount, undefined);
   assert.equal(resolved.qr, undefined);
   assert.equal(resolved.organizer, undefined);
+});
+
+test("getBookingFallback keeps the neutral QR, amount and organizer from site settings", () => {
+  const content = baseContent();
+  const qr = image("QR-код");
+  content.siteSettings.booking = {
+    defaultQr: qr,
+    defaultPrepaymentAmount: 5000,
+    defaultOrganizerId: "organizer-1",
+    isDemo: true,
+  };
+  content.organizers = [organizer("organizer-1", { phone: "+70000000000" })];
+
+  assert.deepEqual(getBookingFallback(content), {
+    prepaymentAmount: 5000,
+    qr,
+    organizerName: "Организатор",
+    organizerPhone: "+70000000000",
+  });
 });
 
 test("formatDepartureDateRange: same month collapses to a single day-month-year tail", () => {
