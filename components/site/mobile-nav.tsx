@@ -1,7 +1,6 @@
 "use client";
 
 import { Menu } from "lucide-react";
-import Link from "next/link";
 
 import { BookingButton } from "@/components/booking/booking-button";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger 
 
 import { MaxChannelButton } from "./max-channel-button";
 import { navLinks } from "./nav-links";
+import { SectionLink } from "./section-link";
 
 export function MobileNav({ maxChannelUrl }: { maxChannelUrl?: string }) {
   return (
@@ -25,7 +25,7 @@ export function MobileNav({ maxChannelUrl }: { maxChannelUrl?: string }) {
             <SheetClose
               key={link.href}
               nativeButton={false}
-              render={<Link href={link.href} />}
+              render={<SectionLink href={link.href} />}
               className="rounded-md px-2 py-2.5 text-base text-foreground hover:bg-muted"
             >
               {link.label}

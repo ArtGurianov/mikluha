@@ -1,6 +1,5 @@
-import Link from "next/link";
-
 import { MaxChannelButton } from "@/components/site/max-channel-button";
+import { SectionLink } from "@/components/site/section-link";
 import { buttonVariants } from "@/components/ui/button";
 import type { SiteSettingsDTO } from "@/lib/cms/types";
 import { cn } from "@/lib/utils";
@@ -24,12 +23,12 @@ export function Hero({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
         {hero.subtitle && <p className="max-w-xl text-lg text-white/85">{hero.subtitle}</p>}
 
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <Link
+          <SectionLink
             href="#tours"
             className={cn(buttonVariants(), "h-auto px-6 py-2 text-2xl font-semibold")}
           >
             Программы и даты
-          </Link>
+          </SectionLink>
           <MaxChannelButton href={socials.maxChannelUrl} className="h-auto px-6 py-2 text-2xl" />
         </div>
       </div>

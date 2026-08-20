@@ -7,6 +7,7 @@ import type { SiteSettingsDTO } from "@/lib/cms/types";
 import { MaxChannelButton } from "./max-channel-button";
 import { MobileNav } from "./mobile-nav";
 import { navLinks } from "./nav-links";
+import { SectionLink } from "./section-link";
 
 export function Header({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
   return (
@@ -26,13 +27,13 @@ export function Header({ siteSettings }: { siteSettings: SiteSettingsDTO }) {
 
         <nav className="hidden items-center gap-6 md:flex">
           {navLinks.map((link) => (
-            <Link
+            <SectionLink
               key={link.href}
               href={link.href}
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {link.label}
-            </Link>
+            </SectionLink>
           ))}
         </nav>
 
