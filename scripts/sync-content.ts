@@ -12,8 +12,7 @@ import { lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import path from "node:path";
 
-import yaml from "js-yaml";
-
+import { loadContentYaml } from "../lib/cms/content-yaml";
 import { normalizeContentSet } from "../lib/cms/normalize";
 import type { RawContentSet } from "../lib/cms/types";
 
@@ -42,7 +41,7 @@ async function readCollection<T>(folder: string): Promise<(T & { _slug: string }
   return Promise.all(
     files.map(async (file) => {
       const raw = await readFile(path.join(dir, file), "utf-8");
-      const doc = yaml.load(raw);
+      const doc = loadContentYaml(raw);
       // An empty or malformed file parses to `undefined`/a scalar, not an
       // object — spreading that below would silently produce a document with
       // only `_slug` set, which then surfaces as a confusing normalize.ts
@@ -63,7 +62,7 @@ async function readSingleton<T>(file: string): Promise<T> {
     throw new Error(`content/${file} must be a regular file inside content/.`);
   }
   const raw = await readFile(filePath, "utf-8");
-  const doc = yaml.load(raw);
+  const doc = loadContentYaml(raw);
   // Same failure mode readCollection guards against: an empty/malformed file
   // parses to `undefined`, and without this check the first symptom is a
   // TypeError deep inside normalize.ts naming some unrelated field instead of
