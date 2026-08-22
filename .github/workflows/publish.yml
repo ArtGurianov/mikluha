@@ -38,7 +38,7 @@ jobs:
               --show-error \
               --output "$response_file" \
               --write-out '%{http_code}' \
-              --request GET \
+              --request POST \
               "$COOLIFY_DEPLOY_WEBHOOK_URL" \
               --header "Authorization: Bearer $COOLIFY_API_TOKEN"
           )"
