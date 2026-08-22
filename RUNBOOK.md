@@ -220,12 +220,14 @@ fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-re
 [sveltia-cms-publish]`) — единственный шаг делает `curl` на Coolify Deploy Webhook с
 Bearer-токеном. Разовая настройка репозитория (не редактора):
 
-1. В Coolify: приложение `mikluha` → Configuration → Webhooks → скопировать `Deploy Webhook
-   (auth required)` URL (вид `https://<coolify-host>/api/v1/deploy?uuid=<uuid>&force=false`).
-2. Там же в Coolify: Keys & Tokens → API Tokens → создать токен с правом `deploy` (без `root`,
+1. В Coolify: Keys & Tokens → API Tokens → создать токен с правом `deploy` (без `root`,
    `write`, `read:sensitive` и т. п.).
-3. В GitHub: репозиторий → Settings → Secrets and variables → Actions → добавить
-   `COOLIFY_WEBHOOK` (URL из шага 1) и `COOLIFY_TOKEN` (токен из шага 2).
+2. В GitHub: репозиторий → Settings → Secrets and variables → Actions → добавить
+   `COOLIFY_BASE_URL` со схемой и портом, но без завершающего `/` (например,
+   `https://coolify.example.com`), и `COOLIFY_API_TOKEN` из шага 1.
+3. UUID ресурса `mikluha` уже зафиксирован в `.github/workflows/publish.yml`; он не является
+   секретом. Workflow вызывает `POST /api/v1/deploy?uuid=<uuid>&force=false`, затем требует
+   `HTTP 200` и непустой `deployment_uuid` в JSON-ответе.
 4. Закоммитить и запушить `.github/workflows/publish.yml` в `main` — `repository_dispatch`
    срабатывает только для workflow-файлов, уже присутствующих в default branch на момент
    события, поэтому этот шаг обязателен один раз при внедрении.
@@ -295,9 +297,10 @@ build того, что сейчас лежит в `main`, вне зависим�
 | Save записи C | ещё коммит в `main`, `[skip ci]` | ничего нового |
 | Нажать «Опубликовать изменения» | Actions → появился запуск `Publish site` (событие `repository_dispatch`, тип `sveltia-cms-publish`), шаг `Trigger Coolify deployment` зелёный | Deployments → появился ровно один новый deployment, содержащий A + B + C |
 
-Если шаг `Trigger Coolify deployment` красный — из-за `--fail-with-body` тело ответа Coolify
-попадёт прямо в лог Action (обычно `401`/`403` — неверный токен или URL, значит перепроверить
-`COOLIFY_WEBHOOK`/`COOLIFY_TOKEN`). Если Action вообще не запустился — проверить, что
+Если шаг `Trigger Coolify deployment` красный, лог покажет HTTP-статус и тело ответа Coolify.
+`401`/`403` означают неверный или недостаточно привилегированный `COOLIFY_API_TOKEN`; `3xx` —
+неверный `COOLIFY_BASE_URL`; `200` без `deployment_uuid` — API не поставил deployment в очередь.
+Если Action вообще не запустился — проверить, что
 `.github/workflows/publish.yml` действительно есть в `main` (см. шаг 4 настройки выше) и что PAT
 редактора не потерял `Contents: write`.
 

@@ -21,13 +21,20 @@ jobs:
     steps:
       - name: Trigger Coolify deployment
         env:
-          COOLIFY_DEPLOY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK }}
-          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_BASE_URL: ${{ secrets.COOLIFY_BASE_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
         run: |
           set -euo pipefail
 
-          : "${COOLIFY_DEPLOY_WEBHOOK_URL:?COOLIFY_WEBHOOK secret is required}"
-          : "${COOLIFY_API_TOKEN:?COOLIFY_TOKEN secret is required}"
+          : "${COOLIFY_BASE_URL:?COOLIFY_BASE_URL secret is required}"
+          : "${COOLIFY_API_TOKEN:?COOLIFY_API_TOKEN secret is required}"
+
+          coolify_base_url="${COOLIFY_BASE_URL%/}"
+          if [[ ! "$coolify_base_url" =~ ^https?://[^/]+$ ]]; then
+            echo "::error::COOLIFY_BASE_URL must be only the Coolify HTTP(S) origin, without a path"
+            exit 1
+          fi
+          echo "Coolify base: $coolify_base_url"
 
           response_file="$(mktemp)"
           trap 'rm -f "$response_file"' EXIT
@@ -39,8 +46,9 @@ jobs:
               --output "$response_file" \
               --write-out '%{http_code}' \
               --request POST \
-              "$COOLIFY_DEPLOY_WEBHOOK_URL" \
-              --header "Authorization: Bearer $COOLIFY_API_TOKEN"
+              "$coolify_base_url/api/v1/deploy?uuid=pxetekoyzceundmfpuapik4q&force=false" \
+              --header "Authorization: Bearer $COOLIFY_API_TOKEN" \
+              --header "Accept: application/json"
           )"
 
           echo "Coolify HTTP status: $status"
