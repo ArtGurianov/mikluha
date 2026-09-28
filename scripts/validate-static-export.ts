@@ -3,6 +3,11 @@
  * Final step of the production build pipeline — runs after
  * `next build` against the generated /out directory, before it is allowed to
  * become the candidate for the HTTP healthcheck / production switch.
+ *
+ * Besides routes and media, it enforces the SEO invariants in lib/seo-audit.ts
+ * (indexability per environment, self-canonicals, titles/descriptions/H1,
+ * sitemap ↔ pages, JSON-LD), so an SEO regression fails the release instead of
+ * surfacing weeks later in Search Console / Yandex Webmaster.
  */
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
@@ -16,7 +21,8 @@ import {
   type CmsMediaConfig,
 } from "../lib/cms/asset-source";
 import type { ContentSnapshot } from "../lib/cms/types";
-import { resolveCanonicalBase } from "../lib/site";
+import { auditSite } from "../lib/seo-audit";
+import { isStaging, resolveCanonicalBase } from "../lib/site";
 
 const ROOT = process.cwd();
 const OUT_DIR = path.join(ROOT, "out");
@@ -24,8 +30,17 @@ const CACHE_FILE = path.join(ROOT, ".cms-cache", "content.json");
 const ADMIN_CONFIG_FILE = path.join(ROOT, "public/admin/config.yml");
 
 const errors: string[] = [];
+const warnings: string[] = [];
 function fail(message: string) {
   errors.push(message);
+}
+
+/** Copies of the branded 404 that `next build` exports; they are never indexable pages. */
+const NOT_FOUND_FILES = new Set(["404.html", "404/index.html", "_not-found/index.html"]);
+
+/** "index.html" → "/", "tours/altai/index.html" → "/tours/altai/" (`trailingSlash: true`). */
+function pagePath(relative: string): string {
+  return `/${relative.replace(/(^|\/)index\.html$/, "$1")}`;
 }
 
 async function exists(filePath: string): Promise<boolean> {
@@ -106,10 +121,22 @@ async function main() {
   const mediaPolicy = createAssetSourcePolicy(adminConfig);
   const canonicalOrigin = content ? new URL(resolveCanonicalBase(content.siteSettings.siteUrl)).origin : undefined;
 
+  const pages = new Map<string, string>();
+  const notFoundPages = new Map<string, string>();
+
   for (const file of files) {
     const ext = path.extname(file);
     if (!SCANNABLE_EXT.has(ext)) continue;
     const text = await readFile(file, "utf-8");
+
+    const relative = path.relative(OUT_DIR, file).split(path.sep).join("/");
+    if (ext === ".html" && !relative.startsWith("admin/")) {
+      if (NOT_FOUND_FILES.has(relative)) notFoundPages.set(`/${relative}`, text);
+      else pages.set(pagePath(relative), text);
+    }
+    if (!isStaging && text.includes("staging.invalid")) {
+      fail(`${path.relative(ROOT, file)} references staging.invalid — a production build must only point at the production domain`);
+    }
 
     if (ext === ".html" && PROCESSED_IMAGE_RE.test(text)) {
       fail(`Found an image-processing URL in ${path.relative(ROOT, file)} — media must be referenced directly`);
@@ -150,11 +177,30 @@ async function main() {
     }
   }
 
-  console.log(`[validate-out] scanned ${files.length} files, ${referencedMedia.size} unique direct media reference(s)`);
+  if (content) {
+    const seo = auditSite({
+      pages,
+      notFoundPages,
+      robotsTxt: await readFile(path.join(OUT_DIR, "robots.txt"), "utf-8").catch(() => ""),
+      sitemapXml: await readFile(path.join(OUT_DIR, "sitemap.xml"), "utf-8").catch(() => ""),
+      siteUrl: content.siteSettings.siteUrl,
+      canonicalBase: resolveCanonicalBase(content.siteSettings.siteUrl),
+      isStaging,
+      noindexPaths: new Set(content.reports.filter((r) => r.noindex).map((r) => `/reports/${r.slug}/`)),
+    });
+    errors.push(...seo.errors);
+    warnings.push(...seo.warnings);
+  }
+
+  console.log(
+    `[validate-out] scanned ${files.length} files, ${referencedMedia.size} unique direct media reference(s), ` +
+      `${pages.size} page(s) SEO-checked`,
+  );
   report();
 }
 
 function report() {
+  for (const warning of warnings) console.warn(`[validate-out] WARN: ${warning}`);
   if (errors.length > 0) {
     console.error(`[validate-out] FAILED with ${errors.length} error(s):`);
     for (const error of errors) console.error(` - ${error}`);

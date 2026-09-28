@@ -117,6 +117,7 @@ singletons:
           - {name: ogrn, label: ОГРН, widget: string}
           - {name: phone, label: "Телефон компании", widget: string}
           - {name: email, label: Email, widget: string, required: false}
+          - {name: city, label: "Город", widget: string, required: false, hint: "Например: Кемерово. Попадает в разметку организации для поисковых систем — указывайте только город, из которого реально работаете, без выдуманного адреса."}
           - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите, пока реквизиты тестовые. Блокирует публичный запуск сайта."}
       - name: seo
         label: "SEO по умолчанию"
@@ -148,6 +149,7 @@ collections:
     create: true
     fields:
       - {name: title, label: Название, widget: string, hint: "Например: «Горный Алтай»"}
+      - {name: heading, label: "Заголовок страницы (H1)", widget: string, required: false, hint: "Главный заголовок на странице направления — так, как люди ищут тур: «Автобусный тур на Горный Алтай из Кемерово». Если не заполнено, используется «Название». Короткое «Название» остаётся на карточках, фильтрах и в «хлебных крошках»."}
       - name: slug
         label: "Адрес страницы (slug)"
         widget: string
@@ -176,6 +178,7 @@ collections:
             - {name: alt, label: "Альтернативный текст (alt)", widget: string}
       - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true, hint: "Выключите, чтобы временно скрыть направление из публичного каталога."}
       - {name: sortOrder, label: "Порядок сортировки", widget: number, default: 0, value_type: int, hint: "Чем меньше число, тем выше направление в списке."}
+      - {name: updatedAt, label: "Дата существенного обновления", widget: datetime, type: date, input_timezone: utc, required: false, default: "{{now}}", hint: "Для поисковых систем (sitemap). Обновляйте, когда меняется программа, описание или фото — не при каждой опечатке."}
       - name: seo
         label: SEO
         widget: object
@@ -225,6 +228,7 @@ collections:
       - {name: organizers, label: Организаторы, widget: relation, collection: organizers, value_field: "{{slug}}", search_fields: [name], display_fields: [name], multiple: true, required: false, hint: "Если список пуст, используется организатор по умолчанию из «Настроек сайта»."}
       - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true}
       - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите для тестовых выездов. Такие выезды блокируют публичный запуск сайта, пока не будут заменены."}
+      - {name: updatedAt, label: "Дата существенного обновления", widget: datetime, type: date, input_timezone: utc, required: false, default: "{{now}}", hint: "Для поисковых систем (sitemap). Новому выезду ставится автоматически; обновляйте при смене цены или статуса набора."}
 
   - name: reports
     label: Отчёты
@@ -265,6 +269,8 @@ collections:
             - {name: alt, label: Alt, widget: string}
       - {name: description, label: Описание, widget: text, required: false}
       - {name: sortOrder, label: "Порядок сортировки", widget: number, default: 0, value_type: int}
+      - {name: noindex, label: "Скрыть от поисковых систем", widget: boolean, default: false, hint: "Включите для короткого отчёта из пары фраз и фотографий: он останется на сайте и в карточках, но не попадёт в поиск и sitemap. Подробный рассказ о поездке (маршрут, погода, впечатления участников) лучше оставить в поиске."}
+      - {name: updatedAt, label: "Дата существенного обновления", widget: datetime, type: date, input_timezone: utc, required: false, default: "{{now}}", hint: "Для поисковых систем (sitemap). Новому отчёту ставится автоматически; обновляйте, когда дописываете текст или меняете фото."}
 
   - name: reviews
     label: Отзывы

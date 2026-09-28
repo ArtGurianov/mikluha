@@ -32,6 +32,8 @@ export interface RawTour {
   title: string | null;
   /** Also the user-facing route slug (`/tours/<slug>/`), explicit and ASCII-validated — see lib/legal.ts's SLUG_RE. */
   slug: string | null;
+  /** Visible page H1 — the search-intent heading ("Автобусный тур на … из Кемерово"); `title` stays the short name used on cards, chips and breadcrumbs. */
+  heading?: string | null;
   shortDescription: string | null;
   description?: string | null;
   coverImage: RawImageRef | null;
@@ -39,6 +41,8 @@ export interface RawTour {
   isListed?: boolean | null;
   sortOrder?: number | null;
   seo?: { title?: string | null; description?: string | null; image?: RawImageRef | null } | null;
+  /** YYYY-MM-DD of the last significant edit — feeds sitemap `lastmod`. */
+  updatedAt?: string | null;
   /** Filename (without extension) — the collection's `slug` template output (`{{fields.slug}}`, so this always equals `slug` above). Injected by sync-content.ts, not a real YAML field. */
   _slug: string;
 }
@@ -54,6 +58,7 @@ export interface RawDeparture {
   organizers?: string[] | null;
   isListed?: boolean | null;
   isDemo?: boolean | null;
+  updatedAt?: string | null;
   _slug: string;
 }
 
@@ -68,6 +73,9 @@ export interface RawReport {
   gallery?: RawImageRef[] | null;
   description?: string | null;
   sortOrder?: number | null;
+  /** Keep the page on the site but out of search results and the sitemap (a thin report). */
+  noindex?: boolean | null;
+  updatedAt?: string | null;
   _slug: string;
 }
 
@@ -125,6 +133,7 @@ export interface RawSiteSettings {
     ogrn: string | null;
     phone: string | null;
     email?: string | null;
+    city?: string | null;
     isDemo?: boolean | null;
   } | null;
   seo?: { title: string | null; description: string | null; ogImage?: RawImageRef | null } | null;
@@ -173,6 +182,7 @@ export interface TourDTO<TImage = ImageAsset> {
   id: string;
   slug: string;
   title: string;
+  heading?: string;
   shortDescription: string;
   /** Markdown. */
   description?: string;
@@ -181,6 +191,7 @@ export interface TourDTO<TImage = ImageAsset> {
   isListed: boolean;
   sortOrder: number;
   seo?: SeoDTO<TImage>;
+  updatedAt?: string;
 }
 
 export interface DepartureDTO<TImage = ImageAsset> {
@@ -195,6 +206,7 @@ export interface DepartureDTO<TImage = ImageAsset> {
   organizerIds: string[];
   isListed: boolean;
   isDemo: boolean;
+  updatedAt?: string;
 }
 
 export interface ReportDTO<TImage = ImageAsset> {
@@ -208,6 +220,8 @@ export interface ReportDTO<TImage = ImageAsset> {
   gallery: TImage[];
   description?: string;
   sortOrder: number;
+  noindex: boolean;
+  updatedAt?: string;
 }
 
 export interface ReviewDTO<TImage = ImageAsset> {
@@ -259,6 +273,7 @@ export interface SiteSettingsDTO<TImage = ImageAsset> {
     ogrn: string;
     phone: string;
     email?: string;
+    city?: string;
     isDemo: boolean;
   };
   seo: { title: string; description: string; ogImage?: TImage };

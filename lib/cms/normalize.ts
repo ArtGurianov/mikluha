@@ -120,6 +120,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
     id: requireSlugConsistency(t, "Tour"),
     slug: requiredString(t.slug, `tour "${t._slug}" slug`),
     title: requiredString(t.title, `tour "${t._slug}" title`),
+    heading: optionalString(t.heading),
     shortDescription: requiredString(t.shortDescription, `tour "${t._slug}" shortDescription`),
     description: optionalString(t.description),
     coverImage: image(t.coverImage, `tour "${t.slug}" coverImage`),
@@ -127,6 +128,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
     isListed: flag(t.isListed),
     sortOrder: t.sortOrder ?? 0,
     seo: normalizeSeo(t.seo),
+    updatedAt: optionalString(t.updatedAt),
   }));
 
   const departures: DepartureDTO<ImageAsset>[] = raw.departures.map((d) => ({
@@ -141,6 +143,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
     organizerIds: d.organizers ?? [],
     isListed: flag(d.isListed),
     isDemo: flag(d.isDemo),
+    updatedAt: optionalString(d.updatedAt),
   }));
 
   const departureById = new Map(departures.map((d) => [d.id, d]));
@@ -159,6 +162,8 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
       gallery: (r.gallery ?? []).map((g, i) => image(g, `report "${r.slug}" gallery[${i}]`)),
       description: optionalString(r.description),
       sortOrder: r.sortOrder ?? 0,
+      noindex: flag(r.noindex),
+      updatedAt: optionalString(r.updatedAt),
     };
   });
 
@@ -224,6 +229,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
       ogrn: requiredString(company.ogrn, "siteSettings.company.ogrn"),
       phone: requiredString(company.phone, "siteSettings.company.phone"),
       email: optionalString(company.email),
+      city: optionalString(company.city),
       isDemo: flag(company.isDemo),
     },
     seo: {
