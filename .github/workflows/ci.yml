@@ -1,0 +1,51 @@
+name: CI
+
+# Independent check of every pull request before merge: the commands a
+# contributor runs locally, then the whole release pipeline in staging mode
+# (production mode is blocked by the launchReady gate while content is demo
+# data). Pull requests only — CMS Saves push straight to main and must not
+# each start a run; Coolify runs build:production again for every release.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      # No version here: it comes from package.json "packageManager".
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Same major as the Dockerfile's node:22-alpine build stage.
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm test
+
+      # PageProps/LayoutProps are generated route types: a fresh checkout has
+      # none until `next typegen` (or a build) writes them.
+      - name: Typecheck
+        run: pnpm exec next typegen && pnpm exec tsc --noEmit
+
+      - name: Release pipeline (staging)
+        env:
+          DEPLOY_ENV: staging
+          SITE_URL: https://staging.invalid
+        run: pnpm run build:production

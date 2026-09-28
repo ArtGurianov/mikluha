@@ -50,6 +50,11 @@ pnpm run build:production
 `public/admin/` — идёт первым шагом, чтобы `/admin` всегда собирался против установленной версии
 пакета (сам бандл в репозиторий не коммитится, см. `.gitignore`).
 
+Каждый pull request независимо проверяет GitHub Actions (`.github/workflows/ci.yml`):
+`pnpm install --frozen-lockfile`, `lint`, `test`, `next typegen && tsc --noEmit` и весь
+`build:production` в `DEPLOY_ENV=staging` (production-режим на демо-контенте упирается в
+`launchReady`). На push в `main` CI не запускается — туда коммитит каждый Save из `/admin`.
+
 `validate:out` помимо маршрутов и медиа проверяет SEO-инварианты (`lib/seo-audit.ts`): в
 production — ни одного `noindex` на публичных страницах, self-canonical на боевом домене,
 `robots.txt` без `Disallow: /` и со ссылкой на sitemap, sitemap ↔ экспортированные страницы
