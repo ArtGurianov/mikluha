@@ -60,7 +60,7 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
   const breadcrumbs = getTourBreadcrumbs(tour);
   // Only the departure the page actually shows (the booking card) is marked up.
   const jsonLd = [
-    buildTouristTripJsonLd(tour, nextDeparture ? [nextDeparture] : [], canonicalBase),
+    buildTouristTripJsonLd(tour, nextDeparture, canonicalBase),
     buildBreadcrumbJsonLd(breadcrumbs, canonicalBase),
   ];
 

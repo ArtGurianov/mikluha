@@ -99,8 +99,8 @@ test("no city means no address at all — never a guessed one", () => {
   assert.equal("address" in org, false);
 });
 
-test("a tour is a TouristTrip, never an Event, linked to the organization", () => {
-  const trip = buildTouristTripJsonLd(tour({ heading: "Автобусный тур на Алтай" }), [departure()], BASE);
+test("a tour is a TouristTrip, never an Event, linked to the organization and dated by its departure", () => {
+  const trip = buildTouristTripJsonLd(tour({ heading: "Автобусный тур на Алтай" }), departure(), BASE);
 
   assert.equal(trip["@type"], "TouristTrip");
   assert.equal(trip.name, "Автобусный тур на Алтай");
@@ -108,11 +108,12 @@ test("a tour is a TouristTrip, never an Event, linked to the organization", () =
   assert.deepEqual(trip.image, ["https://example.ru/media/demo/altai-cover.webp"]);
   assert.deepEqual(trip.provider, { "@id": "https://example.ru/#organization" });
   assert.doesNotMatch(JSON.stringify(trip), /"Event"/);
-
-  const [subTrip] = trip.subTrip ?? [];
-  assert.equal(subTrip.departureTime, "2026-10-10");
-  assert.equal(subTrip.arrivalTime, "2026-10-13");
-  assert.deepEqual(subTrip.offers, {
+  // The date is the trip's own, not a sub-trip: `subTrip` means a leg of the
+  // journey (Day 1, Day 2), not another date of the same tour.
+  assert.equal("subTrip" in trip, false);
+  assert.equal(trip.departureTime, "2026-10-10");
+  assert.equal(trip.arrivalTime, "2026-10-13");
+  assert.deepEqual(trip.offers, {
     "@type": "Offer",
     price: 34000,
     priceCurrency: "RUB",
@@ -121,15 +122,17 @@ test("a tour is a TouristTrip, never an Event, linked to the organization", () =
   });
 });
 
-test("a closed departure is SoldOut, and a departure without a price has no Offer", () => {
-  const closed = buildTouristTripJsonLd(tour(), [departure({ bookingStatus: "CLOSED" })], BASE);
-  assert.equal(closed.subTrip?.[0].offers?.availability, "https://schema.org/SoldOut");
+test("a closed departure is SoldOut, a departure without a price has no Offer, no departure means no dates", () => {
+  const closed = buildTouristTripJsonLd(tour(), departure({ bookingStatus: "CLOSED" }), BASE);
+  assert.equal(closed.offers?.availability, "https://schema.org/SoldOut");
 
-  const unpriced = buildTouristTripJsonLd(tour(), [departure({ price: undefined })], BASE);
-  assert.equal(unpriced.subTrip?.[0].offers, undefined);
+  const unpriced = buildTouristTripJsonLd(tour(), departure({ price: undefined }), BASE);
+  assert.equal(unpriced.departureTime, "2026-10-10");
+  assert.equal("offers" in unpriced, false);
 
-  const undated = buildTouristTripJsonLd(tour(), [], BASE);
-  assert.equal("subTrip" in undated, false);
+  const undated = buildTouristTripJsonLd(tour(), undefined, BASE);
+  assert.equal("departureTime" in undated, false);
+  assert.equal("offers" in undated, false);
 });
 
 test("breadcrumbs: tour and report trails, with absolute item URLs in JSON-LD", () => {

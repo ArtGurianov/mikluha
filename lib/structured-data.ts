@@ -6,7 +6,7 @@ import type { DepartureDTO, ReportDTO, SiteSettingsDTO, TourDTO } from "./cms/ty
  * organization node by `@id` instead of repeating it.
  *
  * Deliberately no `Event`: Google's Event guidelines exclude trip packages, so
- * a departure is described as a `TouristTrip` sub-trip with an `Offer`. That
+ * a departure is described as a dated `TouristTrip` with an `Offer`. That
  * is plain schema.org semantics (Yandex and other consumers read it), not a
  * Google rich result — the organization and breadcrumbs are what search
  * results actually render.
@@ -80,12 +80,14 @@ export function buildBreadcrumbJsonLd(crumbs: Crumb[], base: string) {
 }
 
 /**
- * A tour as a `TouristTrip`, with the departures the page actually shows as
- * dated sub-trips. Pass only what is visible (the nearest departure) — marking
- * up dates and prices a visitor cannot see on the page is against both
+ * A tour as a `TouristTrip`, dated by the departure the page shows (the
+ * nearest one, in the booking card). `departureTime`/`arrivalTime`/`offers`
+ * belong on the trip itself: `subTrip` is for legs of one trip (Day 1, Day 2),
+ * not for other dates of the same tour. Only the visible departure is marked
+ * up — dates and prices a visitor cannot see on the page are against both
  * Google's and Yandex's structured-data rules.
  */
-export function buildTouristTripJsonLd(tour: TourDTO, departures: DepartureDTO[], base: string) {
+export function buildTouristTripJsonLd(tour: TourDTO, departure: DepartureDTO | undefined, base: string) {
   const url = absoluteUrl(`/tours/${tour.slug}/`, base);
   return {
     "@context": "https://schema.org",
@@ -96,26 +98,17 @@ export function buildTouristTripJsonLd(tour: TourDTO, departures: DepartureDTO[]
     url,
     image: [absoluteUrl(tour.coverImage.src, base)],
     provider: { "@id": organizationId(base) },
-    ...(departures.length > 0
+    ...(departure ? { departureTime: departure.startDate, arrivalTime: departure.endDate } : {}),
+    ...(departure?.price !== undefined
       ? {
-          subTrip: departures.map((departure) => ({
-            "@type": "Trip",
-            name: tour.title,
-            departureTime: departure.startDate,
-            arrivalTime: departure.endDate,
-            ...(departure.price !== undefined
-              ? {
-                  offers: {
-                    "@type": "Offer",
-                    price: departure.price,
-                    priceCurrency: "RUB",
-                    availability:
-                      departure.bookingStatus === "OPEN" ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
-                    url,
-                  },
-                }
-              : {}),
-          })),
+          offers: {
+            "@type": "Offer",
+            price: departure.price,
+            priceCurrency: "RUB",
+            availability:
+              departure.bookingStatus === "OPEN" ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
+            url,
+          },
         }
       : {}),
   };

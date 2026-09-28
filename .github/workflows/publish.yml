@@ -12,8 +12,10 @@ name: Publish site
 #   build time, so the release is rebuilt shortly after midnight (site time)
 #   on the days a departure has just started — otherwise the trip that left
 #   stays on the site as "Набор открыт" with a booking button until the next
-#   manual publish. Every other day the gate step below skips the deploy. See
-#   docs/DECISIONS.md #7.
+#   manual publish. Every other day the gate step below skips the deploy.
+#   It never publishes CMS saves nobody published: when `main` is ahead of
+#   the live release, it does not deploy and fails instead, so a person
+#   decides. See docs/DECISIONS.md #7.
 on:
   repository_dispatch:
     types:
@@ -26,6 +28,9 @@ on:
 
 permissions:
   contents: read
+  # Reading this workflow's own past runs: which commit "Опубликовать
+  # изменения" last published.
+  actions: read
 
 concurrency:
   group: mikluha-production-deploy
@@ -70,8 +75,47 @@ jobs:
             echo "due=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # A deploy always builds the current `main`, and CMS Saves land there as
+      # `[skip ci]` commits long before anyone clicks "Опубликовать изменения".
+      # So a scheduled rebuild is only allowed when `main` is already live:
+      #  - HEAD is a regular commit: Coolify built it on push (Save and
+      #    Publish, Delete, a merged PR), and with it every Save before it;
+      #  - or HEAD is exactly the commit the last successful
+      #    "Опубликовать изменения" run published.
+      # Anything else means unpublished Saves. Then nothing is deployed and the
+      # run fails — GitHub emails the failure — because the site is now stale
+      # and only a person can decide whether those Saves may go live.
+      - name: Refuse to publish unpublished CMS saves
+        id: drafts
+        if: github.event_name == 'schedule' && steps.gate.outputs.due == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          head_sha="$(git rev-parse HEAD)"
+          if ! grep -qiE '\[(skip ci|ci skip|skip cd|cd skip|no ci)\]' <<<"$(git log -1 --format=%B HEAD)"; then
+            echo "main $head_sha is a regular commit, already built on push — a rebuild publishes nothing new."
+            echo "safe=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          published="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/runs?event=repository_dispatch&status=success&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // ""')"
+          if [[ "$published" == "$head_sha" ]]; then
+            echo "main $head_sha is exactly what \"Опубликовать изменения\" last published."
+            echo "safe=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "::error title=Unpublished CMS changes — not rebuilding::A departure has started, so the site now shows a trip that already left, but main ($head_sha) has CMS Saves that were never published (last \"Опубликовать изменения\": ${published:-none found}). Nothing was deployed. Publish in /admin (or revert the Saves) to refresh the site."
+          exit 1
+
       - name: Trigger Coolify deployment
-        if: github.event_name != 'schedule' || steps.gate.outputs.due == 'true'
+        if: >-
+          github.event_name != 'schedule'
+          || (steps.gate.outputs.due == 'true' && steps.drafts.outputs.safe == 'true')
         env:
           COOLIFY_BASE_URL: ${{ secrets.COOLIFY_BASE_URL }}
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
