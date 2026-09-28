@@ -21,6 +21,12 @@
 | `DEPLOY_ENV` | `production` или `staging` — управляет индексируемостью |
 | `SITE_URL` | Только при `DEPLOY_ENV=staging`: canonical/OG base URL для staging-хоста |
 
+**Боевой домен должен обслуживаться только сборкой `DEPLOY_ENV=production`.** Staging-сборка
+отдаёт `noindex, nofollow` на каждой странице и `robots.txt: Disallow: /` — если её выкатить на
+`mikluha-maklai.ru` (например, `DEPLOY_ENV=staging` + `SITE_URL=https://mikluha-maklai.ru`),
+сайт целиком выпадает из Яндекса и Google. `validate:out` в такой конфигурации печатает
+предупреждение `this staging build targets the production domain`.
+
 Никаких CMS-credentials и доступности cloud.ru на этапе сборки не требуется: YAML уже лежит в
 репозитории, а прямые URL проходят только синтаксическую проверку. Доступность Object Storage
 нужна браузерам посетителей в runtime.
@@ -43,6 +49,13 @@ pnpm run build:production
 `vendor:admin` копирует Sveltia CMS (`node_modules/@sveltia/cms/dist/sveltia-cms.js`) в
 `public/admin/` — идёт первым шагом, чтобы `/admin` всегда собирался против установленной версии
 пакета (сам бандл в репозиторий не коммитится, см. `.gitignore`).
+
+`validate:out` помимо маршрутов и медиа проверяет SEO-инварианты (`lib/seo-audit.ts`): в
+production — ни одного `noindex` на публичных страницах, self-canonical на боевом домене,
+`robots.txt` без `Disallow: /` и со ссылкой на sitemap, sitemap ↔ экспортированные страницы
+(без `noindex`-отчётов), ровно один `<title>`, description и `<h1>`, уникальные title, валидный
+JSON-LD с `BreadcrumbList` на страницах туров/отчётов и без `Event`; в staging — `noindex,
+nofollow` везде и `Disallow: /`.
 
 Любая ошибка на любом шаге должна ломать именно этот build, не трогая уже работающий production-релиз — это обеспечивается тем, что Docker build стадии независимы, и `docker build` просто падает, не подменяя текущий запущенный container.
 
@@ -355,13 +368,26 @@ git push
 
 ## Периодичность обновлений
 
-Отдельный rebuild по `cron`/systemd timer не используется. Контент планируется обновлять не
-чаще раза в месяц, обычно раз в 2–3 месяца; каждый такой коммит в `main` уже запускает
-пересборку через Coolify webhook.
+Контент планируется обновлять не чаще раза в месяц, обычно раз в 2–3 месяца; каждая публикация
+запускает пересборку.
 
-`nextDeparture`/`nextBookableDeparture` вычисляются во время сборки и между публикациями
-остаются снимком последнего релиза. Это принятый компромисс: перед публикацией редактор
-проверяет даты и статусы выездов, а автоматическая ежедневная актуализация не требуется.
+`nextDeparture`/`nextBookableDeparture` и весь список выездов вычисляются во время сборки. Чтобы
+уехавшая группа не висела на сайте с «Набор открыт» до следующей публикации,
+`.github/workflows/publish.yml` запускается ещё и по расписанию (`cron: "23 17 * * *"` = 00:23 по
+`Asia/Krasnoyarsk`) и вызывает тот же Coolify deploy, **только если вчера или позавчера начался
+какой-то выезд** (`startDate` в `content/departures/*.yml`); в остальные дни шаг
+`Check whether a departure has just started` пишет «skipping» и ничего не деплоит. Секреты те же,
+что у кнопки публикации. Почему так, а не ежедневно, — `docs/DECISIONS.md` #7.
+
+- Scheduled-сборка выпускает всё, что лежит в `main`, включая неопубликованные `[skip ci]`-Save
+  (как и ручной deploy — см. «CMS: публикация»).
+- `schedule` срабатывает только из default branch и может опаздывать на десятки минут; пропущенный
+  запуск подхватит следующий (окно — два дня).
+- В публичном репозитории GitHub отключает scheduled workflows после 60 дней без коммитов —
+  при долгой паузе в контенте проверить в Actions, что `Publish site` не помечен как disabled.
+- Если сменится `siteSettings.timezone` на зону с другим смещением, поправить время в `cron`.
+- `validate:content` предупреждает (не падает) об OPEN-выезде, чья дата начала уже прошла: сайт
+  его уже не показывает, но статус в CMS стоит закрыть.
 
 ## Staging
 

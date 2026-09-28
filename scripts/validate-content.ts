@@ -6,6 +6,7 @@
  *  - referential integrity (every reference points at a real, listed document)
  *  - the launchReady + isDemo production-readiness gate
  *  - that every OPEN departure has a complete booking flow after fallback
+ *  - (warning) OPEN departures whose start date has already passed
  *
  * Exits non-zero (failing the build) on any violation.
  */
@@ -24,6 +25,7 @@ import type { ContentSnapshot, ImageAsset } from "../lib/cms/types";
 import { REQUIRED_LEGAL_SLUGS, RESERVED_SLUGS, SLUG_RE } from "../lib/legal";
 import { findMarkdownPolicyViolations } from "../lib/cms/markdown-policy";
 import { isStaging } from "../lib/site";
+import { getTodayInTimezone } from "../lib/tours";
 
 const CACHE_FILE = path.resolve(process.cwd(), ".cms-cache", "content.json");
 const ADMIN_CONFIG_FILE = path.resolve(process.cwd(), "public/admin/config.yml");
@@ -149,8 +151,9 @@ async function main() {
   if (content.siteSettings.socials.maxChannelUrl && !isHttpsUrl(content.siteSettings.socials.maxChannelUrl)) {
     fail(`siteSettings.socials.maxChannelUrl must be an absolute HTTPS URL`);
   }
+  let today: string | undefined;
   try {
-    new Intl.DateTimeFormat("en", { timeZone: content.siteSettings.timezone }).format();
+    today = getTodayInTimezone(content.siteSettings.timezone);
   } catch {
     fail(`siteSettings.timezone "${content.siteSettings.timezone}" is not a valid IANA timezone`);
   }
@@ -178,6 +181,12 @@ async function main() {
     for (const orgId of d.organizerIds) {
       if (!organizerIds.has(orgId)) fail(`Departure ${d.id} references unknown organizer ${orgId}`);
     }
+    if (d.updatedAt && !isCalendarDate(d.updatedAt)) {
+      fail(`Departure ${d.id} updatedAt must be a real YYYY-MM-DD calendar date`);
+    }
+  }
+  for (const t of content.tours) {
+    if (t.updatedAt && !isCalendarDate(t.updatedAt)) fail(`Tour ${t.id} updatedAt must be a real YYYY-MM-DD calendar date`);
   }
   for (const r of content.reports) {
     if (!tourIds.has(r.tourId)) fail(`Report ${r.id} references unknown tour ${r.tourId}`);
@@ -189,6 +198,9 @@ async function main() {
       }
     }
     if (r.date && !isCalendarDate(r.date)) fail(`Report ${r.id} date must be a real YYYY-MM-DD calendar date`);
+    if (r.updatedAt && !isCalendarDate(r.updatedAt)) {
+      fail(`Report ${r.id} updatedAt must be a real YYYY-MM-DD calendar date`);
+    }
   }
   for (const rv of content.reviews) {
     if (rv.tourId && !tourIds.has(rv.tourId)) fail(`Review ${rv.id} references unknown tour ${rv.tourId}`);
@@ -274,6 +286,21 @@ async function main() {
       fail(`OPEN departure ${d.id} has no organizer, even after siteSettings fallback`);
     } else if (!PHONE_RE.test(resolvedOrganizer.phone)) {
       fail(`OPEN departure ${d.id} resolves to organizer with invalid phone: ${resolvedOrganizer.phone}`);
+    }
+  }
+
+  // --- OPEN departures that already left -----------------------------------
+  // The site itself drops a departure from every listing and from the booking
+  // modal once its start date is behind the build's "today", so a rebuild is
+  // what actually fixes a stale page (see the scheduled run in
+  // .github/workflows/publish.yml). This is a warning, not an error: failing
+  // here would block exactly the rebuild that takes the stale date down.
+  for (const d of content.departures) {
+    if (today && d.isListed && d.bookingStatus === "OPEN" && d.startDate < today) {
+      warn(
+        `Departure ${d.id} started on ${d.startDate} but is still "Набор открыт" — the site already hides it, ` +
+          `but switch it to "Набор закрыт" in the CMS so the content matches reality`,
+      );
     }
   }
 

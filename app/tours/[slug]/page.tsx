@@ -5,11 +5,14 @@ import { Gallery } from "@/components/gallery/gallery";
 import { ReportCard } from "@/components/home/report-card";
 import { ReviewsSection } from "@/components/home/reviews-section";
 import { CmsImage } from "@/components/media/cms-image";
+import { Breadcrumbs } from "@/components/site/breadcrumbs";
 import { MarkdownContent } from "@/components/site/markdown-content";
 import { DepartureBookingCard } from "@/components/tours/departure-booking-card";
 import { MobileBookingDock } from "@/components/tours/mobile-booking-dock";
 import { getContent } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
+import { resolveCanonicalBase } from "@/lib/site";
+import { buildBreadcrumbJsonLd, buildTouristTripJsonLd, getTourBreadcrumbs } from "@/lib/structured-data";
 import {
   getListedTours,
   getNextDeparture,
@@ -53,31 +56,17 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
   const reports = getReportsForTour(content, tour.id);
   const reviews = getReviewsForTour(content, tour.id);
 
-  const eventJsonLd = nextDeparture
-    ? {
-        "@context": "https://schema.org",
-        "@type": "Event",
-        name: tour.title,
-        startDate: nextDeparture.startDate,
-        endDate: nextDeparture.endDate,
-        eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-        eventStatus:
-          nextDeparture.bookingStatus === "CANCELLED"
-            ? "https://schema.org/EventCancelled"
-            : "https://schema.org/EventScheduled",
-        image: [tour.coverImage.src],
-        description: tour.shortDescription,
-      }
-    : null;
+  const canonicalBase = resolveCanonicalBase(content.siteSettings.siteUrl);
+  const breadcrumbs = getTourBreadcrumbs(tour);
+  // Only the departure the page actually shows (the booking card) is marked up.
+  const jsonLd = [
+    buildTouristTripJsonLd(tour, nextDeparture ? [nextDeparture] : [], canonicalBase),
+    buildBreadcrumbJsonLd(breadcrumbs, canonicalBase),
+  ];
 
   return (
     <article>
-      {eventJsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: jsonLdScript(eventJsonLd) }}
-        />
-      )}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
 
       <div className="relative flex h-[55vh] min-h-96 items-end text-white">
         <CmsImage
@@ -87,9 +76,10 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
           className="absolute inset-0 size-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-        <h1 className="font-heading relative z-10 mx-auto w-full max-w-6xl px-4 pb-10 text-4xl font-semibold sm:px-6 sm:text-5xl">
-          {tour.title}
-        </h1>
+        <div className="relative z-10 mx-auto w-full max-w-6xl space-y-2 px-4 pb-10 sm:px-6">
+          <Breadcrumbs crumbs={breadcrumbs} />
+          <h1 className="font-heading text-4xl font-semibold text-balance sm:text-5xl">{tour.heading ?? tour.title}</h1>
+        </div>
       </div>
 
       <div className="mx-auto grid max-w-6xl lg:mb-12 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10 lg:px-6">

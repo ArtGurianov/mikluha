@@ -9,6 +9,7 @@ import { getContent } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
 import { getLegalPagesSorted } from "@/lib/legal";
 import { deployEnv, isStaging, resolveCanonicalBase } from "@/lib/site";
+import { buildOrganizationJsonLd } from "@/lib/structured-data";
 import { getAllBookableDepartures, getTodayInTimezone } from "@/lib/tours";
 
 import "./globals.css";
@@ -55,24 +56,15 @@ function mediaOrigin(src: string): string | undefined {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   const content = getContent();
   const { siteSettings } = content;
-  // The Hero WebM is the heaviest thing the page fetches and the <video> only
-  // mounts after hydration, so get the TLS handshake to Object Storage out of
-  // the way while the document is still parsing.
+  // The Hero poster (the LCP image) and, after the load event, the WebM both
+  // come from Object Storage, so get the TLS handshake to it out of the way
+  // while the document is still parsing.
   const heroVideoOrigin = mediaOrigin(siteSettings.hero.video.src);
   const legalPages = getLegalPagesSorted(content);
   const today = getTodayInTimezone(siteSettings.timezone);
   const bookableDepartures = getAllBookableDepartures(content, today);
 
-  const canonicalBase = resolveCanonicalBase(siteSettings.siteUrl);
-  const organizationJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "TravelAgency",
-    name: siteSettings.siteName,
-    url: canonicalBase,
-    ...(siteSettings.logo ? { logo: new URL(siteSettings.logo.src, canonicalBase).href } : {}),
-    telephone: siteSettings.company.phone,
-    ...(siteSettings.company.email ? { email: siteSettings.company.email } : {}),
-  };
+  const organizationJsonLd = buildOrganizationJsonLd(siteSettings, resolveCanonicalBase(siteSettings.siteUrl));
 
   return (
     <html lang="ru" className={`${manrope.variable} h-full antialiased`}>

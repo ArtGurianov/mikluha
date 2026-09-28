@@ -1,15 +1,31 @@
 name: Publish site
 
-# Fired by Sveltia CMS's global "Опубликовать изменения" toolbar button when
-# no Deploy Hook URL is configured in the editor's browser (see RUNBOOK.md ->
-# "CMS: публикация"). Sveltia's own editor PAT (Contents: Read and write) is
-# already sufficient to create this event — no extra GitHub permission is
-# needed. This workflow only relays the trigger to Coolify; it does not build
-# anything itself.
+# Two ways in, one Coolify deploy out. This workflow only relays the trigger
+# to Coolify; it does not build anything itself.
+#
+# - repository_dispatch: Sveltia CMS's global "Опубликовать изменения" toolbar
+#   button when no Deploy Hook URL is configured in the editor's browser (see
+#   RUNBOOK.md -> "CMS: публикация"). Sveltia's own editor PAT (Contents: Read
+#   and write) is already sufficient to create this event — no extra GitHub
+#   permission is needed.
+# - schedule: the static pages decide which departures are still upcoming at
+#   build time, so the release is rebuilt shortly after midnight (site time)
+#   on the days a departure has just started — otherwise the trip that left
+#   stays on the site as "Набор открыт" with a booking button until the next
+#   manual publish. Every other day the gate step below skips the deploy. See
+#   docs/DECISIONS.md #7.
 on:
   repository_dispatch:
     types:
       - sveltia-cms-publish
+  schedule:
+    # 17:23 UTC = 00:23 in Asia/Krasnoyarsk (UTC+7, no DST) — the
+    # siteSettings.timezone. Off the top of the hour, where GitHub delays
+    # scheduled runs the most. Move it if the site timezone ever changes.
+    - cron: "23 17 * * *"
+
+permissions:
+  contents: read
 
 concurrency:
   group: mikluha-production-deploy
@@ -19,7 +35,43 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out content
+        if: github.event_name == 'schedule'
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: content
+
+      # Deploys only if a departure started yesterday or the day before (site
+      # time): those are the only days the pages change without an edit. Two
+      # days, so a scheduled run GitHub drops is caught up by the next one; the
+      # redundant second deploy this causes otherwise is harmless.
+      - name: Check whether a departure has just started
+        id: gate
+        if: github.event_name == 'schedule'
+        run: |
+          set -euo pipefail
+
+          tz="$(grep -m1 '^timezone:' content/site-settings.yml | cut -d: -f2- | tr -d " \"'")"
+          # `TZ=<unknown> date` silently falls back to UTC — refuse instead.
+          if [[ -z "$tz" || ! -f "/usr/share/zoneinfo/$tz" ]]; then
+            echo "::error::content/site-settings.yml timezone \"$tz\" is not a known IANA timezone"
+            exit 1
+          fi
+
+          yesterday="$(TZ="$tz" date -d yesterday +%F)"
+          day_before="$(TZ="$tz" date -d '2 days ago' +%F)"
+          started="$(grep -h '^startDate:' content/departures/*.yml | cut -d: -f2- | tr -d " \"'" | sort -u)"
+
+          if grep -qxF -e "$yesterday" -e "$day_before" <<<"$started"; then
+            echo "A departure started on $day_before or $yesterday ($tz) — rebuilding so it drops off the site."
+            echo "due=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No departure started on $day_before or $yesterday ($tz) — nothing on the site changed, skipping."
+            echo "due=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Trigger Coolify deployment
+        if: github.event_name != 'schedule' || steps.gate.outputs.due == 'true'
         env:
           COOLIFY_BASE_URL: ${{ secrets.COOLIFY_BASE_URL }}
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}

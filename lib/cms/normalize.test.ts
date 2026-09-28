@@ -143,3 +143,29 @@ test("a Hero video object saved as null fails the build, naming the field", () =
     /siteSettings\.hero\.video/,
   );
 });
+
+test("SEO-only fields are optional: a missing heading/updatedAt/noindex leaves the page indexable with its short title", () => {
+  const content = normalizeContentSet(contentSet({ tours: [tour()], reports: [report()] }), "git");
+
+  assert.equal(content.tours[0].heading, undefined);
+  assert.equal(content.tours[0].updatedAt, undefined);
+  // Unlike isListed (fail-closed), noindex is opt-in: only an explicit `true`
+  // takes a report out of search, so an old document stays indexable.
+  assert.equal(content.reports[0].noindex, false);
+  assert.equal(content.reports[0].updatedAt, undefined);
+});
+
+test("a report's noindex flag and a tour's heading/updatedAt survive normalization", () => {
+  const content = normalizeContentSet(
+    contentSet({
+      tours: [tour({ heading: "Автобусный тур на Алтай из Кемерово", updatedAt: "2026-09-28" })],
+      reports: [report({ noindex: true, updatedAt: "2026-07-05" })],
+    }),
+    "git",
+  );
+
+  assert.equal(content.tours[0].heading, "Автобусный тур на Алтай из Кемерово");
+  assert.equal(content.tours[0].updatedAt, "2026-09-28");
+  assert.equal(content.reports[0].noindex, true);
+  assert.equal(content.reports[0].updatedAt, "2026-07-05");
+});

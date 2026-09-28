@@ -35,13 +35,11 @@ function settings(): SiteSettingsDTO {
 test("Hero always renders the WebM over its WebP poster, with reduced-motion fallback", () => {
   const html = renderToStaticMarkup(createElement(Hero, { siteSettings: settings() }));
 
-  // `muted` + `playsInline` alongside `autoPlay` are what make iOS Safari
-  // autoplay inline at all, rather than refusing or going fullscreen.
-  assert.match(html, /<video[^>]*autoPlay=""/);
+  // `muted` + `playsInline` are what let iOS Safari start playback inline
+  // without a gesture at all, rather than refusing or going fullscreen.
   assert.match(html, /<video[^>]*muted=""/);
   assert.match(html, /<video[^>]*loop=""/);
   assert.match(html, /<video[^>]*playsInline=""/);
-  assert.match(html, /<video[^>]*preload="auto"/);
   assert.match(html, /poster="\/media\/demo\/hero\.webp"/);
   // Reduced motion is handled by never selecting a source (and pausing at
   // runtime), so the video is simply never fetched for those readers.
@@ -63,21 +61,36 @@ test("before the video reports onPlaying, the poster is fully opaque and the vid
   assert.ok(!videoClass?.includes("opacity-100"), "video should not start opaque");
 });
 
-test("a lazy HeroMedia neither autoplays nor preloads, so two copies of one video never race", () => {
+test("no HeroMedia fetches its video during page load: no autoPlay, preload none", () => {
+  const props = { image: settings().hero.image, video: settings().hero.video };
+
+  for (const html of [
+    renderToStaticMarkup(createElement(HeroMedia, props)),
+    renderToStaticMarkup(createElement(HeroMedia, { ...props, lazy: true })),
+  ]) {
+    // `autoPlay` would override `preload="none"` and pull up to 10 MB of WebM
+    // into the critical path, competing with the poster (the LCP image).
+    assert.doesNotMatch(html, /<video[^>]*autoPlay=""/);
+    assert.match(html, /<video[^>]*preload="none"/);
+    // Everything iOS inline playback depends on still has to be there.
+    assert.match(html, /<video[^>]*muted=""/);
+    assert.match(html, /<video[^>]*playsInline=""/);
+  }
+});
+
+test("only the above-the-fold poster is fetched eagerly at high priority", () => {
   const props = { image: settings().hero.image, video: settings().hero.video };
   const eager = renderToStaticMarkup(createElement(HeroMedia, props));
   const lazy = renderToStaticMarkup(createElement(HeroMedia, { ...props, lazy: true }));
 
-  assert.match(eager, /<video[^>]*autoPlay=""/);
-  assert.match(eager, /<video[^>]*preload="auto"/);
+  assert.match(eager, /<img[^>]*loading="eager"/);
+  assert.match(eager, /<img[^>]*fetchPriority="high"/);
 
-  // `autoPlay` would override `preload="none"` and fetch straight away, which
-  // is the whole thing the lazy instance exists to avoid.
-  assert.doesNotMatch(lazy, /<video[^>]*autoPlay=""/);
-  assert.match(lazy, /<video[^>]*preload="none"/);
-  // Everything iOS autoplay depends on still has to be there.
-  assert.match(lazy, /<video[^>]*muted=""/);
-  assert.match(lazy, /<video[^>]*playsInline=""/);
+  // Below the fold it must not compete with the page's own LCP image — and a
+  // video `poster` would be fetched eagerly regardless of the <img>.
+  assert.match(lazy, /<img[^>]*loading="lazy"/);
+  assert.doesNotMatch(lazy, /fetchPriority="high"/);
+  assert.doesNotMatch(lazy, /<video[^>]*poster=/);
 });
 
 test("the gradient overlay is layered after (on top of) both the poster and the video", () => {
