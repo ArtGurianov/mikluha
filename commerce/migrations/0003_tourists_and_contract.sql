@@ -22,12 +22,15 @@ ALTER TABLE order_passenger
     OR (document_type = 'FOREIGN_DOCUMENT' AND citizenship <> 'RU'
           AND (document_series IS NULL OR document_series ~ '^[0-9A-Z]{1,10}$') AND document_number ~ '^[0-9A-Z]{1,20}$'));
 
-ALTER TABLE order_contact
-  ADD COLUMN customer_is_tourist boolean NOT NULL DEFAULT false;
+-- The Заказчик is always tourist №1 (v1): a customer who does not travel would need their own
+-- citizenship, document, address and authority in ЕИС (ПП №417), which online booking does not take.
+-- order_contact holds the customer's phone and email; their name is tourist №1's.
 
--- The Заявка shown to the customer before paying, exactly as shown. It names the tourists, so its
--- content is personal data: erased with the rest of it; the hash stays and is what the contract
--- hash sent to Refref (legalReleaseHash) was computed from.
+-- The Заявка shown to the customer before paying, exactly as shown. Once paid it is the electronic
+-- contract, and ПП РФ №748 requires what a tourist contract contains to be kept for 3 years from
+-- the end of the contract: kept until 3 years after the trip ends (longer under a legal hold), then
+-- erased. An order never paid concluded no contract: its Заявка goes with the other personal data
+-- within 24 hours. The hash always stays: it is what legalReleaseHash sent to Refref was built from.
 CREATE TABLE order_document (
   order_id   uuid NOT NULL REFERENCES orders(id),
   kind       text NOT NULL CHECK (kind = 'ZAYAVKA'),

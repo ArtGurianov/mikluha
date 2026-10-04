@@ -15,8 +15,7 @@ let catalog: Catalog;
 
 const request = (over: Partial<BookingRequest> = {}): BookingRequest => ({
   departureSlug: 'altai-2026-11-01',
-  contact: { fullName: 'Иван Петров', phone: '+7 (903) 907-55-47', email: 'Ivan@Example.ru' },
-  customerIsTourist: true,
+  contact: { phone: '+7 (903) 907-55-47', email: 'Ivan@Example.ru' },
   passengers: [tourist(1)],
   adultsOnlyConfirmed: true,
   termsRef: catalog.terms.ref,
@@ -127,7 +126,7 @@ describe('seats', () => {
     assert.ok(a.ok && b.ok);
     await forceStatus(db.owner, b.orderRef, 'PAYMENT_PENDING');
     const later = new Date(NOW.getTime() + HOUR);
-    assert.deepEqual(await maintain(db.pool, () => undefined, later), { expired: 1, erased: 0 });
+    assert.deepEqual(await maintain(db.pool, () => undefined, later), { expired: 1, erased: 0, contractsErased: 0 });
     // a's two seats are free again; b's pending one is not.
     const c = await reserve(deps({ now: () => later }), request({ passengers: [tourist(3), tourist(4)] }));
     assert.ok(c.ok);
@@ -165,7 +164,7 @@ describe('personal data', () => {
     const { log, lines } = captureLog();
     const r = await reserve(deps({ log }), request());
     assert.ok(r.ok);
-    await reserve(deps({ log }), request({ contact: { fullName: 'Иван Петров', phone: '12345', email: 'ivan@example.ru' } }));
+    await reserve(deps({ log }), request({ contact: { phone: '12345', email: 'ivan@example.ru' } }));
     const { rows } = await db.owner.query('SELECT full_name, phone, email FROM order_contact');
     assert.deepEqual(rows[0], { full_name: 'Иван Петров', phone: '+79039075547', email: 'ivan@example.ru' });
     const logged = lines.join('\n');
@@ -181,8 +180,8 @@ describe('personal data', () => {
     assert.ok(r.ok);
     const expiredAt = new Date(NOW.getTime() + HOUR);
     await maintain(db.pool, () => undefined, expiredAt);
-    assert.deepEqual(await maintain(db.pool, () => undefined, new Date(expiredAt.getTime() + 23 * HOUR)), { expired: 0, erased: 0 });
-    assert.deepEqual(await maintain(db.pool, () => undefined, new Date(expiredAt.getTime() + 24 * HOUR)), { expired: 0, erased: 1 });
+    assert.deepEqual(await maintain(db.pool, () => undefined, new Date(expiredAt.getTime() + 23 * HOUR)), { expired: 0, erased: 0, contractsErased: 0 });
+    assert.deepEqual(await maintain(db.pool, () => undefined, new Date(expiredAt.getTime() + 24 * HOUR)), { expired: 0, erased: 1, contractsErased: 0 });
     const left = await db.owner.query('SELECT (SELECT count(*) FROM order_contact) AS c, (SELECT count(*) FROM order_passenger) AS p');
     assert.deepEqual(left.rows[0], { c: '0', p: '0' });
     const order = await db.owner.query('SELECT status, seats, amount_kopecks, pd_erased_at IS NOT NULL AS erased FROM orders');

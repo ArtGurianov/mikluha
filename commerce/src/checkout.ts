@@ -207,8 +207,8 @@ async function writeZayavka(deps: CheckoutDeps, orderRef: string, now: Date): Pr
   if (o === null || o.status !== 'RESERVED' || o.payable_kopecks === null) return false;
   const departure = deps.catalog.departures.get(o.departure_slug);
   if (departure === undefined || departure.contract === null) return false;
-  const contact = (await deps.pool.query<{ full_name: string; phone: string; email: string; customer_is_tourist: boolean }>(
-    'SELECT full_name, phone, email, customer_is_tourist FROM order_contact WHERE order_id = $1', [o.id])).rows[0];
+  const contact = (await deps.pool.query<{ full_name: string; phone: string; email: string }>(
+    'SELECT full_name, phone, email FROM order_contact WHERE order_id = $1', [o.id])).rows[0];
   if (contact === undefined) return false;
   const tourists = (await deps.pool.query<{ full_name: string; dob: string; citizenship: string; document_type: Tourist['documentType'];
     document_series: string | null; document_number: string }>(
@@ -220,7 +220,7 @@ async function writeZayavka(deps: CheckoutDeps, orderRef: string, now: Date): Pr
   const content = renderZayavka({
     orderRef: o.order_ref, formedAt, offerRef: o.legal_release_ref,
     departure: { ...departure, contract: departure.contract, startsOn: o.trip_starts_on, endsOn: o.trip_ends_on },
-    contact: { fullName: contact.full_name, phone: contact.phone, email: contact.email, isTourist: contact.customer_is_tourist },
+    contact: { fullName: contact.full_name, phone: contact.phone, email: contact.email },
     tourists, amountKopecks: Number(o.amount_kopecks), discountKopecks: Number(o.discount_kopecks),
   });
   await deps.pool.query(`INSERT INTO order_document (order_id, kind, content, sha256, created_at) VALUES ($1, 'ZAYAVKA', $2, $3, $4)

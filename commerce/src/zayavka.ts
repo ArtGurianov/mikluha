@@ -31,7 +31,8 @@ export interface ZayavkaInput {
   readonly formedAt: string;
   readonly offerRef: string;
   readonly departure: Departure & { readonly contract: NonNullable<Departure['contract']> };
-  readonly contact: { readonly fullName: string; readonly phone: string; readonly email: string; readonly isTourist: boolean };
+  /** The customer: tourist №1, with their phone and email. */
+  readonly contact: { readonly fullName: string; readonly phone: string; readonly email: string };
   readonly tourists: readonly Tourist[];
   readonly amountKopecks: number;
   readonly discountKopecks: number;
@@ -53,7 +54,7 @@ export function renderZayavka(z: ZayavkaInput): string {
 <p>Индивидуальные условия туристского продукта. Неотъемлемая часть договора, заключаемого на условиях Публичной оферты.</p>
 <table>${row('Номер заказа', z.orderRef)}${row('Дата и время формирования', z.formedAt)}${row('Версия Оферты', z.offerRef)}${row('Туроператор', OPERATOR)}</table>
 <h3>1. Заказчик</h3>
-<table>${row('ФИО', z.contact.fullName)}${row('Телефон', z.contact.phone)}${row('E-mail', z.contact.email)}${row('Заказчик является туристом', z.contact.isTourist ? 'Да' : 'Нет')}</table>
+<table>${row('ФИО', z.contact.fullName)}${row('Телефон', z.contact.phone)}${row('E-mail', z.contact.email)}${row('Заказчик является туристом', 'Да, турист № 1')}</table>
 <h3>2. Туристы</h3>
 <table><tr><th>№</th><th>ФИО</th><th>Дата рождения</th><th>Гражданство</th><th>Документ, удостоверяющий личность</th></tr>${tourists}</table>
 <h3>3. Туристский продукт</h3>

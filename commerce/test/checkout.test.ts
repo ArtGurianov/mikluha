@@ -96,8 +96,8 @@ async function payOrder(ref: string, cookie: string, zayavka?: string): Promise<
 
 const bookingForm = (seats = 1): Record<string, string> => ({
   departure: 'altai-2026-11-01', termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
-  contactName: 'Иван Петров', contactPhone: '+7 903 907-55-47', contactEmail: 'ivan@example.ru',
-  customerIsTourist: 'yes', adultsOnly: 'yes',
+  contactPhone: '+7 903 907-55-47', contactEmail: 'ivan@example.ru',
+  adultsOnly: 'yes',
   ...touristFields(1, 'Иван Петров', '3210', '654321'),
   ...(seats > 1 ? touristFields(2, 'Анна Петрова', '3211', '765432') : {}),
 });
@@ -200,16 +200,47 @@ describe('the Заявка: shown before paying, accepted by paying, frozen afte
     assert.equal(refref.calls(/\/checkout-attempts$/).length, 0);
   });
 
-  test('once paying, the Заявка cannot change; erasure empties it and keeps its hash', async () => {
+  const document = async () => (await db.owner.query('SELECT content IS NOT NULL AS kept, sha256 FROM order_document')).rows[0];
+  const contactRows = async () => Number((await db.owner.query('SELECT count(*) FROM order_contact')).rows[0].count);
+
+  test('once paid, the Заявка cannot change and is kept as the contract for 3 years after the trip (ПП №748)', async () => {
     const { ref, cookie } = await bookAndResolve();
     await payOrder(ref, cookie);
     await assert.rejects(db.pool.query(`UPDATE order_document SET content = 'forged'`), /ORDER_DOCUMENT_FROZEN/);
     refref.state.obligation = 'SATISFIED';
     await reconcileAll(deps);
+    // The trip ends 2026-11-04. 90 days later the operational personal data is gone, the contract is not.
     await maintain(db.pool, () => undefined, new Date('2027-03-01T00:00:00Z'));
-    const { rows } = await db.owner.query('SELECT content, sha256 FROM order_document');
-    assert.equal(rows[0].content, null);
-    assert.match(rows[0].sha256, /^[0-9a-f]{64}$/);
+    assert.equal(await contactRows(), 0);
+    assert.equal((await document()).kept, true);
+    await maintain(db.pool, () => undefined, new Date('2029-11-04T12:00:00Z'));
+    assert.equal((await document()).kept, true);
+    // A legal hold keeps it past 3 years; released, it goes, and its hash stays.
+    await db.owner.query(`UPDATE orders SET legal_hold = true, legal_hold_reason = 'claim'`);
+    await maintain(db.pool, () => undefined, new Date('2029-11-06T12:00:00Z'));
+    assert.equal((await document()).kept, true);
+    await db.owner.query(`UPDATE orders SET legal_hold = false, legal_hold_reason = NULL`);
+    assert.equal((await maintain(db.pool, () => undefined, new Date('2029-11-06T12:00:00Z'))).contractsErased, 1);
+    const d = await document();
+    assert.equal(d.kept, false);
+    assert.match(d.sha256, /^[0-9a-f]{64}$/);
+  });
+
+  test('an order never paid concluded no contract: its Заявка goes with the rest within 24 hours', async () => {
+    await bookAndResolve();
+    const ended = new Date(clock.getTime() + 60 * MINUTE);
+    await maintain(db.pool, () => undefined, ended);
+    assert.equal((await document()).kept, true);
+    await maintain(db.pool, () => undefined, new Date(ended.getTime() + 24 * 60 * MINUTE));
+    assert.equal((await document()).kept, false);
+    assert.equal(await contactRows(), 0);
+  });
+
+  test('the customer is tourist №1: their name in the Заявка is that tourist\'s', async () => {
+    const { ref, cookie } = await bookAndResolve(2);
+    const page = (await http('GET', `/orders/${ref}`, { cookie })).body;
+    assert.match(page, /<h3>1\. Заказчик<\/h3>\s*<table><tr><th>ФИО<\/th><td>Иван Петров<\/td>/);
+    assert.match(page, /Заказчик является туристом<\/th><td>Да, турист № 1/);
   });
 });
 

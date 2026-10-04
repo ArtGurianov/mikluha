@@ -95,7 +95,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean) {
     const tourists = Array.from({ length: MAX_SEATS_PER_ORDER }, (_, i) => {
       const k = `t${i + 1}`;
       const req = i === 0 ? 'required' : '';
-      return `<fieldset><legend>Турист ${i + 1}${i === 0 ? '' : ' (если едет)'}</legend>
+      return `<fieldset><legend>Турист ${i + 1}${i === 0 ? ' — Заказчик (вы)' : ' (если едет)'}</legend>
       <label>ФИО <input name="${k}Name" ${req} maxlength="200" autocomplete="off"></label>
       <label>Дата рождения <input type="date" name="${k}Dob" ${req}></label>
       <label>Гражданство <select name="${k}Citizenship">${countries}</select></label>
@@ -111,12 +111,11 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean) {
       <form method="post" action="/orders">
         <input type="hidden" name="departure" value="${esc(d.slug)}">
         <input type="hidden" name="termsRef" value="${esc(t.ref)}"><input type="hidden" name="termsHash" value="${esc(t.hash)}">
-        <fieldset><legend>Заказчик: контакт для связи и чека</legend>
-          <label>ФИО <input name="contactName" required maxlength="200"></label>
-          <label>Телефон <input name="contactPhone" type="tel" required></label>
-          <label>Email <input name="contactEmail" type="email" required></label>
-          <label><input type="checkbox" name="customerIsTourist" value="yes" checked> Я тоже еду (укажите себя среди туристов)</label></fieldset>
+        <p>Заказчик — турист № 1: бронировать онлайн можно поездку, в которой вы участвуете сами.</p>
         ${tourists}
+        <fieldset><legend>Контакты Заказчика: для связи и чека</legend>
+          <label>Телефон <input name="contactPhone" type="tel" required></label>
+          <label>Email <input name="contactEmail" type="email" required></label></fieldset>
         <p>Данные туристов нужны для заключения и исполнения договора и передачи сведений в ЕИС «Электронная путёвка», как того требует закон.
           Подробнее — в <a href="${esc(site)}/privacy-policy">Политике обработки персональных данных</a>.</p>
         <label><input type="checkbox" name="adultsOnly" value="yes" required> Все туристы совершеннолетние</label>
@@ -138,8 +137,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean) {
     }
     const request: BookingRequest = {
       departureSlug: form.get('departure') ?? '',
-      contact: { fullName: form.get('contactName') ?? '', phone: form.get('contactPhone') ?? '', email: form.get('contactEmail') ?? '' },
-      customerIsTourist: form.get('customerIsTourist') === 'yes',
+      contact: { phone: form.get('contactPhone') ?? '', email: form.get('contactEmail') ?? '' },
       passengers: tourists, adultsOnlyConfirmed: form.get('adultsOnly') === 'yes',
       termsRef: form.get('termsRef') ?? '', termsHash: form.get('termsHash') ?? '',
     };
