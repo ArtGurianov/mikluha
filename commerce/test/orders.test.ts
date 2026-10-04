@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
+import pg from 'pg';
+
 import type { Catalog } from '../src/catalog.js';
 import { maintain, reserve, salesOpen, setSalesOpen, type BookingRequest, type OrderDeps } from '../src/orders.js';
 import { captureLog, fixtureCatalog, freshDb, type TestDb } from './helpers.js';
@@ -38,7 +40,7 @@ before(async () => {
 after(async () => { await db.drop(); });
 beforeEach(async () => {
   await db.owner.query('TRUNCATE order_event, order_passenger, order_contact, orders');
-  await setSalesOpen(db.pool, true, 'test', 'open for the test');
+  await setSalesOpen(db.operator, true, 'test', 'open for the test');
 });
 
 describe('the booking switch', () => {
@@ -51,13 +53,34 @@ describe('the booking switch', () => {
     } finally { await fresh.drop(); }
   });
 
-  test('closing records who and why; the runtime role cannot change it any other way', async () => {
-    await setSalesOpen(db.pool, false, 'operator', 'stop-sales condition 2');
+  test('an operator closes it; the event records who, why and the database login that did it', async () => {
+    await setSalesOpen(db.operator, false, 'artur', 'stop-sales condition 2');
     assert.deepEqual(await reserve(deps(), request()), { ok: false, refusal: 'SALES_CLOSED' });
-    const { rows } = await db.owner.query('SELECT open, changed_by, reason FROM sales_switch_event ORDER BY id DESC LIMIT 1');
-    assert.deepEqual(rows[0], { open: false, changed_by: 'operator', reason: 'stop-sales condition 2' });
+    const { rows } = await db.owner.query('SELECT open, changed_by, login_role, reason FROM sales_switch_event ORDER BY id DESC LIMIT 1');
+    assert.deepEqual(rows[0], { open: false, changed_by: 'artur', login_role: 'commerce_test_operator', reason: 'stop-sales condition 2' });
+  });
+
+  test('the service can never change it: not by the function, not directly', async () => {
+    await setSalesOpen(db.operator, false, 'artur', 'closed by an operator');
+    await assert.rejects(setSalesOpen(db.pool, true, 'artur', 'reopened by the service'), /permission denied for function fn_set_sales_open/);
     await assert.rejects(db.pool.query('UPDATE sales_switch SET open = true'), /permission denied/);
+    await assert.rejects(db.pool.query('INSERT INTO sales_switch_event (open, changed_at, changed_by, login_role, reason) VALUES (true, now(), $1, $1, $1)', ['x']), /permission denied/);
     await assert.rejects(db.pool.query('DELETE FROM orders'), /permission denied/);
+    assert.equal(await salesOpen(db.pool), false);
+  });
+
+  test('a login that is both operator and service is refused by the function itself', async () => {
+    await db.owner.query(`DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'commerce_test_both') THEN
+        CREATE ROLE commerce_test_both LOGIN PASSWORD 'commerce-test-only' IN ROLE commerce_app, commerce_operator;
+      END IF; END $$`);
+    const u = new URL(db.url);
+    u.username = 'commerce_test_both';
+    u.password = 'commerce-test-only';
+    const both = new pg.Pool({ connectionString: u.toString(), max: 1 });
+    try {
+      await assert.rejects(setSalesOpen(both, false, 'artur', 'misconfigured login'), /SALES_SWITCH_SERVICE_LOGIN/);
+    } finally { await both.end(); }
   });
 });
 

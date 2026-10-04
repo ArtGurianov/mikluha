@@ -1,5 +1,5 @@
-// A fresh database per test file, migrated by the owner, used by a login role that is only a member
-// of commerce_app, exactly as in production. TEST_DATABASE_URL is a superuser on a disposable server.
+// A fresh database per test file, migrated by the owner, used by a login that is only a member of
+// commerce_app (the service) and one that is only a member of commerce_operator, as in production. TEST_DATABASE_URL is a superuser on a disposable server.
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,11 +14,16 @@ import { migrate } from '../src/migrate.js';
 
 const ADMIN = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@127.0.0.1:55432/postgres';
 const RUNTIME_ROLE = 'commerce_test_runtime';
-const RUNTIME_PASSWORD = 'commerce-test-only';
+const OPERATOR_ROLE = 'commerce_test_operator';
+const PASSWORD = 'commerce-test-only';
 
 export interface TestDb {
   readonly owner: pg.Client;
+  /** The service's login (commerce_app). */
   readonly pool: pg.Pool;
+  /** An operator's login (commerce_operator). */
+  readonly operator: pg.Pool;
+  readonly url: URL;
   readonly name: string;
   drop(): Promise<void>;
 }
@@ -33,18 +38,25 @@ export async function freshDb(): Promise<TestDb> {
   const owner = new pg.Client({ connectionString: url.toString() });
   await owner.connect();
   await migrate(owner, MIGRATIONS_DIR);
-  await owner.query(`DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${RUNTIME_ROLE}') THEN
-      CREATE ROLE ${RUNTIME_ROLE} LOGIN PASSWORD '${RUNTIME_PASSWORD}' IN ROLE commerce_app;
-    END IF; END $$`);
-  const rt = new URL(url);
-  rt.username = RUNTIME_ROLE;
-  rt.password = RUNTIME_PASSWORD;
-  const pool = new pg.Pool({ connectionString: rt.toString(), max: 12 });
+  for (const [login, role] of [[RUNTIME_ROLE, 'commerce_app'], [OPERATOR_ROLE, 'commerce_operator']]) {
+    await owner.query(`DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${login}') THEN
+        CREATE ROLE ${login} LOGIN PASSWORD '${PASSWORD}' IN ROLE ${role};
+      END IF; END $$`);
+  }
+  const as = (login: string, max: number) => {
+    const u = new URL(url);
+    u.username = login;
+    u.password = PASSWORD;
+    return new pg.Pool({ connectionString: u.toString(), max });
+  };
+  const pool = as(RUNTIME_ROLE, 12);
+  const operator = as(OPERATOR_ROLE, 2);
   return {
-    owner, pool, name,
+    owner, pool, operator, url, name,
     async drop() {
       await pool.end();
+      await operator.end();
       await owner.end();
       await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);
       await admin.end();

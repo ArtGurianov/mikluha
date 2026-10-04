@@ -5,13 +5,19 @@
 -- `orders` keeps what explains money and capacity (departure, seats, amounts, states, the accepted
 -- terms) and nothing that identifies a person.
 --
--- Run by the database owner. The service connects as a login role that is a member of
--- commerce_app (commerce/README.md): it reads and writes orders, deletes personal data, and changes
--- the booking switch only through fn_set_sales_open, which records who and why.
+-- Run by the database owner. Two capabilities, held by different logins (commerce/README.md):
+--   commerce_app       the running service: reads and writes orders, deletes personal data, and
+--                      reads the booking switch. It can NEVER change the switch: a compromised or
+--                      malfunctioning service must not be able to reopen sales an operator closed.
+--   commerce_operator  a person stopping or resuming sales (refref ops/runbooks/stop-sales.md),
+--                      through fn_set_sales_open only. Its credential is not in the service.
 
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'commerce_app') THEN
     CREATE ROLE commerce_app NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'commerce_operator') THEN
+    CREATE ROLE commerce_operator NOLOGIN;
   END IF;
 END $$;
 
@@ -21,23 +27,33 @@ CREATE TABLE sales_switch (
   open       boolean NOT NULL,
   changed_at timestamptz NOT NULL,
   changed_by text NOT NULL,
+  login_role text NOT NULL,
   reason     text NOT NULL
 );
-INSERT INTO sales_switch VALUES (true, false, now(), 'migration', 'initial state: closed');
+INSERT INTO sales_switch VALUES (true, false, now(), 'migration', session_user, 'initial state: closed');
 
 CREATE TABLE sales_switch_event (
   id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   open       boolean NOT NULL,
   changed_at timestamptz NOT NULL,
   changed_by text NOT NULL CHECK (length(changed_by) BETWEEN 1 AND 100),
+  -- The database login that made the change: recorded by the database, not supplied by the caller.
+  login_role text NOT NULL,
   reason     text NOT NULL CHECK (length(reason) BETWEEN 1 AND 500)
 );
 
 CREATE FUNCTION fn_set_sales_open(p_open boolean, p_by text, p_reason text)
 RETURNS void SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
 BEGIN
-  INSERT INTO sales_switch_event (open, changed_at, changed_by, reason) VALUES (p_open, now(), p_by, p_reason);
-  UPDATE sales_switch SET open = p_open, changed_at = now(), changed_by = p_by, reason = p_reason;
+  -- A login that is also the service would let the service reopen sales: refused, whatever grants say.
+  -- (A superuser passes every pg_has_role; it is the owner's break-glass login, never the service's.)
+  IF pg_has_role(session_user, 'commerce_app', 'MEMBER')
+     AND NOT (SELECT rolsuper FROM pg_roles WHERE rolname = session_user) THEN
+    RAISE EXCEPTION 'SALES_SWITCH_SERVICE_LOGIN: % belongs to commerce_app', session_user USING ERRCODE = '42501';
+  END IF;
+  INSERT INTO sales_switch_event (open, changed_at, changed_by, login_role, reason)
+    VALUES (p_open, now(), p_by, session_user, p_reason);
+  UPDATE sales_switch SET open = p_open, changed_at = now(), changed_by = p_by, login_role = session_user, reason = p_reason;
 END $fn$ LANGUAGE plpgsql;
 
 -- Read by every sale in its own transaction, holding a share lock to the end of it: a sale and a
@@ -107,9 +123,10 @@ CREATE TABLE order_event (
 
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_set_sales_open(boolean, text, text) FROM PUBLIC;
-GRANT SELECT ON sales_switch, sales_switch_event TO commerce_app;
 REVOKE ALL ON FUNCTION fn_sales_open_for_sale() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION fn_set_sales_open(boolean, text, text), fn_sales_open_for_sale() TO commerce_app;
+GRANT SELECT ON sales_switch, sales_switch_event TO commerce_app, commerce_operator;
+GRANT EXECUTE ON FUNCTION fn_sales_open_for_sale() TO commerce_app;
+GRANT EXECUTE ON FUNCTION fn_set_sales_open(boolean, text, text) TO commerce_operator;
 GRANT SELECT, INSERT, UPDATE ON orders TO commerce_app;
 GRANT SELECT, INSERT, DELETE ON order_contact, order_passenger TO commerce_app;
 GRANT SELECT, INSERT ON order_event TO commerce_app;
