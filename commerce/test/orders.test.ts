@@ -43,7 +43,7 @@ before(async () => {
 });
 after(async () => { await db.drop(); });
 beforeEach(async () => {
-  await db.owner.query('TRUNCATE order_document, order_event, order_passenger, order_contact, orders');
+  await db.owner.query('TRUNCATE email_outbox, order_document, order_event, order_passenger, order_contact, orders');
   await setSalesOpen(db.operator, true, 'test', 'open for the test');
 });
 
@@ -120,11 +120,12 @@ describe('what can be sold', () => {
   test('consent evidence is versioned and stored independently of the tourism contract', async () => {
     const result = await reserve(deps(), request());
     assert.ok(result.ok);
-    const { rows } = await db.owner.query(`SELECT legal_release_ref, legal_release_hash,
+    const { rows } = await db.owner.query(`SELECT legal_release_ref, legal_release_hash, legal_release_content,
       pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at FROM orders WHERE order_ref = $1`,
     [result.orderRef]);
     assert.equal(rows[0].legal_release_ref, catalog.terms.ref);
     assert.equal(rows[0].legal_release_hash, catalog.terms.hash);
+    assert.equal(rows[0].legal_release_content, catalog.terms.text);
     assert.equal(rows[0].pd_consent_ref, catalog.pdConsent.ref);
     assert.equal(rows[0].pd_consent_hash, catalog.pdConsent.hash);
     assert.equal(rows[0].pd_consent_content, catalog.pdConsent.text);

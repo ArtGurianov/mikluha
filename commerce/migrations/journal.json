@@ -2,5 +2,6 @@
   { "version": 1, "file": "0001_orders.sql" },
   { "version": 2, "file": "0002_checkout.sql" },
   { "version": 3, "file": "0003_tourists_and_contract.sql" },
-  { "version": 4, "file": "0004_pd_consent.sql" }
+  { "version": 4, "file": "0004_pd_consent.sql" },
+  { "version": 5, "file": "0005_confirmation_outbox.sql" }
 ]

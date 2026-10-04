@@ -210,13 +210,13 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
     const amount = departure.priceKopecks * seats;
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO orders (order_ref, departure_slug, trip_starts_on, trip_ends_on, seats, unit_price_kopecks,
-                           amount_kopecks, status, reserved_until, legal_release_ref, legal_release_hash,
+                           amount_kopecks, status, reserved_until, legal_release_ref, legal_release_hash, legal_release_content,
                            pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at,
                            adults_only_confirmed, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'RESERVED', $8, $9, $10, $11, $12, $13, $14, true, $14) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'RESERVED', $8, $9, $10, $11, $12, $13, $14, $15, true, $15) RETURNING id`,
       [orderRef, departure.slug, departure.startsOn, departure.endsOn, seats, departure.priceKopecks, amount,
-        reservedUntil, req.termsRef, req.termsHash, deps.catalog.pdConsent.ref, deps.catalog.pdConsent.hash,
-        deps.catalog.pdConsent.text, now]);
+        reservedUntil, req.termsRef, req.termsHash, deps.catalog.terms.text, deps.catalog.pdConsent.ref,
+        deps.catalog.pdConsent.hash, deps.catalog.pdConsent.text, now]);
     const id = inserted.rows[0]!.id;
     // The customer is tourist №1: their name is that tourist's, by construction.
     await client.query('INSERT INTO order_contact (order_id, full_name, phone, email) VALUES ($1, $2, $3, $4)',
@@ -268,6 +268,7 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
       if (r.unpaid) await client.query('UPDATE order_document SET content = NULL WHERE order_id = $1', [r.id]);
       await client.query('DELETE FROM order_passenger WHERE order_id = $1', [r.id]);
       await client.query('DELETE FROM order_contact WHERE order_id = $1', [r.id]);
+      await client.query('UPDATE email_outbox SET recipient_email = NULL WHERE order_id = $1', [r.id]);
       await client.query('UPDATE orders SET pd_erased_at = $2 WHERE id = $1', [r.id, now]);
       await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'PD_ERASED')`, [r.id, now]);
     }

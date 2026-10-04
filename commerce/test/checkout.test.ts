@@ -11,6 +11,7 @@ import { contractHash } from '../src/zayavka.js';
 import { schemaHead } from '../src/migrate.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { maintain, setSalesOpen } from '../src/orders.js';
+import { BookingRateLimiter } from '../src/rate-limit.js';
 import { RefrefClient, type CheckoutAttempt } from '../src/refref.js';
 import { createCommerceServer } from '../src/server.js';
 import { createWebHandler } from '../src/web.js';
@@ -43,7 +44,8 @@ before(async () => {
       origin: 'https://book.mikluha.example', siteOrigin: 'https://mikluha.example' },
   };
   server = createCommerceServer({ pool: db.pool, catalog, schemaHead: schemaHead(MIGRATIONS_DIR), sourceCommit: null,
-    startedAt: new Date() }, createWebHandler(deps, false));
+    startedAt: new Date() }, createWebHandler(deps, false,
+    new BookingRateLimiter({ ipLimit: 10_000, emailLimit: 10_000 })));
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -57,24 +59,26 @@ beforeEach(async () => {
   clock = new Date('2026-10-04T06:00:00Z');
   refref.reset();
   logs.lines.length = 0;
-  await db.owner.query('TRUNCATE order_document, order_event, order_passenger, order_contact, orders');
+  await db.owner.query('TRUNCATE email_outbox, order_document, order_event, order_passenger, order_contact, orders');
   await setSalesOpen(db.operator, true, 'test', 'open');
 });
 
-interface Reply { status: number; location: string | undefined; setCookie: string[]; body: string }
+interface Reply { status: number; location: string | undefined; setCookie: string[]; retryAfter: string | undefined; body: string }
 
-function http(method: string, path: string, opts: { cookie?: string; form?: Record<string, string> } = {}): Promise<Reply> {
-  const payload = opts.form ? new URLSearchParams(opts.form).toString() : undefined;
+function http(method: string, path: string, opts: { cookie?: string; form?: Record<string, string>; raw?: string;
+  headers?: Record<string, string>; origin?: string } = {}): Promise<Reply> {
+  const payload = opts.form ? new URLSearchParams(opts.form).toString() : opts.raw;
   return new Promise((resolve, reject) => {
-    const req = request(`${base}${path}`, { method, headers: {
+    const req = request(`${opts.origin ?? base}${path}`, { method, headers: {
       ...(opts.cookie ? { cookie: opts.cookie } : {}),
       ...(payload ? { 'content-type': 'application/x-www-form-urlencoded', 'content-length': String(Buffer.byteLength(payload)) } : {}),
+      ...opts.headers,
     } }, (res) => {
       let body = '';
       res.setEncoding('utf8');
       res.on('data', (c: string) => { body += c; });
       res.on('end', () => resolve({ status: res.statusCode ?? 0, location: res.headers.location,
-        setCookie: res.headers['set-cookie'] ?? [], body }));
+        setCookie: res.headers['set-cookie'] ?? [], retryAfter: res.headers['retry-after'], body }));
     });
     req.on('error', reject);
     if (payload) req.write(payload);
@@ -85,6 +89,50 @@ function http(method: string, path: string, opts: { cookie?: string; form?: Reco
 const touristFields = (i: number, name: string, series: string, number: string): Record<string, string> => ({
   [`t${i}Name`]: name, [`t${i}Dob`]: '1990-05-17', [`t${i}Citizenship`]: 'RU',
   [`t${i}DocType`]: 'RU_PASSPORT', [`t${i}DocSeries`]: series, [`t${i}DocNumber`]: number,
+});
+
+describe('booking HTTP boundaries', () => {
+  test('booking and identity expose the site visual system and exact legal release identities', async () => {
+    const form = await http('GET', '/book?departure=altai-2026-11-01');
+    assert.equal(form.status, 200);
+    assert.match(form.body, /--rust:#bd623c/);
+    assert.match(form.body, /class="steps"/);
+    assert.match(form.body, /Перейти к проверке заявки/);
+    const identity = await http('GET', '/identity');
+    assert.deepEqual(JSON.parse(identity.body), {
+      service: 'mikluha-commerce', sourceCommit: null, schemaHead: schemaHead(MIGRATIONS_DIR),
+      startedAt: JSON.parse(identity.body).startedAt,
+      termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
+      pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash,
+    });
+  });
+
+  test('the form body is capped before an order can be inserted', async () => {
+    const response = await http('POST', '/orders', { raw: `x=${'a'.repeat(8 * 1024)}` });
+    assert.equal(response.status, 400);
+    assert.match(response.body, /Форма заполнена неверно/);
+    assert.equal((await db.owner.query('SELECT count(*) FROM orders')).rows[0].count, '0');
+  });
+
+  test('POST /orders uses per-IP buckets and one shared untrusted-ingress bucket', async () => {
+    const limited = createCommerceServer({ pool: db.pool, catalog, schemaHead: schemaHead(MIGRATIONS_DIR), sourceCommit: null,
+      startedAt: new Date() }, createWebHandler(deps, false,
+      new BookingRateLimiter({ ipLimit: 1, emailLimit: 10, windowMs: 60_000 })));
+    await new Promise<void>((resolve) => limited.listen(0, '127.0.0.1', resolve));
+    const origin = `http://127.0.0.1:${(limited.address() as AddressInfo).port}`;
+    try {
+      assert.equal((await http('POST', '/orders', { origin, form: bookingForm(), headers: { 'x-forwarded-for': '203.0.113.10' } })).status, 303);
+      const repeated = await http('POST', '/orders', { origin, form: bookingForm(), headers: { 'x-forwarded-for': '203.0.113.10' } });
+      assert.equal(repeated.status, 429);
+      assert.equal(repeated.retryAfter, '60');
+      assert.equal((await http('POST', '/orders', { origin, form: bookingForm(), headers: { 'x-forwarded-for': '203.0.113.11' } })).status, 303);
+      assert.equal((await http('POST', '/orders', { origin, form: bookingForm() })).status, 303);
+      assert.equal((await http('POST', '/orders', { origin, form: bookingForm(), headers: { 'x-forwarded-for': '203.0.113.12, 10.0.0.1' } })).status, 429);
+    } finally {
+      limited.closeAllConnections();
+      await new Promise<void>((resolve, reject) => limited.close((e) => e ? reject(e) : resolve()));
+    }
+  });
 });
 
 /** POST /pay as the confirmation page's form does: with the hash of the Заявка it showed. */
@@ -149,8 +197,22 @@ describe('the paid path', () => {
     refref.state.obligation = 'SATISFIED';
     const done = await http('GET', `/orders/${ref}`, { cookie });
     assert.match(done.body, /Бронирование подтверждено/);
+    assert.match(done.body, /Тестовая публичная оферта/);
+    assert.match(done.body, new RegExp(`Заявка на бронирование № ${ref}`));
     assert.equal((await order(ref)).status, 'FULFILLED');
+    assert.deepEqual((await db.owner.query(`SELECT type, recipient_email, idempotency_key, state, attempts
+      FROM email_outbox`)).rows, [{ type: 'BOOKING_CONFIRMATION', recipient_email: 'ivan@example.ru',
+      idempotency_key: `mk-confirm:${ref}`, state: 'PENDING', attempts: 0 }]);
+    const token = (await db.owner.query('SELECT access_token FROM email_outbox')).rows[0].access_token;
+    const shared = await http('GET', `/documents/${token}`);
+    assert.equal(shared.status, 200);
+    assert.match(shared.body, /Тестовая публичная оферта/);
+    assert.match(shared.body, new RegExp(`Заявка на бронирование № ${ref}`));
     await reconcileAll(deps);
+    await assert.rejects(db.pool.query(`INSERT INTO email_outbox
+      (order_id, type, recipient_email, access_token, idempotency_key, state, attempts, next_attempt_at, created_at)
+      SELECT id, 'BOOKING_CONFIRMATION', 'other@example.ru', $2, 'other-key', 'PENDING', 0, now(), now()
+      FROM orders WHERE order_ref = $1`, [ref, 'b'.repeat(43)]), /duplicate key/);
     const acks = refref.calls(/\/fulfillment-ack$/);
     assert.equal(acks.length, 1);
     assert.equal(acks[0]!.key, `mk-fulfil:${ref}`);
@@ -211,6 +273,15 @@ describe('the Заявка: shown before paying, accepted by paying, frozen afte
     assert.equal(refref.calls(/\/checkout-attempts$/).length, 0);
   });
 
+  test('payment fails closed when the stored offer no longer hashes to what the form showed', async () => {
+    const { ref, cookie } = await bookAndResolve();
+    await db.owner.query(`UPDATE orders SET legal_release_content = legal_release_content || ' forged' WHERE order_ref = $1`, [ref]);
+    const result = await payOrder(ref, cookie);
+    assert.equal(result.location, `/orders/${ref}?notice=LEGAL_RELEASE_INVALID`);
+    assert.equal((await order(ref)).status, 'RESERVED');
+    assert.equal(refref.calls(/\/checkout-attempts$/).length, 0);
+  });
+
   const document = async () => (await db.owner.query('SELECT content IS NOT NULL AS kept, sha256 FROM order_document')).rows[0];
   const contactRows = async () => Number((await db.owner.query('SELECT count(*) FROM order_contact')).rows[0].count);
 
@@ -223,6 +294,7 @@ describe('the Заявка: shown before paying, accepted by paying, frozen afte
     // The trip ends 2026-11-04. 90 days later the operational personal data is gone, the contract is not.
     await maintain(db.pool, () => undefined, new Date('2027-03-01T00:00:00Z'));
     assert.equal(await contactRows(), 0);
+    assert.equal((await db.owner.query('SELECT recipient_email FROM email_outbox')).rows[0].recipient_email, null);
     assert.equal((await document()).kept, true);
     await maintain(db.pool, () => undefined, new Date('2029-11-04T12:00:00Z'));
     assert.equal((await document()).kept, true);

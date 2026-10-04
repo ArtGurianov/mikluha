@@ -8,12 +8,14 @@
 //   REFREF_API_BASE       e.g. https://api.refref.ru/v1-rc
 //   REFREF_CHECKOUT_ORIGIN  e.g. https://checkout.refref.ru
 //   REFREF_BUSINESS_ID, REFREF_BUSINESS_SLUG, REFREF_API_KEY   Mikluha's Refref Business and its key
+//   UNISENDER_GO_API_KEY, UNISENDER_GO_FROM_EMAIL, UNISENDER_GO_FROM_NAME
 
 import pg from 'pg';
 
 import { loadCatalog } from '../catalog.js';
 import { reconcileAll, type CheckoutDeps } from '../checkout.js';
 import { env, environment, MIGRATIONS_DIR } from '../config.js';
+import { processEmailOutbox, UniSenderGoClient } from '../email.js';
 import { jsonLogger } from '../log.js';
 import { schemaHead } from '../migrate.js';
 import { maintain } from '../orders.js';
@@ -34,6 +36,11 @@ const checkout: CheckoutDeps = {
     checkoutOrigin: env('REFREF_CHECKOUT_ORIGIN'), origin: env('COMMERCE_ORIGIN'), siteOrigin: env('SITE_ORIGIN'),
   },
 };
+const email = new UniSenderGoClient({
+  apiKey: env('UNISENDER_GO_API_KEY'), fromEmail: env('UNISENDER_GO_FROM_EMAIL'),
+  fromName: env('UNISENDER_GO_FROM_NAME'), commerceOrigin: checkout.merchant.origin,
+  ...(process.env.UNISENDER_GO_REPLY_TO ? { replyTo: process.env.UNISENDER_GO_REPLY_TO } : {}),
+});
 const server = createCommerceServer({
   pool, catalog, schemaHead: schemaHead(MIGRATIONS_DIR),
   sourceCommit: process.env.SOURCE_COMMIT || null, startedAt: new Date(),
@@ -42,21 +49,32 @@ const server = createCommerceServer({
 const port = Number(process.env.PORT ?? 3000);
 server.listen(port, '0.0.0.0', () => log('listening', { port, environment: which, departures: catalog.departures.size }));
 
-let running = false;
-const tick = () => {
-  if (running) return;
-  running = true;
-  // Read-back first (it may free or confirm seats), then expiry and erasure.
+let maintenanceRunning = false;
+const maintenanceTick = () => {
+  if (maintenanceRunning) return;
+  maintenanceRunning = true;
+  // Read-back may fulfil and enqueue; the independent mail worker will see it within ten seconds.
   reconcileAll(checkout)
     .then(() => maintain(pool, log))
     .catch((e: unknown) => log('maintenance_failed', { error: e instanceof Error ? e.name : 'unknown' }))
-    .finally(() => { running = false; });
+    .finally(() => { maintenanceRunning = false; });
 };
-const timer = setInterval(tick, 60_000);
-tick();
+let emailRunning = false;
+const emailTick = () => {
+  if (emailRunning) return;
+  emailRunning = true;
+  processEmailOutbox(pool, email, log)
+    .catch((e: unknown) => log('email_worker_failed', { error: e instanceof Error ? e.name : 'unknown' }))
+    .finally(() => { emailRunning = false; });
+};
+const maintenanceTimer = setInterval(maintenanceTick, 60_000);
+const emailTimer = setInterval(emailTick, 10_000);
+maintenanceTick();
+emailTick();
 
 const stop = () => {
-  clearInterval(timer);
+  clearInterval(maintenanceTimer);
+  clearInterval(emailTimer);
   server.close(() => { pool.end().finally(() => process.exit(0)); });
 };
 process.on('SIGTERM', stop);

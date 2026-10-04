@@ -63,6 +63,7 @@ const sameSecret = (a: string, b: string) => {
 interface OrderRow {
   id: string; order_ref: string; departure_slug: string; trip_starts_on: string; trip_ends_on: string; seats: number;
   amount_kopecks: string; status: string; reserved_until: Date; legal_release_ref: string; legal_release_hash: string;
+  legal_release_content: string | null;
   pd_consent_ref: string; pd_consent_hash: string; pd_consent_content: string; pd_consent_accepted_at: Date;
   state_hash: string | null; referral_resolution_id: string | null; terms_version_id: string | null;
   resolution_expires_at: Date | null; discount_kopecks: string | null; payable_kopecks: string | null;
@@ -72,7 +73,7 @@ interface OrderRow {
 
 const ORDER_COLUMNS = `id, order_ref, departure_slug, to_char(trip_starts_on, 'YYYY-MM-DD') AS trip_starts_on,
   to_char(trip_ends_on, 'YYYY-MM-DD') AS trip_ends_on, seats, amount_kopecks, status, reserved_until,
-  legal_release_ref, legal_release_hash, pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at,
+  legal_release_ref, legal_release_hash, legal_release_content, pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at,
   state_hash, referral_resolution_id, terms_version_id, resolution_expires_at,
   discount_kopecks, payable_kopecks, snapshot, snapshot_hash, payment_pending_since, checkout_attempt_id, last_session`;
 
@@ -255,6 +256,10 @@ export async function pay(deps: CheckoutDeps, orderRef: string, acceptedZayavka:
   if (o === null) return { kind: 'STATUS', code: 'UNKNOWN_ORDER' };
 
   if (o.status === 'RESERVED') {
+    if (o.legal_release_content === null || o.legal_release_hash !== `sha256:${sha256(o.legal_release_content)}`
+      || o.legal_release_ref.trim() === '') {
+      return { kind: 'STATUS', code: 'LEGAL_RELEASE_INVALID' };
+    }
     if (o.pd_consent_hash !== `sha256:${sha256(o.pd_consent_content)}` || o.pd_consent_ref.trim() === '') {
       return { kind: 'STATUS', code: 'PD_CONSENT_INVALID' };
     }
@@ -447,12 +452,39 @@ export async function reconcileOrder(deps: CheckoutDeps, orderRef: string): Prom
   }
 }
 
-/** The booking is confirmed: tell Refref (once, idempotently), then the order is FULFILLED. */
+/** Atomically confirm the order and queue exactly one customer email. */
+async function markFulfilledAndQueueEmail(deps: CheckoutDeps, o: OrderRow, now: Date): Promise<boolean> {
+  const accessToken = randomBytes(32).toString('base64url');
+  const client = await deps.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const contact = await client.query<{ email: string }>(
+      'SELECT email FROM order_contact WHERE order_id = $1', [o.id]);
+    if (contact.rows[0] === undefined) { await client.query('ROLLBACK'); return false; }
+    const changed = await client.query(
+      `UPDATE orders SET status = 'FULFILLED', fulfilled_at = $3, document_access_hash = $4
+        WHERE id = $1 AND status = $2`, [o.id, 'PAID', now, sha256(accessToken)]);
+    if (changed.rowCount !== 1) { await client.query('ROLLBACK'); return false; }
+    await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'FULFILLED')`, [o.id, now]);
+    await client.query(`INSERT INTO email_outbox
+      (order_id, type, recipient_email, access_token, idempotency_key, state, attempts, next_attempt_at, created_at)
+      VALUES ($1, 'BOOKING_CONFIRMATION', $2, $3, $4, 'PENDING', 0, $5, $5)`,
+    [o.id, contact.rows[0].email, accessToken, `mk-confirm:${o.order_ref}`, now]);
+    await client.query('COMMIT');
+    return true;
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/** The booking is confirmed: tell Refref (once, idempotently), then fulfil and enqueue locally. */
 async function fulfil(deps: CheckoutDeps, o: OrderRow, attemptId: string, now: Date): Promise<void> {
   const ack = await deps.refref.acknowledgeFulfillment(o.order_ref, attemptId, `mk-fulfil:${o.order_ref}`);
   if (ack.kind === 'ANSWERED' && ack.status === 200) {
-    await transition(deps.pool, o, 'PAID', { status: 'FULFILLED', fulfilled_at: now }, 'FULFILLED', null, now);
-    deps.log('fulfilled', { orderRef: o.order_ref });
+    if (await markFulfilledAndQueueEmail(deps, o, now)) deps.log('fulfilled', { orderRef: o.order_ref });
   }
 }
 
