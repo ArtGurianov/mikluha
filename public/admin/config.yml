@@ -216,6 +216,8 @@ collections:
           - {label: "Набор закрыт", value: CLOSED}
           - {label: "Поездка отменена", value: CANCELLED}
       - {name: price, label: "Стоимость поездки, ₽", widget: number, required: false, value_type: int, hint: "Цена за одного человека, целое число рублей. Обязательна, если набор открыт."}
+      - {name: capacity, label: "Мест в группе", widget: number, required: false, value_type: int, min: 1, hint: "Сколько человек можно продать онлайн. Обязательно, если набор открыт. Сколько мест уже занято, считает сервис бронирования, а не CMS."}
+      - {name: requiresDateOfBirth, label: "Нужна дата рождения участников", widget: boolean, default: false, hint: "Включайте только если для этого выезда дата рождения действительно нужна (например, для билетов или страховки). Без необходимости её не собираем."}
       - {name: prepaymentAmount, label: "Сумма бронирования, ₽", widget: number, required: false, value_type: int, hint: "Если не заполнено, используется значение по умолчанию из «Настроек сайта»."}
       - name: paymentQr
         label: "QR-код бронирования"

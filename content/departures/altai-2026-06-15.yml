@@ -4,6 +4,7 @@ endDate: 2026-06-19
 bookingStatus: CLOSED
 price: 35000
 prepaymentAmount: 5000
+capacity: 12
 paymentQr: null
 organizers: []
 isListed: true

@@ -4,6 +4,7 @@ endDate: "2026-10-13"
 bookingStatus: OPEN
 price: 34000
 prepaymentAmount: 5000
+capacity: 12
 organizers:
   - artur
 isListed: true

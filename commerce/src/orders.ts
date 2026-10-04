@@ -1,0 +1,227 @@
+// Orders: reserving seats, letting unpaid reservations go, and erasing personal data on time.
+//
+// Owner decisions (Linear ART-47, 2026-10-04):
+//   * the customer pays the full departure price online, for every seat;
+//   * booking contact = full name, phone, email; each passenger = full name, and a date of birth
+//     only when the departure requires it (otherwise it is refused, not just ignored);
+//   * adults only in v1: the booker confirms it; where dates of birth are collected, they prove it;
+//   * personal data never goes to logs (or to Refref, except the receipt email in a later slice);
+//   * an unpaid order's personal data is erased within 24 hours of it ending; a trip's within
+//     90 days after it ends, unless the order is under a legal hold or its money is unresolved.
+
+import { randomBytes } from 'node:crypto';
+
+import type pg from 'pg';
+
+import { bookable, type Catalog, type NotBookable } from './catalog.js';
+import type { Logger } from './log.js';
+
+export const MAX_SEATS_PER_ORDER = 6;
+export const RESERVATION_MINUTES = 30;
+export const UNPAID_PD_RETENTION_HOURS = 24;
+export const TRIP_PD_RETENTION_DAYS = 90;
+export const ADULT_AGE = 18;
+
+/** States whose seats are taken. PAYMENT_PENDING and HELD never free seats on a timer. */
+export const TAKEN = ['RESERVED', 'PAYMENT_PENDING', 'PAID', 'FULFILLED', 'HELD'] as const;
+
+export interface BookingRequest {
+  readonly departureSlug: string;
+  readonly contact: { readonly fullName: string; readonly phone: string; readonly email: string };
+  readonly passengers: readonly { readonly fullName: string; readonly dateOfBirth?: string }[];
+  readonly adultsOnlyConfirmed: boolean;
+  readonly termsRef: string;
+  readonly termsHash: string;
+}
+
+export type BookingRefusal =
+  | NotBookable | 'SALES_CLOSED' | 'TERMS_NOT_CURRENT' | 'ADULTS_ONLY_NOT_CONFIRMED'
+  | 'SEATS_INVALID' | 'NOT_ENOUGH_SEATS' | 'CONTACT_NAME_INVALID' | 'CONTACT_PHONE_INVALID'
+  | 'CONTACT_EMAIL_INVALID' | 'PASSENGER_NAME_INVALID' | 'DATE_OF_BIRTH_REQUIRED'
+  | 'DATE_OF_BIRTH_NOT_COLLECTED' | 'DATE_OF_BIRTH_INVALID' | 'PASSENGER_NOT_ADULT';
+
+export type BookingResult =
+  | { readonly ok: true; readonly orderRef: string; readonly amountKopecks: number; readonly reservedUntil: Date }
+  | { readonly ok: false; readonly refusal: BookingRefusal };
+
+const NAME = /^[\p{L}][\p{L}\p{M} .'’-]{1,199}$/u;
+const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,63}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const name = (s: string): string | null => {
+  const t = s.normalize('NFC').trim().replace(/\s+/g, ' ');
+  return NAME.test(t) ? t : null;
+};
+
+/** A Russian mobile or landline number as +7XXXXXXXXXX; anything else is refused. */
+export function normalizePhone(s: string): string | null {
+  const digits = s.replace(/[\s()-]/g, '');
+  const m = /^(?:\+7|8|7)(\d{10})$/.exec(digits);
+  return m ? `+7${m[1]}` : null;
+}
+
+function realDate(s: string): boolean {
+  if (!DATE.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s);
+}
+
+/** Age in whole years on `on` (both YYYY-MM-DD). */
+export function ageOn(dateOfBirth: string, on: string): number {
+  const [by, bm, bd] = dateOfBirth.split('-').map(Number) as [number, number, number];
+  const [y, m, d] = on.split('-').map(Number) as [number, number, number];
+  return y - by - (m < bm || (m === bm && d < bd) ? 1 : 0);
+}
+
+const newOrderRef = () => {
+  const alphabet = '0123456789abcdefghijklmnopqrstuvwxyz';
+  return `mk-${[...randomBytes(12)].map((b) => alphabet[b % 36]).join('')}`;
+};
+
+export interface OrderDeps {
+  readonly pool: pg.Pool;
+  readonly catalog: Catalog;
+  readonly log: Logger;
+  readonly allowDemo: boolean;
+  readonly now?: () => Date;
+}
+
+export async function salesOpen(pool: pg.Pool): Promise<boolean> {
+  const { rows } = await pool.query<{ open: boolean }>('SELECT open FROM sales_switch');
+  return rows[0]?.open === true;
+}
+
+export async function setSalesOpen(pool: pg.Pool, open: boolean, by: string, reason: string): Promise<void> {
+  await pool.query('SELECT fn_set_sales_open($1, $2, $3)', [open, by, reason]);
+}
+
+/**
+ * Reserve seats for a new order. Everything is checked before the transaction; capacity is checked
+ * inside it, under a lock on the departure, so two customers cannot both take the last seat.
+ */
+export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<BookingResult> {
+  const now = (deps.now ?? (() => new Date()))();
+  const refuse = (refusal: BookingRefusal): BookingResult => {
+    deps.log('booking_refused', { departure: req.departureSlug, refusal });
+    return { ok: false, refusal };
+  };
+
+  const departure = bookable(deps.catalog, req.departureSlug, now, deps.allowDemo);
+  if (typeof departure === 'string') return refuse(departure);
+  if (req.termsRef !== deps.catalog.terms.ref || req.termsHash !== deps.catalog.terms.hash) return refuse('TERMS_NOT_CURRENT');
+  if (req.adultsOnlyConfirmed !== true) return refuse('ADULTS_ONLY_NOT_CONFIRMED');
+  const seats = req.passengers.length;
+  if (seats < 1 || seats > MAX_SEATS_PER_ORDER) return refuse('SEATS_INVALID');
+
+  const contactName = name(req.contact.fullName);
+  if (contactName === null) return refuse('CONTACT_NAME_INVALID');
+  const phone = normalizePhone(req.contact.phone);
+  if (phone === null) return refuse('CONTACT_PHONE_INVALID');
+  const email = req.contact.email.trim().toLowerCase();
+  if (!EMAIL.test(email) || email.length > 254) return refuse('CONTACT_EMAIL_INVALID');
+
+  const passengers: { fullName: string; dateOfBirth: string | null }[] = [];
+  for (const p of req.passengers) {
+    const n = name(p.fullName);
+    if (n === null) return refuse('PASSENGER_NAME_INVALID');
+    if (!departure.requiresDateOfBirth) {
+      // Not needed for this departure, so not collected at all (data minimisation).
+      if (p.dateOfBirth !== undefined) return refuse('DATE_OF_BIRTH_NOT_COLLECTED');
+      passengers.push({ fullName: n, dateOfBirth: null });
+      continue;
+    }
+    if (p.dateOfBirth === undefined) return refuse('DATE_OF_BIRTH_REQUIRED');
+    if (!realDate(p.dateOfBirth) || p.dateOfBirth >= departure.startsOn) return refuse('DATE_OF_BIRTH_INVALID');
+    if (ageOn(p.dateOfBirth, departure.startsOn) < ADULT_AGE) return refuse('PASSENGER_NOT_ADULT');
+    passengers.push({ fullName: n, dateOfBirth: p.dateOfBirth });
+  }
+
+  const client = await deps.pool.connect();
+  try {
+    await client.query('BEGIN');
+    // The switch is read in the same transaction that sells: closing it stops every later sale.
+    const open = await client.query<{ open: boolean }>('SELECT fn_sales_open_for_sale() AS open');
+    if (open.rows[0]?.open !== true) {
+      await client.query('ROLLBACK');
+      return refuse('SALES_CLOSED');
+    }
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`departure:${departure.slug}`]);
+    const taken = await client.query<{ seats: string }>(
+      `SELECT coalesce(sum(seats), 0) AS seats FROM orders
+        WHERE departure_slug = $1 AND status = ANY($2) AND NOT (status = 'RESERVED' AND reserved_until <= $3)`,
+      [departure.slug, TAKEN, now]);
+    if (Number(taken.rows[0]!.seats) + seats > departure.capacity) {
+      await client.query('ROLLBACK');
+      return refuse('NOT_ENOUGH_SEATS');
+    }
+    const orderRef = newOrderRef();
+    const reservedUntil = new Date(now.getTime() + RESERVATION_MINUTES * 60_000);
+    const amount = departure.priceKopecks * seats;
+    const inserted = await client.query<{ id: string }>(
+      `INSERT INTO orders (order_ref, departure_slug, trip_starts_on, trip_ends_on, seats, unit_price_kopecks,
+                           amount_kopecks, status, reserved_until, legal_release_ref, legal_release_hash,
+                           adults_only_confirmed, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'RESERVED', $8, $9, $10, true, $11) RETURNING id`,
+      [orderRef, departure.slug, departure.startsOn, departure.endsOn, seats, departure.priceKopecks, amount,
+        reservedUntil, req.termsRef, req.termsHash, now]);
+    const id = inserted.rows[0]!.id;
+    await client.query('INSERT INTO order_contact (order_id, full_name, phone, email) VALUES ($1, $2, $3, $4)',
+      [id, contactName, phone, email]);
+    for (const [i, p] of passengers.entries()) {
+      await client.query('INSERT INTO order_passenger (order_id, position, full_name, date_of_birth) VALUES ($1, $2, $3, $4)',
+        [id, i + 1, p.fullName, p.dateOfBirth]);
+    }
+    await client.query(`INSERT INTO order_event (order_id, at, event, detail) VALUES ($1, $2, 'RESERVED', $3)`,
+      [id, now, `seats:${seats}`]);
+    await client.query('COMMIT');
+    deps.log('booking_reserved', { orderRef, departure: departure.slug, seats, amountKopecks: amount });
+    return { ok: true, orderRef, amountKopecks: amount, reservedUntil };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Housekeeping, run every minute: reservations past their time end as EXPIRED (their seats are
+ * free again), then personal data past its retention is erased. Returns what it did, as counts.
+ */
+export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date()): Promise<{ expired: number; erased: number }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const expired = await client.query<{ id: string }>(
+      `UPDATE orders SET status = 'EXPIRED', closed_at = $1
+        WHERE status = 'RESERVED' AND reserved_until <= $1 RETURNING id`, [now]);
+    for (const r of expired.rows) {
+      await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'EXPIRED')`, [r.id, now]);
+    }
+    // Unpaid and over: 24 hours. A trip: 90 days after it ends, once its money is settled (a paid,
+    // fulfilled or refunded order — never one still pending or held). A legal hold stops both.
+    const erasable = await client.query<{ id: string }>(
+      `SELECT id FROM orders
+        WHERE pd_erased_at IS NULL AND NOT legal_hold AND (
+              (status IN ('EXPIRED','CANCELLED') AND closed_at <= $1::timestamptz - make_interval(hours => $2))
+           OR (status IN ('PAID','FULFILLED','REFUNDED')
+               AND trip_ends_on + $3::int < ($1::timestamptz AT TIME ZONE 'UTC')::date))
+        FOR UPDATE`, [now, UNPAID_PD_RETENTION_HOURS, TRIP_PD_RETENTION_DAYS]);
+    for (const r of erasable.rows) {
+      await client.query('DELETE FROM order_passenger WHERE order_id = $1', [r.id]);
+      await client.query('DELETE FROM order_contact WHERE order_id = $1', [r.id]);
+      await client.query('UPDATE orders SET pd_erased_at = $2 WHERE id = $1', [r.id, now]);
+      await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'PD_ERASED')`, [r.id, now]);
+    }
+    await client.query('COMMIT');
+    if (expired.rowCount || erasable.rowCount) {
+      log('maintenance', { expired: expired.rowCount ?? 0, erased: erasable.rowCount ?? 0 });
+    }
+    return { expired: expired.rowCount ?? 0, erased: erasable.rowCount ?? 0 };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw e;
+  } finally {
+    client.release();
+  }
+}

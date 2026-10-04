@@ -4,6 +4,8 @@
 /node_modules
 /.pnpm-store/
 /oauth-broker/node_modules
+/commerce/node_modules
+/commerce/dist
 /.pnp
 .pnp.*
 .yarn/*
