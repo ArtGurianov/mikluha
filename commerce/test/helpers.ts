@@ -95,3 +95,13 @@ export function captureLog(): { log: Logger; lines: string[] } {
   const lines: string[] = [];
   return { lines, log: (event, fields = {}) => { lines.push(JSON.stringify({ event, ...fields })); } };
 }
+
+/**
+ * Move an order to a later state directly, with the columns that state requires (migration 0002's
+ * constraints), for tests about what happens AFTER checkout (seats, erasure).
+ */
+export async function forceStatus(owner: pg.Client, orderRef: string, status: 'PAYMENT_PENDING' | 'FULFILLED', extra = ''): Promise<void> {
+  const frozen = `snapshot = '{}', snapshot_hash = 'refref-jcs-1:${'0'.repeat(64)}', payment_pending_since = now()`;
+  const paid = status === 'FULFILLED' ? `, payment_id = gen_random_uuid(), paid_at = now(), fulfilled_at = now()` : '';
+  await owner.query(`UPDATE orders SET status = $2, ${frozen}${paid}${extra} WHERE order_ref = $1`, [orderRef, status]);
+}
