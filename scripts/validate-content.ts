@@ -178,6 +178,9 @@ async function main() {
         fail(`Departure ${d.id} ${label} must be a non-negative integer`);
       }
     }
+    if (d.capacity !== undefined && (!Number.isInteger(d.capacity) || d.capacity < 1)) {
+      fail(`Departure ${d.id} capacity must be a positive integer`);
+    }
     for (const orgId of d.organizerIds) {
       if (!organizerIds.has(orgId)) fail(`Departure ${d.id} references unknown organizer ${orgId}`);
     }
@@ -275,6 +278,9 @@ async function main() {
       // Unlike the QR/prepayment/organizer below, price has no siteSettings
       // fallback — it is per-date by definition, so nothing can stand in for it.
       fail(`OPEN departure ${d.id} has no price — a departure open for booking must show what it costs`);
+    }
+    if (d.capacity === undefined) {
+      fail(`OPEN departure ${d.id} has no capacity — online booking needs to know how many seats it may sell`);
     }
     if (resolvedPrepayment === undefined) {
       fail(`OPEN departure ${d.id} has no prepaymentAmount, even after siteSettings fallback`);

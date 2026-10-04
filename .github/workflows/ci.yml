@@ -49,3 +49,43 @@ jobs:
           DEPLOY_ENV: staging
           SITE_URL: https://staging.invalid
         run: pnpm run build:production
+
+  # mikluha-commerce (commerce/README.md): its own package, tests against a real Postgres, and the
+  # image built from the repository root, as Coolify builds it.
+  commerce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 15
+    defaults:
+      run:
+        working-directory: commerce
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:55432/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: commerce/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - run: pnpm run typecheck
+
+      - run: pnpm test
+
+      - name: Image
+        working-directory: .
+        run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=${{ github.sha }} -t mikluha-commerce:ci .
