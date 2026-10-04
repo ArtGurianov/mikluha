@@ -88,6 +88,12 @@ describe('the booking switch', () => {
   });
 });
 
+test('a live legal-release mismatch refuses a reservation before writing customer data', async () => {
+  const r = await reserve(deps({ legalAdmission: { verify: async () => { throw new Error('mismatch'); } } }), request());
+  assert.deepEqual(r, { ok: false, refusal: 'LEGAL_RELEASE_NOT_ADMITTED' });
+  assert.equal((await db.owner.query('SELECT count(*) AS n FROM orders')).rows[0].n, '0');
+});
+
 describe('what can be sold', () => {
   test('the full price per seat, frozen on the order', async () => {
     const r = await reserve(deps(), request({ passengers: [tourist(1), tourist(2)] }));

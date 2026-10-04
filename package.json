@@ -9,14 +9,15 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test \"lib/**/*.test.ts\"",
-    "clean": "rm -rf .next out .cms-cache public/generated/cms",
+    "clean": "rm -rf .next out .cms-cache public/generated/cms public/release.json",
     "vendor:admin": "tsx scripts/vendor-admin-cms.ts",
     "validate:cms-config": "tsx scripts/validate-cms-config.ts",
     "sync:content": "tsx scripts/sync-content.ts",
+    "write:release": "tsx scripts/write-release-descriptor.ts",
     "validate:content": "tsx scripts/validate-content.ts",
     "validate:out": "tsx scripts/validate-static-export.ts",
     "healthcheck": "tsx scripts/healthcheck.ts",
-    "build:production": "pnpm run clean && pnpm run validate:cms-config && pnpm run vendor:admin && pnpm run lint && pnpm run test && pnpm run sync:content && pnpm run validate:content && pnpm run build && pnpm run validate:out"
+    "build:production": "pnpm run clean && pnpm run validate:cms-config && pnpm run vendor:admin && pnpm run lint && pnpm run test && pnpm run sync:content && pnpm run validate:content && pnpm run write:release && pnpm run build && pnpm run validate:out"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -20,6 +20,7 @@
 |---|---|
 | `DEPLOY_ENV` | `production` или `staging` — управляет индексируемостью |
 | `SITE_URL` | Только при `DEPLOY_ENV=staging`: canonical/OG base URL для staging-хоста |
+| `SOURCE_COMMIT` | Обязательный 40-символьный SHA собираемого коммита; записывается в `/release.json` и не задаётся в runtime |
 
 **Боевой домен должен обслуживаться только сборкой `DEPLOY_ENV=production`.** Staging-сборка
 отдаёт `noindex, nofollow` на каждой странице и `robots.txt: Disallow: /` — если её выкатить на
@@ -43,8 +44,14 @@ pnpm dev   # predev сам прогонит vendor:admin + sync:content
 ```bash
 pnpm run build:production
 # = clean && validate:cms-config && vendor:admin && lint && test
-#   && sync:content && validate:content && build && validate:out
+#   && sync:content && validate:content && write:release && build && validate:out
 ```
+
+Для production `SOURCE_COMMIT` должен быть build arg, равный выбранному reviewed merge commit.
+Сгенерированный `/release.json` связывает этот commit с точными версиями и хешами `oferta` и
+`soglasie-pd`; файл не кэшируется. Commerce в production допускает бронирование и оплату только
+при полном совпадении live descriptor. Полный порядок запуска —
+[`commerce/runbooks/production-launch.md`](commerce/runbooks/production-launch.md).
 
 `vendor:admin` копирует Sveltia CMS (`node_modules/@sveltia/cms/dist/sveltia-cms.js`) в
 `public/admin/` — идёт первым шагом, чтобы `/admin` всегда собирался против установленной версии

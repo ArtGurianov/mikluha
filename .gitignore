@@ -28,6 +28,7 @@
 /.cms-cache/
 /public/generated/cms/
 /public/admin/sveltia-cms.js
+/public/release.json
 
 # misc
 .DS_Store

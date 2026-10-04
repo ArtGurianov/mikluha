@@ -18,6 +18,7 @@ import type pg from 'pg';
 
 import type { Catalog } from './catalog.js';
 import type { Logger } from './log.js';
+import type { LegalReleaseAdmission } from './legal-admission.js';
 import { errorCode, type CheckoutAttempt, type RefrefClient, type ResolvedResolution } from './refref.js';
 import { contractHash, renderZayavka, sha256Hex } from './zayavka.js';
 import type { Tourist } from './orders.js';
@@ -41,6 +42,7 @@ export interface CheckoutDeps {
   readonly refref: RefrefClient;
   readonly merchant: Merchant;
   readonly log: Logger;
+  readonly legalAdmission?: LegalReleaseAdmission;
   readonly now?: () => Date;
 }
 
@@ -256,6 +258,13 @@ export async function pay(deps: CheckoutDeps, orderRef: string, acceptedZayavka:
   if (o === null) return { kind: 'STATUS', code: 'UNKNOWN_ORDER' };
 
   if (o.status === 'RESERVED') {
+    // Reservation admission is not enough: the public site may have published a newer legal
+    // artifact while this order was waiting. Contract creation must fail closed instead of
+    // accepting the older frozen release after the customer-facing page changed.
+    if (deps.legalAdmission !== undefined) {
+      try { await deps.legalAdmission.verify(); }
+      catch { return { kind: 'STATUS', code: 'LEGAL_RELEASE_NOT_ADMITTED' }; }
+    }
     if (o.legal_release_content === null || o.legal_release_hash !== `sha256:${sha256(o.legal_release_content)}`
       || o.legal_release_ref.trim() === '') {
       return { kind: 'STATUS', code: 'LEGAL_RELEASE_INVALID' };
@@ -357,6 +366,22 @@ async function ensureAttempt(deps: CheckoutDeps, o: OrderRow, now: Date): Promis
   const r = await deps.refref.createAttempt(o.order_ref,
     { referralResolutionId: o.referral_resolution_id!, snapshot: o.snapshot, snapshotHash: o.snapshot_hash! }, `mk-attempt:${o.order_ref}`);
   if (r.kind === 'UNKNOWN') {
+    const recovered = await deps.refref.getMerchantOrder(o.order_ref);
+    if (recovered.kind === 'ANSWERED' && recovered.status === 200) {
+      const matches = recovered.body.checkoutAttempts.filter((attempt) =>
+        attempt.snapshotHash === o.snapshot_hash && attempt.referralResolutionId === o.referral_resolution_id);
+      if (recovered.body.merchantOrderId !== o.order_ref || matches.length !== 1) {
+        if (recovered.body.checkoutAttempts.length > 0 || recovered.body.merchantOrderId !== o.order_ref) {
+          await hold(deps, o, 'PAYMENT_PENDING', 'ATTEMPT_RECOVERY_MISMATCH', now);
+        }
+        return null;
+      }
+      return persistAttempt(deps.pool, o, matches[0]!.id, now, 'ATTEMPT_RECOVERED');
+    }
+    if (recovered.kind === 'ANSWERED' && recovered.status !== 404) {
+      await hold(deps, o, 'PAYMENT_PENDING', `ATTEMPT_RECOVERY_REFUSED:${errorCode(recovered.body)}`, now);
+      return null;
+    }
     if (o.payment_pending_since! <= new Date(now.getTime() - ATTEMPT_UNCONFIRMED_AFTER_MINUTES * 60_000)) {
       await hold(deps, o, 'PAYMENT_PENDING', 'ATTEMPT_UNCONFIRMED', now);
     }
@@ -372,12 +397,17 @@ async function ensureAttempt(deps: CheckoutDeps, o: OrderRow, now: Date): Promis
     await hold(deps, o, 'PAYMENT_PENDING', 'SNAPSHOT_DIVERGED', now);
     return null;
   }
-  const set = await deps.pool.query(`UPDATE orders SET checkout_attempt_id = $2 WHERE id = $1 AND checkout_attempt_id IS NULL`,
-    [o.id, r.body.checkoutAttemptId]);
+  return persistAttempt(deps.pool, o, r.body.checkoutAttemptId, now, 'ATTEMPT_CREATED');
+}
+
+async function persistAttempt(pool: pg.Pool, o: OrderRow, attemptId: string, now: Date,
+  event: 'ATTEMPT_CREATED' | 'ATTEMPT_RECOVERED'): Promise<string | null> {
+  const set = await pool.query(`UPDATE orders SET checkout_attempt_id = $2 WHERE id = $1 AND checkout_attempt_id IS NULL`,
+    [o.id, attemptId]);
   if (set.rowCount === 1) {
-    await deps.pool.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'ATTEMPT_CREATED')`, [o.id, now]);
+    await pool.query('INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, $3)', [o.id, now, event]);
   }
-  const { rows } = await deps.pool.query<{ checkout_attempt_id: string | null }>('SELECT checkout_attempt_id FROM orders WHERE id = $1', [o.id]);
+  const { rows } = await pool.query<{ checkout_attempt_id: string | null }>('SELECT checkout_attempt_id FROM orders WHERE id = $1', [o.id]);
   return rows[0]?.checkout_attempt_id ?? null;
 }
 

@@ -8,7 +8,7 @@ import { resolutionInputHash, snapshotDigest, type Json, type ResolutionLine } f
 
 export interface Recorded { method: string; path: string; key: string | undefined; body: unknown }
 
-type Behaviour = 'OK' | 'TIMEOUT' | 'ERROR_500' | { status: number; code: string };
+type Behaviour = 'OK' | 'TIMEOUT' | 'ACCEPTED_TIMEOUT' | 'ERROR_500' | { status: number; code: string };
 
 export interface FakeState {
   discountKopecks: number;
@@ -19,13 +19,16 @@ export interface FakeState {
   obligation: 'OUTSTANDING' | 'IN_PROGRESS' | 'SATISFIED' | 'LATE_PAYMENT';
   attemptStatus: 'OPEN' | 'SETTLED' | 'CANCELLED' | 'EXPIRED';
   paymentAmountDelta: number;
+  projectionMismatch: boolean;
+  projectionResolutionMismatch: boolean;
 }
 
 export class FakeRefref {
   readonly requests: Recorded[] = [];
-  readonly attempts = new Map<string, { id: string; key: string; body: string; snapshotHash: string; payable: number }>();
+  readonly attempts = new Map<string, { id: string; key: string; body: string; snapshotHash: string;
+    referralResolutionId: string; payable: number }>();
   state: FakeState = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', obligation: 'IN_PROGRESS',
-    attemptStatus: 'OPEN', paymentAmountDelta: 0 };
+    attemptStatus: 'OPEN', paymentAmountDelta: 0, projectionMismatch: false, projectionResolutionMismatch: false };
   #server: Server | null = null;
   #gate: { arrived: () => void; released: Promise<void> } | null = null;
 
@@ -70,16 +73,24 @@ export class FakeRefref {
             lines: [{ lineRef: line.lineRef, eligible: this.state.discountKopecks > 0, referralDiscountAmountKopecks: this.state.discountKopecks }],
             totals: {}, expiresAt: new Date(Date.now() + 30 * 60_000).toISOString() });
         } else if (req.method === 'POST' && (m = /^\/integrations\/orders\/([^/]+)\/checkout-attempts$/.exec(path))) {
-          behave(this.state.attempt, () => {
+          const accept = (answer: boolean) => {
             const ref = m![1]!;
             const existing = this.attempts.get(ref);
             if (existing && (existing.key !== key || existing.body !== text)) { send(409, { error: { code: 'IDEMPOTENCY_KEY_CONFLICT' } }); return; }
             if (snapshotDigest(body.snapshot) !== body.snapshotHash) { send(422, { error: { code: 'SNAPSHOT_HASH_MISMATCH' } }); return; }
             const a = existing ?? { id: `00000000-0000-4000-8000-${String(this.attempts.size + 1).padStart(12, '0')}`, key: key!, body: text,
-              snapshotHash: body.snapshotHash, payable: body.snapshot.totalContractAmountKopecks };
+              snapshotHash: body.snapshotHash, referralResolutionId: body.referralResolutionId,
+              payable: body.snapshot.totalContractAmountKopecks };
             this.attempts.set(ref, a);
-            send(201, { checkoutAttemptId: a.id, snapshotHash: a.snapshotHash, customerStatusUrl: 'https://checkout.example/s', obligations: [] });
-          });
+            if (answer) send(201, { checkoutAttemptId: a.id, snapshotHash: a.snapshotHash, customerStatusUrl: 'https://checkout.example/s', obligations: [] });
+          };
+          if (this.state.attempt === 'ACCEPTED_TIMEOUT') accept(false);
+          else behave(this.state.attempt, () => accept(true));
+        } else if (req.method === 'GET' && (m = /^\/integrations\/merchant-orders\/([^/]+)$/.exec(path))) {
+          const a = this.attempts.get(m[1]!);
+          if (!a) { send(404, { error: { code: 'NOT_FOUND' } }); return; }
+          send(200, { id: '10000000-0000-4000-8000-000000000001', merchantOrderId: m[1], status: 'OPEN',
+            checkoutAttempts: [this.projection(a)] });
         } else if (req.method === 'POST' && /\/payment-session$/.test(path) && this.#gate !== null) {
           const gate = this.#gate;
           this.#gate = null;
@@ -121,16 +132,20 @@ export class FakeRefref {
     this.requests.length = 0;
     this.attempts.clear();
     this.state = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', obligation: 'IN_PROGRESS',
-      attemptStatus: 'OPEN', paymentAmountDelta: 0 };
+      attemptStatus: 'OPEN', paymentAmountDelta: 0, projectionMismatch: false, projectionResolutionMismatch: false };
   }
 
   calls(pattern: RegExp, method = 'POST'): Recorded[] {
     return this.requests.filter((r) => r.method === method && pattern.test(r.path));
   }
 
-  private projection(a: { id: string; snapshotHash: string; payable: number }) {
+  private projection(a: { id: string; snapshotHash: string; referralResolutionId: string; payable: number }) {
     const satisfied = this.state.obligation === 'SATISFIED' || this.state.obligation === 'LATE_PAYMENT';
-    return { id: a.id, status: this.state.attemptStatus, snapshotHash: a.snapshotHash, obligations: [{
+    return { id: a.id, status: this.state.attemptStatus,
+      snapshotHash: this.state.projectionMismatch ? `refref-jcs-1:${'0'.repeat(64)}` : a.snapshotHash,
+      referralResolutionId: this.state.projectionResolutionMismatch
+        ? '00000000-0000-4000-8000-000000000099' : a.referralResolutionId,
+      obligations: [{
       obligationRef: 'full', kind: 'FULL', executionMode: 'ORCHESTRATED', amountKopecks: a.payable, status: this.state.obligation,
       payment: satisfied ? { id: '11111111-1111-4111-8111-111111111111', status: 'SUCCEEDED',
         amountKopecks: a.payable + this.state.paymentAmountDelta, remainingRefundableAmountKopecks: a.payable,
@@ -142,4 +157,3 @@ export class FakeRefref {
     return resolutionInputHash(this.merchantId, orderRef, lines as unknown as ResolutionLine[]);
   }
 }
-

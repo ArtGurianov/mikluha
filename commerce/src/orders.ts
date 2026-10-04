@@ -17,6 +17,7 @@ import type pg from 'pg';
 
 import { bookable, type Catalog, type NotBookable } from './catalog.js';
 import type { Logger } from './log.js';
+import type { LegalReleaseAdmission } from './legal-admission.js';
 
 export const MAX_SEATS_PER_ORDER = 6;
 export const RESERVATION_MINUTES = 30;
@@ -89,7 +90,7 @@ export type BookingRefusal =
   | 'PD_CONSENT_NOT_CONFIRMED' | 'ADULTS_ONLY_NOT_CONFIRMED'
   | 'SEATS_INVALID' | 'NOT_ENOUGH_SEATS' | 'CONTACT_PHONE_INVALID'
   | 'CONTACT_EMAIL_INVALID' | 'PASSENGER_NAME_INVALID' | 'DATE_OF_BIRTH_INVALID' | 'PASSENGER_NOT_ADULT'
-  | 'CITIZENSHIP_INVALID' | 'DOCUMENT_INVALID';
+  | 'CITIZENSHIP_INVALID' | 'DOCUMENT_INVALID' | 'LEGAL_RELEASE_NOT_ADMITTED';
 
 export type BookingResult =
   | { readonly ok: true; readonly orderRef: string; readonly amountKopecks: number; readonly reservedUntil: Date }
@@ -134,6 +135,7 @@ export interface OrderDeps {
   readonly catalog: Catalog;
   readonly log: Logger;
   readonly allowDemo: boolean;
+  readonly legalAdmission?: LegalReleaseAdmission;
   readonly now?: () => Date;
 }
 
@@ -156,6 +158,11 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
     deps.log('booking_refused', { departure: req.departureSlug, refusal });
     return { ok: false, refusal };
   };
+
+  if (deps.legalAdmission !== undefined) {
+    try { await deps.legalAdmission.verify(); }
+    catch { return refuse('LEGAL_RELEASE_NOT_ADMITTED'); }
+  }
 
   const departure = bookable(deps.catalog, req.departureSlug, now, deps.allowDemo);
   if (typeof departure === 'string') return refuse(departure);

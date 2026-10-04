@@ -15,10 +15,13 @@ static; everything that sells a trip lives here, with its own Postgres.
   to the exact offer and Заявка frozen on the order.
 - slice 3d: manual ЕИС filing state, operator-only submission evidence, fail-closed stale-filing
   detection, and the first-sale filing checklist.
+- slice 4 application controls: immutable site/commerce build identities, live legal-release
+  admission at startup/readiness/reservation/payment, merchant-order recovery after an ambiguous
+  attempt create, aggregate PD-free monitor signals, and the owner-run production launch gate.
 
 **Next:**
-- immutable image-file build identity, deploy, backups, merchant-order attempt recovery,
-  monitoring and the first real payment (slice 4).
+- merge the separate Refref host backup/monitor integration; then the owner-run deployment,
+  business/legal/content gates, production conformance, and first real payment + ЕИС evidence.
 
 ## Rules the code keeps
 
@@ -53,6 +56,7 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 | refunds at launch | only the qualified full PROVIDER refund. Mikluha waives deductions of actual expenses and returns the full paid amount when a refund is approved. Partial refunds remain a later end-to-end qualification task |
 | PAID | only from Refref's read-back: the obligation SATISFIED by a SUCCEEDED payment of exactly the payable amount. The customer's return from the bank decides nothing |
 | no second payment | one attempt per order, created with the fixed key `mk-attempt:<ref>`; an unanswered request is repeated identically. Sessions are only re-requested on that attempt: Refref replays a live payment and starts a new one only after a definitive failure |
+| ambiguous create recovery | after an unanswered create, read the Refref merchant-order projection and accept exactly one attempt whose `snapshotHash` and `referralResolutionId` match the frozen order. A foreign/mismatched projection is HELD; no payment session is started |
 | seats of a payment | freed only when Refref confirms the attempt can't settle. Either the cancel answers CANCELLED (tried after 60 minutes OUTSTANDING), or the attempt reads back CANCELLED or EXPIRED without money. Anything inconsistent is HELD, with seats kept |
 | fulfilment | PAID → `fulfillment-ack` DELIVERED (key `mk-fulfil:<ref>`) → FULFILLED |
 | personal data to Refref | the receipt email in the payment session, which PROVIDER fiscalization requires. Nothing else |
@@ -134,11 +138,11 @@ docker run -d --rm --name commerce-test-pg -e POSTGRES_PASSWORD=postgres -p 5543
 | `DATABASE_URL` | the runtime role |
 | `COMMERCE_ENVIRONMENT` | `STAGING` or `PRODUCTION`. PRODUCTION refuses to start unless the content is `launchReady` |
 | `CONTENT_DIR` | set by the image: the site's `content/` from the same commit |
-| `SOURCE_COMMIT` | build arg, reported by `/readyz` and `/identity` |
-| `COMMERCE_ORIGIN` | this service's public origin: `https://book.mikluha-maklai.ru` |
-| `SITE_ORIGIN` | the public site, where the legal pages are: `https://mikluha-maklai.ru` |
-| `REFREF_API_BASE` | e.g. `https://api.refref.ru/v1-rc` |
-| `REFREF_CHECKOUT_ORIGIN` | e.g. `https://checkout.refref.ru` |
+| `SOURCE_COMMIT` | required image build arg. The commerce image stores it read-only in `/app/identity/identity.json`; production has no runtime override |
+| `COMMERCE_ORIGIN` | fixed in production: `https://book.mikluha-maklai.ru` |
+| `SITE_ORIGIN` | fixed in production: `https://mikluha-maklai.ru` |
+| `REFREF_API_BASE` | fixed in production: `https://api.refref.ru/v1-rc` |
+| `REFREF_CHECKOUT_ORIGIN` | fixed in production: `https://checkout.refref.ru` |
 | `REFREF_BUSINESS_ID`, `REFREF_BUSINESS_SLUG` | Mikluha's Refref Business |
 | `REFREF_API_KEY` | its Business API key (a secret) |
 | `UNISENDER_GO_API_KEY` | UniSender Go transactional API key (a secret) |
@@ -147,7 +151,12 @@ docker run -d --rm --name commerce-test-pg -e POSTGRES_PASSWORD=postgres -p 5543
 
 ## Legal-release deployment gate
 
-`/identity` reports `termsRef`, `termsHash`, `pdConsentRef` and `pdConsentHash`. Slice 4 must publish
-the public legal pages and deploy commerce from the same admitted source commit, compare those four
-values with the public `oferta` and `soglasie-pd`, and only then open sales. The two deployments must
-not drift: commerce must never record an older legal version than the public page the customer saw.
+The site publishes `/release.json`; commerce `/identity` reports the corresponding source commit,
+`termsRef`, `termsHash`, `pdConsentRef` and `pdConsentHash`. In production, commerce compares all
+five immutable values with the live site at startup, readiness, reservation, and payment. Drift
+fails closed. The owner-run deploy, backup, logging, legal/content and first-sale gates are in
+[`runbooks/production-launch.md`](runbooks/production-launch.md).
+
+The four network addresses above remain configurable in staging. Production compares their
+normalized URLs against the fixed values and refuses startup on any host, port, path, credential,
+query or fragment mismatch.

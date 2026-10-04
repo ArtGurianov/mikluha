@@ -23,6 +23,7 @@ import {
 import type { ContentSnapshot } from "../lib/cms/types";
 import { auditSite } from "../lib/seo-audit";
 import { isStaging, resolveCanonicalBase } from "../lib/site";
+import { makeSiteReleaseDescriptor, parseSiteReleaseDescriptor, type SiteReleaseDescriptor } from "../lib/release-descriptor";
 
 const ROOT = process.cwd();
 const OUT_DIR = path.join(ROOT, "out");
@@ -87,6 +88,13 @@ async function main() {
   if (!(await exists(path.join(OUT_DIR, "robots.txt")))) {
     fail("/out/robots.txt is missing");
   }
+  const releaseFile = path.join(OUT_DIR, "release.json");
+  let release: SiteReleaseDescriptor | undefined;
+  if (!(await exists(releaseFile))) fail("/out/release.json is missing");
+  else {
+    try { release = parseSiteReleaseDescriptor(JSON.parse(await readFile(releaseFile, "utf8"))); }
+    catch { fail("/out/release.json is invalid"); }
+  }
   if (!(await exists(path.join(OUT_DIR, "404.html")))) {
     fail("/out/404.html is missing (branded 404 required by section 35/48)");
   }
@@ -99,6 +107,14 @@ async function main() {
   let content: ContentSnapshot | undefined;
   if (await exists(CACHE_FILE)) {
     content = JSON.parse(await readFile(CACHE_FILE, "utf-8")) as ContentSnapshot;
+    try {
+      const expected = makeSiteReleaseDescriptor(process.env.SOURCE_COMMIT ?? "", content.legalPages);
+      if (release && JSON.stringify(release) !== JSON.stringify(expected)) {
+        fail("/out/release.json does not match this build's source commit and legal artifacts");
+      }
+    } catch (error) {
+      fail(`Cannot derive the release descriptor: ${(error as Error).message}`);
+    }
     for (const tour of content.tours) {
       const routeFile = path.join(OUT_DIR, "tours", tour.slug, "index.html");
       if (!(await exists(routeFile))) fail(`Missing static route for tour "${tour.slug}": ${path.relative(ROOT, routeFile)}`);

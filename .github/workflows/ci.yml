@@ -48,6 +48,7 @@ jobs:
         env:
           DEPLOY_ENV: staging
           SITE_URL: https://staging.invalid
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha }}
         run: pnpm run build:production
 
   # mikluha-commerce (commerce/README.md): its own package, tests against a real Postgres, and the
@@ -88,4 +89,4 @@ jobs:
 
       - name: Image
         working-directory: .
-        run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=${{ github.sha }} -t mikluha-commerce:ci .
+        run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=${{ github.event.pull_request.head.sha }} -t mikluha-commerce:ci .
