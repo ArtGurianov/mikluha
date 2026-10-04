@@ -13,9 +13,10 @@ static; everything that sells a trip lives here, with its own Postgres.
 - slice 3c: an atomic Postgres confirmation-email outbox delivered asynchronously through
   UniSender Go, bounded proxy-aware booking throttling, and site-matched customer pages with access
   to the exact offer and Заявка frozen on the order.
+- slice 3d: manual ЕИС filing state, operator-only submission evidence, fail-closed stale-filing
+  detection, and the first-sale filing checklist.
 
 **Next:**
-- manual ЕИС filing state and operator evidence (slice 3d);
 - immutable image-file build identity, deploy, backups, merchant-order attempt recovery,
   monitoring and the first real payment (slice 4).
 
@@ -30,6 +31,7 @@ static; everything that sells a trip lives here, with its own Postgres.
 | PD consent | a separate published `soglasie-pd` artifact, not the offer. The booking form carries its version reference and hash and requires its own checkbox. Commerce validates them, stores the authoritative text, reference, hash and acceptance time, and verifies the evidence again before payment. It is never included in Refref's `legalReleaseHash` |
 | transactional email (3c) | one Postgres outbox row is inserted with FULFILLED in the same transaction; an async worker sends through UniSender Go with one stable idempotency key and stores the provider `job_id`. UniSender deduplicates that key for only one minute: first submission time is persisted, retries run every 10 s and may start only in a conservative first-40-second window. A late/delayed retry, expired lease outside the window, or duplicate-key error 1573 becomes operator attention without another send. Contract/order mail has no unsubscribe mechanism; marketing is a separate class |
 | booking rate limit (3c) | trust only exactly one valid `X-Forwarded-For` IP from the single Coolify/Traefik hop; missing, malformed or multiple values share one conservative untrusted-ingress bucket. The in-memory store has TTL eviction and a hard size bound. A body-size limit and order-scoped controls remain separate protections. SmartCaptcha is reserved for observed abuse, not launch |
+| ЕИС filing (3d) | the first proven paid state atomically creates `EIS_PENDING`. Only an explicit `commerce_operator` action after manual submission in the ЕИС personal account records `EIS_SUBMITTED` and its actual electronic-voucher number. Submission must name the material revision printed with the reviewed filing packet; an intervening change is refused as `EIS_PACKET_STALE`. A later contract/tourist correction or refund becomes `EIS_NEEDS_UPDATE`; commerce never claims it filed anything and has no ЕИС API integration |
 | contract | the offer (`content/legal/oferta.yml`) plus the order's **Заявка на бронирование** (`src/zayavka.ts`), built from the order, its tourists and the tour's and departure's `contract` data in the CMS. A departure without complete contract data is not sold. The authoritative offer text/ref/hash are frozen on reservation and re-hashed before payment. The Заявка is rendered when the price is resolved, shown before paying exactly as stored, and accepted by paying; `/pay` carries its hash, and a different one is refused. Both frozen documents remain available on the cookie-protected order page and through the high-entropy bearer link in the confirmation email; only the token hash remains in `orders`, and the outbox drops its plaintext token when UniSender accepts the mail. The bearer token/path must be redacted or excluded from live Traefik/Coolify access logs. After payment the database forbids changing the Заявка. Erased 3 years after the contract ended (24 hours after an unpaid order ends); its hash stays |
 | erasure | unpaid (EXPIRED, CANCELLED): everything, the Заявка included, within 24 h of ending; no contract was concluded. A paid trip (PAID, FULFILLED, REFUNDED): the contact and tourist rows 90 days after it ends; the Заявка, which is the contract, **3 years after the contract ended** (ПП РФ №748): the trip's end for FULFILLED, the refund (`closed_at`) for REFUNDED, never for a PAID order, whose contract is still open. Nothing under `legal_hold` or while money is unresolved |
 | booking switch | closed on a new database. Only an operator login (`commerce_operator`) can change it, through `fn_set_sales_open`, which records who, why and the database login. The service can read it, never change it. A sale reads it under a lock in its own transaction |
@@ -69,7 +71,7 @@ The owner applies migrations. There are two other logins, and neither is a membe
 | login | role | can | its credential |
 |---|---|---|---|
 | `commerce_runtime` | `commerce_app` | orders, personal data, erasure, read the switch | the service's `DATABASE_URL` (Coolify) |
-| `commerce_operator_login` | `commerce_operator` | change the booking switch, read its history | root-only `/etc/mikluha-commerce/operator.env` on the host, never in the service |
+| `commerce_operator_login` | `commerce_operator` | change the booking switch; read the local ЕИС filing packet/state; record manual ЕИС evidence | root-only `/etc/mikluha-commerce/operator.env` on the host, never in the service |
 
 The service can't change the schema, delete orders or touch the switch. If the service is
 compromised or broken, it still can't reopen sales an operator closed. `fn_set_sales_open` also
@@ -103,6 +105,20 @@ sales() { docker run --rm --network "$NET" --env-file /etc/mikluha-commerce/oper
 sales status
 sales close --by <who> --reason "<why>"
 sales open  --by <who> --reason "<why>"
+```
+
+Manual ЕИС filing uses the same isolated image/network/operator env boundary. It never calls ЕИС;
+`submit` records what the operator already did in the ЕИС personal account. `packet` prints personal
+data to the local terminal and must never be redirected or pasted into logs, CI, GitHub or Linear.
+The complete workflow and first-sale evidence checklist are in
+[`runbooks/eis-manual-filing.md`](runbooks/eis-manual-filing.md).
+
+```bash
+eis() { docker run --rm --network "$NET" --env-file /etc/mikluha-commerce/operator.env "$IMG" node dist/bin/eis.js "$@"; }
+eis status [<mk-order-ref>]
+eis packet <mk-order-ref>
+eis submit <mk-order-ref> --number '<actual-number>' --revision '<packet-revision>' --by '<who>' --confirmed-in-eis-lk
+eis needs-update <mk-order-ref> --by '<who>' --reason '<why>'
 ```
 
 Locally, start a disposable Postgres for the tests:
