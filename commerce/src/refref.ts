@@ -35,12 +35,15 @@ export interface PaymentSession {
   providerPaymentUrl?: string; failureCode?: string; supportReference: string;
 }
 export interface CheckoutAttempt {
-  id: string; status: 'OPEN' | 'SETTLED' | 'CANCELLED' | 'EXPIRED'; snapshotHash: string;
+  id: string; status: 'OPEN' | 'SETTLED' | 'CANCELLED' | 'EXPIRED'; snapshotHash: string; referralResolutionId: string;
   obligations: {
     obligationRef: string; status: 'OUTSTANDING' | 'IN_PROGRESS' | 'SATISFIED' | 'LATE_PAYMENT' | 'CANCELLED';
     amountKopecks: number;
     payment: null | { id: string; status: string; amountKopecks: number; succeededAt?: string | null };
   }[];
+}
+export interface MerchantOrder {
+  id: string; merchantOrderId: string; status: string; checkoutAttempts: CheckoutAttempt[];
 }
 /** Refref's Error: `{ error: { code, … } }`. */
 export interface RefrefError { error?: { code?: string } }
@@ -75,6 +78,10 @@ export class RefrefClient {
   getAttempt(orderRef: string, attemptId: string) {
     return this.#send<CheckoutAttempt>('GET',
       `/integrations/orders/${encodeURIComponent(orderRef)}/checkout-attempts/${encodeURIComponent(attemptId)}`);
+  }
+
+  getMerchantOrder(orderRef: string) {
+    return this.#send<MerchantOrder>('GET', `/integrations/merchant-orders/${encodeURIComponent(orderRef)}`);
   }
 
   /** No Idempotency-Key: a live initiation is replayed, never submitted twice (docs/28 §11). */

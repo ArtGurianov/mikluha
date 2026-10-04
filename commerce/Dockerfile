@@ -11,10 +11,14 @@ COPY commerce/tsconfig.json ./
 COPY commerce/src ./src
 RUN pnpm run build && pnpm prune --prod --ignore-workspace
 
-FROM node:22-alpine AS runtime
+FROM node:22-alpine AS identity
 ARG SOURCE_COMMIT
+COPY commerce/scripts/write-build-identity.mjs /tmp/write-build-identity.mjs
+RUN node /tmp/write-build-identity.mjs /identity/identity.json "$SOURCE_COMMIT" \
+    && chmod 0555 /identity && chmod 0444 /identity/identity.json
+
+FROM node:22-alpine AS runtime
 ENV NODE_ENV=production \
-    SOURCE_COMMIT=$SOURCE_COMMIT \
     CONTENT_DIR=/app/content \
     PORT=3000
 WORKDIR /app/commerce
@@ -23,6 +27,8 @@ COPY --from=build /app/commerce/dist ./dist
 COPY commerce/package.json ./
 COPY commerce/migrations ./migrations
 COPY content /app/content
+COPY --from=identity /identity/identity.json /app/identity/identity.json
+RUN chmod 0555 /app/identity && chmod 0444 /app/identity/identity.json
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

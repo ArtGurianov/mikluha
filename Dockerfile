@@ -9,6 +9,7 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
@@ -26,9 +27,11 @@ WORKDIR /app
 
 ARG DEPLOY_ENV=production
 ARG SITE_URL
+ARG SOURCE_COMMIT
 
 ENV DEPLOY_ENV=$DEPLOY_ENV \
     SITE_URL=$SITE_URL \
+    SOURCE_COMMIT=$SOURCE_COMMIT \
     NEXT_TELEMETRY_DISABLED=1
 
 COPY . .

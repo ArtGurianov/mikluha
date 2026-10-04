@@ -27,6 +27,9 @@ test('ready only at exactly this build\'s schema', async () => {
   assert.equal((await readiness({ ...deps, schemaHead: schemaHead(MIGRATIONS_DIR) })).status, 'READY');
   assert.deepEqual(await readiness({ ...deps, schemaHead: schemaHead(MIGRATIONS_DIR) + 1 }),
     { status: 'NOT_READY', reason: 'SCHEMA_NOT_AT_HEAD', schema: schemaHead(MIGRATIONS_DIR) });
+  assert.deepEqual(await readiness({ ...deps, schemaHead: schemaHead(MIGRATIONS_DIR),
+    legalAdmission: { verify: async () => { throw new Error('mismatch'); } } }),
+  { status: 'NOT_READY', reason: 'LEGAL_RELEASE_NOT_ADMITTED', schema: schemaHead(MIGRATIONS_DIR) });
 });
 
 test("the site's own content/ loads, as the image ships it", () => {

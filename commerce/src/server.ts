@@ -5,6 +5,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type pg from 'pg';
 
 import type { Catalog } from './catalog.js';
+import type { LegalReleaseAdmission } from './legal-admission.js';
 
 export const SERVICE = 'mikluha-commerce';
 
@@ -14,6 +15,7 @@ export interface ServerDeps {
   readonly schemaHead: number;
   readonly sourceCommit: string | null;
   readonly startedAt: Date;
+  readonly legalAdmission?: LegalReleaseAdmission;
   readonly onError?: (e: unknown) => void;
 }
 
@@ -23,6 +25,10 @@ export async function readiness(deps: ServerDeps): Promise<{ status: 'READY' | '
     const { rows } = await deps.pool.query<{ v: number | null }>('SELECT max(version) AS v FROM schema_migrations');
     const schema = rows[0]?.v ?? 0;
     if (schema !== deps.schemaHead) return { status: 'NOT_READY', reason: 'SCHEMA_NOT_AT_HEAD', schema };
+    if (deps.legalAdmission !== undefined) {
+      try { await deps.legalAdmission.verify(); }
+      catch { return { status: 'NOT_READY', reason: 'LEGAL_RELEASE_NOT_ADMITTED', schema }; }
+    }
     return { status: 'READY', schema };
   } catch {
     return { status: 'NOT_READY', reason: 'DATABASE_UNAVAILABLE' };

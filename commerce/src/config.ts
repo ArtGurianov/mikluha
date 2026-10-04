@@ -21,3 +21,14 @@ export function environment(): 'STAGING' | 'PRODUCTION' {
   if (v !== 'STAGING' && v !== 'PRODUCTION') throw new Error('CONFIG_INVALID: COMMERCE_ENVIRONMENT');
   return v;
 }
+
+export function requireHttps(name: string, value: string): string {
+  let url: URL;
+  try { url = new URL(value); } catch { throw new Error(`CONFIG_INVALID: ${name}`); }
+  if (url.protocol !== 'https:') throw new Error(`CONFIG_HTTPS_REQUIRED: ${name}`);
+  return value;
+}
+
+export function productionAddress(which: 'STAGING' | 'PRODUCTION', name: string, value: string): string {
+  return which === 'PRODUCTION' ? requireHttps(name, value) : value;
+}

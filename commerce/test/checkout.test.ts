@@ -6,7 +6,7 @@ import type { AddressInfo } from 'node:net';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
 import type { Catalog } from '../src/catalog.js';
-import { reconcileAll, verdict, type CheckoutDeps } from '../src/checkout.js';
+import { pay, reconcileAll, verdict, zayavkaOf, type CheckoutDeps } from '../src/checkout.js';
 import { contractHash } from '../src/zayavka.js';
 import { schemaHead } from '../src/migrate.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
@@ -246,6 +246,16 @@ describe('the paid path', () => {
 });
 
 describe('the Заявка: shown before paying, accepted by paying, frozen after', () => {
+  test('payment fails closed if the live public legal release changed after reservation', async () => {
+    const { ref } = await bookAndResolve();
+    const document = await zayavkaOf(db.pool, ref);
+    assert.ok(document);
+    const result = await pay({ ...deps, legalAdmission: { verify: async () => { throw new Error('site drift'); } } }, ref, document.sha256);
+    assert.deepEqual(result, { kind: 'STATUS', code: 'LEGAL_RELEASE_NOT_ADMITTED' });
+    assert.equal((await order(ref)).status, 'RESERVED');
+    assert.equal(refref.calls(/\/checkout-attempts$/).length, 0);
+  });
+
   test('the confirmation page shows the order\'s Заявка; Refref gets the contract hash over the offer and it', async () => {
     const { ref, cookie } = await bookAndResolve(2);
     const page = (await http('GET', `/orders/${ref}`, { cookie })).body;
@@ -372,6 +382,36 @@ describe('the Заявка: shown before paying, accepted by paying, frozen afte
 });
 
 describe('never a second payment after ambiguity', () => {
+  test('an accepted attempt with a lost response is recovered from the merchant-order projection', async () => {
+    const { ref, cookie } = await bookAndResolve();
+    refref.state.attempt = 'ACCEPTED_TIMEOUT';
+    assert.equal((await payOrder(ref, cookie)).location, 'https://pay.alfa.example/form?mdOrder=1');
+    assert.equal(refref.calls(/\/checkout-attempts$/).length, 1);
+    assert.equal(refref.calls(/\/merchant-orders\//, 'GET').length, 1);
+    assert.equal((await order(ref)).checkout_attempt_id, [...refref.attempts.values()][0]!.id);
+    assert.deepEqual((await db.owner.query(`SELECT event FROM order_event WHERE order_id =
+      (SELECT id FROM orders WHERE order_ref = $1) AND event = 'ATTEMPT_RECOVERED'`, [ref])).rows,
+    [{ event: 'ATTEMPT_RECOVERED' }]);
+  });
+
+  test('merchant-order recovery holds a projection that does not match the frozen attempt facts', async () => {
+    const { ref, cookie } = await bookAndResolve();
+    refref.state.attempt = 'ACCEPTED_TIMEOUT';
+    refref.state.projectionMismatch = true;
+    assert.equal((await payOrder(ref, cookie)).location, `/orders/${ref}`);
+    assert.deepEqual(await order(ref).then((o) => [o.status, o.hold_reason]), ['HELD', 'ATTEMPT_RECOVERY_MISMATCH']);
+    assert.equal(refref.calls(/\/payment-session$/).length, 0);
+  });
+
+  test('merchant-order recovery also binds the frozen referral resolution', async () => {
+    const { ref, cookie } = await bookAndResolve();
+    refref.state.attempt = 'ACCEPTED_TIMEOUT';
+    refref.state.projectionResolutionMismatch = true;
+    assert.equal((await payOrder(ref, cookie)).location, `/orders/${ref}`);
+    assert.deepEqual(await order(ref).then((o) => [o.status, o.hold_reason]), ['HELD', 'ATTEMPT_RECOVERY_MISMATCH']);
+    assert.equal(refref.calls(/\/payment-session$/).length, 0);
+  });
+
   test('an unanswered attempt is repeated identically; an unanswered session is re-asked on the same attempt', async () => {
     const { ref, cookie } = await bookAndResolve();
     refref.state.attempt = 'TIMEOUT';
@@ -517,7 +557,8 @@ describe('stop-sales against a payment session already being started (PR #19 rev
 
 describe("the read-back's verdict", () => {
   const attempt = (o: Partial<CheckoutAttempt['obligations'][0]>, status: CheckoutAttempt['status'] = 'OPEN'): CheckoutAttempt => ({
-    id: 'a', status, snapshotHash: 'h', obligations: [{ obligationRef: 'full', status: 'SATISFIED', amountKopecks: 100,
+    id: 'a', status, snapshotHash: 'h', referralResolutionId: 'resolution',
+    obligations: [{ obligationRef: 'full', status: 'SATISFIED', amountKopecks: 100,
       payment: { id: 'p', status: 'SUCCEEDED', amountKopecks: 100 }, ...o }],
   });
   const now = new Date();

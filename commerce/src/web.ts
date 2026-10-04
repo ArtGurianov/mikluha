@@ -96,6 +96,7 @@ const MESSAGES: Record<string, string> = {
   FORM_INVALID: 'Форма заполнена неверно. Откройте её заново.',
   RATE_LIMITED: 'Слишком много попыток бронирования. Подождите и попробуйте снова.',
   LEGAL_RELEASE_INVALID: 'Сохранённая редакция Оферты не прошла проверку. Начните бронирование заново.',
+  LEGAL_RELEASE_NOT_ADMITTED: 'Публикация условий обновляется. Онлайн-бронирование временно приостановлено.',
   DOCUMENT_CHANGED: 'Заявка изменилась после того, как вы её открыли. Проверьте её ещё раз.',
   DEPARTURE_NO_CONTRACT: 'Онлайн-бронирование этого выезда пока недоступно. Свяжитесь с организатором.',
   DOCUMENT_INVALID: 'Проверьте документ туриста: для паспорта РФ — серия 4 цифры и номер 6 цифр, для загранпаспорта РФ — 2 и 7 цифр.',
@@ -176,8 +177,10 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
     const email = limiter.checkEmail(request.contact.email, at);
     if (!email.allowed) { page(res, 429, 'Бронирование', `<p class="notice">${message('RATE_LIMITED')}</p>`, '',
       { 'retry-after': String(email.retryAfterSeconds) }); return; }
-    const r = await reserve({ pool: deps.pool, catalog: deps.catalog, log: deps.log, allowDemo, ...(deps.now ? { now: deps.now } : {}) }, request);
-    if (!r.ok) { page(res, r.refusal === 'NOT_ENOUGH_SEATS' || r.refusal === 'SALES_CLOSED' ? 409 : 400, 'Бронирование', `<p>${esc(message(r.refusal))}</p>`); return; }
+    const r = await reserve({ pool: deps.pool, catalog: deps.catalog, log: deps.log, allowDemo,
+      ...(deps.legalAdmission ? { legalAdmission: deps.legalAdmission } : {}), ...(deps.now ? { now: deps.now } : {}) }, request);
+    if (!r.ok) { page(res, ['NOT_ENOUGH_SEATS', 'SALES_CLOSED', 'LEGAL_RELEASE_NOT_ADMITTED'].includes(r.refusal) ? 409 : 400,
+      'Бронирование', `<p>${esc(message(r.refusal))}</p>`); return; }
     const state = await issueState(deps.pool, r.orderRef);
     if (state === null) throw new Error('STATE_NOT_ISSUED');
     redirect(res, handoffUrl(deps.merchant, r.orderRef, state), [stateCookie(r.orderRef, state)]);
