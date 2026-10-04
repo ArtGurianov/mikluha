@@ -236,6 +236,38 @@ base backup с `pg_verifybackup`, мониторинг цепочки, пров�
 
 ---
 
+## 10. Flexperiment — reference implementation, не зависимость и не authority платежей
+
+Для оставшихся срезов ART-47 Flexperiment используется как инженерный reference repository:
+из него переносятся отдельные уже проверенные инварианты в архитектуру Mikluha на Node HTTP и
+Postgres. Пакеты и runtime Flexperiment не импортируются. Опубликованный контракт Refref,
+а не реализация Flexperiment, остаётся authority для платежной семантики.
+
+**Slice 3c:** подтверждение заказа отправляет UniSender Go через маленький Postgres-outbox.
+Строка создаётся в одной транзакции с переходом в `FULFILLED`; worker использует устойчивый
+idempotency key, сохраняет `job_id`, повторяет неоднозначную отправку только с той же identity,
+а окончательный отказ переводит в операторское attention-состояние. Это договорное письмо со
+ссылкой на замороженные документы: unsubscribe-механизма в нём нет. Маркетинг — отдельный класс.
+
+IP-ограничение доверяет только одному валидному адресу в `X-Forwarded-For` после единственного
+Coolify/Traefik hop. Отсутствующий, неверный или составной заголовок попадает в общий
+`untrusted-ingress` bucket. В отличие от reference-кода, store обязан иметь TTL-очистку и
+жёсткий предел числа bucket; лимит тела запроса и защита операций конкретного заказа остаются
+отдельными границами. SmartCaptcha в launch не включается: это эскалация после наблюдаемого abuse.
+
+**Slice 4:** build identity записывается при Docker build в read-only image file. Production
+читает только фиксированный путь, не принимает runtime override/fallback и отказывается стартовать
+при отсутствующей или неверной identity. После неоднозначного создания checkout attempt сервис
+сначала читает Refref merchant-order projection и коррелирует попытку по order ref, snapshot hash
+и referral resolution; только доказанное отсутствие допускает повтор того же idempotent create,
+а конфликт оставляет заказ в `HELD`.
+
+Refund adapter Flexperiment остаётся reference на потом. Launch поддерживает только полный возврат
+по квалифицированной PROVIDER-цепочке; частичные суммы и `lineAllocations` не вводятся до отдельной
+квалификации Alfa/Refref.
+
+---
+
 ## Решения по деплою (не архитектурные)
 
 Контракт: сборка производит проверенный самодостаточный статический `/out`.
