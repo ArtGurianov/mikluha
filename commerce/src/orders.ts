@@ -265,11 +265,13 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
                AND trip_ends_on + $3::int < ($1::timestamptz AT TIME ZONE 'UTC')::date))
         FOR UPDATE`, [now, UNPAID_PD_RETENTION_HOURS, TRIP_PD_RETENTION_DAYS]);
     for (const r of erasable.rows) {
+      // Mark the scheduled retention operation before deleting tourist/contact rows. The EIS
+      // material-change triggers then distinguish erasure from a factual correction.
+      await client.query('UPDATE orders SET pd_erased_at = $2 WHERE id = $1', [r.id, now]);
       if (r.unpaid) await client.query('UPDATE order_document SET content = NULL WHERE order_id = $1', [r.id]);
       await client.query('DELETE FROM order_passenger WHERE order_id = $1', [r.id]);
       await client.query('DELETE FROM order_contact WHERE order_id = $1', [r.id]);
       await client.query('UPDATE email_outbox SET recipient_email = NULL WHERE order_id = $1', [r.id]);
-      await client.query('UPDATE orders SET pd_erased_at = $2 WHERE id = $1', [r.id, now]);
       await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'PD_ERASED')`, [r.id, now]);
     }
     // The contract (a paid order's Заявка): 3 years after the contract ended, unless held.

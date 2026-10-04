@@ -59,7 +59,7 @@ beforeEach(async () => {
   clock = new Date('2026-10-04T06:00:00Z');
   refref.reset();
   logs.lines.length = 0;
-  await db.owner.query('TRUNCATE email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await db.owner.query('TRUNCATE order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
   await setSalesOpen(db.operator, true, 'test', 'open');
 });
 
@@ -203,6 +203,13 @@ describe('the paid path', () => {
     assert.deepEqual((await db.owner.query(`SELECT type, recipient_email, idempotency_key, state, attempts
       FROM email_outbox`)).rows, [{ type: 'BOOKING_CONFIRMATION', recipient_email: 'ivan@example.ru',
       idempotency_key: `mk-confirm:${ref}`, state: 'PENDING', attempts: 0 }]);
+    assert.deepEqual((await db.owner.query(`SELECT e.status, e.electronic_voucher_number
+      FROM order_eis e JOIN orders o ON o.id = e.order_id WHERE o.order_ref = $1`, [ref])).rows,
+    [{ status: 'EIS_PENDING', electronic_voucher_number: null }]);
+    assert.deepEqual((await db.owner.query(`SELECT x.to_status, x.changed_by, x.login_role, x.reason
+      FROM order_eis_event x JOIN orders o ON o.id = x.order_id WHERE o.order_ref = $1`, [ref])).rows,
+    [{ to_status: 'EIS_PENDING', changed_by: 'system:payment', login_role: 'commerce_test_runtime',
+      reason: 'PAYMENT_CONFIRMED' }]);
     const token = (await db.owner.query('SELECT access_token FROM email_outbox')).rows[0].access_token;
     const shared = await http('GET', `/documents/${token}`);
     assert.equal(shared.status, 200);

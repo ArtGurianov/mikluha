@@ -43,7 +43,7 @@ before(async () => {
 });
 after(async () => { await db.drop(); });
 beforeEach(async () => {
-  await db.owner.query('TRUNCATE email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await db.owner.query('TRUNCATE order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
   await setSalesOpen(db.operator, true, 'test', 'open for the test');
 });
 
