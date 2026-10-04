@@ -7,6 +7,7 @@ import { after, before, beforeEach, describe, test } from 'node:test';
 
 import type { Catalog } from '../src/catalog.js';
 import { reconcileAll, verdict, type CheckoutDeps } from '../src/checkout.js';
+import { contractHash } from '../src/zayavka.js';
 import { schemaHead } from '../src/migrate.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { maintain, setSalesOpen } from '../src/orders.js';
@@ -18,7 +19,7 @@ import { captureLog, fixtureCatalog, freshDb, type TestDb } from './helpers.js';
 
 const MERCHANT_ID = '3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90';
 const MINUTE = 60_000;
-const PD = ['Иван', 'Петров', 'Анна', '9039075547', 'ivan@example.ru'];
+const PD = ['Иван', 'Петров', 'Анна', '9039075547', 'ivan@example.ru', '654321', '765432', '1990-05-17'];
 
 let db: TestDb;
 let catalog: Catalog;
@@ -39,7 +40,7 @@ before(async () => {
     pool: db.pool, catalog, log: (e, f) => logs.log(e, f), now: () => clock,
     refref: new RefrefClient({ apiBase: refref.base, apiKey: 'rk_test', timeoutMs: 1500 }),
     merchant: { businessId: MERCHANT_ID, businessSlug: 'mikluha', checkoutOrigin: 'https://checkout.refref.example',
-      origin: 'https://book.mikluha.example' },
+      origin: 'https://book.mikluha.example', siteOrigin: 'https://mikluha.example' },
   };
   server = createCommerceServer({ pool: db.pool, catalog, schemaHead: schemaHead(MIGRATIONS_DIR), sourceCommit: null,
     startedAt: new Date() }, createWebHandler(deps, false));
@@ -56,7 +57,7 @@ beforeEach(async () => {
   clock = new Date('2026-10-04T06:00:00Z');
   refref.reset();
   logs.lines.length = 0;
-  await db.owner.query('TRUNCATE order_event, order_passenger, order_contact, orders');
+  await db.owner.query('TRUNCATE order_document, order_event, order_passenger, order_contact, orders');
   await setSalesOpen(db.operator, true, 'test', 'open');
 });
 
@@ -81,11 +82,24 @@ function http(method: string, path: string, opts: { cookie?: string; form?: Reco
   });
 }
 
+const touristFields = (i: number, name: string, series: string, number: string): Record<string, string> => ({
+  [`t${i}Name`]: name, [`t${i}Dob`]: '1990-05-17', [`t${i}Citizenship`]: 'RU',
+  [`t${i}DocType`]: 'RU_PASSPORT', [`t${i}DocSeries`]: series, [`t${i}DocNumber`]: number,
+});
+
+/** POST /pay as the confirmation page's form does: with the hash of the Заявка it showed. */
+async function payOrder(ref: string, cookie: string, zayavka?: string): Promise<Reply> {
+  const { rows } = await db.owner.query(`SELECT d.sha256 FROM order_document d JOIN orders o ON o.id = d.order_id
+    WHERE o.order_ref = $1`, [ref]);
+  return http('POST', `/orders/${ref}/pay`, { cookie, form: { zayavka: zayavka ?? rows[0]?.sha256 ?? '' } });
+}
+
 const bookingForm = (seats = 1): Record<string, string> => ({
   departure: 'altai-2026-11-01', termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
   contactName: 'Иван Петров', contactPhone: '+7 903 907-55-47', contactEmail: 'ivan@example.ru',
-  passenger1Name: 'Иван Петров', ...(seats > 1 ? { passenger2Name: 'Анна Петрова' } : {}),
-  adultsOnly: 'yes', acceptTerms: 'yes',
+  customerIsTourist: 'yes', adultsOnly: 'yes',
+  ...touristFields(1, 'Иван Петров', '3210', '654321'),
+  ...(seats > 1 ? touristFields(2, 'Анна Петрова', '3211', '765432') : {}),
 });
 
 /** Book, come back from the handoff, and land on the confirmation page. */
@@ -121,7 +135,7 @@ describe('the paid path', () => {
     assert.match(confirm.body, /Итого к оплате: 67[\s ]?000 ₽/);
     assert.match(confirm.body, /скидка по приглашению 1[\s ]?000 ₽/);
 
-    const paid = await http('POST', `/orders/${ref}/pay`, { cookie });
+    const paid = await payOrder(ref, cookie);
     assert.equal(paid.location, 'https://pay.alfa.example/form?mdOrder=1');
     const [session] = refref.calls(/\/payment-session$/);
     assert.deepEqual(session!.body, { successUrl: `https://book.mikluha.example/orders/${ref}`, receiptContact: { email: 'ivan@example.ru' } });
@@ -161,20 +175,58 @@ describe('the paid path', () => {
   });
 });
 
+describe('the Заявка: shown before paying, accepted by paying, frozen after', () => {
+  test('the confirmation page shows the order\'s Заявка; Refref gets the contract hash over the offer and it', async () => {
+    const { ref, cookie } = await bookAndResolve(2);
+    const page = (await http('GET', `/orders/${ref}`, { cookie })).body;
+    for (const expected of [`Заявка на бронирование № ${ref}`, 'Иван Петров', 'Анна Петрова', 'Паспорт гражданина РФ: 3210 654321',
+      'Россия', '17.05.1990', 'Гостевой дом «Озеро»', 'ООО «Перевозчик»', 'День 1. Кемерово — Телецкое озеро', 'Версия Оферты',
+      'oferta@2026-10-04', 'Оплачивая заказ, я подтверждаю']) {
+      assert.ok(page.includes(expected), `the confirmation page lacks ${expected}`);
+    }
+    await payOrder(ref, cookie);
+    const [create] = refref.calls(/\/checkout-attempts$/);
+    const snapshot = (create!.body as { snapshot: { legalReleaseRef: string; legalReleaseHash: string } }).snapshot;
+    const doc = (await db.owner.query('SELECT sha256 FROM order_document')).rows[0];
+    assert.equal(snapshot.legalReleaseRef, catalog.terms.ref);
+    assert.equal(snapshot.legalReleaseHash, contractHash(catalog.terms.ref, catalog.terms.hash, doc.sha256));
+  });
+
+  test('a Заявка other than the one stored is refused, and nothing is sent', async () => {
+    const { ref, cookie } = await bookAndResolve();
+    const r = await payOrder(ref, cookie, 'f'.repeat(64));
+    assert.equal(r.location, `/orders/${ref}?notice=DOCUMENT_CHANGED`);
+    assert.equal((await order(ref)).status, 'RESERVED');
+    assert.equal(refref.calls(/\/checkout-attempts$/).length, 0);
+  });
+
+  test('once paying, the Заявка cannot change; erasure empties it and keeps its hash', async () => {
+    const { ref, cookie } = await bookAndResolve();
+    await payOrder(ref, cookie);
+    await assert.rejects(db.pool.query(`UPDATE order_document SET content = 'forged'`), /ORDER_DOCUMENT_FROZEN/);
+    refref.state.obligation = 'SATISFIED';
+    await reconcileAll(deps);
+    await maintain(db.pool, () => undefined, new Date('2027-03-01T00:00:00Z'));
+    const { rows } = await db.owner.query('SELECT content, sha256 FROM order_document');
+    assert.equal(rows[0].content, null);
+    assert.match(rows[0].sha256, /^[0-9a-f]{64}$/);
+  });
+});
+
 describe('never a second payment after ambiguity', () => {
   test('an unanswered attempt is repeated identically; an unanswered session is re-asked on the same attempt', async () => {
     const { ref, cookie } = await bookAndResolve();
     refref.state.attempt = 'TIMEOUT';
-    assert.equal((await http('POST', `/orders/${ref}/pay`, { cookie })).location, `/orders/${ref}`);
+    assert.equal((await payOrder(ref, cookie)).location, `/orders/${ref}`);
     assert.equal((await order(ref)).checkout_attempt_id, null);
     assert.equal(refref.calls(/\/payment-session$/).length, 0);
 
     refref.state.attempt = 'OK';
     refref.state.session = 'ERROR_500';
     await reconcileAll(deps);
-    assert.equal((await http('POST', `/orders/${ref}/pay`, { cookie })).location, `/orders/${ref}`);
+    assert.equal((await payOrder(ref, cookie)).location, `/orders/${ref}`);
     refref.state.session = 'READY';
-    assert.equal((await http('POST', `/orders/${ref}/pay`, { cookie })).location, 'https://pay.alfa.example/form?mdOrder=1');
+    assert.equal((await payOrder(ref, cookie)).location, 'https://pay.alfa.example/form?mdOrder=1');
 
     const creates = refref.calls(/\/checkout-attempts$/);
     assert.ok(creates.length >= 2);
@@ -188,10 +240,10 @@ describe('never a second payment after ambiguity', () => {
   test('a definitive failure offers another try on the same attempt', async () => {
     const { ref, cookie } = await bookAndResolve();
     refref.state.session = 'FAILED';
-    await http('POST', `/orders/${ref}/pay`, { cookie });
+    await payOrder(ref, cookie);
     assert.match((await http('GET', `/orders/${ref}`, { cookie })).body, /Платёж не прошёл[\s\S]*Попробовать ещё раз/);
     refref.state.session = 'READY';
-    assert.equal((await http('POST', `/orders/${ref}/pay`, { cookie })).location, 'https://pay.alfa.example/form?mdOrder=1');
+    assert.equal((await payOrder(ref, cookie)).location, 'https://pay.alfa.example/form?mdOrder=1');
     assert.equal(refref.attempts.size, 1);
   });
 });
@@ -199,7 +251,7 @@ describe('never a second payment after ambiguity', () => {
 describe('seats come back only when Refref says the money cannot move', () => {
   test('an abandoned payment: cancelled after an hour, and only once Refref agrees', async () => {
     const { ref, cookie } = await bookAndResolve(2);
-    await http('POST', `/orders/${ref}/pay`, { cookie });
+    await payOrder(ref, cookie);
     refref.state.obligation = 'OUTSTANDING';
     clock = new Date(clock.getTime() + 30 * MINUTE);
     await reconcileAll(deps);
@@ -223,12 +275,12 @@ describe('seats come back only when Refref says the money cannot move', () => {
   test('an attempt Refref refuses outright ends the order; an unexpected refusal holds it', async () => {
     const a = await bookAndResolve();
     refref.state.attempt = { status: 422, code: 'SNAPSHOT_INVALID' };
-    await http('POST', `/orders/${a.ref}/pay`, { cookie: a.cookie });
+    await payOrder(a.ref, a.cookie);
     assert.equal((await order(a.ref)).status, 'CANCELLED');
 
     const b = await bookAndResolve();
     refref.state.attempt = { status: 409, code: 'LIVE_CHECKOUT_ATTEMPT_EXISTS' };
-    await http('POST', `/orders/${b.ref}/pay`, { cookie: b.cookie });
+    await payOrder(b.ref, b.cookie);
     assert.deepEqual(await order(b.ref).then((o) => [o.status, o.hold_reason]), ['HELD', 'ATTEMPT_REFUSED:LIVE_CHECKOUT_ATTEMPT_EXISTS']);
   });
 });
@@ -236,11 +288,11 @@ describe('seats come back only when Refref says the money cannot move', () => {
 describe('the booking switch', () => {
   test('closed: no new payment is started, but a payment in flight is still read back and fulfilled', async () => {
     const a = await bookAndResolve();
-    await http('POST', `/orders/${a.ref}/pay`, { cookie: a.cookie });
+    await payOrder(a.ref, a.cookie);
     const b = await bookAndResolve();
     await setSalesOpen(db.operator, false, 'test', 'stop-sales');
     const before = refref.requests.length;
-    const refused = await http('POST', `/orders/${b.ref}/pay`, { cookie: b.cookie });
+    const refused = await payOrder(b.ref, b.cookie);
     assert.equal(refused.location, `/orders/${b.ref}?notice=SALES_CLOSED`);
     assert.equal(refref.requests.length, before);
     assert.equal((await order(b.ref)).status, 'RESERVED');
@@ -258,7 +310,7 @@ describe('stop-sales against a payment session already being started (PR #19 rev
   async function retryableOrder() {
     const o = await bookAndResolve();
     refref.state.session = 'FAILED';
-    await http('POST', `/orders/${o.ref}/pay`, { cookie: o.cookie });
+    await payOrder(o.ref, o.cookie);
     refref.state.session = 'READY';
     return o;
   }
@@ -272,7 +324,7 @@ describe('stop-sales against a payment session already being started (PR #19 rev
     try {
       await operator.query('BEGIN');
       await operator.query(`SELECT fn_set_sales_open(false, 'artur', 'stop-sales')`);
-      paying = http('POST', `/orders/${ref}/pay`, { cookie });
+      paying = payOrder(ref, cookie);
       // /pay cannot get past the switch while the close is in flight…
       assert.equal(await Promise.race([paying.then(() => 'DONE'), pending(300)]), 'PENDING');
       await operator.query('COMMIT');
@@ -289,7 +341,7 @@ describe('stop-sales against a payment session already being started (PR #19 rev
   test('a session already being started holds the close until it has been made', async () => {
     const { ref, cookie } = await retryableOrder();
     const gate = refref.holdSessions();
-    const paying = http('POST', `/orders/${ref}/pay`, { cookie });
+    const paying = payOrder(ref, cookie);
     await gate.arrived;
     const closing = setSalesOpen(db.operator, false, 'artur', 'stop-sales');
     try {
@@ -301,7 +353,7 @@ describe('stop-sales against a payment session already being started (PR #19 rev
     await closing;
     // From here on, nothing starts.
     assert.equal((await http('POST', '/orders', { form: bookingForm() })).status, 409);
-    assert.equal((await http('POST', `/orders/${ref}/pay`, { cookie })).location, `/orders/${ref}?notice=SALES_CLOSED`);
+    assert.equal((await payOrder(ref, cookie)).location, `/orders/${ref}?notice=SALES_CLOSED`);
   });
 });
 

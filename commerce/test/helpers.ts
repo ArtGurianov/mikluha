@@ -10,6 +10,7 @@ import pg from 'pg';
 import { loadCatalog, type Catalog } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import type { Logger } from '../src/log.js';
+import type { TouristInput } from '../src/orders.js';
 import { migrate } from '../src/migrate.js';
 
 const ADMIN = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@127.0.0.1:55432/postgres';
@@ -66,27 +67,74 @@ export async function freshDb(): Promise<TestDb> {
 
 export interface FixtureDeparture {
   slug: string; startsOn: string; endsOn?: string; status?: string; price?: number | null; capacity?: number | null;
-  requiresDateOfBirth?: boolean; isListed?: boolean; isDemo?: boolean;
+  isListed?: boolean; isDemo?: boolean;
+  /** false: the departure has no contract data, so it cannot be sold. */
+  contract?: boolean;
 }
 
-export const TERMS_TEXT = '## Условия\n\nТестовые условия бронирования.';
+const TOUR_CONTRACT = `contract:
+  destination: Республика Алтай
+  route: Кемерово — Телецкое озеро — Кемерово
+  program:
+    - title: "День 1. Кемерово — Телецкое озеро"
+      items: |-
+        06:00 — отправление
+        Заселение, ужин
+    - title: "День 2. Озеро"
+      items: |-
+        Прогулка на теплоходе
+  included: |-
+    Проезд
+    Проживание
+  excluded: Обеды
+  risks: Горная местность, перепады погоды
+`;
+
+const DEPARTURE_CONTRACT = `contract:
+  departurePoint: Кемерово, пл. Советов, 06:00
+  returnPoint: Кемерово, пл. Советов, около 21:00
+  accommodation:
+    name: Гостевой дом «Озеро»
+    address: Республика Алтай, с. Артыбаш
+    roomType: 2-местный номер
+    nights: 3
+    meals: Завтраки
+    legalEntity: ИП Озёрный
+  carrier:
+    legalName: ООО «Перевозчик»
+    route: Кемерово — Артыбаш — Кемерово
+    baggage: 1 место багажа
+    boarding: по документу, за 20 минут
+  services:
+    - name: Теплоход
+      supplier: ИП Озёрный
+      included: true
+`;
+
+export const TERMS_TEXT = '## Оферта\n\nТестовая публичная оферта.';
+
+/** A valid adult Russian tourist; `n` varies the name and the passport. */
+export const tourist = (n = 1, over: Partial<TouristInput> = {}): TouristInput => ({
+  fullName: ['Иван Петров', 'Анна Петрова', 'Олег Сидоров', 'Мария Сидорова'][(n - 1) % 4]!,
+  dateOfBirth: '1990-05-17', citizenship: 'RU',
+  document: { type: 'RU_PASSPORT', series: '3210', number: String(654320 + n) }, ...over,
+});
 
 export function fixtureCatalog(departures: FixtureDeparture[]): Catalog {
   const dir = mkdtempSync(join(tmpdir(), 'commerce-content-'));
   for (const sub of ['tours', 'departures', 'legal']) mkdirSync(join(dir, sub));
   writeFileSync(join(dir, 'site-settings.yml'), 'timezone: Asia/Krasnoyarsk\nlaunchReady: true\n');
-  writeFileSync(join(dir, 'tours', 'altai.yml'), 'title: Алтай\nslug: altai\n');
-  writeFileSync(join(dir, 'legal', 'booking-terms.yml'),
-    `title: Условия\nslug: booking-terms\nupdatedAt: "2026-10-04"\ncontent: |-\n${TERMS_TEXT.split('\n').map((l) => `  ${l}`).join('\n')}\n`);
+  writeFileSync(join(dir, 'tours', 'altai.yml'), `title: Алтай\nslug: altai\n${TOUR_CONTRACT}`);
+  writeFileSync(join(dir, 'legal', 'oferta.yml'),
+    `title: Публичная оферта\nslug: oferta\nupdatedAt: "2026-10-04"\ncontent: |-\n${TERMS_TEXT.split('\n').map((l) => `  ${l}`).join('\n')}\n`);
   for (const d of departures) {
     // Dates unquoted, as the CMS writes them.
     const lines = [`tour: altai`, `startDate: ${d.startsOn}`, `endDate: ${d.endsOn ?? d.startsOn}`,
       `bookingStatus: ${d.status ?? 'OPEN'}`];
     if (d.price !== null) lines.push(`price: ${d.price ?? 34000}`);
     if (d.capacity !== null) lines.push(`capacity: ${d.capacity ?? 12}`);
-    if (d.requiresDateOfBirth) lines.push('requiresDateOfBirth: true');
     lines.push(`isListed: ${d.isListed ?? true}`, `isDemo: ${d.isDemo ?? false}`);
-    writeFileSync(join(dir, 'departures', `${d.slug}.yml`), `${lines.join('\n')}\n`);
+    writeFileSync(join(dir, 'departures', `${d.slug}.yml`), `${lines.join('\n')}\n${d.contract === false ? '' : DEPARTURE_CONTRACT}`);
   }
   return loadCatalog(dir);
 }

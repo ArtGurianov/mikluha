@@ -176,6 +176,30 @@ collections:
           fields:
             - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_libraries: {all: {max_file_size: 1048576}}}
             - {name: alt, label: "Альтернативный текст (alt)", widget: string}
+      - name: contract
+        label: "Для договора: программа и условия"
+        widget: object
+        required: false
+        collapsed: true
+        hint: "Попадает в Заявку на бронирование каждого заказа и становится частью договора. Пока не заполнено, онлайн-бронирование этого направления не работает."
+        fields:
+          - {name: destination, label: "Регион / место временного пребывания", widget: string, required: false}
+          - {name: route, label: "Маршрут", widget: text, required: false}
+          - name: program
+            label: "Программа по дням"
+            widget: list
+            required: false
+            field:
+              name: day
+              label: День
+              widget: object
+              fields:
+                - {name: title, label: "Заголовок дня", widget: string, hint: "Например: «День 1. Кемерово — Телецкое озеро»"}
+                - {name: items, label: "Что происходит", widget: text, hint: "По одному пункту на строку, со временем, если оно известно."}
+          - {name: included, label: "Включено в цену", widget: text, required: false, hint: "По одному пункту на строку."}
+          - {name: excluded, label: "Не включено в цену", widget: text, required: false, hint: "По одному пункту на строку."}
+          - {name: insurance, label: "Добровольное страхование", widget: text, required: false, hint: "Если пусто: страхование в цену не включено."}
+          - {name: risks, label: "Характерные риски маршрута", widget: text, required: false}
       - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true, hint: "Выключите, чтобы временно скрыть направление из публичного каталога."}
       - {name: sortOrder, label: "Порядок сортировки", widget: number, default: 0, value_type: int, hint: "Чем меньше число, тем выше направление в списке."}
       - {name: updatedAt, label: "Дата существенного обновления", widget: datetime, type: date, input_timezone: utc, required: false, default: "{{now}}", hint: "Для поисковых систем (sitemap). Обновляйте, когда меняется программа, описание или фото — не при каждой опечатке."}
@@ -217,7 +241,51 @@ collections:
           - {label: "Поездка отменена", value: CANCELLED}
       - {name: price, label: "Стоимость поездки, ₽", widget: number, required: false, value_type: int, hint: "Цена за одного человека, целое число рублей. Обязательна, если набор открыт."}
       - {name: capacity, label: "Мест в группе", widget: number, required: false, value_type: int, min: 1, hint: "Сколько человек можно продать онлайн. Обязательно, если набор открыт. Сколько мест уже занято, считает сервис бронирования, а не CMS."}
-      - {name: requiresDateOfBirth, label: "Нужна дата рождения участников", widget: boolean, default: false, hint: "Включайте только если для этого выезда дата рождения действительно нужна (например, для билетов или страховки). Без необходимости её не собираем."}
+      - name: contract
+        label: "Для договора: посадка, размещение, перевозка"
+        widget: object
+        required: false
+        collapsed: true
+        hint: "Попадает в Заявку на бронирование и становится частью договора. Пока не заполнено, онлайн-бронирование этого выезда не работает."
+        fields:
+          - {name: departurePoint, label: "Место и время отправления", widget: string, required: false, hint: "Например: «Кемерово, пл. Советов, 10.10.2026 06:00»"}
+          - {name: returnPoint, label: "Место и ориентировочное время возвращения", widget: string, required: false}
+          - name: accommodation
+            label: Размещение
+            widget: object
+            required: false
+            fields:
+              - {name: name, label: "Средство размещения", widget: string, required: false}
+              - {name: address, label: Адрес, widget: string, required: false}
+              - {name: category, label: "Категория (если есть)", widget: string, required: false}
+              - {name: registryNumber, label: "Номер в реестре средств размещения (если применимо)", widget: string, required: false}
+              - {name: roomType, label: "Тип номера / размещения", widget: string, required: false}
+              - {name: nights, label: Ночей, widget: number, value_type: int, min: 0, required: false}
+              - {name: meals, label: Питание, widget: string, required: false}
+              - {name: legalEntity, label: "Поставщик (юрлицо / ИП)", widget: string, required: false}
+          - name: carrier
+            label: Перевозка
+            widget: object
+            required: false
+            fields:
+              - {name: legalName, label: "Перевозчик / фрахтовщик (юрлицо / ИП)", widget: string, required: false}
+              - {name: route, label: "Маршрут перевозки", widget: string, required: false}
+              - {name: vehicle, label: "Транспорт / класс (если известно)", widget: string, required: false}
+              - {name: baggage, label: "Условия провоза багажа", widget: string, required: false}
+              - {name: boarding, label: "Порядок посадки", widget: string, required: false}
+          - name: services
+            label: "Экскурсии и дополнительные услуги"
+            widget: list
+            required: false
+            field:
+              name: service
+              label: Услуга
+              widget: object
+              fields:
+                - {name: name, label: Услуга, widget: string}
+                - {name: supplier, label: Поставщик, widget: string}
+                - {name: included, label: "Включено в цену", widget: boolean, default: true}
+                - {name: note, label: Примечание, widget: string, required: false}
       - {name: prepaymentAmount, label: "Сумма бронирования, ₽", widget: number, required: false, value_type: int, hint: "Если не заполнено, используется значение по умолчанию из «Настроек сайта»."}
       - name: paymentQr
         label: "QR-код бронирования"

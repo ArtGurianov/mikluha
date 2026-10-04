@@ -55,7 +55,6 @@ export interface RawDeparture {
   price?: number | null;
   prepaymentAmount?: number | null;
   capacity?: number | null;
-  requiresDateOfBirth?: boolean | null;
   paymentQr?: RawImageRef | null;
   organizers?: string[] | null;
   isListed?: boolean | null;
@@ -206,7 +205,6 @@ export interface DepartureDTO<TImage = ImageAsset> {
   prepaymentAmount?: number;
   /** Seats sold online; mikluha-commerce counts the taken ones (docs/DECISIONS.md #9). */
   capacity?: number;
-  requiresDateOfBirth: boolean;
   paymentQr?: TImage;
   organizerIds: string[];
   isListed: boolean;
