@@ -5,7 +5,7 @@ import pg from 'pg';
 
 import type { Catalog } from '../src/catalog.js';
 import { maintain, reserve, salesOpen, setSalesOpen, type BookingRequest, type OrderDeps } from '../src/orders.js';
-import { captureLog, fixtureCatalog, freshDb, type TestDb } from './helpers.js';
+import { captureLog, fixtureCatalog, forceStatus, freshDb, type TestDb } from './helpers.js';
 
 const NOW = new Date('2026-10-04T06:00:00Z');
 const HOUR = 3_600_000;
@@ -123,7 +123,7 @@ describe('seats', () => {
     const a = await reserve(deps(), request({ passengers: [{ fullName: 'Иван Петров' }, { fullName: 'Анна Петрова' }] }));
     const b = await reserve(deps(), request());
     assert.ok(a.ok && b.ok);
-    await db.owner.query(`UPDATE orders SET status = 'PAYMENT_PENDING' WHERE order_ref = $1`, [b.orderRef]);
+    await forceStatus(db.owner, b.orderRef, 'PAYMENT_PENDING');
     const later = new Date(NOW.getTime() + HOUR);
     assert.deepEqual(await maintain(db.pool, () => undefined, later), { expired: 1, erased: 0 });
     // a's two seats are free again; b's pending one is not.
@@ -181,9 +181,9 @@ describe('personal data', () => {
       assert.ok(r.ok);
       refs.push(r.orderRef);
     }
-    await db.owner.query(`UPDATE orders SET status = 'FULFILLED' WHERE order_ref = $1`, [refs[0]]);
-    await db.owner.query(`UPDATE orders SET status = 'FULFILLED', legal_hold = true, legal_hold_reason = 'claim' WHERE order_ref = $1`, [refs[1]]);
-    await db.owner.query(`UPDATE orders SET status = 'PAYMENT_PENDING' WHERE order_ref = $1`, [refs[2]]);
+    await forceStatus(db.owner, refs[0]!, 'FULFILLED');
+    await forceStatus(db.owner, refs[1]!, 'FULFILLED', `, legal_hold = true, legal_hold_reason = 'claim'`);
+    await forceStatus(db.owner, refs[2]!, 'PAYMENT_PENDING');
     // The trip ends 2026-11-04: day 90 after it is 2027-02-02.
     assert.equal((await maintain(db.pool, () => undefined, new Date('2027-02-02T12:00:00Z'))).erased, 0);
     assert.equal((await maintain(db.pool, () => undefined, new Date('2027-02-03T12:00:00Z'))).erased, 1);

@@ -1,7 +1,6 @@
-// The HTTP surface of slice 1: health, readiness and identity only. Booking and payment routes come
-// with the Refref adapter (ART-47 slice 2) and the booking page (slice 3).
+// The HTTP server: health, readiness and identity here; the customer's routes in web.ts.
 
-import { createServer, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
 import type pg from 'pg';
 
@@ -15,6 +14,7 @@ export interface ServerDeps {
   readonly schemaHead: number;
   readonly sourceCommit: string | null;
   readonly startedAt: Date;
+  readonly onError?: (e: unknown) => void;
 }
 
 /** READY when the database answers at exactly this build's schema version. */
@@ -29,25 +29,30 @@ export async function readiness(deps: ServerDeps): Promise<{ status: 'READY' | '
   }
 }
 
-export function createCommerceServer(deps: ServerDeps): Server {
+export type RouteHandler = (req: IncomingMessage, res: ServerResponse, url: URL) => Promise<boolean>;
+
+export function createCommerceServer(deps: ServerDeps, routes?: RouteHandler): Server {
   return createServer((req, res) => {
     const send = (status: number, body: unknown) => {
+      if (res.headersSent) { res.end(); return; }
       res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' });
       res.end(JSON.stringify(body));
     };
-    const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-    if (req.method !== 'GET') { send(405, { error: 'METHOD_NOT_ALLOWED' }); return; }
-    if (path === '/healthz') { send(200, { ok: true }); return; }
-    if (path === '/readyz') {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const path = url.pathname;
+    if (req.method === 'GET' && path === '/healthz') { send(200, { ok: true }); return; }
+    if (req.method === 'GET' && path === '/readyz') {
       readiness(deps).then((r) => send(r.status === 'READY' ? 200 : 503, { service: SERVICE, ...r, sourceCommit: deps.sourceCommit }),
         () => send(503, { service: SERVICE, status: 'NOT_READY' }));
       return;
     }
-    if (path === '/identity') {
+    if (req.method === 'GET' && path === '/identity') {
       send(200, { service: SERVICE, sourceCommit: deps.sourceCommit, schemaHead: deps.schemaHead,
         startedAt: deps.startedAt.toISOString(), termsRef: deps.catalog.terms.ref });
       return;
     }
-    send(404, { error: 'NOT_FOUND' });
+    if (routes === undefined) { send(404, { error: 'NOT_FOUND' }); return; }
+    routes(req, res, url).then((handled) => { if (!handled) send(404, { error: 'NOT_FOUND' }); },
+      (e: unknown) => { deps.onError?.(e); send(500, { error: 'INTERNAL' }); });
   });
 }

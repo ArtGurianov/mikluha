@@ -1,0 +1,88 @@
+{
+  "source": "refref docs/scripts/rc2-contract-fixtures.yaml (copied; refref is the authority)",
+  "jcsVectors": [
+    {
+      "name": "object keys are ordered",
+      "json": "{\"b\":1,\"a\":2}",
+      "canonical": "{\"a\":2,\"b\":1}"
+    },
+    {
+      "name": "RFC 8785 §3.2.3 — UTF-16 code-unit order, not code-point order",
+      "json": "{\"\\u20ac\":\"Euro Sign\",\"\\r\":\"Carriage Return\",\"\\ufb33\":\"Hebrew Letter Dalet With Dagesh\",\"1\":\"One\",\"\\ud83d\\ude00\":\"Emoji: Grinning Face\",\"\\u0080\":\"Control\",\"\\u00f6\":\"Latin Small Letter O With Diaeresis\"}",
+      "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}"
+    },
+    {
+      "name": "string escaping follows ECMAScript JSON.stringify",
+      "json": "[\"\\u0000\\u001f\\\"\\\\/\\b\\f\\n\\r\\t é €\"]",
+      "canonical": "[\"\\u0000\\u001f\\\"\\\\/\\b\\f\\n\\r\\t é €\"]"
+    },
+    {
+      "name": "literals, nesting and no whitespace",
+      "json": "{ \"z\" : [ true , false , null , { } , [ ] ] , \"a\" : 0 }",
+      "canonical": "{\"a\":0,\"z\":[true,false,null,{},[]]}"
+    },
+    {
+      "name": "largest safe integer",
+      "json": "[9007199254740991,0,-1]",
+      "canonical": "[9007199254740991,0,-1]"
+    }
+  ],
+  "mikluhaCase": {
+    "snapshot": {
+      "schema": "refref.shared-checkout-snapshot/1",
+      "merchantId": "3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90",
+      "merchantOrderRef": "mk-2026-0142",
+      "currency": "RUB",
+      "referralResolutionId": "7a0e1c3b-5d2f-4e8a-b6c1-9f3d2e4a5b60",
+      "termsVersionId": "c2b7d9e1-4a3f-4b6c-8d2e-1f0a9b8c7d65",
+      "lines": [
+        {
+          "lineRef": "line_01",
+          "offerRef": "altai-tour",
+          "unitRef": "altai-2026-10-10",
+          "quantity": 2,
+          "merchantOfferAmountKopecks": 6800000,
+          "referralDiscountAmountKopecks": 400000,
+          "finalAmountKopecks": 6400000,
+          "serviceStartsAt": "2026-10-09T17:30:00Z",
+          "serviceEndsAt": "2026-10-13T14:00:00Z"
+        }
+      ],
+      "totalContractAmountKopecks": 6400000,
+      "paymentObligations": [
+        {
+          "obligationRef": "full",
+          "kind": "FULL",
+          "executionMode": "ORCHESTRATED",
+          "fiscalizationMode": "MERCHANT",
+          "amountKopecks": 6400000,
+          "allocations": [
+            {
+              "lineRef": "line_01",
+              "amountKopecks": 6400000
+            }
+          ],
+          "fiscal": {
+            "taxSystem": "USN_INCOME",
+            "items": [
+              {
+                "lineRef": "line_01",
+                "name": "Тур «Алтай», 10–13.10.2026",
+                "quantity": 2,
+                "amountKopecks": 6400000,
+                "vatCode": "NONE",
+                "paymentMethod": "FULL_PREPAYMENT",
+                "paymentObject": "SERVICE"
+              }
+            ]
+          }
+        }
+      ],
+      "inventoryReservationRef": "res-altai-2026-10-10-0142",
+      "legalReleaseRef": "mikluha-offer-2026-09",
+      "legalReleaseHash": "sha256:9f2c61b0e4d7a3c85e1f0b2a6d9c4e7f"
+    },
+    "snapshotHash": "refref-jcs-1:95c2d583ed74a929dd18eb725ce926fc4c6ae0d497c8a849580d79a90079b6bd",
+    "inputHash": "refref-jcs-1:01dee43b9e47267e4d46aefe0c6966587f4e507305e769581d4ee9d76533b403"
+  }
+}

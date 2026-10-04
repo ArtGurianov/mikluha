@@ -1,3 +1,4 @@
 [
-  { "version": 1, "file": "0001_orders.sql" }
+  { "version": 1, "file": "0001_orders.sql" },
+  { "version": 2, "file": "0002_checkout.sql" }
 ]
