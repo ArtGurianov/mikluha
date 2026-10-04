@@ -20,8 +20,9 @@ static; everything that sells a trip lives here, with its own Postgres.
 | price | the full `price` of the departure for every seat, frozen on the order; `prepaymentAmount` is never used |
 | what is sold | an OPEN, listed departure with a `price` and a `capacity` that has not started; demo departures only in STAGING |
 | seats | counted here, never in the CMS; checked under a per-departure lock; RESERVED for 30 min, PAYMENT_PENDING and HELD never freed by time |
-| personal data | contact: full name, phone, email. Passengers: full name, plus a date of birth only where the departure sets `requiresDateOfBirth`; otherwise it is refused. Adults only. Nothing personal in logs |
-| erasure | unpaid (EXPIRED, CANCELLED): within 24 h of ending. A trip (PAID, FULFILLED, REFUNDED): 90 days after it ends. Never under `legal_hold`, never while money is unresolved |
+| personal data | the customer (Заказчик) is tourist №1, plus a phone and an email; a customer who does not travel is not booked online. Every tourist: what ЕИС «Электронная путёвка» requires (ПП №417): full name, date of birth, citizenship, and an identity document (type, series where it has one, number). Nothing more: no issue date, issuer, address or scans. Adults only. Nothing personal in logs |
+| contract | the offer (`content/legal/oferta.yml`) plus the order's **Заявка на бронирование** (`src/zayavka.ts`), built from the order, its tourists and the tour's and departure's `contract` data in the CMS. A departure without complete contract data is not sold. The Заявка is rendered when the price is resolved, shown before paying exactly as stored, and accepted by paying; `/pay` carries its hash, and a different one is refused. After that the database forbids changing it. Erased 3 years after the contract ended (24 hours after an unpaid order ends); its hash stays |
+| erasure | unpaid (EXPIRED, CANCELLED): everything, the Заявка included, within 24 h of ending; no contract was concluded. A paid trip (PAID, FULFILLED, REFUNDED): the contact and tourist rows 90 days after it ends; the Заявка, which is the contract, **3 years after the contract ended** (ПП РФ №748): the trip's end for FULFILLED, the refund (`closed_at`) for REFUNDED, never for a PAID order, whose contract is still open. Nothing under `legal_hold` or while money is unresolved |
 | booking switch | closed on a new database. Only an operator login (`commerce_operator`) can change it, through `fn_set_sales_open`, which records who, why and the database login. The service can read it, never change it. A sale reads it under a lock in its own transaction |
 
 ## Checkout (refref docs/28)
@@ -36,6 +37,7 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 
 | | |
 |---|---|
+| contract hash | `legalReleaseRef` is the offer version; `legalReleaseHash` is `sha256` over the offer's hash and the Заявка's (`contractHash`) |
 | what is paid | one FULL / ORCHESTRATED / PROVIDER obligation: the full price minus any referral discount. One fiscal item of quantity 1 equal to the payment, USN_INCOME, FULL_PREPAYMENT, SERVICE, no VAT. This is the Alfa path that was qualified, and nothing else is built (`src/snapshot.ts`). The digest is computed here independently and checked against Refref's own vectors |
 | PAID | only from Refref's read-back: the obligation SATISFIED by a SUCCEEDED payment of exactly the payable amount. The customer's return from the bank decides nothing |
 | no second payment | one attempt per order, created with the fixed key `mk-attempt:<ref>`; an unanswered request is repeated identically. Sessions are only re-requested on that attempt: Refref replays a live payment and starts a new one only after a definitive failure |
@@ -107,7 +109,8 @@ docker run -d --rm --name commerce-test-pg -e POSTGRES_PASSWORD=postgres -p 5543
 | `COMMERCE_ENVIRONMENT` | `STAGING` or `PRODUCTION`. PRODUCTION refuses to start unless the content is `launchReady` |
 | `CONTENT_DIR` | set by the image: the site's `content/` from the same commit |
 | `SOURCE_COMMIT` | build arg, reported by `/readyz` and `/identity` |
-| `COMMERCE_ORIGIN` | this service's public origin |
+| `COMMERCE_ORIGIN` | this service's public origin: `https://book.mikluha-maklai.ru` |
+| `SITE_ORIGIN` | the public site, where the legal pages are: `https://mikluha-maklai.ru` |
 | `REFREF_API_BASE` | e.g. `https://api.refref.ru/v1-rc` |
 | `REFREF_CHECKOUT_ORIGIN` | e.g. `https://checkout.refref.ru` |
 | `REFREF_BUSINESS_ID`, `REFREF_BUSINESS_SLUG` | Mikluha's Refref Business |

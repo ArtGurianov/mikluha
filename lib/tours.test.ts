@@ -28,7 +28,6 @@ function departure(overrides: Partial<DepartureDTO>): DepartureDTO {
     organizerIds: [],
     isListed: true,
     isDemo: false,
-    requiresDateOfBirth: false,
     ...overrides,
   };
 }

@@ -19,6 +19,8 @@ import type pg from 'pg';
 import type { Catalog } from './catalog.js';
 import type { Logger } from './log.js';
 import { errorCode, type CheckoutAttempt, type RefrefClient, type ResolvedResolution } from './refref.js';
+import { contractHash, renderZayavka, sha256Hex } from './zayavka.js';
+import type { Tourist } from './orders.js';
 import { buildSnapshot, LINE_REF, OBLIGATION_REF, orderLine, resolutionInputHash, snapshotDigest, type Json, type OrderDeal } from './snapshot.js';
 
 export interface Merchant {
@@ -29,6 +31,8 @@ export interface Merchant {
   readonly checkoutOrigin: string;
   /** This service's public origin; /return and /orders/ must be authorized destinations of the Business. */
   readonly origin: string;
+  /** The public site's origin, where the offer and the other legal pages are published. */
+  readonly siteOrigin: string;
 }
 
 export interface CheckoutDeps {
@@ -190,7 +194,46 @@ export async function onReturn(deps: CheckoutDeps, q: { rt: string | null; state
     discount_kopecks: discount, payable_kopecks: Number(o.amount_kopecks) - discount,
   }, 'RESOLVED', res.attributionSource.replace(/[^A-Z_]/g, ''), now);
   deps.log('resolved', { orderRef: o.order_ref, attribution: res.attributionSource, discountKopecks: discount });
+  if (!(await writeZayavka(deps, o.order_ref, now))) return { kind: 'REFUSED', code: 'DEPARTURE_NO_CONTRACT', orderRef: o.order_ref };
   return { kind: 'CONFIRM', orderRef: o.order_ref };
+}
+
+/**
+ * (Re)write the order's Заявка from its frozen facts, its tourists and the departure's contract
+ * data. Only while RESERVED: once the customer pays, the database refuses any change.
+ */
+async function writeZayavka(deps: CheckoutDeps, orderRef: string, now: Date): Promise<boolean> {
+  const o = await loadOrder(deps.pool, orderRef);
+  if (o === null || o.status !== 'RESERVED' || o.payable_kopecks === null) return false;
+  const departure = deps.catalog.departures.get(o.departure_slug);
+  if (departure === undefined || departure.contract === null) return false;
+  const contact = (await deps.pool.query<{ full_name: string; phone: string; email: string }>(
+    'SELECT full_name, phone, email FROM order_contact WHERE order_id = $1', [o.id])).rows[0];
+  if (contact === undefined) return false;
+  const tourists = (await deps.pool.query<{ full_name: string; dob: string; citizenship: string; document_type: Tourist['documentType'];
+    document_series: string | null; document_number: string }>(
+    `SELECT full_name, to_char(date_of_birth, 'YYYY-MM-DD') AS dob, citizenship, document_type, document_series, document_number
+       FROM order_passenger WHERE order_id = $1 ORDER BY position`, [o.id])).rows
+    .map((t) => ({ fullName: t.full_name, dateOfBirth: t.dob, citizenship: t.citizenship, documentType: t.document_type,
+      documentSeries: t.document_series, documentNumber: t.document_number }));
+  const formedAt = new Intl.DateTimeFormat('ru-RU', { timeZone: deps.catalog.timezone, dateStyle: 'short', timeStyle: 'short' }).format(now);
+  const content = renderZayavka({
+    orderRef: o.order_ref, formedAt, offerRef: o.legal_release_ref,
+    departure: { ...departure, contract: departure.contract, startsOn: o.trip_starts_on, endsOn: o.trip_ends_on },
+    contact: { fullName: contact.full_name, phone: contact.phone, email: contact.email },
+    tourists, amountKopecks: Number(o.amount_kopecks), discountKopecks: Number(o.discount_kopecks),
+  });
+  await deps.pool.query(`INSERT INTO order_document (order_id, kind, content, sha256, created_at) VALUES ($1, 'ZAYAVKA', $2, $3, $4)
+    ON CONFLICT (order_id, kind) DO UPDATE SET content = EXCLUDED.content, sha256 = EXCLUDED.sha256, created_at = EXCLUDED.created_at`,
+  [o.id, content, sha256Hex(content), now]);
+  return true;
+}
+
+/** The order's Заявка as stored: what the customer is shown, and what they accept by paying. */
+export async function zayavkaOf(pool: pg.Pool, orderRef: string): Promise<{ content: string | null; sha256: string } | null> {
+  const { rows } = await pool.query<{ content: string | null; sha256: string }>(
+    `SELECT d.content, d.sha256 FROM order_document d JOIN orders o ON o.id = d.order_id WHERE o.order_ref = $1 AND d.kind = 'ZAYAVKA'`, [orderRef]);
+  return rows[0] ?? null;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -200,8 +243,11 @@ export type PayOutcome =
   | { readonly kind: 'REDIRECT'; readonly url: string }
   | { readonly kind: 'STATUS'; readonly code?: string };
 
-/** POST /orders/:ref/pay — the customer accepted the final price. */
-export async function pay(deps: CheckoutDeps, orderRef: string): Promise<PayOutcome> {
+/**
+ * POST /orders/:ref/pay — the customer accepted the final price and the Заявка whose hash the form
+ * carried. A Заявка that changed since it was shown (a new resolution in another tab) is refused.
+ */
+export async function pay(deps: CheckoutDeps, orderRef: string, acceptedZayavka: string): Promise<PayOutcome> {
   const now = (deps.now ?? (() => new Date()))();
   let o = await loadOrder(deps.pool, orderRef);
   if (o === null) return { kind: 'STATUS', code: 'UNKNOWN_ORDER' };
@@ -209,9 +255,12 @@ export async function pay(deps: CheckoutDeps, orderRef: string): Promise<PayOutc
   if (o.status === 'RESERVED') {
     if (o.referral_resolution_id === null) return { kind: 'STATUS', code: 'NOT_RESOLVED' };
     if (o.reserved_until <= now || o.resolution_expires_at! <= now) return { kind: 'STATUS', code: 'RESERVATION_EXPIRED' };
+    const zayavka = await zayavkaOf(deps.pool, orderRef);
+    if (zayavka === null) return { kind: 'STATUS', code: 'NOT_RESOLVED' };
+    if (zayavka.sha256 !== acceptedZayavka) return { kind: 'STATUS', code: 'DOCUMENT_CHANGED' };
     const snapshot = buildSnapshot(deal(deps, o), { merchantId: deps.merchant.businessId,
       referralResolutionId: o.referral_resolution_id, termsVersionId: o.terms_version_id, discountKopecks: Number(o.discount_kopecks) },
-    { ref: o.legal_release_ref, hash: o.legal_release_hash });
+    { ref: o.legal_release_ref, hash: contractHash(o.legal_release_ref, o.legal_release_hash, zayavka.sha256) });
     const hash = snapshotDigest(snapshot);
     // Freeze, under the booking switch: a closed switch stops new payments too.
     const client = await deps.pool.connect();

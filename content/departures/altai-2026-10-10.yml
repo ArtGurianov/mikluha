@@ -5,6 +5,25 @@ bookingStatus: OPEN
 price: 34000
 prepaymentAmount: 5000
 capacity: 12
+contract:
+  departurePoint: "Демо: Кемерово, пл. Советов, 10.10.2026 06:00"
+  returnPoint: "Демо: Кемерово, пл. Советов, 13.10.2026 около 21:00"
+  accommodation:
+    name: "Демо: гостевой дом «Пример»"
+    address: "Демо: Республика Алтай, с. Артыбаш"
+    roomType: "Демо: 2-местный номер"
+    nights: 3
+    meals: "Демо: завтраки"
+    legalEntity: "Демо: ИП Пример"
+  carrier:
+    legalName: "Демо: ООО «Перевозчик»"
+    route: "Демо: Кемерово — Артыбаш — Кемерово"
+    baggage: "Демо: 1 место багажа и ручная кладь"
+    boarding: "Демо: посадка за 20 минут до отправления по документу"
+  services:
+    - name: "Демо: прогулка на теплоходе"
+      supplier: "Демо: ИП Пример"
+      included: true
 organizers:
   - artur
 isListed: true

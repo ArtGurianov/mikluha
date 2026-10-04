@@ -4,6 +4,7 @@
 //   CONTENT_DIR           the site's content/ (in the image: /app/content)
 //   SOURCE_COMMIT         set by the image build
 //   COMMERCE_ORIGIN       this service's public origin, e.g. https://book.mikluha-maklai.ru
+//   SITE_ORIGIN           the public site, where the legal pages are, e.g. https://mikluha-maklai.ru
 //   REFREF_API_BASE       e.g. https://api.refref.ru/v1-rc
 //   REFREF_CHECKOUT_ORIGIN  e.g. https://checkout.refref.ru
 //   REFREF_BUSINESS_ID, REFREF_BUSINESS_SLUG, REFREF_API_KEY   Mikluha's Refref Business and its key
@@ -30,7 +31,7 @@ const checkout: CheckoutDeps = {
   refref: new RefrefClient({ apiBase: env('REFREF_API_BASE'), apiKey: env('REFREF_API_KEY') }),
   merchant: {
     businessId: env('REFREF_BUSINESS_ID'), businessSlug: env('REFREF_BUSINESS_SLUG'),
-    checkoutOrigin: env('REFREF_CHECKOUT_ORIGIN'), origin: env('COMMERCE_ORIGIN'),
+    checkoutOrigin: env('REFREF_CHECKOUT_ORIGIN'), origin: env('COMMERCE_ORIGIN'), siteOrigin: env('SITE_ORIGIN'),
   },
 };
 const server = createCommerceServer({

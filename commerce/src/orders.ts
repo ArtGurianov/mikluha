@@ -2,9 +2,11 @@
 //
 // Owner decisions (Linear ART-47, 2026-10-04):
 //   * the customer pays the full departure price online, for every seat;
-//   * booking contact = full name, phone, email; each passenger = full name, and a date of birth
-//     only when the departure requires it (otherwise it is refused, not just ignored);
-//   * adults only in v1: the booker confirms it; where dates of birth are collected, they prove it;
+//   * the customer (Заказчик) is tourist №1, plus a phone and an email: a customer who does not
+//     travel would need their own document, address and authority in ЕИС, which v1 does not take;
+//   * every tourist = what ЕИС «Электронная путёвка» requires (ПП №417): full name, date of birth,
+//     citizenship, identity document (type, series where it has one, number). Nothing more;
+//   * adults only in v1: the booker confirms it and every date of birth proves it;
 //   * personal data never goes to logs (or to Refref, except the receipt email in a later slice);
 //   * an unpaid order's personal data is erased within 24 hours of it ending; a trip's within
 //     90 days after it ends, unless the order is under a legal hold or its money is unresolved.
@@ -20,15 +22,60 @@ export const MAX_SEATS_PER_ORDER = 6;
 export const RESERVATION_MINUTES = 30;
 export const UNPAID_PD_RETENTION_HOURS = 24;
 export const TRIP_PD_RETENTION_DAYS = 90;
+/**
+ * ПП РФ №748: what a tourist contract contains is kept 3 years from the END OF THE CONTRACT: for a
+ * FULFILLED order the trip's end, for a REFUNDED one the refund (closed_at). A PAID order has not
+ * ended, so its contract is never erased, however old the trip.
+ */
+export const CONTRACT_RETENTION_YEARS = 3;
 export const ADULT_AGE = 18;
 
 /** States whose seats are taken. PAYMENT_PENDING and HELD never free seats on a timer. */
 export const TAKEN = ['RESERVED', 'PAYMENT_PENDING', 'PAID', 'FULFILLED', 'HELD'] as const;
 
+export type DocumentType = 'RU_PASSPORT' | 'RU_INTERNATIONAL_PASSPORT' | 'FOREIGN_DOCUMENT';
+
+export interface TouristInput {
+  readonly fullName: string;
+  readonly dateOfBirth: string;
+  /** ISO 3166-1 alpha-2, e.g. RU. */
+  readonly citizenship: string;
+  readonly document: { readonly type: string; readonly series?: string; readonly number: string };
+}
+
+export interface Tourist {
+  readonly fullName: string; readonly dateOfBirth: string; readonly citizenship: string;
+  readonly documentType: DocumentType; readonly documentSeries: string | null; readonly documentNumber: string;
+}
+
+/** Codes that name a country (Intl knows its name), not a region or a placeholder. */
+const NOT_COUNTRIES = new Set(['EU', 'EZ', 'UN', 'ZZ', 'QO', 'XA', 'XB', 'AQ']);
+const regionNames = new Intl.DisplayNames('ru', { type: 'region' });
+export function countryName(code: string): string | null {
+  if (!/^[A-Z]{2}$/.test(code) || NOT_COUNTRIES.has(code)) return null;
+  const n = regionNames.of(code);
+  return n === undefined || n === code ? null : n;
+}
+
+/** The document, normalised (digits and Latin capitals only), or null if it is not one we accept. */
+export function normalizeDocument(citizenship: string, d: TouristInput['document']):
+  { type: DocumentType; series: string | null; number: string } | null {
+  const clean = (v: string | undefined) => (v ?? '').toUpperCase().replace(/[\s№-]/g, '');
+  const series = clean(d.series);
+  const number = clean(d.number);
+  if (d.type === 'RU_PASSPORT' && citizenship === 'RU' && /^\d{4}$/.test(series) && /^\d{6}$/.test(number)) return { type: d.type, series, number };
+  if (d.type === 'RU_INTERNATIONAL_PASSPORT' && citizenship === 'RU' && /^\d{2}$/.test(series) && /^\d{7}$/.test(number)) return { type: d.type, series, number };
+  if (d.type === 'FOREIGN_DOCUMENT' && citizenship !== 'RU' && /^[0-9A-Z]{0,10}$/.test(series) && /^[0-9A-Z]{1,20}$/.test(number)) {
+    return { type: d.type, series: series === '' ? null : series, number };
+  }
+  return null;
+}
+
 export interface BookingRequest {
   readonly departureSlug: string;
-  readonly contact: { readonly fullName: string; readonly phone: string; readonly email: string };
-  readonly passengers: readonly { readonly fullName: string; readonly dateOfBirth?: string }[];
+  /** The customer's phone and email. The customer is passengers[0]. */
+  readonly contact: { readonly phone: string; readonly email: string };
+  readonly passengers: readonly TouristInput[];
   readonly adultsOnlyConfirmed: boolean;
   readonly termsRef: string;
   readonly termsHash: string;
@@ -36,9 +83,9 @@ export interface BookingRequest {
 
 export type BookingRefusal =
   | NotBookable | 'SALES_CLOSED' | 'TERMS_NOT_CURRENT' | 'ADULTS_ONLY_NOT_CONFIRMED'
-  | 'SEATS_INVALID' | 'NOT_ENOUGH_SEATS' | 'CONTACT_NAME_INVALID' | 'CONTACT_PHONE_INVALID'
-  | 'CONTACT_EMAIL_INVALID' | 'PASSENGER_NAME_INVALID' | 'DATE_OF_BIRTH_REQUIRED'
-  | 'DATE_OF_BIRTH_NOT_COLLECTED' | 'DATE_OF_BIRTH_INVALID' | 'PASSENGER_NOT_ADULT';
+  | 'SEATS_INVALID' | 'NOT_ENOUGH_SEATS' | 'CONTACT_PHONE_INVALID'
+  | 'CONTACT_EMAIL_INVALID' | 'PASSENGER_NAME_INVALID' | 'DATE_OF_BIRTH_INVALID' | 'PASSENGER_NOT_ADULT'
+  | 'CITIZENSHIP_INVALID' | 'DOCUMENT_INVALID';
 
 export type BookingResult =
   | { readonly ok: true; readonly orderRef: string; readonly amountKopecks: number; readonly reservedUntil: Date }
@@ -113,27 +160,23 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
   const seats = req.passengers.length;
   if (seats < 1 || seats > MAX_SEATS_PER_ORDER) return refuse('SEATS_INVALID');
 
-  const contactName = name(req.contact.fullName);
-  if (contactName === null) return refuse('CONTACT_NAME_INVALID');
   const phone = normalizePhone(req.contact.phone);
   if (phone === null) return refuse('CONTACT_PHONE_INVALID');
   const email = req.contact.email.trim().toLowerCase();
   if (!EMAIL.test(email) || email.length > 254) return refuse('CONTACT_EMAIL_INVALID');
 
-  const passengers: { fullName: string; dateOfBirth: string | null }[] = [];
+  const passengers: Tourist[] = [];
   for (const p of req.passengers) {
     const n = name(p.fullName);
     if (n === null) return refuse('PASSENGER_NAME_INVALID');
-    if (!departure.requiresDateOfBirth) {
-      // Not needed for this departure, so not collected at all (data minimisation).
-      if (p.dateOfBirth !== undefined) return refuse('DATE_OF_BIRTH_NOT_COLLECTED');
-      passengers.push({ fullName: n, dateOfBirth: null });
-      continue;
-    }
-    if (p.dateOfBirth === undefined) return refuse('DATE_OF_BIRTH_REQUIRED');
     if (!realDate(p.dateOfBirth) || p.dateOfBirth >= departure.startsOn) return refuse('DATE_OF_BIRTH_INVALID');
     if (ageOn(p.dateOfBirth, departure.startsOn) < ADULT_AGE) return refuse('PASSENGER_NOT_ADULT');
-    passengers.push({ fullName: n, dateOfBirth: p.dateOfBirth });
+    const citizenship = p.citizenship.trim().toUpperCase();
+    if (countryName(citizenship) === null) return refuse('CITIZENSHIP_INVALID');
+    const doc = normalizeDocument(citizenship, p.document);
+    if (doc === null) return refuse('DOCUMENT_INVALID');
+    passengers.push({ fullName: n, dateOfBirth: p.dateOfBirth, citizenship,
+      documentType: doc.type, documentSeries: doc.series, documentNumber: doc.number });
   }
 
   const client = await deps.pool.connect();
@@ -165,11 +208,13 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
       [orderRef, departure.slug, departure.startsOn, departure.endsOn, seats, departure.priceKopecks, amount,
         reservedUntil, req.termsRef, req.termsHash, now]);
     const id = inserted.rows[0]!.id;
+    // The customer is tourist №1: their name is that tourist's, by construction.
     await client.query('INSERT INTO order_contact (order_id, full_name, phone, email) VALUES ($1, $2, $3, $4)',
-      [id, contactName, phone, email]);
+      [id, passengers[0]!.fullName, phone, email]);
     for (const [i, p] of passengers.entries()) {
-      await client.query('INSERT INTO order_passenger (order_id, position, full_name, date_of_birth) VALUES ($1, $2, $3, $4)',
-        [id, i + 1, p.fullName, p.dateOfBirth]);
+      await client.query(`INSERT INTO order_passenger (order_id, position, full_name, date_of_birth, citizenship,
+          document_type, document_series, document_number) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [id, i + 1, p.fullName, p.dateOfBirth, p.citizenship, p.documentType, p.documentSeries, p.documentNumber]);
     }
     await client.query(`INSERT INTO order_event (order_id, at, event, detail) VALUES ($1, $2, 'RESERVED', $3)`,
       [id, now, `seats:${seats}`]);
@@ -188,7 +233,7 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
  * Housekeeping, run every minute: reservations past their time end as EXPIRED (their seats are
  * free again), then personal data past its retention is erased. Returns what it did, as counts.
  */
-export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date()): Promise<{ expired: number; erased: number }> {
+export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date()): Promise<{ expired: number; erased: number; contractsErased: number }> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -198,26 +243,41 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
     for (const r of expired.rows) {
       await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'EXPIRED')`, [r.id, now]);
     }
-    // Unpaid and over: 24 hours. A trip: 90 days after it ends, once its money is settled (a paid,
-    // fulfilled or refunded order — never one still pending or held). A legal hold stops both.
-    const erasable = await client.query<{ id: string }>(
-      `SELECT id FROM orders
+    // Unpaid and over: 24 hours; no contract was concluded, so the Заявка goes too. A trip: the
+    // operational personal data 90 days after it ends, once its money is settled (paid, fulfilled or
+    // refunded; never pending or held); the Заявка, which is then the contract, stays (below).
+    // A legal hold stops all of it.
+    const erasable = await client.query<{ id: string; unpaid: boolean }>(
+      `SELECT id, status IN ('EXPIRED','CANCELLED') AS unpaid FROM orders
         WHERE pd_erased_at IS NULL AND NOT legal_hold AND (
               (status IN ('EXPIRED','CANCELLED') AND closed_at <= $1::timestamptz - make_interval(hours => $2))
            OR (status IN ('PAID','FULFILLED','REFUNDED')
                AND trip_ends_on + $3::int < ($1::timestamptz AT TIME ZONE 'UTC')::date))
         FOR UPDATE`, [now, UNPAID_PD_RETENTION_HOURS, TRIP_PD_RETENTION_DAYS]);
     for (const r of erasable.rows) {
+      if (r.unpaid) await client.query('UPDATE order_document SET content = NULL WHERE order_id = $1', [r.id]);
       await client.query('DELETE FROM order_passenger WHERE order_id = $1', [r.id]);
       await client.query('DELETE FROM order_contact WHERE order_id = $1', [r.id]);
       await client.query('UPDATE orders SET pd_erased_at = $2 WHERE id = $1', [r.id, now]);
       await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'PD_ERASED')`, [r.id, now]);
     }
-    await client.query('COMMIT');
-    if (expired.rowCount || erasable.rowCount) {
-      log('maintenance', { expired: expired.rowCount ?? 0, erased: erasable.rowCount ?? 0 });
+    // The contract (a paid order's Заявка): 3 years after the contract ended, unless held.
+    const contracts = await client.query<{ order_id: string }>(
+      `UPDATE order_document d SET content = NULL FROM orders o
+        WHERE o.id = d.order_id AND d.content IS NOT NULL AND NOT o.legal_hold
+          AND ((o.status = 'FULFILLED'
+                AND o.trip_ends_on + make_interval(years => $2) < ($1::timestamptz AT TIME ZONE 'UTC')::date)
+            OR (o.status = 'REFUNDED' AND o.closed_at + make_interval(years => $2) < $1::timestamptz))
+        RETURNING d.order_id`, [now, CONTRACT_RETENTION_YEARS]);
+    for (const r of contracts.rows) {
+      await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'CONTRACT_ERASED')`, [r.order_id, now]);
     }
-    return { expired: expired.rowCount ?? 0, erased: erasable.rowCount ?? 0 };
+    await client.query('COMMIT');
+    const contractsErased = contracts.rowCount ?? 0;
+    if (expired.rowCount || erasable.rowCount || contractsErased) {
+      log('maintenance', { expired: expired.rowCount ?? 0, erased: erasable.rowCount ?? 0, contractsErased });
+    }
+    return { expired: expired.rowCount ?? 0, erased: erasable.rowCount ?? 0, contractsErased };
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw e;

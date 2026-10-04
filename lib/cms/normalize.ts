@@ -140,7 +140,6 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
     price: d.price ?? undefined,
     prepaymentAmount: d.prepaymentAmount ?? undefined,
     capacity: d.capacity ?? undefined,
-    requiresDateOfBirth: flag(d.requiresDateOfBirth),
     paymentQr: maybeImage(d.paymentQr),
     organizerIds: d.organizers ?? [],
     isListed: flag(d.isListed),
