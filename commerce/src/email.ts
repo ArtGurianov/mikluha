@@ -18,6 +18,7 @@ export interface EmailConfig {
 export type SendResult =
   | { readonly kind: 'ACCEPTED'; readonly jobId: string }
   | { readonly kind: 'AMBIGUOUS'; readonly code: string }
+  | { readonly kind: 'DUPLICATE'; readonly code: 'IDEMPOTENCE_DUPLICATE' }
   | { readonly kind: 'REJECTED'; readonly code: string };
 
 export interface EmailSender {
@@ -27,7 +28,8 @@ export interface EmailSender {
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const safeCode = (value: unknown, fallback: string): string => {
-  const code = typeof value === 'string' ? value.toUpperCase().replace(/[^A-Z0-9_]/g, '_').slice(0, 60) : '';
+  const code = typeof value === 'string' || typeof value === 'number'
+    ? String(value).toUpperCase().replace(/[^A-Z0-9_]/g, '_').slice(0, 60) : '';
   return code || fallback;
 };
 
@@ -72,9 +74,13 @@ export class UniSenderGoClient implements EmailSender {
       });
       let body: unknown;
       try { body = await response.json(); } catch { body = null; }
-      if (response.status === 429 || response.status >= 500) return { kind: 'AMBIGUOUS', code: `HTTP_${response.status}` };
+      if (response.status === 408 || response.status === 429 || response.status >= 500) {
+        return { kind: 'AMBIGUOUS', code: `HTTP_${response.status}` };
+      }
       const parsed = body as { status?: unknown; job_id?: unknown; failed_emails?: unknown; code?: unknown;
         error?: { code?: unknown } } | null;
+      const providerCode = parsed?.code ?? parsed?.error?.code;
+      if (String(providerCode) === '1573') return { kind: 'DUPLICATE', code: 'IDEMPOTENCE_DUPLICATE' };
       const failures = parsed?.failed_emails;
       const hasFailures = Array.isArray(failures) ? failures.length > 0
         : typeof failures === 'object' && failures !== null ? Object.keys(failures).length > 0 : failures !== undefined;
@@ -83,7 +89,7 @@ export class UniSenderGoClient implements EmailSender {
         return { kind: 'ACCEPTED', jobId: parsed.job_id };
       }
       if (response.status >= 400 && response.status < 500) {
-        return { kind: 'REJECTED', code: safeCode(parsed?.code ?? parsed?.error?.code, `HTTP_${response.status}`) };
+        return { kind: 'REJECTED', code: safeCode(providerCode, `HTTP_${response.status}`) };
       }
       if (response.status >= 200 && response.status < 300 && hasFailures) {
         return { kind: 'REJECTED', code: 'RECIPIENT_REJECTED' };
@@ -97,55 +103,90 @@ export class UniSenderGoClient implements EmailSender {
 
 interface OutboxRow {
   id: string; order_ref: string; recipient_email: string; access_token: string; idempotency_key: string; attempts: number;
+  first_attempt_at: Date | null;
 }
 
-async function claim(pool: pg.Pool, now: Date): Promise<OutboxRow | null> {
+type SendableOutboxRow = Omit<OutboxRow, 'first_attempt_at'> & { readonly first_attempt_at: Date };
+type Claim = { readonly kind: 'SEND'; readonly row: SendableOutboxRow }
+  | { readonly kind: 'WINDOW_EXPIRED'; readonly row: Pick<OutboxRow, 'id' | 'order_ref' | 'attempts'> };
+
+// UniSender only rejects a repeated idempotence key for one minute. A retry may start for the
+// first 40 seconds, leaving a 20-second margin (greater than the 15-second request timeout).
+const SAFE_RETRY_START_WINDOW_MS = 40_000;
+const AMBIGUOUS_RETRY_DELAY_MS = 10_000;
+
+async function claim(pool: pg.Pool, now: Date): Promise<Claim | null> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query<OutboxRow>(`SELECT e.id, o.order_ref, e.recipient_email, e.access_token,
-      e.idempotency_key, e.attempts
+      e.idempotency_key, e.attempts, e.first_attempt_at
       FROM email_outbox e JOIN orders o ON o.id = e.order_id
       WHERE e.recipient_email IS NOT NULL AND e.next_attempt_at <= $1
         AND (e.state = 'PENDING' OR (e.state = 'SENDING' AND e.lease_until <= $1))
       ORDER BY e.next_attempt_at, e.created_at FOR UPDATE OF e SKIP LOCKED LIMIT 1`, [now]);
     const row = rows[0];
     if (row === undefined) { await client.query('COMMIT'); return null; }
+    if (row.first_attempt_at !== null
+      && now.getTime() >= row.first_attempt_at.getTime() + SAFE_RETRY_START_WINDOW_MS) {
+      await client.query(`UPDATE email_outbox SET state = 'ATTENTION', lease_until = NULL,
+        last_error_code = 'DEDUPE_WINDOW_EXPIRED' WHERE id = $1`, [row.id]);
+      await client.query('COMMIT');
+      return { kind: 'WINDOW_EXPIRED', row };
+    }
+    const firstAttemptAt = row.first_attempt_at ?? now;
     await client.query(`UPDATE email_outbox SET state = 'SENDING', attempts = attempts + 1,
-      lease_until = $2, last_error_code = NULL WHERE id = $1`, [row.id, new Date(now.getTime() + 2 * 60_000)]);
+      first_attempt_at = COALESCE(first_attempt_at, $2), lease_until = $3, last_error_code = NULL
+      WHERE id = $1`, [row.id, firstAttemptAt, new Date(now.getTime() + 2 * 60_000)]);
     await client.query('COMMIT');
-    return { ...row, attempts: row.attempts + 1 };
+    return { kind: 'SEND', row: { ...row, attempts: row.attempts + 1, first_attempt_at: firstAttemptAt } };
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw e;
   } finally { client.release(); }
 }
 
-const retryDelayMs = (attempts: number) => Math.min(30 * 60_000, 30_000 * (2 ** Math.min(attempts - 1, 6)));
-
 /** Process at most `limit` due messages. Nothing personal is included in logs. */
 export async function processEmailOutbox(pool: pg.Pool, sender: EmailSender, log: Logger,
-  now: Date = new Date(), limit = 10): Promise<number> {
+  clock: () => Date = () => new Date(), limit = 10): Promise<number> {
   let processed = 0;
   while (processed < limit) {
-    const row = await claim(pool, now);
-    if (row === null) break;
+    const claimed = await claim(pool, clock());
+    if (claimed === null) break;
+    if (claimed.kind === 'WINDOW_EXPIRED') {
+      log('confirmation_email_attention', { orderRef: claimed.row.order_ref, outboxId: claimed.row.id,
+        code: 'DEDUPE_WINDOW_EXPIRED', attempts: claimed.row.attempts });
+      processed += 1;
+      continue;
+    }
+    const row = claimed.row;
     const result = await sender.send({ recipient: row.recipient_email, orderRef: row.order_ref,
       accessToken: row.access_token, idempotencyKey: row.idempotency_key });
+    const finishedAt = clock();
     if (result.kind === 'ACCEPTED') {
       await pool.query(`UPDATE email_outbox SET state = 'ACCEPTED', provider_job_id = $2, sent_at = $3,
         access_token = NULL, lease_until = NULL, last_error_code = NULL WHERE id = $1 AND state = 'SENDING'`,
-      [row.id, result.jobId, now]);
+      [row.id, result.jobId, finishedAt]);
       log('confirmation_email_accepted', { orderRef: row.order_ref, outboxId: row.id, attempts: row.attempts });
-    } else if (result.kind === 'REJECTED' || row.attempts >= 6) {
+    } else if (result.kind === 'REJECTED' || result.kind === 'DUPLICATE') {
       await pool.query(`UPDATE email_outbox SET state = 'ATTENTION', lease_until = NULL, last_error_code = $2
         WHERE id = $1 AND state = 'SENDING'`, [row.id, result.code]);
       log('confirmation_email_attention', { orderRef: row.order_ref, outboxId: row.id, code: result.code, attempts: row.attempts });
     } else {
-      await pool.query(`UPDATE email_outbox SET state = 'PENDING', next_attempt_at = $2, lease_until = NULL,
-        last_error_code = $3 WHERE id = $1 AND state = 'SENDING'`,
-      [row.id, new Date(now.getTime() + retryDelayMs(row.attempts)), result.code]);
-      log('confirmation_email_retry', { orderRef: row.order_ref, outboxId: row.id, code: result.code, attempts: row.attempts });
+      const nextAttemptAt = new Date(finishedAt.getTime() + AMBIGUOUS_RETRY_DELAY_MS);
+      const retryDeadline = row.first_attempt_at.getTime() + SAFE_RETRY_START_WINDOW_MS;
+      if (nextAttemptAt.getTime() >= retryDeadline) {
+        await pool.query(`UPDATE email_outbox SET state = 'ATTENTION', lease_until = NULL, last_error_code = $2
+          WHERE id = $1 AND state = 'SENDING'`, [row.id, result.code]);
+        log('confirmation_email_attention', { orderRef: row.order_ref, outboxId: row.id,
+          code: result.code, reason: 'dedupe_window_closed', attempts: row.attempts });
+      } else {
+        await pool.query(`UPDATE email_outbox SET state = 'PENDING', next_attempt_at = $2, lease_until = NULL,
+          last_error_code = $3 WHERE id = $1 AND state = 'SENDING'`,
+        [row.id, nextAttemptAt, result.code]);
+        log('confirmation_email_retry', { orderRef: row.order_ref, outboxId: row.id,
+          code: result.code, attempts: row.attempts });
+      }
     }
     processed += 1;
   }

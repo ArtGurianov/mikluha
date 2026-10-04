@@ -12,11 +12,15 @@ transaction, after Refref accepts the idempotent fulfilment acknowledgement. A u
 payment never calls UniSender Go.
 
 A worker claims due rows with a lease and `FOR UPDATE SKIP LOCKED`. UniSender acceptance records the
-provider `job_id`; a definitive refusal becomes `ATTENTION`; transport, timeout, 429, 5xx and an
-unreadable success are ambiguous and are retried with the same stable idempotency key. The message
-is transactional and contains no unsubscribe mechanism. It sends only the recipient email, order
-number and protected order URL; tourist and identity-document data never enter the provider
-payload or logs.
+provider `job_id`; a definitive refusal becomes `ATTENTION`. Transport, timeout (including HTTP
+408), 429, 5xx and an unreadable success are ambiguous. UniSender rejects a repeated
+`idempotence_key` only for one minute, so the first submission time is persisted and the worker runs
+every ten seconds. An ambiguous retry may start only in the first 40 seconds, leaving more than the
+15-second request timeout as safety margin. A delayed worker, an expired lease outside that window,
+or API error 1573 becomes `ATTENTION` without another send. Longer automatic recovery requires
+Event Dump reconciliation and is outside 3c. The message is transactional and contains no
+unsubscribe mechanism. It sends only the recipient email, order number and protected order URL;
+tourist and identity-document data never enter the provider payload or logs.
 
 Fulfilment creates a 256-bit document-access token, stores only its hash on the order, and places the
 plaintext token in the pending outbox row only until UniSender accepts the message. The protected
@@ -24,6 +28,9 @@ link exposes the order's exact stored offer and Заявка from any browser. T
 access to the frozen contractual documents without sending those personal documents through the
 email provider. The message warns the customer not to share the bearer link; the application never
 logs it and sends a no-referrer response.
+
+Because the protected URL is a bearer credential to passport-bearing contract data, slice 4 must
+also verify that live Coolify/Traefik access logging does not retain the token or unredacted path.
 
 ## Frozen legal content and release coupling
 

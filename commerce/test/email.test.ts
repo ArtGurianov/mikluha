@@ -59,10 +59,12 @@ test('ambiguous delivery is retried with the same identity and acceptance stores
     return calls === 1 ? { kind: 'AMBIGUOUS', code: 'TIMEOUT' } : { kind: 'ACCEPTED', jobId: 'job-2' };
   } };
   const logs = captureLog();
-  assert.equal(await processEmailOutbox(db.pool, sender, logs.log, now), 1);
-  let row = (await db.owner.query('SELECT state, attempts, provider_job_id, last_error_code FROM email_outbox')).rows[0];
-  assert.deepEqual(row, { state: 'PENDING', attempts: 1, provider_job_id: null, last_error_code: 'TIMEOUT' });
-  assert.equal(await processEmailOutbox(db.pool, sender, logs.log, new Date(now.getTime() + 30_000)), 1);
+  assert.equal(await processEmailOutbox(db.pool, sender, logs.log, () => now), 1);
+  let row = (await db.owner.query(
+    'SELECT state, attempts, first_attempt_at, provider_job_id, last_error_code FROM email_outbox')).rows[0];
+  assert.deepEqual(row, { state: 'PENDING', attempts: 1, first_attempt_at: now,
+    provider_job_id: null, last_error_code: 'TIMEOUT' });
+  assert.equal(await processEmailOutbox(db.pool, sender, logs.log, () => new Date(now.getTime() + 10_000)), 1);
   row = (await db.owner.query('SELECT state, attempts, provider_job_id, access_token, last_error_code FROM email_outbox')).rows[0];
   assert.deepEqual(row, { state: 'ACCEPTED', attempts: 2, provider_job_id: 'job-2', access_token: null, last_error_code: null });
   assert.deepEqual(seen, [key, key]);
@@ -72,8 +74,78 @@ test('ambiguous delivery is retried with the same identity and acceptance stores
 test('a definitive refusal goes to operator attention and is not retried', async () => {
   await pending();
   const sender: EmailSender = { send: async () => ({ kind: 'REJECTED', code: 'FROM_EMAIL_INVALID' }) };
-  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined, now), 1);
+  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined, () => now), 1);
   assert.deepEqual((await db.owner.query('SELECT state, attempts, last_error_code FROM email_outbox')).rows[0],
     { state: 'ATTENTION', attempts: 1, last_error_code: 'FROM_EMAIL_INVALID' });
-  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined, new Date(now.getTime() + 60_000)), 0);
+  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined, () => new Date(now.getTime() + 60_000)), 0);
+});
+
+test('an accepted response lost past one minute cannot cause a second provider acceptance', async () => {
+  await pending();
+  let providerAcceptances = 0;
+  const sender: EmailSender = { send: async () => {
+    providerAcceptances += 1;
+    return { kind: 'AMBIGUOUS', code: 'TRANSPORT' };
+  } };
+  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined, () => now), 1);
+  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined,
+    () => new Date(now.getTime() + 61_000)), 1);
+  assert.equal(providerAcceptances, 1);
+  assert.deepEqual((await db.owner.query('SELECT state, attempts, last_error_code FROM email_outbox')).rows[0],
+    { state: 'ATTENTION', attempts: 1, last_error_code: 'DEDUPE_WINDOW_EXPIRED' });
+});
+
+test('the conservative retry-start deadline is exclusive', async () => {
+  await pending();
+  let sends = 0;
+  const sender: EmailSender = { send: async () => {
+    sends += 1;
+    return { kind: 'AMBIGUOUS', code: 'TIMEOUT' };
+  } };
+  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined, () => now), 1);
+  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined,
+    () => new Date(now.getTime() + 40_000)), 1);
+  assert.equal(sends, 1);
+  assert.equal((await db.owner.query('SELECT state FROM email_outbox')).rows[0].state, 'ATTENTION');
+});
+
+test('an expired send lease outside the dedupe window becomes attention without resending', async () => {
+  await pending();
+  await db.owner.query(`UPDATE email_outbox SET state = 'SENDING', attempts = 1, first_attempt_at = $1,
+    lease_until = $2, next_attempt_at = $1 WHERE state = 'PENDING'`,
+  [now, new Date(now.getTime() + 120_000)]);
+  let sends = 0;
+  const sender: EmailSender = { send: async () => { sends += 1; return { kind: 'ACCEPTED', jobId: 'unsafe' }; } };
+  const afterLease = new Date(now.getTime() + 121_000);
+  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined, () => afterLease), 1);
+  assert.equal(sends, 0);
+  assert.deepEqual((await db.owner.query('SELECT state, attempts, last_error_code FROM email_outbox')).rows[0],
+    { state: 'ATTENTION', attempts: 1, last_error_code: 'DEDUPE_WINDOW_EXPIRED' });
+});
+
+test('HTTP 408 is ambiguous and API 1573 is a distinct duplicate-key outcome', async () => {
+  const config = { apiKey: 'secret', fromEmail: 'noreply@mikluha.example', fromName: 'Миклуха',
+    commerceOrigin: 'https://book.mikluha.example' };
+  const input = { recipient: 'ivan@example.ru', orderRef: 'mk-000000000001', accessToken: 'a'.repeat(43),
+    idempotencyKey: 'mk-confirm:1' };
+  const timedOut = new UniSenderGoClient(config, async () => new Response('{}', { status: 408 }));
+  assert.deepEqual(await timedOut.send(input), { kind: 'AMBIGUOUS', code: 'HTTP_408' });
+  const duplicate = new UniSenderGoClient(config, async () =>
+    new Response(JSON.stringify({ status: 'error', code: 1573 }), { status: 400 }));
+  assert.deepEqual(await duplicate.send(input), { kind: 'DUPLICATE', code: 'IDEMPOTENCE_DUPLICATE' });
+});
+
+test('API 1573 requires operator reconciliation instead of another automatic send', async () => {
+  await pending();
+  let sends = 0;
+  const sender: EmailSender = { send: async () => {
+    sends += 1;
+    return { kind: 'DUPLICATE', code: 'IDEMPOTENCE_DUPLICATE' };
+  } };
+  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined, () => now), 1);
+  assert.equal(await processEmailOutbox(db.pool, sender, () => undefined,
+    () => new Date(now.getTime() + 10_000)), 0);
+  assert.equal(sends, 1);
+  assert.deepEqual((await db.owner.query('SELECT state, attempts, last_error_code FROM email_outbox')).rows[0],
+    { state: 'ATTENTION', attempts: 1, last_error_code: 'IDEMPOTENCE_DUPLICATE' });
 });
