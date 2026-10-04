@@ -54,6 +54,8 @@ eis() { docker run --rm --network "$NET" --env-file /etc/mikluha-commerce/operat
 
    The read-back must say `EIS=EIS_SUBMITTED` and show the same number. `EIS_PACKET_STALE` means a
    material fact changed after review: print and compare a fresh packet before doing anything else.
+   `EIS_VOUCHER_NUMBER_OWNED` means that number is already lifetime evidence for another order: stop,
+   verify both order references in the ЕИС personal account, and never work around the refusal.
 6. If ЕИС later needs a correction, or the operator discovers an external mismatch:
 
    ```bash

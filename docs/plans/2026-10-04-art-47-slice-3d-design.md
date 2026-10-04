@@ -20,7 +20,10 @@ Only the separate `commerce_operator` login can call the security-definer transi
 The runtime role cannot update the table or call those functions. `submitted_at`, `submitted_by`,
 the database login, the actual voucher number, the last stale timestamp and current reason are
 stored on the record. A separate append-only event table preserves every transition and prior
-number. A monotonic material revision binds submission to the exact filing packet the operator
+number. That history is also the lifetime ownership ledger for voucher numbers: a normalized number
+may be reused by its own order after correction, but no other order can claim it, even after the
+first order receives a replacement number. A transaction-scoped advisory lock serializes concurrent
+claims before the indexed history lookup. A monotonic material revision binds submission to the exact filing packet the operator
 reviewed: any intervening contract/tourist change makes the command fail `EIS_PACKET_STALE`. The CLI
 requires both that revision and `--confirmed-in-eis-lk`; this is an operator assertion, not
 automation.

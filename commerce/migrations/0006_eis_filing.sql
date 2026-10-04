@@ -52,6 +52,8 @@ CREATE TABLE order_eis_event (
   reason                     text CHECK (reason IS NULL OR
                                 (length(reason) BETWEEN 1 AND 500 AND reason !~ '[[:cntrl:]]'))
 );
+CREATE INDEX order_eis_event_voucher_number_idx ON order_eis_event (electronic_voucher_number)
+  WHERE electronic_voucher_number IS NOT NULL;
 
 -- Internal helper used by material-change triggers. Only a previously submitted filing can become
 -- stale; a still-pending filing simply remains pending. Reasons are fixed non-personal codes.
@@ -177,6 +179,7 @@ DECLARE
   v_order_id uuid;
   v_old_status text;
   v_revision bigint;
+  v_number text;
 BEGIN
   IF pg_has_role(session_user, 'commerce_app', 'MEMBER')
      AND NOT (SELECT rolsuper FROM pg_roles WHERE rolname = session_user) THEN
@@ -188,6 +191,7 @@ BEGIN
   IF p_by IS NULL OR length(btrim(p_by)) NOT BETWEEN 1 AND 100 OR p_by ~ '[[:cntrl:]]' THEN
     RAISE EXCEPTION 'EIS_OPERATOR_INVALID' USING ERRCODE = '22023';
   END IF;
+  v_number := btrim(p_number);
 
   SELECT e.order_id, e.status, e.material_revision INTO v_order_id, v_old_status, v_revision
     FROM order_eis e JOIN orders o ON o.id = e.order_id
@@ -200,13 +204,23 @@ BEGIN
     RAISE EXCEPTION 'EIS_PACKET_STALE: expected %, current %', p_expected_revision, v_revision USING ERRCODE = '55000';
   END IF;
 
-  UPDATE order_eis SET status = 'EIS_SUBMITTED', electronic_voucher_number = btrim(p_number),
+  -- Event history is the lifetime ownership ledger. Serialize claims by the normalized number so
+  -- two orders cannot both pass the lookup before either event becomes visible.
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_number, 0));
+  IF EXISTS (
+    SELECT 1 FROM order_eis_event
+      WHERE electronic_voucher_number = v_number AND order_id <> v_order_id
+  ) THEN
+    RAISE EXCEPTION 'EIS_VOUCHER_NUMBER_OWNED' USING ERRCODE = '23505';
+  END IF;
+
+  UPDATE order_eis SET status = 'EIS_SUBMITTED', electronic_voucher_number = v_number,
     submitted_at = now(), submitted_by = btrim(p_by), submitted_login_role = session_user,
     submitted_revision = v_revision, needs_update_reason = NULL, updated_at = now()
     WHERE order_id = v_order_id;
   INSERT INTO order_eis_event (order_id, at, from_status, to_status, electronic_voucher_number,
                                changed_by, login_role, reason)
-    VALUES (v_order_id, now(), v_old_status, 'EIS_SUBMITTED', btrim(p_number),
+    VALUES (v_order_id, now(), v_old_status, 'EIS_SUBMITTED', v_number,
             btrim(p_by), session_user, 'RECORDED_AFTER_EIS_LK_SUBMISSION');
 END $fn$ LANGUAGE plpgsql;
 

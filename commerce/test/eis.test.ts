@@ -63,6 +63,56 @@ test('only an operator explicitly records submission after filing in the EIS per
   await assert.rejects(recordEisSubmitted(db.operator, ref, 'ЭП-002', 'Artur', 0), /EIS_ALREADY_SUBMITTED/);
 });
 
+test('a voucher number remains owned by one order across corrections and same-order reuse', async () => {
+  const first = await order();
+  const second = await order();
+  await recordEisSubmitted(db.operator, first, ' ЭП-OWNED-001 ', 'Artur', 0);
+  await assert.rejects(recordEisSubmitted(db.operator, second, 'ЭП-OWNED-001', 'Artur', 0),
+    /EIS_VOUCHER_NUMBER_OWNED/);
+
+  await markEisNeedsUpdate(db.operator, first, 'Artur', 'ЕИС ЛК requested correction');
+  await recordEisSubmitted(db.operator, first, 'ЭП-OWNED-001', 'Artur', 0);
+  await markEisNeedsUpdate(db.operator, first, 'Artur', 'ЕИС ЛК issued a replacement number');
+  await recordEisSubmitted(db.operator, first, 'ЭП-OWNED-002', 'Artur', 0);
+
+  await assert.rejects(recordEisSubmitted(db.operator, second, 'ЭП-OWNED-001', 'Artur', 0),
+    /EIS_VOUCHER_NUMBER_OWNED/);
+  assert.equal((await eisRecords(db.operator, first))[0]!.electronicVoucherNumber, 'ЭП-OWNED-002');
+});
+
+test('concurrent claims of one voucher number by different orders have exactly one winner', async () => {
+  const first = await order();
+  const second = await order();
+  await db.owner.query('BEGIN');
+  await db.owner.query('LOCK TABLE order_eis_event IN ACCESS EXCLUSIVE MODE');
+  const outcome = Promise.allSettled([
+    recordEisSubmitted(db.operator, first, 'ЭП-CONCURRENT-001', 'Artur', 0),
+    recordEisSubmitted(db.operator, second, 'ЭП-CONCURRENT-001', 'Artur', 0),
+  ]);
+  let blocked = 0;
+  try {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      await db.owner.query('SELECT pg_stat_clear_snapshot()');
+      blocked = Number((await db.owner.query(`SELECT count(*) AS n FROM pg_stat_activity
+        WHERE datname = current_database() AND usename = 'commerce_test_operator'
+          AND wait_event_type = 'Lock'`)).rows[0].n);
+      if (blocked === 2) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  } finally {
+    await db.owner.query('COMMIT');
+  }
+  assert.equal(blocked, 2, 'both claims must reach the controlled lock boundary');
+  const results = await outcome;
+
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+  const rejected = results.find((r) => r.status === 'rejected');
+  assert.ok(rejected && rejected.status === 'rejected');
+  assert.match(String(rejected.reason), /EIS_VOUCHER_NUMBER_OWNED/);
+  assert.equal((await db.owner.query(`SELECT count(*) AS n FROM order_eis_event
+    WHERE electronic_voucher_number = 'ЭП-CONCURRENT-001' AND to_status = 'EIS_SUBMITTED'`)).rows[0].n, '1');
+});
+
 test('a login shared with the runtime role cannot record EIS submission', async () => {
   const ref = await order();
   await db.owner.query(`DO $$ BEGIN
