@@ -112,6 +112,7 @@ const DEPARTURE_CONTRACT = `contract:
 `;
 
 export const TERMS_TEXT = '## Оферта\n\nТестовая публичная оферта.';
+export const PD_CONSENT_TEXT = '## Согласие на обработку персональных данных\n\nТестовая версия согласия.';
 
 /** A valid adult Russian tourist; `n` varies the name and the passport. */
 export const tourist = (n = 1, over: Partial<TouristInput> = {}): TouristInput => ({
@@ -127,6 +128,8 @@ export function fixtureCatalog(departures: FixtureDeparture[]): Catalog {
   writeFileSync(join(dir, 'tours', 'altai.yml'), `title: Алтай\nslug: altai\n${TOUR_CONTRACT}`);
   writeFileSync(join(dir, 'legal', 'oferta.yml'),
     `title: Публичная оферта\nslug: oferta\nupdatedAt: "2026-10-04"\ncontent: |-\n${TERMS_TEXT.split('\n').map((l) => `  ${l}`).join('\n')}\n`);
+  writeFileSync(join(dir, 'legal', 'soglasie-pd.yml'),
+    `title: Согласие на обработку персональных данных\nslug: soglasie-pd\nupdatedAt: "2026-10-04"\ncontent: |-\n${PD_CONSENT_TEXT.split('\n').map((l) => `  ${l}`).join('\n')}\n`);
   for (const d of departures) {
     // Dates unquoted, as the CMS writes them.
     const lines = [`tour: altai`, `startDate: ${d.startsOn}`, `endDate: ${d.endsOn ?? d.startsOn}`,

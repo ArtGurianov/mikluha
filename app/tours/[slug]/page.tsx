@@ -117,12 +117,13 @@ export default async function TourPage(props: PageProps<"/tours/[slug]">) {
 
         <DepartureBookingCard
           departure={nextDeparture}
+          commerceOrigin={content.siteSettings.commerceOrigin}
           className="hidden self-start lg:sticky lg:top-24 lg:mt-12 lg:block"
         />
       </div>
 
       <MobileBookingDock>
-        <DepartureBookingCard departure={nextDeparture} compact />
+        <DepartureBookingCard departure={nextDeparture} commerceOrigin={content.siteSettings.commerceOrigin} compact />
       </MobileBookingDock>
     </article>
   );

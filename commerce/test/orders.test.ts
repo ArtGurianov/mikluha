@@ -20,6 +20,9 @@ const request = (over: Partial<BookingRequest> = {}): BookingRequest => ({
   adultsOnlyConfirmed: true,
   termsRef: catalog.terms.ref,
   termsHash: catalog.terms.hash,
+  pdConsentConfirmed: true,
+  pdConsentRef: catalog.pdConsent.ref,
+  pdConsentHash: catalog.pdConsent.hash,
   ...over,
 });
 
@@ -107,9 +110,25 @@ describe('what can be sold', () => {
     assert.equal(await refusal('altai-demo', true), 'OK');
   });
 
-  test('the terms accepted must be the ones published now, and adults only must be confirmed', async () => {
+  test('the contract, separate PD consent and adult confirmation must each be current and explicit', async () => {
     assert.deepEqual(await reserve(deps(), request({ termsHash: `sha256:${'0'.repeat(64)}` })), { ok: false, refusal: 'TERMS_NOT_CURRENT' });
+    assert.deepEqual(await reserve(deps(), request({ pdConsentHash: `sha256:${'0'.repeat(64)}` })), { ok: false, refusal: 'PD_CONSENT_NOT_CURRENT' });
+    assert.deepEqual(await reserve(deps(), request({ pdConsentConfirmed: false })), { ok: false, refusal: 'PD_CONSENT_NOT_CONFIRMED' });
     assert.deepEqual(await reserve(deps(), request({ adultsOnlyConfirmed: false })), { ok: false, refusal: 'ADULTS_ONLY_NOT_CONFIRMED' });
+  });
+
+  test('consent evidence is versioned and stored independently of the tourism contract', async () => {
+    const result = await reserve(deps(), request());
+    assert.ok(result.ok);
+    const { rows } = await db.owner.query(`SELECT legal_release_ref, legal_release_hash,
+      pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at FROM orders WHERE order_ref = $1`,
+    [result.orderRef]);
+    assert.equal(rows[0].legal_release_ref, catalog.terms.ref);
+    assert.equal(rows[0].legal_release_hash, catalog.terms.hash);
+    assert.equal(rows[0].pd_consent_ref, catalog.pdConsent.ref);
+    assert.equal(rows[0].pd_consent_hash, catalog.pdConsent.hash);
+    assert.equal(rows[0].pd_consent_content, catalog.pdConsent.text);
+    assert.deepEqual(rows[0].pd_consent_accepted_at, NOW);
   });
 });
 

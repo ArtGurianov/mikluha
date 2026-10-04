@@ -26,12 +26,18 @@ export const RESERVED_SLUGS = [
 export const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
- * Legal pages the site must not ship without, independent of which slugs are
- * *allowed*. The booking terms are referenced from the booking flow itself, so
- * a production release without them would link nowhere; everything else
- * (privacy policy, оферта, возврат) is optional and up to the owner.
+ * Legal pages linked by the booking and payment flow. A release missing any of
+ * them would publish a customer action whose legal links lead nowhere.
  */
-export const REQUIRED_LEGAL_SLUGS = ["booking-terms"] as const;
+export const REQUIRED_LEGAL_SLUGS = [
+  "oferta",
+  "turoperator",
+  "privacy-policy",
+  "soglasie-pd",
+  "pravila-oplaty",
+  "otkaz-i-vozvrat",
+  "cookies",
+] as const;
 
 export function getLegalPageBySlug(content: ContentSnapshot, slug: string): LegalPageDTO | undefined {
   return content.legalPages.find((page) => page.slug === slug);

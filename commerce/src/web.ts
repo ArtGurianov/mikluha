@@ -73,6 +73,9 @@ const MESSAGES: Record<string, string> = {
   NOT_ENOUGH_SEATS: 'Свободных мест на эту дату не осталось.',
   RESERVATION_EXPIRED: 'Время брони истекло. Начните бронирование заново.',
   TERMS_NOT_CURRENT: 'Условия бронирования обновились. Откройте форму заново.',
+  PD_CONSENT_NOT_CURRENT: 'Согласие на обработку персональных данных обновилось. Откройте форму заново.',
+  PD_CONSENT_NOT_CONFIRMED: 'Для онлайн-бронирования нужно отдельно подтвердить согласие на обработку персональных данных.',
+  PD_CONSENT_INVALID: 'Сохранённое подтверждение согласия не прошло проверку. Начните бронирование заново.',
   STATE_MISMATCH: 'Ссылка открыта не в том браузере, где начато бронирование.',
   REFREF_UNAVAILABLE: 'Платёжный сервис временно недоступен. Обновите страницу через минуту.',
   FORM_INVALID: 'Форма заполнена неверно. Откройте её заново.',
@@ -90,6 +93,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean) {
     const d = bookable(deps.catalog, slug, (deps.now ?? (() => new Date()))(), allowDemo);
     if (typeof d === 'string') { page(res, 404, 'Бронирование', `<p>${esc(message(d))}</p>`); return; }
     const t = deps.catalog.terms;
+    const consent = deps.catalog.pdConsent;
     const site = deps.merchant.siteOrigin;
     const countries = CITIZENSHIPS.map((c) => `<option value="${c}">${esc(countryName(c) ?? c)}</option>`).join('');
     const tourists = Array.from({ length: MAX_SEATS_PER_ORDER }, (_, i) => {
@@ -111,6 +115,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean) {
       <form method="post" action="/orders">
         <input type="hidden" name="departure" value="${esc(d.slug)}">
         <input type="hidden" name="termsRef" value="${esc(t.ref)}"><input type="hidden" name="termsHash" value="${esc(t.hash)}">
+        <input type="hidden" name="pdConsentRef" value="${esc(consent.ref)}"><input type="hidden" name="pdConsentHash" value="${esc(consent.hash)}">
         <p>Заказчик — турист № 1: бронировать онлайн можно поездку, в которой вы участвуете сами.</p>
         ${tourists}
         <fieldset><legend>Контакты Заказчика: для связи и чека</legend>
@@ -118,6 +123,8 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean) {
           <label>Email <input name="contactEmail" type="email" required></label></fieldset>
         <p>Данные туристов нужны для заключения и исполнения договора и передачи сведений в ЕИС «Электронная путёвка», как того требует закон.
           Подробнее — в <a href="${esc(site)}/privacy-policy">Политике обработки персональных данных</a>.</p>
+        <label><input type="checkbox" name="pdConsent" value="yes" required> Я отдельно даю
+          <a href="${esc(site)}/soglasie-pd">согласие на обработку персональных данных</a> в опубликованной редакции.</label>
         <label><input type="checkbox" name="adultsOnly" value="yes" required> Все туристы совершеннолетние</label>
         <p>Перед оплатой вы увидите Заявку на бронирование с итоговой ценой. Договор заключается на условиях
           <a href="${esc(site)}/oferta">Публичной оферты</a> в момент оплаты.</p>
@@ -140,6 +147,8 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean) {
       contact: { phone: form.get('contactPhone') ?? '', email: form.get('contactEmail') ?? '' },
       passengers: tourists, adultsOnlyConfirmed: form.get('adultsOnly') === 'yes',
       termsRef: form.get('termsRef') ?? '', termsHash: form.get('termsHash') ?? '',
+      pdConsentConfirmed: form.get('pdConsent') === 'yes',
+      pdConsentRef: form.get('pdConsentRef') ?? '', pdConsentHash: form.get('pdConsentHash') ?? '',
     };
     const r = await reserve({ pool: deps.pool, catalog: deps.catalog, log: deps.log, allowDemo, ...(deps.now ? { now: deps.now } : {}) }, request);
     if (!r.ok) { page(res, r.refusal === 'NOT_ENOUGH_SEATS' || r.refusal === 'SALES_CLOSED' ? 409 : 400, 'Бронирование', `<p>${esc(message(r.refusal))}</p>`); return; }

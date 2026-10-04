@@ -79,10 +79,14 @@ export interface BookingRequest {
   readonly adultsOnlyConfirmed: boolean;
   readonly termsRef: string;
   readonly termsHash: string;
+  readonly pdConsentConfirmed: boolean;
+  readonly pdConsentRef: string;
+  readonly pdConsentHash: string;
 }
 
 export type BookingRefusal =
-  | NotBookable | 'SALES_CLOSED' | 'TERMS_NOT_CURRENT' | 'ADULTS_ONLY_NOT_CONFIRMED'
+  | NotBookable | 'SALES_CLOSED' | 'TERMS_NOT_CURRENT' | 'PD_CONSENT_NOT_CURRENT'
+  | 'PD_CONSENT_NOT_CONFIRMED' | 'ADULTS_ONLY_NOT_CONFIRMED'
   | 'SEATS_INVALID' | 'NOT_ENOUGH_SEATS' | 'CONTACT_PHONE_INVALID'
   | 'CONTACT_EMAIL_INVALID' | 'PASSENGER_NAME_INVALID' | 'DATE_OF_BIRTH_INVALID' | 'PASSENGER_NOT_ADULT'
   | 'CITIZENSHIP_INVALID' | 'DOCUMENT_INVALID';
@@ -156,6 +160,10 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
   const departure = bookable(deps.catalog, req.departureSlug, now, deps.allowDemo);
   if (typeof departure === 'string') return refuse(departure);
   if (req.termsRef !== deps.catalog.terms.ref || req.termsHash !== deps.catalog.terms.hash) return refuse('TERMS_NOT_CURRENT');
+  if (req.pdConsentRef !== deps.catalog.pdConsent.ref || req.pdConsentHash !== deps.catalog.pdConsent.hash) {
+    return refuse('PD_CONSENT_NOT_CURRENT');
+  }
+  if (req.pdConsentConfirmed !== true) return refuse('PD_CONSENT_NOT_CONFIRMED');
   if (req.adultsOnlyConfirmed !== true) return refuse('ADULTS_ONLY_NOT_CONFIRMED');
   const seats = req.passengers.length;
   if (seats < 1 || seats > MAX_SEATS_PER_ORDER) return refuse('SEATS_INVALID');
@@ -203,10 +211,12 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO orders (order_ref, departure_slug, trip_starts_on, trip_ends_on, seats, unit_price_kopecks,
                            amount_kopecks, status, reserved_until, legal_release_ref, legal_release_hash,
+                           pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at,
                            adults_only_confirmed, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'RESERVED', $8, $9, $10, true, $11) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'RESERVED', $8, $9, $10, $11, $12, $13, $14, true, $14) RETURNING id`,
       [orderRef, departure.slug, departure.startsOn, departure.endsOn, seats, departure.priceKopecks, amount,
-        reservedUntil, req.termsRef, req.termsHash, now]);
+        reservedUntil, req.termsRef, req.termsHash, deps.catalog.pdConsent.ref, deps.catalog.pdConsent.hash,
+        deps.catalog.pdConsent.text, now]);
     const id = inserted.rows[0]!.id;
     // The customer is tourist №1: their name is that tourist's, by construction.
     await client.query('INSERT INTO order_contact (order_id, full_name, phone, email) VALUES ($1, $2, $3, $4)',

@@ -11,6 +11,7 @@ import { formatDepartureDateRange, formatDurationLabel } from "@/lib/tours";
 
 interface TripCardProps {
   tour: TourDTO;
+  commerceOrigin: string;
   /** Omitted for a destination that has no upcoming date yet — the card still links to the tour. */
   departure?: DepartureDTO;
 }
@@ -24,7 +25,7 @@ interface TripCardProps {
  * The whole card is a link (a stretched pseudo-element on the title), so the
  * booking button has to sit above it in the stacking order to stay clickable.
  */
-export function TripCard({ tour, departure }: TripCardProps) {
+export function TripCard({ tour, commerceOrigin, departure }: TripCardProps) {
   const isBookable = departure?.bookingStatus === "OPEN";
 
   return (
@@ -90,6 +91,7 @@ export function TripCard({ tour, departure }: TripCardProps) {
           {departure ? (
             <BookingButton
               departureId={departure.id}
+              commerceOrigin={commerceOrigin}
               disabled={!isBookable}
               label={isBookable ? "Забронировать место" : "Набор закрыт"}
               className="h-auto w-full px-3 py-2 text-lg"

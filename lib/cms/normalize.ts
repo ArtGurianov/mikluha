@@ -125,22 +125,22 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
     description: optionalString(t.description),
     coverImage: image(t.coverImage, `tour "${t.slug}" coverImage`),
     gallery: (t.gallery ?? []).map((g, i) => image(g, `tour "${t.slug}" gallery[${i}]`)),
+    contract: t.contract ?? undefined,
     isListed: flag(t.isListed),
     sortOrder: t.sortOrder ?? 0,
     seo: normalizeSeo(t.seo),
     updatedAt: optionalString(t.updatedAt),
   }));
 
-  const departures: DepartureDTO<ImageAsset>[] = raw.departures.map((d) => ({
+  const departures: DepartureDTO[] = raw.departures.map((d) => ({
     id: d._slug,
     tourId: requiredString(d.tour, `departure "${d._slug}" tour`),
     startDate: requiredString(d.startDate, `departure "${d._slug}" startDate`),
     endDate: requiredString(d.endDate, `departure "${d._slug}" endDate`),
     bookingStatus: required(d.bookingStatus, `departure "${d._slug}" bookingStatus`),
     price: d.price ?? undefined,
-    prepaymentAmount: d.prepaymentAmount ?? undefined,
     capacity: d.capacity ?? undefined,
-    paymentQr: maybeImage(d.paymentQr),
+    contract: d.contract ?? undefined,
     organizerIds: d.organizers ?? [],
     isListed: flag(d.isListed),
     isDemo: flag(d.isDemo),
@@ -198,17 +198,15 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
   }));
 
   const s = raw.siteSettings;
-  // hero/company/seo are whole objects the site cannot render without; booking
-  // is genuinely optional (every fallback inside it is), so an absent object
-  // just means "no defaults configured".
+  // hero/company/seo are whole objects the site cannot render without.
   const hero = required(s.hero, "siteSettings.hero");
   const company = required(s.company, "siteSettings.company");
   const seo = required(s.seo, "siteSettings.seo");
-  const booking = s.booking ?? {};
 
   const siteSettings: SiteSettingsDTO<ImageAsset> = {
     siteName: requiredString(s.siteName, "siteSettings.siteName"),
     siteUrl: requiredString(s.siteUrl, "siteSettings.siteUrl"),
+    commerceOrigin: requiredString(s.commerceOrigin, "siteSettings.commerceOrigin"),
     timezone: requiredString(s.timezone, "siteSettings.timezone"),
     logo: maybeImage(s.logo),
     hero: {
@@ -216,12 +214,6 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
       subtitle: optionalString(hero.subtitle),
       image: image(hero.image, "siteSettings.hero.image"),
       video: video(hero.video, "siteSettings.hero.video"),
-    },
-    booking: {
-      defaultQr: maybeImage(booking.defaultQr),
-      defaultPrepaymentAmount: booking.defaultPrepaymentAmount ?? undefined,
-      defaultOrganizerId: optionalString(booking.defaultOrganizer),
-      isDemo: flag(booking.isDemo),
     },
     socials: { maxChannelUrl: optionalString(s.socials?.maxChannelUrl) },
     company: {

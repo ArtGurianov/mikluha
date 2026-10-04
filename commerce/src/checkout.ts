@@ -63,6 +63,7 @@ const sameSecret = (a: string, b: string) => {
 interface OrderRow {
   id: string; order_ref: string; departure_slug: string; trip_starts_on: string; trip_ends_on: string; seats: number;
   amount_kopecks: string; status: string; reserved_until: Date; legal_release_ref: string; legal_release_hash: string;
+  pd_consent_ref: string; pd_consent_hash: string; pd_consent_content: string; pd_consent_accepted_at: Date;
   state_hash: string | null; referral_resolution_id: string | null; terms_version_id: string | null;
   resolution_expires_at: Date | null; discount_kopecks: string | null; payable_kopecks: string | null;
   snapshot: Record<string, Json> | null; snapshot_hash: string | null; payment_pending_since: Date | null;
@@ -71,7 +72,8 @@ interface OrderRow {
 
 const ORDER_COLUMNS = `id, order_ref, departure_slug, to_char(trip_starts_on, 'YYYY-MM-DD') AS trip_starts_on,
   to_char(trip_ends_on, 'YYYY-MM-DD') AS trip_ends_on, seats, amount_kopecks, status, reserved_until,
-  legal_release_ref, legal_release_hash, state_hash, referral_resolution_id, terms_version_id, resolution_expires_at,
+  legal_release_ref, legal_release_hash, pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at,
+  state_hash, referral_resolution_id, terms_version_id, resolution_expires_at,
   discount_kopecks, payable_kopecks, snapshot, snapshot_hash, payment_pending_since, checkout_attempt_id, last_session`;
 
 async function loadOrder(pool: pg.Pool, orderRef: string): Promise<OrderRow | null> {
@@ -253,6 +255,9 @@ export async function pay(deps: CheckoutDeps, orderRef: string, acceptedZayavka:
   if (o === null) return { kind: 'STATUS', code: 'UNKNOWN_ORDER' };
 
   if (o.status === 'RESERVED') {
+    if (o.pd_consent_hash !== `sha256:${sha256(o.pd_consent_content)}` || o.pd_consent_ref.trim() === '') {
+      return { kind: 'STATUS', code: 'PD_CONSENT_INVALID' };
+    }
     if (o.referral_resolution_id === null) return { kind: 'STATUS', code: 'NOT_RESOLVED' };
     if (o.reserved_until <= now || o.resolution_expires_at! <= now) return { kind: 'STATUS', code: 'RESERVATION_EXPIRED' };
     const zayavka = await zayavkaOf(deps.pool, orderRef);

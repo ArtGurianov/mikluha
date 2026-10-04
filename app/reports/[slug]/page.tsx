@@ -102,6 +102,7 @@ export default async function ReportPage(props: PageProps<"/reports/[slug]">) {
             {nextBookable && (
               <BookingButton
                 departureId={nextBookable.id}
+                commerceOrigin={content.siteSettings.commerceOrigin}
                 size="lg"
                 className="mt-2 h-auto px-6 py-3 text-2xl"
               />

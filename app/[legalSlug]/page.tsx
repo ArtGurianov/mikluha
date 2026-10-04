@@ -6,8 +6,8 @@ import { getContent } from "@/lib/cms/content";
 import { getLegalPageBySlug } from "@/lib/legal";
 
 /**
- * Top-level route for every legalPage document in the CMS — /booking-terms/,
- * /privacy-policy/, and anything else the organizer publishes later (оферта,
+ * Top-level route for every legalPage document in the CMS — /oferta/,
+ * /privacy-policy/, and anything else the organizer publishes later (согласие,
  * возврат, памятка туристу) without waiting for a code release.
  *
  * It sits at the site root rather than under /legal/ to keep the short URLs

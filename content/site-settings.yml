@@ -1,5 +1,6 @@
 siteName: Миклуха Маклай
 siteUrl: https://mikluha-maklai.ru
+commerceOrigin: https://book.mikluha-maklai.ru
 timezone: Asia/Krasnoyarsk
 logo:
   image: /media/demo/brand-logo.webp
@@ -12,17 +13,10 @@ hero:
     alt: Катунь в Горном Алтае
   video:
     file: https://mikluha-maklai.s3.cloud.ru/cms/mikluha.webm
-booking:
-  defaultQr:
-    image: /media/demo/qr-default.webp
-    alt: Тестовый QR-код для бронирования
-  defaultPrepaymentAmount: 5000
-  defaultOrganizer: artur
-  isDemo: false
 socials:
   maxChannelUrl: https://max.ru/join/Ur79GmrtXjmTwzOtHf1i0yVn7snxvpZTV1XWwFoBY04
 company:
-  legalName: ООО Миклуха Маклай
+  legalName: ООО «ООО МИКЛУХА МАКЛАЙ»
   inn: '4205435867'
   ogrn: '1264200007631'
   phone: '+79039075547'

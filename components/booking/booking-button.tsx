@@ -1,14 +1,12 @@
-"use client";
-
-import { Button, type buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { commerceBookingUrl } from "@/lib/booking";
 import { cn } from "@/lib/utils";
 import type { VariantProps } from "class-variance-authority";
-
-import { useBookingModal } from "./booking-provider";
 
 interface BookingButtonProps extends VariantProps<typeof buttonVariants> {
   /** Every booking CTA must name the exact date it books. */
   departureId: string;
+  commerceOrigin: string;
   label?: string;
   /** Renders the button but refuses the click — used to keep card footers the same height when there is nothing to book. */
   disabled?: boolean;
@@ -17,23 +15,30 @@ interface BookingButtonProps extends VariantProps<typeof buttonVariants> {
 
 export function BookingButton({
   departureId,
+  commerceOrigin,
   label = "Забронировать место",
   disabled,
   variant,
   size,
   className,
 }: BookingButtonProps) {
-  const { open } = useBookingModal();
-
-  return (
+  if (disabled) return (
     <Button
       variant={variant}
       size={size}
       disabled={disabled}
       className={cn("font-semibold", className)}
-      onClick={() => open(departureId)}
     >
       {label}
     </Button>
+  );
+
+  return (
+    <a
+      href={commerceBookingUrl(commerceOrigin, departureId)}
+      className={cn(buttonVariants({ variant, size }), "font-semibold", className)}
+    >
+      {label}
+    </a>
   );
 }

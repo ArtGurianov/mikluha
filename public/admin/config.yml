@@ -62,6 +62,7 @@ singletons:
     fields:
       - {name: siteName, label: "Название сайта / бренда", widget: string}
       - {name: siteUrl, label: "Адрес сайта", widget: string, hint: "Например https://mikluha-maklai.ru"}
+      - {name: commerceOrigin, label: "Адрес сервиса бронирования", widget: string, hint: "HTTPS origin без пути, например https://book.mikluha-maklai.ru"}
       - {name: timezone, label: "Часовой пояс", widget: string, default: "Europe/Moscow", hint: "Используется для расчёта ближайшего выезда во время сборки сайта, например Europe/Moscow"}
       - name: logo
         label: Логотип
@@ -88,21 +89,6 @@ singletons:
             hint: "Обязательно, до 10 МБ. Фоновое изображение выше используется как постер, пока видео грузится, и как fallback при отключённой анимации или ошибке загрузки — но само видео должно быть загружено всегда."
             fields:
               - {name: file, label: "Файл WebM", widget: file, accept: ".webm,video/webm", choose_url: false, media_libraries: {all: {max_file_size: 10485760}}}
-      - name: booking
-        label: "Бронирование по умолчанию"
-        widget: object
-        hint: "Значения по умолчанию для Booking Modal, если у конкретного выезда не заданы свои QR / сумма / организатор."
-        fields:
-          - name: defaultQr
-            label: "QR-код по умолчанию"
-            widget: object
-            required: false
-            fields:
-              - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_libraries: {all: {max_file_size: 1048576}}}
-              - {name: alt, label: Alt, widget: string, required: false}
-          - {name: defaultPrepaymentAmount, label: "Сумма бронирования по умолчанию, ₽", widget: number, required: false, value_type: int}
-          - {name: defaultOrganizer, label: "Организатор по умолчанию", widget: relation, collection: organizers, value_field: "{{slug}}", search_fields: [name], display_fields: [name], required: false}
-          - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите, пока QR/сумма/организатор по умолчанию тестовые."}
       - name: socials
         label: "Соцсети и мессенджеры"
         widget: object
@@ -286,16 +272,7 @@ collections:
                 - {name: supplier, label: Поставщик, widget: string}
                 - {name: included, label: "Включено в цену", widget: boolean, default: true}
                 - {name: note, label: Примечание, widget: string, required: false}
-      - {name: prepaymentAmount, label: "Сумма бронирования, ₽", widget: number, required: false, value_type: int, hint: "Если не заполнено, используется значение по умолчанию из «Настроек сайта»."}
-      - name: paymentQr
-        label: "QR-код бронирования"
-        widget: object
-        required: false
-        hint: "Если не загружен, используется QR по умолчанию из «Настроек сайта»."
-        fields:
-          - {name: image, label: Файл, widget: image, accept: ".webp,image/webp", choose_url: false, media_libraries: {all: {max_file_size: 1048576}}}
-          - {name: alt, label: Alt, widget: string, required: false}
-      - {name: organizers, label: Организаторы, widget: relation, collection: organizers, value_field: "{{slug}}", search_fields: [name], display_fields: [name], multiple: true, required: false, hint: "Если список пуст, используется организатор по умолчанию из «Настроек сайта»."}
+      - {name: organizers, label: Организаторы, widget: relation, collection: organizers, value_field: "{{slug}}", search_fields: [name], display_fields: [name], multiple: true, required: false}
       - {name: isListed, label: "Показывать на сайте", widget: boolean, default: true}
       - {name: isDemo, label: "Демо-данные (тест)", widget: boolean, default: false, hint: "Включите для тестовых выездов. Такие выезды блокируют публичный запуск сайта, пока не будут заменены."}
       - {name: updatedAt, label: "Дата существенного обновления", widget: datetime, type: date, input_timezone: utc, required: false, default: "{{now}}", hint: "Для поисковых систем (sitemap). Новому выезду ставится автоматически; обновляйте при смене цены или статуса набора."}
@@ -408,6 +385,6 @@ collections:
         label: "Адрес страницы (slug)"
         widget: string
         pattern: ["^[a-z0-9]+(-[a-z0-9]+)*$", "Только латиница в нижнем регистре, цифры и дефис — например public-offer"]
-        hint: "Адрес страницы на сайте: например booking-terms → /booking-terms/. Только латиница в нижнем регистре, цифры и дефис. После публикации менять не рекомендуется — старый адрес перестанет открываться. Занятые разделами сайта адреса (tours, reports, api, _next, generated, index, 404, robots.txt, sitemap.xml, icon.png, apple-icon.png) недоступны — сборка их отклонит."
+        hint: "Адрес страницы на сайте: например privacy-policy → /privacy-policy/. Только латиница в нижнем регистре, цифры и дефис. После публикации менять не рекомендуется — старый адрес перестанет открываться. Занятые разделами сайта адреса (tours, reports, api, _next, generated, index, 404, robots.txt, sitemap.xml, icon.png, apple-icon.png) недоступны — сборка их отклонит."
       - {name: content, label: "Текст страницы", widget: markdown}
       - {name: updatedAt, label: "Дата обновления текста", widget: datetime, type: date, input_timezone: utc, required: false}

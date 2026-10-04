@@ -1,8 +1,6 @@
-import type { BookingDepartureInfo } from "./tours";
-
-export function selectBookingDeparture(
-  departures: BookingDepartureInfo[],
-  departureId: string,
-): BookingDepartureInfo | null {
-  return departures.find((departure) => departure.id === departureId) ?? null;
+/** The static site's only booking action: leave for the isolated commerce service. */
+export function commerceBookingUrl(commerceOrigin: string, departureId: string): string {
+  const url = new URL("/book", commerceOrigin);
+  url.searchParams.set("departure", departureId);
+  return url.toString();
 }

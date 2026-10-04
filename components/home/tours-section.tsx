@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { TripCard } from "./trip-card";
 
 interface ToursSectionProps {
+  commerceOrigin: string;
   /** Every future departure of every listed tour, soonest first. */
   upcoming: UpcomingDeparture[];
   /** Every listed tour — including ones with nothing scheduled, so they can still be filtered to. */
@@ -18,7 +19,7 @@ interface ToursSectionProps {
 
 const ALL = "all";
 
-export function ToursSection({ upcoming, tours }: ToursSectionProps) {
+export function ToursSection({ commerceOrigin, upcoming, tours }: ToursSectionProps) {
   const [selectedTourId, setSelectedTourId] = React.useState<string>(ALL);
   const stripRef = React.useRef<HTMLDivElement>(null);
 
@@ -93,10 +94,10 @@ export function ToursSection({ upcoming, tours }: ToursSectionProps) {
           className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-12 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6"
         >
           {visible.map(({ departure, tour }) => (
-            <TripCard key={departure.id} tour={tour} departure={departure} />
+            <TripCard key={departure.id} tour={tour} departure={departure} commerceOrigin={commerceOrigin} />
           ))}
           {placeholders.map((tour) => (
-            <TripCard key={`placeholder-${tour.id}`} tour={tour} />
+            <TripCard key={`placeholder-${tour.id}`} tour={tour} commerceOrigin={commerceOrigin} />
           ))}
         </div>
       </div>
