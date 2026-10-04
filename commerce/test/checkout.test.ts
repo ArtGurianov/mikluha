@@ -37,7 +37,7 @@ before(async () => {
   logs = captureLog();
   deps = {
     pool: db.pool, catalog, log: (e, f) => logs.log(e, f), now: () => clock,
-    refref: new RefrefClient({ apiBase: refref.base, apiKey: 'rk_test', timeoutMs: 300 }),
+    refref: new RefrefClient({ apiBase: refref.base, apiKey: 'rk_test', timeoutMs: 1500 }),
     merchant: { businessId: MERCHANT_ID, businessSlug: 'mikluha', checkoutOrigin: 'https://checkout.refref.example',
       origin: 'https://book.mikluha.example' },
   };
@@ -248,6 +248,60 @@ describe('the booking switch', () => {
     refref.state.obligation = 'SATISFIED';
     await reconcileAll(deps);
     assert.equal((await order(a.ref)).status, 'FULFILLED');
+  });
+});
+
+describe('stop-sales against a payment session already being started (PR #19 review)', () => {
+  const pending = (ms: number) => new Promise<'PENDING'>((r) => setTimeout(() => r('PENDING'), ms));
+
+  /** An order whose first session failed definitively: the next /pay goes straight to a new session. */
+  async function retryableOrder() {
+    const o = await bookAndResolve();
+    refref.state.session = 'FAILED';
+    await http('POST', `/orders/${o.ref}/pay`, { cookie: o.cookie });
+    refref.state.session = 'READY';
+    return o;
+  }
+
+  test('a close committed after the switch was read but before the session: no session is started', async () => {
+    const { ref, cookie } = await retryableOrder();
+    const sessionsBefore = refref.calls(/\/payment-session$/).length;
+    // The operator's close is under way: its row lock is taken, its commit not yet made.
+    const operator = await db.operator.connect();
+    let paying: Promise<Reply> | undefined;
+    try {
+      await operator.query('BEGIN');
+      await operator.query(`SELECT fn_set_sales_open(false, 'artur', 'stop-sales')`);
+      paying = http('POST', `/orders/${ref}/pay`, { cookie });
+      // /pay cannot get past the switch while the close is in flight…
+      assert.equal(await Promise.race([paying.then(() => 'DONE'), pending(300)]), 'PENDING');
+      await operator.query('COMMIT');
+    } finally {
+      await operator.query('ROLLBACK').catch(() => undefined);
+      operator.release();
+      await paying?.catch(() => undefined);
+    }
+    // …and once the close commits, it sees it: nothing new is sent to Refref.
+    assert.equal((await paying!).location, `/orders/${ref}?notice=SALES_CLOSED`);
+    assert.equal(refref.calls(/\/payment-session$/).length, sessionsBefore);
+  });
+
+  test('a session already being started holds the close until it has been made', async () => {
+    const { ref, cookie } = await retryableOrder();
+    const gate = refref.holdSessions();
+    const paying = http('POST', `/orders/${ref}/pay`, { cookie });
+    await gate.arrived;
+    const closing = setSalesOpen(db.operator, false, 'artur', 'stop-sales');
+    try {
+      assert.equal(await Promise.race([closing.then(() => 'DONE'), pending(300)]), 'PENDING');
+    } finally {
+      gate.release();
+    }
+    assert.equal((await paying).location, 'https://pay.alfa.example/form?mdOrder=1');
+    await closing;
+    // From here on, nothing starts.
+    assert.equal((await http('POST', '/orders', { form: bookingForm() })).status, 409);
+    assert.equal((await http('POST', `/orders/${ref}/pay`, { cookie })).location, `/orders/${ref}?notice=SALES_CLOSED`);
   });
 });
 

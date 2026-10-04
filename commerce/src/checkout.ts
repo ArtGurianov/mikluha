@@ -234,16 +234,15 @@ export async function pay(deps: CheckoutDeps, orderRef: string): Promise<PayOutc
     o = (await loadOrder(deps.pool, orderRef))!;
   }
   if (o.status !== 'PAYMENT_PENDING') return { kind: 'STATUS' };
-  if (!(await salesOpenNow(deps.pool))) return { kind: 'STATUS', code: 'SALES_CLOSED' };
-
   const attemptId = o.checkout_attempt_id ?? await ensureAttempt(deps, o, now);
   if (attemptId === null) return { kind: 'STATUS' };
 
   const contact = await deps.pool.query<{ email: string }>('SELECT email FROM order_contact WHERE order_id = $1', [o.id]);
   const email = contact.rows[0]?.email;
   if (email === undefined) { await hold(deps, o, 'PAYMENT_PENDING', 'CONTACT_MISSING', now); return { kind: 'STATUS' }; }
-  const s = await deps.refref.paymentSession(orderRef, attemptId, OBLIGATION_REF,
-    { successUrl: `${deps.merchant.origin}/orders/${orderRef}`, receiptContact: { email } });
+  const s = await underOpenSwitch(deps.pool, () => deps.refref.paymentSession(orderRef, attemptId, OBLIGATION_REF,
+    { successUrl: `${deps.merchant.origin}/orders/${orderRef}`, receiptContact: { email } }));
+  if (s === 'SALES_CLOSED') return { kind: 'STATUS', code: 'SALES_CLOSED' };
   if (s.kind === 'UNKNOWN') {
     await setLastSession(deps.pool, o.id, 'UNKNOWN');
     return { kind: 'STATUS' };
@@ -266,9 +265,25 @@ export async function pay(deps: CheckoutDeps, orderRef: string): Promise<PayOutc
   return { kind: 'STATUS' };
 }
 
-async function salesOpenNow(pool: pg.Pool): Promise<boolean> {
-  const { rows } = await pool.query<{ open: boolean }>('SELECT open FROM sales_switch');
-  return rows[0]?.open === true;
+/**
+ * Start money only while the booking switch is open, and keep it open until the request has been
+ * made: the switch's share lock is held across the Refref call itself. An operator's close
+ * (fn_set_sales_open, an UPDATE of that row) therefore either commits first, and this sees it
+ * closed and sends nothing, or waits until the request already under way has finished. Once a
+ * close has committed, no payment session can start (refref ops/runbooks/stop-sales.md). The wait
+ * is bounded by the client's timeout.
+ */
+async function underOpenSwitch<T>(pool: pg.Pool, start: () => Promise<T>): Promise<T | 'SALES_CLOSED'> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query<{ open: boolean }>('SELECT fn_sales_open_for_sale() AS open');
+    if (rows[0]?.open !== true) return 'SALES_CLOSED';
+    return await start();
+  } finally {
+    await client.query('ROLLBACK').catch(() => undefined);
+    client.release();
+  }
 }
 
 async function setLastSession(pool: pg.Pool, id: string, value: string): Promise<void> {

@@ -14,6 +14,10 @@ test("Refref's refref-jcs-1 vectors", () => {
   for (const v of vectors.jcsVectors) assert.equal(canonical(JSON.parse(v.json) as Json), v.canonical, v.name);
 });
 
+// This Refref case is the HISTORICAL Mikluha fixture: fiscalizationMode MERCHANT, quantity 2, with an
+// inventory reservation. It is not what this service builds. It is here only because Refref's own
+// digest and input hash are published for it, so it proves the canonical form (refref-jcs-1) agrees.
+// What this service builds, the Alfa-qualified PROVIDER shape, is asserted by the next test.
 test("Refref's Mikluha snapshot case: the same digest and resolution input hash, computed here", () => {
   const s = vectors.mikluhaCase.snapshot;
   assert.equal(snapshotDigest(s), vectors.mikluhaCase.snapshotHash);

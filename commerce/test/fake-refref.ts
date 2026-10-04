@@ -27,6 +27,19 @@ export class FakeRefref {
   state: FakeState = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', obligation: 'IN_PROGRESS',
     attemptStatus: 'OPEN', paymentAmountDelta: 0 };
   #server: Server | null = null;
+  #gate: { arrived: () => void; released: Promise<void> } | null = null;
+
+  /**
+   * Hold the next payment-session request inside Refref: `arrived` resolves when it reaches here,
+   * and it is answered only after `release()`.
+   */
+  holdSessions(): { arrived: Promise<void>; release: () => void } {
+    let arrived!: () => void;
+    let release!: () => void;
+    const a = new Promise<void>((r) => { arrived = r; });
+    this.#gate = { arrived, released: new Promise<void>((r) => { release = r; }) };
+    return { arrived: a, release };
+  }
   base = '';
 
   constructor(readonly merchantId: string) {}
@@ -67,6 +80,11 @@ export class FakeRefref {
             this.attempts.set(ref, a);
             send(201, { checkoutAttemptId: a.id, snapshotHash: a.snapshotHash, customerStatusUrl: 'https://checkout.example/s', obligations: [] });
           });
+        } else if (req.method === 'POST' && /\/payment-session$/.test(path) && this.#gate !== null) {
+          const gate = this.#gate;
+          this.#gate = null;
+          gate.arrived();
+          void gate.released.then(() => send(200, { status: 'PAYMENT_READY', providerPaymentUrl: 'https://pay.alfa.example/form?mdOrder=1', supportReference: 'x' }));
         } else if (req.method === 'POST' && /\/payment-session$/.test(path)) {
           const s = this.state.session;
           if (s === 'READY') send(200, { status: 'PAYMENT_READY', providerPaymentUrl: 'https://pay.alfa.example/form?mdOrder=1', supportReference: 'x' });
@@ -99,6 +117,7 @@ export class FakeRefref {
   }
 
   reset(): void {
+    this.#gate = null;
     this.requests.length = 0;
     this.attempts.clear();
     this.state = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', obligation: 'IN_PROGRESS',
