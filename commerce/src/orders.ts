@@ -22,7 +22,11 @@ export const MAX_SEATS_PER_ORDER = 6;
 export const RESERVATION_MINUTES = 30;
 export const UNPAID_PD_RETENTION_HOURS = 24;
 export const TRIP_PD_RETENTION_DAYS = 90;
-/** ПП РФ №748: what a tourist contract contains is kept 3 years from the contract's end (the trip's). */
+/**
+ * ПП РФ №748: what a tourist contract contains is kept 3 years from the END OF THE CONTRACT: for a
+ * FULFILLED order the trip's end, for a REFUNDED one the refund (closed_at). A PAID order has not
+ * ended, so its contract is never erased, however old the trip.
+ */
 export const CONTRACT_RETENTION_YEARS = 3;
 export const ADULT_AGE = 18;
 
@@ -257,12 +261,13 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
       await client.query('UPDATE orders SET pd_erased_at = $2 WHERE id = $1', [r.id, now]);
       await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'PD_ERASED')`, [r.id, now]);
     }
-    // The contract (a paid order's Заявка): 3 years after the trip ends, unless held.
+    // The contract (a paid order's Заявка): 3 years after the contract ended, unless held.
     const contracts = await client.query<{ order_id: string }>(
       `UPDATE order_document d SET content = NULL FROM orders o
         WHERE o.id = d.order_id AND d.content IS NOT NULL AND NOT o.legal_hold
-          AND o.status IN ('PAID','FULFILLED','REFUNDED')
-          AND o.trip_ends_on + make_interval(years => $2) < ($1::timestamptz AT TIME ZONE 'UTC')::date
+          AND ((o.status = 'FULFILLED'
+                AND o.trip_ends_on + make_interval(years => $2) < ($1::timestamptz AT TIME ZONE 'UTC')::date)
+            OR (o.status = 'REFUNDED' AND o.closed_at + make_interval(years => $2) < $1::timestamptz))
         RETURNING d.order_id`, [now, CONTRACT_RETENTION_YEARS]);
     for (const r of contracts.rows) {
       await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'CONTRACT_ERASED')`, [r.order_id, now]);

@@ -28,8 +28,8 @@ ALTER TABLE order_passenger
 
 -- The Заявка shown to the customer before paying, exactly as shown. Once paid it is the electronic
 -- contract, and ПП РФ №748 requires what a tourist contract contains to be kept for 3 years from
--- the end of the contract: kept until 3 years after the trip ends (longer under a legal hold), then
--- erased. An order never paid concluded no contract: its Заявка goes with the other personal data
+-- the end of the contract: 3 years after the trip ends for a fulfilled order, after the refund for a
+-- refunded one, never while the contract is still open (PAID); longer under a legal hold. An order never paid concluded no contract: its Заявка goes with the other personal data
 -- within 24 hours. The hash always stays: it is what legalReleaseHash sent to Refref was built from.
 CREATE TABLE order_document (
   order_id   uuid NOT NULL REFERENCES orders(id),

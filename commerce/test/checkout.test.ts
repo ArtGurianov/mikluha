@@ -226,6 +226,43 @@ describe('the Заявка: shown before paying, accepted by paying, frozen afte
     assert.match(d.sha256, /^[0-9a-f]{64}$/);
   });
 
+  /** A paid, fulfilled order (trip 2026-11-04) with its Заявка. */
+  async function fulfilledOrder(): Promise<string> {
+    const { ref, cookie } = await bookAndResolve();
+    await payOrder(ref, cookie);
+    refref.state.obligation = 'SATISFIED';
+    await reconcileAll(deps);
+    assert.equal((await order(ref)).status, 'FULFILLED');
+    return ref;
+  }
+  const at = (iso: string) => maintain(db.pool, () => undefined, new Date(iso));
+
+  test('retention follows the contract\'s end: an old PAID order is never erased', async () => {
+    const ref = await fulfilledOrder();
+    // Paid, but the contract is still open (fulfilment not confirmed): no end, no clock.
+    await db.owner.query(`UPDATE orders SET status = 'PAID', fulfilled_at = NULL WHERE order_ref = $1`, [ref]);
+    await at('2040-01-01T00:00:00Z');
+    assert.equal((await document()).kept, true);
+  });
+
+  test('a FULFILLED order: 3 years from the trip\'s end', async () => {
+    await fulfilledOrder();
+    await at('2029-11-04T12:00:00Z');
+    assert.equal((await document()).kept, true);
+    await at('2029-11-05T12:00:00Z');
+    assert.equal((await document()).kept, false);
+  });
+
+  test('a REFUNDED order: 3 years from the refund, also when it came after the trip', async () => {
+    const ref = await fulfilledOrder();
+    await db.owner.query(`UPDATE orders SET status = 'REFUNDED', closed_at = '2030-06-01T10:00:00Z' WHERE order_ref = $1`, [ref]);
+    // Long past trip end + 3 years, but not refund + 3 years.
+    await at('2033-05-31T10:00:00Z');
+    assert.equal((await document()).kept, true);
+    await at('2033-06-02T10:00:00Z');
+    assert.equal((await document()).kept, false);
+  });
+
   test('an order never paid concluded no contract: its Заявка goes with the rest within 24 hours', async () => {
     await bookAndResolve();
     const ended = new Date(clock.getTime() + 60 * MINUTE);
