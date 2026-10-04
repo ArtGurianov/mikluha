@@ -139,10 +139,10 @@ docker run -d --rm --name commerce-test-pg -e POSTGRES_PASSWORD=postgres -p 5543
 | `COMMERCE_ENVIRONMENT` | `STAGING` or `PRODUCTION`. PRODUCTION refuses to start unless the content is `launchReady` |
 | `CONTENT_DIR` | set by the image: the site's `content/` from the same commit |
 | `SOURCE_COMMIT` | required image build arg. The commerce image stores it read-only in `/app/identity/identity.json`; production has no runtime override |
-| `COMMERCE_ORIGIN` | this service's public origin: `https://book.mikluha-maklai.ru` |
-| `SITE_ORIGIN` | the public site, where the legal pages are: `https://mikluha-maklai.ru` |
-| `REFREF_API_BASE` | e.g. `https://api.refref.ru/v1-rc` |
-| `REFREF_CHECKOUT_ORIGIN` | e.g. `https://checkout.refref.ru` |
+| `COMMERCE_ORIGIN` | fixed in production: `https://book.mikluha-maklai.ru` |
+| `SITE_ORIGIN` | fixed in production: `https://mikluha-maklai.ru` |
+| `REFREF_API_BASE` | fixed in production: `https://api.refref.ru/v1-rc` |
+| `REFREF_CHECKOUT_ORIGIN` | fixed in production: `https://checkout.refref.ru` |
 | `REFREF_BUSINESS_ID`, `REFREF_BUSINESS_SLUG` | Mikluha's Refref Business |
 | `REFREF_API_KEY` | its Business API key (a secret) |
 | `UNISENDER_GO_API_KEY` | UniSender Go transactional API key (a secret) |
@@ -156,3 +156,7 @@ The site publishes `/release.json`; commerce `/identity` reports the correspondi
 five immutable values with the live site at startup, readiness, reservation, and payment. Drift
 fails closed. The owner-run deploy, backup, logging, legal/content and first-sale gates are in
 [`runbooks/production-launch.md`](runbooks/production-launch.md).
+
+The four network addresses above remain configurable in staging. Production compares their
+normalized URLs against the fixed values and refuses startup on any host, port, path, credential,
+query or fragment mismatch.

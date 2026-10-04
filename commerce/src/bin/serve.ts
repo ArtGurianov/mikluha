@@ -3,10 +3,10 @@
 //   COMMERCE_ENVIRONMENT  STAGING | PRODUCTION
 //   CONTENT_DIR           the site's content/ (in the image: /app/content)
 //   source commit         read from the image's immutable /app/identity/identity.json
-//   COMMERCE_ORIGIN       this service's public origin, e.g. https://book.mikluha-maklai.ru
-//   SITE_ORIGIN           the public site, where the legal pages are, e.g. https://mikluha-maklai.ru
-//   REFREF_API_BASE       e.g. https://api.refref.ru/v1-rc
-//   REFREF_CHECKOUT_ORIGIN  e.g. https://checkout.refref.ru
+//   COMMERCE_ORIGIN       fixed in production: https://book.mikluha-maklai.ru
+//   SITE_ORIGIN           fixed in production: https://mikluha-maklai.ru
+//   REFREF_API_BASE       fixed in production: https://api.refref.ru/v1-rc
+//   REFREF_CHECKOUT_ORIGIN  fixed in production: https://checkout.refref.ru
 //   REFREF_BUSINESS_ID, REFREF_BUSINESS_SLUG, REFREF_API_KEY   Mikluha's Refref Business and its key
 //   UNISENDER_GO_API_KEY, UNISENDER_GO_FROM_EMAIL, UNISENDER_GO_FROM_NAME
 

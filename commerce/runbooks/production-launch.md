@@ -87,9 +87,12 @@ UNISENDER_GO_FROM_EMAIL=noreply@mikluha-maklai.ru
 UNISENDER_GO_FROM_NAME=<reviewed sender name>
 ```
 
-Do not set `SOURCE_COMMIT` at runtime. Production refuses non-HTTPS values for the four public or
-provider addresses. Keep the commerce application disconnected from public traffic until its
-database has been bootstrapped and the site candidate is live.
+Do not set `SOURCE_COMMIT` at runtime. Before launch, replace the two Refref placeholders above with
+the fixed values `https://api.refref.ru/v1-rc` and `https://checkout.refref.ru`. Production accepts
+only the normalized four fixed addresses shown here; any host, port, path, credential, query or
+fragment mismatch refuses startup. Staging remains configurable. Keep the commerce application
+disconnected from public traffic until its database has been bootstrapped and the site candidate
+is live.
 
 After certificates are issued, require HTTPS and check that plain HTTP redirects without ever
 serving a booking form:
