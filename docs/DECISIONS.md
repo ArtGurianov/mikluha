@@ -210,9 +210,24 @@ Postgres — единственный источник истины; Redis — �
 **Резервные копии.** Та же уже проверенная машинерия, что у Refref:
 ежечасный логический дамп **и** WAL/PITR (spool, отправка в S3, ежедневная
 base backup с `pg_verifybackup`, мониторинг цепочки, проверка восстановления).
-Отдельная цель и отдельный S3-префикс, шифрование отдельным ключом
-`mikluha-recovery` (age). Ключ `refref-recovery` **не** переиспользуется:
-потеря или ротация одного не должна затрагивать другой.
+Для отправки в S3 брать rclone-контракт из `refref/ops/host/refref-backup-lib`,
+а для зашифрованного runtime recovery bundle — адаптировать
+`flexperiment/deploy/host/flexperiment-recovery-backup` из PR #171 вместе с
+`deploy/test-recovery-backup.sh`. Зафиксировать тот же образ
+`rclone/rclone@sha256:74c51b8817e5431bd6d7ed27cb2a50d8ee78d77f6807b72a41ef6f898845942b`;
+старый `minio/mc` не переносить. Refref уже перешёл на rclone; Flexperiment
+внёс этот переход в PR #171, но его merge и production rollout проверяются
+отдельно.
+
+Все артефакты Mikluha хранить под собственным S3-префиксом
+`art-backups/mikluha/recovery/`, раздельно для runtime bundle, дампов и PITR:
+без пересечения с Refref и Flexperiment. Шифровать отдельным age recipient/key
+`mikluha-recovery`; ключи `refref-recovery` и Flexperiment не переиспользовать.
+После загрузки читать объект обратно через `rclone cat` и сверять SHA-256;
+для runtime bundle сохранять 7 локальных и 100 удалённых копий, а для дампов и
+PITR — их собственные сроки хранения. Удалять только объекты с точным именем
+ожидаемого формата. Для локального end-to-end теста использовать отдельный override
+`MIKLUHA_S3_LOCAL_DIR` с rclone alias remote; запускать этот тест в CI.
 
 **Локализация (152-ФЗ).** И живая база, и резервные копии — в той же
 российской инфраструктуре, что и Refref (VPS и S3 cloud.ru). Персональные данные
@@ -254,6 +269,12 @@ Coolify/Traefik hop. Отсутствующий, неверный или сос�
 `untrusted-ingress` bucket. В отличие от reference-кода, store обязан иметь TTL-очистку и
 жёсткий предел числа bucket; лимит тела запроса и защита операций конкретного заказа остаются
 отдельными границами. SmartCaptcha в launch не включается: это эскалация после наблюдаемого abuse.
+
+Commerce сохраняет точный текст Оферты вместе с её ref/hash и показывает эту копию до оплаты и
+после подтверждения заказа. `/identity` публикует ref/hash Оферты и отдельного `soglasie-pd`.
+В slice 4 публичные legal pages и commerce допускаются к открытию продаж только вместе, из одного
+source commit, с проверкой этих четырёх значений: commerce не вправе записывать более старую
+редакцию, чем та, которую покупатель мог открыть на публичном сайте.
 
 **Slice 4:** build identity записывается при Docker build в read-only image file. Production
 читает только фиксированный путь, не принимает runtime override/fallback и отказывается стартовать

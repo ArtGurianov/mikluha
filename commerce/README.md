@@ -10,10 +10,11 @@ static; everything that sells a trip lives here, with its own Postgres.
   the PROVIDER payment session, and read-back-driven payment and fulfilment.
 - slice 3b: public legal pages, direct site-to-commerce booking links, real-contract production
   gates, and separate versioned personal-data consent evidence.
+- slice 3c: an atomic Postgres confirmation-email outbox delivered asynchronously through
+  UniSender Go, bounded proxy-aware booking throttling, and site-matched customer pages with access
+  to the exact offer and Заявка frozen on the order.
 
 **Next:**
-- Postgres confirmation-email outbox + UniSender Go, proxy-safe bounded rate limiting,
-  request-body limits and visual booking-page integration; no SmartCaptcha at launch (slice 3c);
 - manual ЕИС filing state and operator evidence (slice 3d);
 - immutable image-file build identity, deploy, backups, merchant-order attempt recovery,
   monitoring and the first real payment (slice 4).
@@ -29,7 +30,7 @@ static; everything that sells a trip lives here, with its own Postgres.
 | PD consent | a separate published `soglasie-pd` artifact, not the offer. The booking form carries its version reference and hash and requires its own checkbox. Commerce validates them, stores the authoritative text, reference, hash and acceptance time, and verifies the evidence again before payment. It is never included in Refref's `legalReleaseHash` |
 | transactional email (3c) | one Postgres outbox row is inserted with FULFILLED in the same transaction; an async worker sends through UniSender Go with one stable idempotency key and stores the provider `job_id`. Ambiguity retries the same identity; definitive rejection becomes operator attention. Contract/order mail has no unsubscribe mechanism; marketing is a separate class |
 | booking rate limit (3c) | trust only exactly one valid `X-Forwarded-For` IP from the single Coolify/Traefik hop; missing, malformed or multiple values share one conservative untrusted-ingress bucket. The in-memory store has TTL eviction and a hard size bound. A body-size limit and order-scoped controls remain separate protections. SmartCaptcha is reserved for observed abuse, not launch |
-| contract | the offer (`content/legal/oferta.yml`) plus the order's **Заявка на бронирование** (`src/zayavka.ts`), built from the order, its tourists and the tour's and departure's `contract` data in the CMS. A departure without complete contract data is not sold. The Заявка is rendered when the price is resolved, shown before paying exactly as stored, and accepted by paying; `/pay` carries its hash, and a different one is refused. After that the database forbids changing it. Erased 3 years after the contract ended (24 hours after an unpaid order ends); its hash stays |
+| contract | the offer (`content/legal/oferta.yml`) plus the order's **Заявка на бронирование** (`src/zayavka.ts`), built from the order, its tourists and the tour's and departure's `contract` data in the CMS. A departure without complete contract data is not sold. The authoritative offer text/ref/hash are frozen on reservation and re-hashed before payment. The Заявка is rendered when the price is resolved, shown before paying exactly as stored, and accepted by paying; `/pay` carries its hash, and a different one is refused. Both frozen documents remain available on the cookie-protected order page and through the high-entropy bearer link in the confirmation email; only the token hash remains in `orders`, and the outbox drops its plaintext token when UniSender accepts the mail. After payment the database forbids changing the Заявка. Erased 3 years after the contract ended (24 hours after an unpaid order ends); its hash stays |
 | erasure | unpaid (EXPIRED, CANCELLED): everything, the Заявка included, within 24 h of ending; no contract was concluded. A paid trip (PAID, FULFILLED, REFUNDED): the contact and tourist rows 90 days after it ends; the Заявка, which is the contract, **3 years after the contract ended** (ПП РФ №748): the trip's end for FULFILLED, the refund (`closed_at`) for REFUNDED, never for a PAID order, whose contract is still open. Nothing under `legal_hold` or while money is unresolved |
 | booking switch | closed on a new database. Only an operator login (`commerce_operator`) can change it, through `fn_set_sales_open`, which records who, why and the database login. The service can read it, never change it. A sale reads it under a lock in its own transaction |
 
@@ -124,3 +125,13 @@ docker run -d --rm --name commerce-test-pg -e POSTGRES_PASSWORD=postgres -p 5543
 | `REFREF_CHECKOUT_ORIGIN` | e.g. `https://checkout.refref.ru` |
 | `REFREF_BUSINESS_ID`, `REFREF_BUSINESS_SLUG` | Mikluha's Refref Business |
 | `REFREF_API_KEY` | its Business API key (a secret) |
+| `UNISENDER_GO_API_KEY` | UniSender Go transactional API key (a secret) |
+| `UNISENDER_GO_FROM_EMAIL`, `UNISENDER_GO_FROM_NAME` | verified transactional sender |
+| `UNISENDER_GO_REPLY_TO` | optional reply address |
+
+## Legal-release deployment gate
+
+`/identity` reports `termsRef`, `termsHash`, `pdConsentRef` and `pdConsentHash`. Slice 4 must publish
+the public legal pages and deploy commerce from the same admitted source commit, compare those four
+values with the public `oferta` and `soglasie-pd`, and only then open sales. The two deployments must
+not drift: commerce must never record an older legal version than the public page the customer saw.

@@ -48,7 +48,8 @@ export function createCommerceServer(deps: ServerDeps, routes?: RouteHandler): S
     }
     if (req.method === 'GET' && path === '/identity') {
       send(200, { service: SERVICE, sourceCommit: deps.sourceCommit, schemaHead: deps.schemaHead,
-        startedAt: deps.startedAt.toISOString(), termsRef: deps.catalog.terms.ref });
+        startedAt: deps.startedAt.toISOString(), termsRef: deps.catalog.terms.ref, termsHash: deps.catalog.terms.hash,
+        pdConsentRef: deps.catalog.pdConsent.ref, pdConsentHash: deps.catalog.pdConsent.hash });
       return;
     }
     if (routes === undefined) { send(404, { error: 'NOT_FOUND' }); return; }
