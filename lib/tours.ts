@@ -2,8 +2,6 @@ import type {
   BookingStatus,
   ContentSnapshot,
   DepartureDTO,
-  ImageAsset,
-  OrganizerDTO,
   ReportDTO,
   ReviewDTO,
   TourDTO,
@@ -19,7 +17,6 @@ export function getTodayInTimezone(timezone: string, referenceDate: Date = new D
   });
   return formatter.format(referenceDate);
 }
-
 export function getTourBySlug(content: ContentSnapshot, slug: string): TourDTO | undefined {
   return content.tours.find((t) => t.slug === slug && t.isListed);
 }
@@ -65,29 +62,6 @@ export function getDepartureById(content: ContentSnapshot, id: string): Departur
   return content.departures.find((d) => d.id === id);
 }
 
-export function getOrganizerById(content: ContentSnapshot, id: string | undefined): OrganizerDTO | undefined {
-  if (!id) return undefined;
-  return content.organizers.find((o) => o.id === id);
-}
-
-export interface ResolvedBooking {
-  prepaymentAmount?: number;
-  qr?: ImageAsset;
-  organizer?: OrganizerDTO;
-}
-
-/** Applies the Departure -> SiteSettings.booking fallback chain (section 29). */
-export function resolveBookingDetails(content: ContentSnapshot, departure: DepartureDTO): ResolvedBooking {
-  const { booking } = content.siteSettings;
-  const departureOrganizer = getOrganizerById(content, departure.organizerIds[0]);
-  const fallbackOrganizer = getOrganizerById(content, booking.defaultOrganizerId);
-
-  return {
-    prepaymentAmount: departure.prepaymentAmount ?? booking.defaultPrepaymentAmount,
-    qr: departure.paymentQr ?? booking.defaultQr,
-    organizer: departureOrganizer ?? fallbackOrganizer,
-  };
-}
 
 export function getBookingStatusLabel(status: BookingStatus): string {
   switch (status) {
@@ -204,43 +178,4 @@ export function getUpcomingDepartures(content: ContentSnapshot, today: string): 
     )
     .sort(sortByStartDateAsc)
     .map((departure) => ({ departure, tour: tourById.get(departure.tourId)! }));
-}
-
-
-// ---------------------------------------------------------------------------
-// Data for the client-side Booking Modal (section 16-20): a small, serializable
-// slice of the content snapshot with the booking fallback chain already applied.
-// ---------------------------------------------------------------------------
-
-export interface BookingDepartureInfo {
-  id: string;
-  tourId: string;
-  tourTitle: string;
-  startDate: string;
-  endDate: string;
-  prepaymentAmount?: number;
-  qr?: ImageAsset;
-  organizerName?: string;
-  organizerPhone?: string;
-}
-
-/** Every currently-bookable (OPEN, listed, future) departure across the whole site. */
-export function getAllBookableDepartures(content: ContentSnapshot, today: string): BookingDepartureInfo[] {
-  return content.departures
-    .filter((d) => d.isListed && d.bookingStatus === "OPEN" && d.startDate >= today)
-    .map((d) => {
-      const tour = getTourById(content, d.tourId);
-      const resolved = resolveBookingDetails(content, d);
-      return {
-        id: d.id,
-        tourId: d.tourId,
-        tourTitle: tour?.title ?? "",
-        startDate: d.startDate,
-        endDate: d.endDate,
-        prepaymentAmount: resolved.prepaymentAmount,
-        qr: resolved.qr,
-        organizerName: resolved.organizer?.name,
-        organizerPhone: resolved.organizer?.phone,
-      };
-    });
 }

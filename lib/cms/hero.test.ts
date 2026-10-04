@@ -12,13 +12,13 @@ function settings(): SiteSettingsDTO {
   return {
     siteName: "Миклуха Маклай",
     siteUrl: "https://example.com",
+    commerceOrigin: "https://book.example.com",
     timezone: "Europe/Moscow",
     hero: {
       title: "Путешествия",
       image: { src: "/media/demo/hero.webp", alt: "Горы" },
       video: { src: "https://s3.example/cms/hero.webm" },
     },
-    booking: { isDemo: true },
     socials: {},
     company: {
       legalName: "ИП Тест",

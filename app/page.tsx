@@ -15,7 +15,11 @@ export default function HomePage() {
     <>
       <Hero siteSettings={content.siteSettings} />
       {/* Client-side filtering, so it gets only the two slices it needs rather than the whole snapshot. */}
-      <ToursSection upcoming={getUpcomingDepartures(content, today)} tours={getListedTours(content)} />
+      <ToursSection
+        commerceOrigin={content.siteSettings.commerceOrigin}
+        upcoming={getUpcomingDepartures(content, today)}
+        tours={getListedTours(content)}
+      />
       <ReportsSection content={content} />
       <OrganizerSection organizers={content.organizers} />
       <ReviewsSection reviews={getAllReviewsSorted(content)} />

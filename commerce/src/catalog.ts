@@ -41,7 +41,7 @@ export interface Departure {
   readonly startsOn: string;
   readonly endsOn: string;
   readonly bookingStatus: 'OPEN' | 'CLOSED' | 'CANCELLED';
-  /** Full trip price per person, the amount paid online (never prepaymentAmount: ART-47 decision). */
+  /** Full trip price per person: online checkout never collects a partial advance. */
   readonly priceKopecks: number | null;
   readonly capacity: number | null;
   /** Null until both the tour and the departure carry every contract field: then it cannot be sold. */
@@ -59,11 +59,19 @@ export interface BookingTerms {
   readonly text: string;
 }
 
+/** A separate authorization artifact: never folded into the tourism contract hash sent to Refref. */
+export interface PersonalDataConsent {
+  readonly ref: string;
+  readonly hash: string;
+  readonly text: string;
+}
+
 export interface Catalog {
   readonly timezone: string;
   readonly launchReady: boolean;
   readonly departures: ReadonlyMap<string, Departure>;
   readonly terms: BookingTerms;
+  readonly pdConsent: PersonalDataConsent;
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -162,14 +170,18 @@ export function loadCatalog(contentDir: string): Catalog {
       isDemo: d.isDemo === true,
     });
   }
-  const offer = load(join(contentDir, 'legal', 'oferta.yml'));
-  const offerText = str(offer, 'content', 'oferta');
-  const terms: BookingTerms = {
-    ref: `${str(offer, 'slug', 'oferta')}@${str(offer, 'updatedAt', 'oferta')}`,
-    hash: `sha256:${createHash('sha256').update(offerText, 'utf8').digest('hex')}`,
-    text: offerText,
+  const artifact = (slug: string): BookingTerms => {
+    const page = load(join(contentDir, 'legal', `${slug}.yml`));
+    const content = str(page, 'content', slug);
+    return {
+      ref: `${str(page, 'slug', slug)}@${str(page, 'updatedAt', slug)}`,
+      hash: `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`,
+      text: content,
+    };
   };
-  return { timezone, launchReady: settings.launchReady === true, departures, terms };
+  const terms = artifact('oferta');
+  const pdConsent = artifact('soglasie-pd');
+  return { timezone, launchReady: settings.launchReady === true, departures, terms, pdConsent };
 }
 
 /** Today's date in the site's timezone, as YYYY-MM-DD. */

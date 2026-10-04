@@ -11,9 +11,9 @@ test("a Sveltia date-only value remains a calendar-date string", () => {
 });
 
 test("content's JSON scalar types stay intact", () => {
-  const content = loadContentYaml("price: 28500\nisListed: true\npaymentQr: null\n") as Record<string, unknown>;
+  const content = loadContentYaml("price: 28500\nisListed: true\ncapacity: 12\n") as Record<string, unknown>;
 
   assert.equal(content.price, 28500);
   assert.equal(content.isListed, true);
-  assert.equal(content.paymentQr, null);
+  assert.equal(content.capacity, 12);
 });

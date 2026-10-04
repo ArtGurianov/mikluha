@@ -7,11 +7,12 @@ import { cn } from "@/lib/utils";
 
 interface DepartureBookingCardProps {
   departure?: DepartureDTO;
+  commerceOrigin: string;
   compact?: boolean;
   className?: string;
 }
 
-function BookingAction({ departure, className }: { departure?: DepartureDTO; className?: string }) {
+function BookingAction({ departure, commerceOrigin, className }: { departure?: DepartureDTO; commerceOrigin: string; className?: string }) {
   if (!departure) return null;
 
   const isBookable = departure.bookingStatus === "OPEN";
@@ -19,6 +20,7 @@ function BookingAction({ departure, className }: { departure?: DepartureDTO; cla
   return (
     <BookingButton
       departureId={departure.id}
+      commerceOrigin={commerceOrigin}
       disabled={!isBookable}
       label={isBookable ? "Забронировать место" : "Набор закрыт"}
       className={className}
@@ -26,7 +28,7 @@ function BookingAction({ departure, className }: { departure?: DepartureDTO; cla
   );
 }
 
-export function DepartureBookingCard({ departure, compact = false, className }: DepartureBookingCardProps) {
+export function DepartureBookingCard({ departure, commerceOrigin, compact = false, className }: DepartureBookingCardProps) {
   if (compact) {
     return (
       <aside
@@ -64,7 +66,7 @@ export function DepartureBookingCard({ departure, compact = false, className }: 
                 {departure ? "Цену уточняйте" : "Цена появится вместе с датой"}
               </p>
             )}
-            <BookingAction departure={departure} className="h-11 min-w-40 px-4 text-base" />
+            <BookingAction departure={departure} commerceOrigin={commerceOrigin} className="h-11 min-w-40 px-4 text-base" />
           </div>
         </div>
       </aside>
@@ -103,7 +105,7 @@ export function DepartureBookingCard({ departure, compact = false, className }: 
             {departure ? "Цену уточняйте у организатора" : "Цена станет известна вместе с датой"}
           </p>
         )}
-        <BookingAction departure={departure} className="mt-4 w-full" />
+        <BookingAction departure={departure} commerceOrigin={commerceOrigin} className="mt-4 w-full" />
       </div>
     </aside>
   );

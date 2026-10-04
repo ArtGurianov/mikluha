@@ -3,7 +3,6 @@ startDate: "2026-10-10"
 endDate: "2026-10-13"
 bookingStatus: OPEN
 price: 34000
-prepaymentAmount: 5000
 capacity: 12
 contract:
   departurePoint: "Демо: Кемерово, пл. Советов, 10.10.2026 06:00"

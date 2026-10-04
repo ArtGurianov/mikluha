@@ -28,6 +28,39 @@ export interface RawImageRef {
   alt?: string | null;
 }
 
+export interface RawTourContract {
+  destination?: string | null;
+  route?: string | null;
+  program?: { title?: string | null; items?: string | null }[] | null;
+  included?: string | null;
+  excluded?: string | null;
+  insurance?: string | null;
+  risks?: string | null;
+}
+
+export interface RawDepartureContract {
+  departurePoint?: string | null;
+  returnPoint?: string | null;
+  accommodation?: {
+    name?: string | null;
+    address?: string | null;
+    category?: string | null;
+    registryNumber?: string | null;
+    roomType?: string | null;
+    nights?: number | null;
+    meals?: string | null;
+    legalEntity?: string | null;
+  } | null;
+  carrier?: {
+    legalName?: string | null;
+    route?: string | null;
+    vehicle?: string | null;
+    baggage?: string | null;
+    boarding?: string | null;
+  } | null;
+  services?: { name?: string | null; supplier?: string | null; included?: boolean | null; note?: string | null }[] | null;
+}
+
 export interface RawTour {
   title: string | null;
   /** Also the user-facing route slug (`/tours/<slug>/`), explicit and ASCII-validated — see lib/legal.ts's SLUG_RE. */
@@ -38,6 +71,7 @@ export interface RawTour {
   description?: string | null;
   coverImage: RawImageRef | null;
   gallery?: RawImageRef[] | null;
+  contract?: RawTourContract | null;
   isListed?: boolean | null;
   sortOrder?: number | null;
   seo?: { title?: string | null; description?: string | null; image?: RawImageRef | null } | null;
@@ -53,9 +87,8 @@ export interface RawDeparture {
   endDate: string | null;
   bookingStatus: BookingStatus | null;
   price?: number | null;
-  prepaymentAmount?: number | null;
   capacity?: number | null;
-  paymentQr?: RawImageRef | null;
+  contract?: RawDepartureContract | null;
   organizers?: string[] | null;
   isListed?: boolean | null;
   isDemo?: boolean | null;
@@ -113,6 +146,7 @@ export interface RawLegalPage {
 export interface RawSiteSettings {
   siteName: string | null;
   siteUrl: string | null;
+  commerceOrigin: string | null;
   timezone: string | null;
   logo?: RawImageRef | null;
   hero?: {
@@ -120,12 +154,6 @@ export interface RawSiteSettings {
     subtitle?: string | null;
     image: RawImageRef | null;
     video: { file?: string | null } | null;
-  } | null;
-  booking?: {
-    defaultQr?: RawImageRef | null;
-    defaultPrepaymentAmount?: number | null;
-    defaultOrganizer?: string | null;
-    isDemo?: boolean | null;
   } | null;
   socials?: { maxChannelUrl?: string | null } | null;
   company?: {
@@ -189,23 +217,23 @@ export interface TourDTO<TImage = ImageAsset> {
   description?: string;
   coverImage: TImage;
   gallery: TImage[];
+  contract?: RawTourContract;
   isListed: boolean;
   sortOrder: number;
   seo?: SeoDTO<TImage>;
   updatedAt?: string;
 }
 
-export interface DepartureDTO<TImage = ImageAsset> {
+export interface DepartureDTO {
   id: string;
   tourId: string;
   startDate: string;
   endDate: string;
   bookingStatus: BookingStatus;
   price?: number;
-  prepaymentAmount?: number;
   /** Seats sold online; mikluha-commerce counts the taken ones (docs/DECISIONS.md #9). */
   capacity?: number;
-  paymentQr?: TImage;
+  contract?: RawDepartureContract;
   organizerIds: string[];
   isListed: boolean;
   isDemo: boolean;
@@ -260,15 +288,10 @@ export interface LegalPageDTO {
 export interface SiteSettingsDTO<TImage = ImageAsset> {
   siteName: string;
   siteUrl: string;
+  commerceOrigin: string;
   timezone: string;
   logo?: TImage;
   hero: { title: string; subtitle?: string; image: TImage; video: VideoAsset };
-  booking: {
-    defaultQr?: TImage;
-    defaultPrepaymentAmount?: number;
-    defaultOrganizerId?: string;
-    isDemo: boolean;
-  };
   socials: { maxChannelUrl?: string };
   company: {
     legalName: string;
@@ -288,7 +311,7 @@ export interface ContentSnapshot<TImage = ImageAsset> {
   source: "git";
   siteSettings: SiteSettingsDTO<TImage>;
   tours: TourDTO<TImage>[];
-  departures: DepartureDTO<TImage>[];
+  departures: DepartureDTO[];
   reports: ReportDTO<TImage>[];
   reviews: ReviewDTO<TImage>[];
   organizers: OrganizerDTO<TImage>[];

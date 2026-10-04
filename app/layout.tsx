@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 
-import { BookingModal } from "@/components/booking/booking-modal";
-import { BookingModalProvider } from "@/components/booking/booking-provider";
 import { Footer } from "@/components/site/footer";
 import { Header } from "@/components/site/header";
 import { getContent } from "@/lib/cms/content";
@@ -10,7 +8,6 @@ import { jsonLdScript } from "@/lib/json-ld";
 import { getLegalPagesSorted } from "@/lib/legal";
 import { deployEnv, isStaging, resolveCanonicalBase } from "@/lib/site";
 import { buildOrganizationJsonLd } from "@/lib/structured-data";
-import { getAllBookableDepartures, getTodayInTimezone } from "@/lib/tours";
 
 import "./globals.css";
 
@@ -61,8 +58,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   // while the document is still parsing.
   const heroVideoOrigin = mediaOrigin(siteSettings.hero.video.src);
   const legalPages = getLegalPagesSorted(content);
-  const today = getTodayInTimezone(siteSettings.timezone);
-  const bookableDepartures = getAllBookableDepartures(content, today);
 
   const organizationJsonLd = buildOrganizationJsonLd(siteSettings, resolveCanonicalBase(siteSettings.siteUrl));
 
@@ -79,12 +74,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdScript(organizationJsonLd) }}
         />
-        <BookingModalProvider departures={bookableDepartures}>
-          <Header siteSettings={siteSettings} />
-          <main className="flex-1">{children}</main>
-          <Footer siteSettings={siteSettings} legalPages={legalPages} />
-          <BookingModal />
-        </BookingModalProvider>
+        <Header siteSettings={siteSettings} />
+        <main className="flex-1">{children}</main>
+        <Footer siteSettings={siteSettings} legalPages={legalPages} />
       </body>
     </html>
   );

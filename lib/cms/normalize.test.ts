@@ -43,6 +43,7 @@ function siteSettings(overrides: Partial<RawSiteSettings> = {}): RawSiteSettings
   return {
     siteName: "Тест",
     siteUrl: "https://example.com",
+    commerceOrigin: "https://book.example.com",
     timezone: "Europe/Moscow",
     hero: { title: "Заголовок", image: imageRef("hero"), video: { file: "https://media.example/cms/hero.webm" } },
     company: { legalName: "ООО Миклуха Маклай", inn: "4205435867", ogrn: "1264200007631", phone: "+79039075547" },
@@ -106,14 +107,6 @@ test("a siteSettings document missing a whole required object fails the build by
     () => normalizeContentSet(contentSet({ siteSettings: siteSettings({ hero: undefined }) }), "git"),
     /siteSettings\.hero/,
   );
-});
-
-test("an absent siteSettings.booking object means 'no defaults', not a crash", () => {
-  const content = normalizeContentSet(contentSet({ siteSettings: siteSettings({ booking: undefined }) }), "git");
-
-  assert.equal(content.siteSettings.booking.defaultQr, undefined);
-  assert.equal(content.siteSettings.booking.defaultPrepaymentAmount, undefined);
-  assert.equal(content.siteSettings.booking.isDemo, false);
 });
 
 test("a Hero video becomes a direct WebM source", () => {

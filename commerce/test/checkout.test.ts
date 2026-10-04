@@ -96,6 +96,7 @@ async function payOrder(ref: string, cookie: string, zayavka?: string): Promise<
 
 const bookingForm = (seats = 1): Record<string, string> => ({
   departure: 'altai-2026-11-01', termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
+  pdConsent: 'yes', pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash,
   contactPhone: '+7 903 907-55-47', contactEmail: 'ivan@example.ru',
   adultsOnly: 'yes',
   ...touristFields(1, 'Иван Петров', '3210', '654321'),
@@ -190,12 +191,22 @@ describe('the Заявка: shown before paying, accepted by paying, frozen afte
     const doc = (await db.owner.query('SELECT sha256 FROM order_document')).rows[0];
     assert.equal(snapshot.legalReleaseRef, catalog.terms.ref);
     assert.equal(snapshot.legalReleaseHash, contractHash(catalog.terms.ref, catalog.terms.hash, doc.sha256));
+    assert.doesNotMatch(JSON.stringify(snapshot), /soglasie-pd|pdConsent/i);
   });
 
   test('a Заявка other than the one stored is refused, and nothing is sent', async () => {
     const { ref, cookie } = await bookAndResolve();
     const r = await payOrder(ref, cookie, 'f'.repeat(64));
     assert.equal(r.location, `/orders/${ref}?notice=DOCUMENT_CHANGED`);
+    assert.equal((await order(ref)).status, 'RESERVED');
+    assert.equal(refref.calls(/\/checkout-attempts$/).length, 0);
+  });
+
+  test('payment fails closed when the stored consent no longer hashes to what the form showed', async () => {
+    const { ref, cookie } = await bookAndResolve();
+    await db.owner.query(`UPDATE orders SET pd_consent_content = pd_consent_content || ' forged' WHERE order_ref = $1`, [ref]);
+    const result = await payOrder(ref, cookie);
+    assert.equal(result.location, `/orders/${ref}?notice=PD_CONSENT_INVALID`);
     assert.equal((await order(ref)).status, 'RESERVED');
     assert.equal(refref.calls(/\/checkout-attempts$/).length, 0);
   });

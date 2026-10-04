@@ -3,7 +3,6 @@ startDate: "2026-09-12"
 endDate: "2026-09-15"
 bookingStatus: CLOSED
 price: 34000
-prepaymentAmount: 5000
 organizers:
   - artur
 isListed: true

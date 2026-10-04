@@ -32,7 +32,7 @@ const deal: OrderDeal = { orderRef: 'mk-abcdefghijkl', tourSlug: 'altai', tourTi
 test('the snapshot is exactly the qualified Alfa path: one PROVIDER line of quantity 1 equal to the payment', () => {
   const s = buildSnapshot(deal, { merchantId: '3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90',
     referralResolutionId: '7a0e1c3b-5d2f-4e8a-b6c1-9f3d2e4a5b60', termsVersionId: null, discountKopecks: 400_000 },
-  { ref: 'booking-terms@2026-10-04', hash: `sha256:${'a'.repeat(64)}` });
+  { ref: 'oferta@2026-10-04', hash: `sha256:${'a'.repeat(64)}` });
   assert.equal(s.totalContractAmountKopecks, 6_400_000);
   assert.deepEqual(s.paymentObligations, [{
     obligationRef: 'full', kind: 'FULL', executionMode: 'ORCHESTRATED', fiscalizationMode: 'PROVIDER', amountKopecks: 6_400_000,

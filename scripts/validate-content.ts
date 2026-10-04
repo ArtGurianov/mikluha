@@ -22,6 +22,11 @@ import {
   type CmsMediaConfig,
 } from "../lib/cms/asset-source";
 import type { ContentSnapshot, ImageAsset } from "../lib/cms/types";
+import {
+  demoContractFields,
+  hasCompleteDepartureContract,
+  hasCompleteTourContract,
+} from "../lib/contract-readiness";
 import { REQUIRED_LEGAL_SLUGS, RESERVED_SLUGS, SLUG_RE } from "../lib/legal";
 import { findMarkdownPolicyViolations } from "../lib/cms/markdown-policy";
 import { isStaging } from "../lib/site";
@@ -46,6 +51,20 @@ function isCalendarDate(value: string): boolean {
 function isHttpsUrl(value: string): boolean {
   try {
     return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isHttpsOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:"
+      && url.username === ""
+      && url.password === ""
+      && url.pathname === "/"
+      && url.search === ""
+      && url.hash === "";
   } catch {
     return false;
   }
@@ -109,7 +128,6 @@ async function main() {
 
   validateImage(content.siteSettings.logo, "siteSettings.logo", mediaPolicy);
   validateImage(content.siteSettings.hero.image, "siteSettings.hero.image", mediaPolicy);
-  validateImage(content.siteSettings.booking.defaultQr, "siteSettings.booking.defaultQr", mediaPolicy);
   validateImage(content.siteSettings.seo.ogImage, "siteSettings.seo.ogImage", mediaPolicy);
   try {
     assertVideoSource(content.siteSettings.hero.video.src, mediaPolicy);
@@ -124,9 +142,6 @@ async function main() {
     validateImage(tour.seo?.image, `Tour ${tour.id} seo.image`, mediaPolicy);
     tour.gallery.forEach((image, index) => validateImage(image, `Tour ${tour.id} gallery[${index}]`, mediaPolicy));
     if (tour.gallery.length > 10) fail(`Tour ${tour.id} gallery has ${tour.gallery.length} images; maximum is 10`);
-  }
-  for (const departure of content.departures) {
-    validateImage(departure.paymentQr, `Departure ${departure.id} paymentQr`, mediaPolicy);
   }
   for (const report of content.reports) {
     validateImage(report.coverImage, `Report ${report.id} coverImage`, mediaPolicy);
@@ -148,6 +163,9 @@ async function main() {
   );
 
   if (!isHttpsUrl(content.siteSettings.siteUrl)) fail(`siteSettings.siteUrl must be an absolute HTTPS URL`);
+  if (!isHttpsOrigin(content.siteSettings.commerceOrigin)) {
+    fail(`siteSettings.commerceOrigin must be an HTTPS origin without a path, query or credentials`);
+  }
   if (content.siteSettings.socials.maxChannelUrl && !isHttpsUrl(content.siteSettings.socials.maxChannelUrl)) {
     fail(`siteSettings.socials.maxChannelUrl must be an absolute HTTPS URL`);
   }
@@ -157,11 +175,6 @@ async function main() {
   } catch {
     fail(`siteSettings.timezone "${content.siteSettings.timezone}" is not a valid IANA timezone`);
   }
-  const defaultPrepayment = content.siteSettings.booking.defaultPrepaymentAmount;
-  if (defaultPrepayment !== undefined && (!Number.isInteger(defaultPrepayment) || defaultPrepayment < 0)) {
-    fail(`siteSettings.booking.defaultPrepaymentAmount must be a non-negative integer`);
-  }
-
   // --- referential integrity ---------------------------------------------
   for (const d of content.departures) {
     if (!tourIds.has(d.tourId)) fail(`Departure ${d.id} references unknown tour ${d.tourId}`);
@@ -173,10 +186,8 @@ async function main() {
     if (!("OPEN" === d.bookingStatus || "CLOSED" === d.bookingStatus || "CANCELLED" === d.bookingStatus)) {
       fail(`Departure ${d.id} has unknown bookingStatus "${d.bookingStatus}"`);
     }
-    for (const [label, amount] of [["price", d.price], ["prepaymentAmount", d.prepaymentAmount]] as const) {
-      if (amount !== undefined && (!Number.isInteger(amount) || amount < 0)) {
-        fail(`Departure ${d.id} ${label} must be a non-negative integer`);
-      }
+    if (d.price !== undefined && (!Number.isInteger(d.price) || d.price < 0)) {
+      fail(`Departure ${d.id} price must be a non-negative integer`);
     }
     if (d.capacity !== undefined && (!Number.isInteger(d.capacity) || d.capacity < 1)) {
       fail(`Departure ${d.id} capacity must be a positive integer`);
@@ -208,11 +219,6 @@ async function main() {
   for (const rv of content.reviews) {
     if (rv.tourId && !tourIds.has(rv.tourId)) fail(`Review ${rv.id} references unknown tour ${rv.tourId}`);
   }
-  const defaultOrganizerId = content.siteSettings.booking.defaultOrganizerId;
-  if (defaultOrganizerId && !organizerIds.has(defaultOrganizerId)) {
-    fail(`siteSettings.booking.defaultOrganizer references unknown organizer ${defaultOrganizerId}`);
-  }
-
   const slugs = new Set<string>();
   for (const t of content.tours) {
     if (slugs.has(`tour:${t.slug}`)) fail(`Duplicate tour slug: ${t.slug}`);
@@ -267,31 +273,11 @@ async function main() {
   // --- OPEN departures must always resolve to a complete booking flow ----
   for (const d of content.departures) {
     if (d.bookingStatus !== "OPEN") continue;
-    const resolvedPrepayment = d.prepaymentAmount ?? content.siteSettings.booking.defaultPrepaymentAmount;
-    const resolvedQr = d.paymentQr ?? content.siteSettings.booking.defaultQr;
-    const departureOrganizer = content.organizers.find((organizer) => organizer.id === d.organizerIds[0]);
-    const fallbackOrganizer = content.organizers.find(
-      (organizer) => organizer.id === content.siteSettings.booking.defaultOrganizerId,
-    );
-    const resolvedOrganizer = departureOrganizer ?? fallbackOrganizer;
     if (d.price === undefined) {
-      // Unlike the QR/prepayment/organizer below, price has no siteSettings
-      // fallback — it is per-date by definition, so nothing can stand in for it.
       fail(`OPEN departure ${d.id} has no price — a departure open for booking must show what it costs`);
     }
     if (d.capacity === undefined) {
       fail(`OPEN departure ${d.id} has no capacity — online booking needs to know how many seats it may sell`);
-    }
-    if (resolvedPrepayment === undefined) {
-      fail(`OPEN departure ${d.id} has no prepaymentAmount, even after siteSettings fallback`);
-    }
-    if (!resolvedQr) {
-      fail(`OPEN departure ${d.id} has no payment QR, even after siteSettings fallback`);
-    }
-    if (!resolvedOrganizer) {
-      fail(`OPEN departure ${d.id} has no organizer, even after siteSettings fallback`);
-    } else if (!PHONE_RE.test(resolvedOrganizer.phone)) {
-      fail(`OPEN departure ${d.id} resolves to organizer with invalid phone: ${resolvedOrganizer.phone}`);
     }
   }
 
@@ -311,14 +297,10 @@ async function main() {
   }
 
   // --- launchReady production gate ----------------------------------------
-  // A production release must never carry placeholder payment details: the
-  // demo QR sends real money to a test account and the demo phone reaches
-  // nobody. Every blocker is collected up front so the operator gets the whole
+  // A production release must never carry placeholder company or contract details.
+  // Every blocker is collected up front so the operator gets the whole
   // list in one build rather than discovering them one failed build at a time.
   const demoBlockers: string[] = [];
-  if (content.siteSettings.booking.isDemo) {
-    demoBlockers.push('siteSettings.booking is still marked "Демо-данные" (default QR / prepayment / organizer)');
-  }
   if (content.siteSettings.company.isDemo) {
     demoBlockers.push('siteSettings.company is still marked "Демо-данные" (legal name / ИНН / ОГРН / phone)');
   }
@@ -338,6 +320,23 @@ async function main() {
   }
 
   if (content.siteSettings.launchReady) {
+    const tourById = new Map(content.tours.map((tour) => [tour.id, tour]));
+    for (const departure of content.departures) {
+      if (departure.bookingStatus !== "OPEN") continue;
+      const tour = tourById.get(departure.tourId);
+      if (!hasCompleteTourContract(tour?.contract)) {
+        fail(`Production release blocked — OPEN departure ${departure.id} has incomplete tour contract data.`);
+      }
+      if (!hasCompleteDepartureContract(departure.contract)) {
+        fail(`Production release blocked — OPEN departure ${departure.id} has incomplete departure contract data.`);
+      }
+      for (const field of demoContractFields(tour?.contract, `tour ${departure.tourId}.contract`)) {
+        fail(`Production release blocked — OPEN departure ${departure.id} uses explicit demo content in ${field}.`);
+      }
+      for (const field of demoContractFields(departure.contract, `departure ${departure.id}.contract`)) {
+        fail(`Production release blocked — OPEN departure ${departure.id} uses explicit demo content in ${field}.`);
+      }
+    }
     for (const blocker of demoBlockers) {
       fail(`Production release blocked — ${blocker}. Replace it in the CMS and commit.`);
     }

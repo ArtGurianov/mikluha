@@ -59,10 +59,10 @@ function settings(overrides: Partial<SiteSettingsDTO["company"]> = {}): SiteSett
   return {
     siteName: "Миклуха Маклай",
     siteUrl: BASE,
+    commerceOrigin: "https://book.example.com",
     timezone: "Asia/Krasnoyarsk",
     logo: { src: "/media/demo/brand-logo.webp", alt: "Логотип" },
     hero: { title: "t", image: { src: "/h.webp", alt: "" }, video: { src: "/h.webm" } },
-    booking: { isDemo: false },
     socials: { maxChannelUrl: "https://max.ru/join/abc" },
     company: {
       legalName: "ООО Миклуха Маклай",
