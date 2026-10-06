@@ -12,7 +12,7 @@ function input(): ZayavkaInput {
       accommodation: { ...d.contract.departure.accommodation, nights: 2, meals: '2 завтрака, 2 ужина' },
       services: [{ name: 'Сплав', supplier: 'ИП Исполнитель', included: false, note: 'Оплачивается отдельно' }] } } },
     contact: { fullName: 'Иван Петров', phone: '+7 900 000 0000', email: 'synthetic@example.ru' },
-    tourists: [{ position: 1, fullName: 'Иван Петров', dateOfBirth: '1990-05-17', citizenship: 'RU', documentType: 'RU_PASSPORT',
+    tourists: [{ fullName: 'Иван Петров', dateOfBirth: '1990-05-17', citizenship: 'RU', documentType: 'RU_PASSPORT',
       documentSeries: '0000', documentNumber: '000001' }], amountKopecks: 2_650_000, discountKopecks: 0 };
 }
 

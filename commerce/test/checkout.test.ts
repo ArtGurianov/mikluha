@@ -174,7 +174,8 @@ describe('the paid path', () => {
     const later = { ...catalog, timezone: 'Europe/Moscow', departures: new Map(catalog.departures).set(d.slug,
       { ...d, contract: { ...d.contract!, departure: { ...d.contract!.departure, departureTime: '10:00', returnTime: '18:00' } } }) };
     const shown = await zayavkaOf(db.pool, ref);
-    assert.match(shown!.content, /06:00 \(Asia\/Krasnoyarsk\)/);
+    assert.ok(shown?.content);
+    assert.match(shown.content, /06:00 \(Asia\/Krasnoyarsk\)/);
     assert.equal((await pay({ ...deps, catalog: later }, ref, shown!.sha256)).kind, 'REDIRECT');
     const stored = (await db.owner.query('SELECT snapshot FROM orders WHERE order_ref = $1', [ref])).rows[0].snapshot;
     assert.equal(stored.lines[0].serviceStartsAt, '2026-10-31T23:00:00Z');
