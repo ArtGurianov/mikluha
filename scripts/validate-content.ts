@@ -24,6 +24,8 @@ import {
 import type { ContentSnapshot, ImageAsset } from "../lib/cms/types";
 import {
   demoContractFields,
+  effectiveProduct,
+  hasQualifiedRefundPolicy,
   hasCompleteDepartureContract,
   hasCompleteTourContract,
 } from "../lib/contract-readiness";
@@ -320,17 +322,21 @@ async function main() {
   }
 
   if (content.siteSettings.launchReady) {
+    if (!hasQualifiedRefundPolicy(content.legalPages.find((page) => page.slug === 'oferta')?.refundPolicy)) {
+      fail('Production release blocked — REFUND_WORKFLOW_UNQUALIFIED. Documented-expense refunds require separate end-to-end qualification.');
+    }
     const tourById = new Map(content.tours.map((tour) => [tour.id, tour]));
     for (const departure of content.departures) {
       if (departure.bookingStatus !== "OPEN") continue;
       const tour = tourById.get(departure.tourId);
-      if (!hasCompleteTourContract(tour?.contract)) {
+      const product = effectiveProduct(tour?.contract, departure.contract);
+      if (!hasCompleteTourContract(product)) {
         fail(`Production release blocked — OPEN departure ${departure.id} has incomplete tour contract data.`);
       }
       if (!hasCompleteDepartureContract(departure.contract)) {
         fail(`Production release blocked — OPEN departure ${departure.id} has incomplete departure contract data.`);
       }
-      for (const field of demoContractFields(tour?.contract, `tour ${departure.tourId}.contract`)) {
+      for (const field of demoContractFields(product, `departure ${departure.id}.product`)) {
         fail(`Production release blocked — OPEN departure ${departure.id} uses explicit demo content in ${field}.`);
       }
       for (const field of demoContractFields(departure.contract, `departure ${departure.id}.contract`)) {

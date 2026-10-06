@@ -25,6 +25,12 @@ eis() { docker run --rm --network "$NET" --env-file /etc/mikluha-commerce/operat
 
 ## One paid order
 
+The legal transmission deadline is the 15th of the month following contract conclusion, but not
+later than the trip starts. Our internal target is **24 hours before departure** to allow
+corrections; it is not a claim that the ЕИС statute itself sets that 24-hour deadline. For a sale
+in October for `altai-1` on 29 October, the trip-start limit takes precedence. The separate duty
+to deliver travel/transport/accommodation documents is not fulfilled just by recording ЕИС state.
+
 1. Confirm Refref read-back and commerce show the real order paid/fulfilled. Record only non-secret
    evidence: deployed source commit, order reference, payment evidence reference and timestamps.
 2. Confirm commerce created the filing obligation:
@@ -70,7 +76,7 @@ eis() { docker run --rm --network "$NET" --env-file /etc/mikluha-commerce/operat
 
 The evidence comment may contain only:
 
-- deployed immutable source commit and schema 6;
+- deployed immutable source commit and exact schema head (7 after migration 0007);
 - order reference and Refref payment evidence reference (no receipt contact or tourist data);
 - `EIS_PENDING` read-back timestamp;
 - operator confirmation that all stored contract/tourist fields matched the ЕИС form;

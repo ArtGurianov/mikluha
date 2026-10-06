@@ -13,7 +13,7 @@
 import pg from 'pg';
 
 import { PRODUCTION_BUILD_IDENTITY_FILE, readBuildIdentity } from '../build-identity.js';
-import { loadCatalog } from '../catalog.js';
+import { assertProductionContent, loadCatalog } from '../catalog.js';
 import { reconcileAll, type CheckoutDeps } from '../checkout.js';
 import { env, environment, MIGRATIONS_DIR, productionAddress } from '../config.js';
 import { processEmailOutbox, UniSenderGoClient } from '../email.js';
@@ -28,7 +28,7 @@ import { createWebHandler } from '../web.js';
 const log = jsonLogger(SERVICE);
 const which = environment();
 const catalog = loadCatalog(env('CONTENT_DIR'));
-if (which === 'PRODUCTION' && !catalog.launchReady) throw new Error('CONTENT_NOT_LAUNCH_READY: production serves launchReady content only');
+if (which === 'PRODUCTION') assertProductionContent(catalog);
 const identityPath = which === 'PRODUCTION' ? PRODUCTION_BUILD_IDENTITY_FILE
   : (process.env.BUILD_IDENTITY_FILE || PRODUCTION_BUILD_IDENTITY_FILE);
 const identity = await readBuildIdentity(identityPath);

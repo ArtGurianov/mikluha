@@ -89,6 +89,8 @@ export interface OrderDeal {
   readonly departureSlug: string;
   readonly startsOn: string;
   readonly endsOn: string;
+  readonly startsTime?: string;
+  readonly endsTime?: string;
   readonly seats: number;
   readonly amountKopecks: number;
   readonly timezone: string;
@@ -99,8 +101,8 @@ export function orderLine(deal: OrderDeal): ResolutionLine {
   return {
     lineRef: LINE_REF, offerRef: deal.tourSlug, unitRef: deal.departureSlug, quantity: deal.seats,
     merchantOfferAmountKopecks: deal.amountKopecks,
-    serviceStartsAt: zonedToUtc(deal.startsOn, '00:00:00', deal.timezone),
-    serviceEndsAt: zonedToUtc(deal.endsOn, '23:59:59', deal.timezone),
+    serviceStartsAt: zonedToUtc(deal.startsOn, deal.startsTime === undefined ? '00:00:00' : `${deal.startsTime}:00`, deal.timezone),
+    serviceEndsAt: zonedToUtc(deal.endsOn, deal.endsTime === undefined ? '23:59:59' : `${deal.endsTime}:00`, deal.timezone),
   };
 }
 

@@ -91,6 +91,8 @@ const TOUR_CONTRACT = `contract:
 `;
 
 const DEPARTURE_CONTRACT = `contract:
+  departureTime: "06:00"
+  returnTime: "21:00"
   departurePoint: Кемерово, пл. Советов, 06:00
   returnPoint: Кемерово, пл. Советов, около 21:00
   accommodation:
@@ -127,7 +129,7 @@ export function fixtureCatalog(departures: FixtureDeparture[]): Catalog {
   writeFileSync(join(dir, 'site-settings.yml'), 'timezone: Asia/Krasnoyarsk\nlaunchReady: true\n');
   writeFileSync(join(dir, 'tours', 'altai.yml'), `title: Алтай\nslug: altai\n${TOUR_CONTRACT}`);
   writeFileSync(join(dir, 'legal', 'oferta.yml'),
-    `title: Публичная оферта\nslug: oferta\nupdatedAt: "2026-10-04"\ncontent: |-\n${TERMS_TEXT.split('\n').map((l) => `  ${l}`).join('\n')}\n`);
+    `title: Публичная оферта\nslug: oferta\nrefundPolicy: FULL_ONLY\nupdatedAt: "2026-10-04"\ncontent: |-\n${TERMS_TEXT.split('\n').map((l) => `  ${l}`).join('\n')}\n`);
   writeFileSync(join(dir, 'legal', 'soglasie-pd.yml'),
     `title: Согласие на обработку персональных данных\nslug: soglasie-pd\nupdatedAt: "2026-10-04"\ncontent: |-\n${PD_CONSENT_TEXT.split('\n').map((l) => `  ${l}`).join('\n')}\n`);
   for (const d of departures) {

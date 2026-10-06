@@ -29,6 +29,7 @@ export interface ZayavkaInput {
   readonly orderRef: string;
   /** When it was formed, in the site's timezone, e.g. 04.10.2026 13:00. */
   readonly formedAt: string;
+  readonly timezone: string;
   readonly offerRef: string;
   readonly departure: Departure & { readonly contract: NonNullable<Departure['contract']> };
   /** The customer: tourist №1, with their phone and email. */
@@ -42,6 +43,7 @@ export function renderZayavka(z: ZayavkaInput): string {
   const { tour, departure: dc } = z.departure.contract;
   const d = z.departure;
   const nights = dc.accommodation.nights;
+  const days = Math.round((Date.parse(d.endsOn) - Date.parse(d.startsOn)) / 86_400_000) + 1;
   const tourists = z.tourists.map((t, i) => `<tr><td>${i + 1}</td><td>${esc(t.fullName)}</td><td>${date(t.dateOfBirth)}</td>`
     + `<td>${esc(countryName(t.citizenship) ?? t.citizenship)}</td>`
     + `<td>${esc(DOCUMENT_NAMES[t.documentType])}: ${esc([t.documentSeries, t.documentNumber].filter(Boolean).join(' '))}</td></tr>`).join('');
@@ -58,7 +60,7 @@ export function renderZayavka(z: ZayavkaInput): string {
 <h3>2. Туристы</h3>
 <table><tr><th>№</th><th>ФИО</th><th>Дата рождения</th><th>Гражданство</th><th>Документ, удостоверяющий личность</th></tr>${tourists}</table>
 <h3>3. Туристский продукт</h3>
-<table>${row('Название тура', d.tourTitle)}${row('Регион / место временного пребывания', tour.destination)}${row('Даты', `${date(d.startsOn)} — ${date(d.endsOn)}`)}${row('Продолжительность', `${nights + 1} дн. / ${nights} ноч.`)}${row('Маршрут', tour.route)}${row('Место и время отправления', dc.departurePoint)}${row('Место и ориентировочное время возвращения', dc.returnPoint)}</table>
+<table>${row('Название тура', d.tourTitle)}${row('Идентификатор тура', d.tourSlug)}${row('Идентификатор выезда', d.slug)}${row('Регион / место временного пребывания', tour.destination)}${row('Даты', `${date(d.startsOn)} — ${date(d.endsOn)}`)}${row('Время отправления', `${date(d.startsOn)} ${dc.departureTime} (${z.timezone})`)}${row('Ориентировочное время возвращения', `${date(d.endsOn)} ${dc.returnTime} (${z.timezone})`)}${row('Продолжительность', `${days} календарных дн. / ${nights} ноч. размещения`)}${row('Маршрут', tour.route)}${row('Место отправления', dc.departurePoint)}${row('Место возвращения', dc.returnPoint)}</table>
 <h4>3.1. Размещение</h4>
 <table>${row('Средство размещения', dc.accommodation.name)}${row('Адрес', dc.accommodation.address)}${row('Категория', dc.accommodation.category ?? 'Не присвоена / не применимо')}${dc.accommodation.registryNumber ? row('Номер в реестре средств размещения', dc.accommodation.registryNumber) : ''}${row('Тип номера / размещения', dc.accommodation.roomType)}${row('Ночей', String(nights))}${row('Питание', dc.accommodation.meals)}${row('Поставщик услуги размещения', dc.accommodation.legalEntity)}</table>
 <h4>3.2. Перевозка</h4>

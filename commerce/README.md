@@ -20,8 +20,49 @@ static; everything that sells a trip lives here, with its own Postgres.
   attempt create, aggregate PD-free monitor signals, and the owner-run production launch gate.
 
 **Next:**
-- merge the separate Refref host backup/monitor integration; then the owner-run deployment,
-  business/legal/content gates, production conformance, and first real payment + ЕИС evidence.
+- qualify the selected documented-expense refund workflow separately; obtain real commercial
+  facts, signed processing instruction and remaining legal/provider evidence. Refref host
+  integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migration 0007
+  needs owner-only application and fresh recovery evidence before future admission. Mikluha
+  commerce is undeployed; monitor admission, sales and payments remain closed.
+
+## Generic legal pack and individual application
+
+All tours use the same `content/legal/` pack. The offer's version/hash, tourist PD consent's
+version/hash, and Refref processing instruction evidence are three separate artifacts; neither
+PD artifact changes Refref's commercial `legalReleaseHash`.
+
+`tour.contract` supplies shared product defaults. An optional `departure.contract.product`
+**replaces all product conditions** (route/program/inclusions/exclusions/insurance/risks), never
+merges them. A supplied null/incomplete override cannot fall back to a different/demo trip.
+Departure conditions supply valid exact `departureTime`/`returnTime`, accommodation nights and
+meal plan, carrier and explicitly included/optional services. The frozen application identifies
+the departure and shows calendar days separately from accommodation nights, in the site timezone.
+These same exact times become Refref's service instants.
+Times and timezone are frozen with the reserved dates/price and cannot be updated on that order.
+A later catalog cannot replace them; historical rows without them refuse resolution/new payment
+rather than guess. Correcting the frozen schedule requires a separately reviewed replacement
+contract workflow, not a direct schedule update. Already frozen payment read-back is unaffected.
+
+`altai-1` records only owner-supplied dates/times, 26,500 RUB/person and nominal capacity 40. It is
+CLOSED and unlisted, with unresolved accommodation/address/program/inclusion facts left blank;
+capacity must still be reconciled with offline reservations before opening. It is not a real offer
+or a substitute for supplier/registry evidence.
+
+The offer now selects `refundPolicy: DOCUMENTED_EXPENSES`: voluntary full refund with notice at
+least five calendar days before departure; later only documented actual attributable expenses,
+never fixed percentage penalties or automatic forfeiture for no-show. Commerce currently qualifies
+only `FULL_ONLY`. For `DOCUMENTED_EXPENSES`, production startup, new reservations and payment
+initiation fail closed as `REFUND_WORKFLOW_UNQUALIFIED`, independently of launchReady/sales switch.
+Existing payment read-back/fulfilment/cancellation remain available; no partial-refund engine is
+implemented here. Removing the metadata also refuses catalog load. Do not relabel the expense
+policy `FULL_ONLY` to bypass qualification.
+
+`commerce/legal/pd-processing-instruction-refref-v1.md` is a generic signing form. Migration 0007
+stores its exact template hash as DRAFT with NULL signature evidence and SELECT-only access for
+runtime/operator. It does not claim the instruction is signed. The owner verifies completed
+requisites and signatures, stores the signed bytes privately in Russia and records the actual
+signed-file digest/dates/reference in a separately authorized step (launch runbook §3).
 
 ## Rules the code keeps
 
@@ -53,7 +94,7 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 |---|---|
 | contract hash | `legalReleaseRef` is the offer version; `legalReleaseHash` is `sha256` over the offer's hash and the Заявка's (`contractHash`) |
 | what is paid | one FULL / ORCHESTRATED / PROVIDER obligation: the full price minus any referral discount. One fiscal item of quantity 1 equal to the payment, USN_INCOME, FULL_PREPAYMENT, SERVICE, no VAT. This is the Alfa path that was qualified, and nothing else is built (`src/snapshot.ts`). The digest is computed here independently and checked against Refref's own vectors |
-| refunds at launch | only the qualified full PROVIDER refund. Mikluha waives deductions of actual expenses and returns the full paid amount when a refund is approved. Partial refunds remain a later end-to-end qualification task |
+| refund qualification | only the full PROVIDER refund is technically qualified. The published documented-expense policy is not: launch and new payments are blocked until its separate end-to-end workflow qualification; this PR implements no partial refunds |
 | PAID | only from Refref's read-back: the obligation SATISFIED by a SUCCEEDED payment of exactly the payable amount. The customer's return from the bank decides nothing |
 | no second payment | one attempt per order, created with the fixed key `mk-attempt:<ref>`; an unanswered request is repeated identically. Sessions are only re-requested on that attempt: Refref replays a live payment and starts a new one only after a definitive failure |
 | ambiguous create recovery | after an unanswered create, read the Refref merchant-order projection and accept exactly one attempt whose `snapshotHash` and `referralResolutionId` match the frozen order. A foreign/mismatched projection is HELD; no payment session is started |
@@ -136,7 +177,7 @@ docker run -d --rm --name commerce-test-pg -e POSTGRES_PASSWORD=postgres -p 5543
 | variable | |
 |---|---|
 | `DATABASE_URL` | the runtime role |
-| `COMMERCE_ENVIRONMENT` | `STAGING` or `PRODUCTION`. PRODUCTION refuses to start unless the content is `launchReady` |
+| `COMMERCE_ENVIRONMENT` | `STAGING` or `PRODUCTION`. PRODUCTION refuses to start unless content is `launchReady` and its refund workflow is qualified |
 | `CONTENT_DIR` | set by the image: the site's `content/` from the same commit |
 | `SOURCE_COMMIT` | required image build arg. The commerce image stores it read-only in `/app/identity/identity.json`; production has no runtime override |
 | `COMMERCE_ORIGIN` | fixed in production: `https://book.mikluha-maklai.ru` |

@@ -16,7 +16,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import type pg from 'pg';
 
-import type { Catalog } from './catalog.js';
+import { refundWorkflowQualified, type Catalog } from './catalog.js';
 import type { Logger } from './log.js';
 import type { LegalReleaseAdmission } from './legal-admission.js';
 import { errorCode, type CheckoutAttempt, type RefrefClient, type ResolvedResolution } from './refref.js';
@@ -64,6 +64,7 @@ const sameSecret = (a: string, b: string) => {
 
 interface OrderRow {
   id: string; order_ref: string; departure_slug: string; trip_starts_on: string; trip_ends_on: string; seats: number;
+  trip_departure_time: string | null; trip_return_time: string | null; trip_timezone: string | null;
   amount_kopecks: string; status: string; reserved_until: Date; legal_release_ref: string; legal_release_hash: string;
   legal_release_content: string | null;
   pd_consent_ref: string; pd_consent_hash: string; pd_consent_content: string; pd_consent_accepted_at: Date;
@@ -74,7 +75,7 @@ interface OrderRow {
 }
 
 const ORDER_COLUMNS = `id, order_ref, departure_slug, to_char(trip_starts_on, 'YYYY-MM-DD') AS trip_starts_on,
-  to_char(trip_ends_on, 'YYYY-MM-DD') AS trip_ends_on, seats, amount_kopecks, status, reserved_until,
+  to_char(trip_ends_on, 'YYYY-MM-DD') AS trip_ends_on, trip_departure_time, trip_return_time, trip_timezone, seats, amount_kopecks, status, reserved_until,
   legal_release_ref, legal_release_hash, legal_release_content, pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at,
   state_hash, referral_resolution_id, terms_version_id, resolution_expires_at,
   discount_kopecks, payable_kopecks, snapshot, snapshot_hash, payment_pending_since, checkout_attempt_id, last_session`;
@@ -86,10 +87,11 @@ async function loadOrder(pool: pg.Pool, orderRef: string): Promise<OrderRow | nu
 
 function deal(deps: CheckoutDeps, o: OrderRow): OrderDeal {
   const d = deps.catalog.departures.get(o.departure_slug);
-  // Built from the order's own frozen facts; the catalog supplies only names.
+  // Dates, price, exact times AND timezone are frozen on reservation; catalog supplies names only.
   return { orderRef: o.order_ref, tourSlug: d?.tourSlug ?? 'unknown', tourTitle: d?.tourTitle ?? o.departure_slug,
     departureSlug: o.departure_slug, startsOn: o.trip_starts_on, endsOn: o.trip_ends_on, seats: o.seats,
-    amountKopecks: Number(o.amount_kopecks), timezone: deps.catalog.timezone };
+    ...(o.trip_departure_time !== null && o.trip_return_time !== null ? { startsTime: o.trip_departure_time, endsTime: o.trip_return_time } : {}),
+    amountKopecks: Number(o.amount_kopecks), timezone: o.trip_timezone ?? deps.catalog.timezone };
 }
 
 /** Compare-and-set on the order's state: a concurrent change makes it a no-op. */
@@ -169,6 +171,7 @@ export async function onReturn(deps: CheckoutDeps, q: { rt: string | null; state
   const cookie = o === undefined ? undefined : q.cookieState(o.order_ref);
   if (o === undefined || cookie === undefined || !sameSecret(cookie, q.state)) return { kind: 'REFUSED', code: 'STATE_MISMATCH' };
   if (o.status !== 'RESERVED') return { kind: 'CONFIRM', orderRef: o.order_ref };
+  if (o.trip_departure_time === null || o.trip_return_time === null || o.trip_timezone === null) return { kind: 'REFUSED', code: 'TRIP_SCHEDULE_MISSING', orderRef: o.order_ref };
   if (o.reserved_until <= now) return { kind: 'REFUSED', code: 'RESERVATION_EXPIRED', orderRef: o.order_ref };
 
   const d = deal(deps, o);
@@ -210,6 +213,7 @@ export async function onReturn(deps: CheckoutDeps, q: { rt: string | null; state
 async function writeZayavka(deps: CheckoutDeps, orderRef: string, now: Date): Promise<boolean> {
   const o = await loadOrder(deps.pool, orderRef);
   if (o === null || o.status !== 'RESERVED' || o.payable_kopecks === null) return false;
+  if (o.trip_departure_time === null || o.trip_return_time === null || o.trip_timezone === null) return false;
   const departure = deps.catalog.departures.get(o.departure_slug);
   if (departure === undefined || departure.contract === null) return false;
   const contact = (await deps.pool.query<{ full_name: string; phone: string; email: string }>(
@@ -221,10 +225,11 @@ async function writeZayavka(deps: CheckoutDeps, orderRef: string, now: Date): Pr
        FROM order_passenger WHERE order_id = $1 ORDER BY position`, [o.id])).rows
     .map((t) => ({ fullName: t.full_name, dateOfBirth: t.dob, citizenship: t.citizenship, documentType: t.document_type,
       documentSeries: t.document_series, documentNumber: t.document_number }));
-  const formedAt = new Intl.DateTimeFormat('ru-RU', { timeZone: deps.catalog.timezone, dateStyle: 'short', timeStyle: 'short' }).format(now);
+  const formedAt = new Intl.DateTimeFormat('ru-RU', { timeZone: o.trip_timezone, dateStyle: 'short', timeStyle: 'short' }).format(now);
   const content = renderZayavka({
-    orderRef: o.order_ref, formedAt, offerRef: o.legal_release_ref,
-    departure: { ...departure, contract: departure.contract, startsOn: o.trip_starts_on, endsOn: o.trip_ends_on },
+    orderRef: o.order_ref, formedAt, timezone: o.trip_timezone, offerRef: o.legal_release_ref,
+    departure: { ...departure, contract: { ...departure.contract, departure: { ...departure.contract.departure,
+      departureTime: o.trip_departure_time, returnTime: o.trip_return_time } }, startsOn: o.trip_starts_on, endsOn: o.trip_ends_on },
     contact: { fullName: contact.full_name, phone: contact.phone, email: contact.email },
     tourists, amountKopecks: Number(o.amount_kopecks), discountKopecks: Number(o.discount_kopecks),
   });
@@ -257,7 +262,12 @@ export async function pay(deps: CheckoutDeps, orderRef: string, acceptedZayavka:
   let o = await loadOrder(deps.pool, orderRef);
   if (o === null) return { kind: 'STATUS', code: 'UNKNOWN_ORDER' };
 
+  // Stops any new payment initiation, including a previously reserved/frozen order. Read-back,
+  // fulfillment and cancellation remain available through their independent paths.
+  if (!refundWorkflowQualified(deps.catalog)) return { kind: 'STATUS', code: 'REFUND_WORKFLOW_UNQUALIFIED' };
+
   if (o.status === 'RESERVED') {
+    if (o.trip_departure_time === null || o.trip_return_time === null || o.trip_timezone === null) return { kind: 'STATUS', code: 'TRIP_SCHEDULE_MISSING' };
     // Reservation admission is not enough: the public site may have published a newer legal
     // artifact while this order was waiting. Contract creation must fail closed instead of
     // accepting the older frozen release after the customer-facing page changed.

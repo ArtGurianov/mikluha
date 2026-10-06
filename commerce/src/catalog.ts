@@ -24,6 +24,8 @@ export interface TourContract {
 
 /** What one departure adds: where and when, where the tourists sleep, who carries them, what else. */
 export interface DepartureContract {
+  readonly departureTime: string;
+  readonly returnTime: string;
   readonly departurePoint: string;
   readonly returnPoint: string;
   readonly accommodation: {
@@ -67,6 +69,7 @@ export interface PersonalDataConsent {
 }
 
 export interface Catalog {
+  readonly refundPolicy: 'FULL_ONLY' | 'DOCUMENTED_EXPENSES';
   readonly timezone: string;
   readonly launchReady: boolean;
   readonly departures: ReadonlyMap<string, Departure>;
@@ -75,6 +78,7 @@ export interface Catalog {
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 function load(file: string): Record<string, unknown> {
   // JSON_SCHEMA, as the site reads it (lib/cms/content-yaml.ts): an unquoted 2026-06-15 stays a string.
@@ -115,19 +119,23 @@ export function departureContract(raw: unknown): DepartureContract | null {
   const req = [c.departurePoint, c.returnPoint, a.name, a.address, a.roomType, a.meals, a.legalEntity,
     k.legalName, k.route, k.baggage, k.boarding].map(text);
   const nights = a.nights;
+  const departureTime = text(c.departureTime);
+  const returnTime = text(c.returnTime);
+  if (departureTime === null || returnTime === null || !TIME.test(departureTime) || !TIME.test(returnTime)) return null;
   if (req.some((v) => v === null) || typeof nights !== 'number' || !Number.isSafeInteger(nights) || nights < 0) return null;
   const services = Array.isArray(c.services) ? c.services.map((x) => {
     const r = record(x);
-    return { name: text(r.name), supplier: text(r.supplier), included: r.included !== false, note: text(r.note) };
+    return { name: text(r.name), supplier: text(r.supplier), included: r.included, note: text(r.note) };
   }) : [];
-  if (services.some((x) => x.name === null || x.supplier === null)) return null;
+  if (services.some((x) => x.name === null || x.supplier === null || typeof x.included !== 'boolean')) return null;
   const [departurePoint, returnPoint, name, address, roomType, meals, legalEntity, legalName, route, baggage, boarding] = req as string[];
   return {
+    departureTime, returnTime,
     departurePoint: departurePoint!, returnPoint: returnPoint!,
     accommodation: { name: name!, address: address!, category: text(a.category), registryNumber: text(a.registryNumber),
       roomType: roomType!, nights, meals: meals!, legalEntity: legalEntity! },
     carrier: { legalName: legalName!, route: route!, vehicle: text(k.vehicle), baggage: baggage!, boarding: boarding! },
-    services: services.map((x) => ({ name: x.name!, supplier: x.supplier!, included: x.included, note: x.note })),
+    services: services.map((x) => ({ name: x.name!, supplier: x.supplier!, included: x.included as boolean, note: x.note })),
   };
 }
 
@@ -154,6 +162,9 @@ export function loadCatalog(contentDir: string): Catalog {
     const tour = tours.get(tourSlug);
     if (tour === undefined) throw new Error(`CATALOG_INVALID: ${slug} names unknown tour ${tourSlug}`);
     const dc = departureContract(d.contract);
+    // Whole replacement, never a merge: an incomplete override cannot borrow another trip's facts.
+    const rawContract = record(d.contract);
+    const product = Object.hasOwn(rawContract, 'product') ? tourContract(rawContract.product) : tour.contract;
     const startsOn = str(d, 'startDate', slug);
     const endsOn = str(d, 'endDate', slug);
     if (!DATE.test(startsOn) || !DATE.test(endsOn) || endsOn < startsOn) throw new Error(`CATALOG_INVALID: ${slug} dates`);
@@ -164,7 +175,7 @@ export function loadCatalog(contentDir: string): Catalog {
       slug, tourSlug, tourTitle: tour.title, startsOn, endsOn, bookingStatus: status,
       priceKopecks: price === null ? null : price * 100,
       capacity: optInt(d, 'capacity', slug, 1),
-      contract: tour.contract !== null && dc !== null ? { tour: tour.contract, departure: dc } : null,
+      contract: product !== null && dc !== null ? { tour: product, departure: dc } : null,
       // Visibility is fail-closed on the site too: only an explicit true.
       isListed: d.isListed === true,
       isDemo: d.isDemo === true,
@@ -181,7 +192,19 @@ export function loadCatalog(contentDir: string): Catalog {
   };
   const terms = artifact('oferta');
   const pdConsent = artifact('soglasie-pd');
-  return { timezone, launchReady: settings.launchReady === true, departures, terms, pdConsent };
+  const refundPolicy = load(join(contentDir, 'legal', 'oferta.yml')).refundPolicy;
+  if (refundPolicy !== 'FULL_ONLY' && refundPolicy !== 'DOCUMENTED_EXPENSES') throw new Error('CATALOG_INVALID: oferta refundPolicy');
+  return { timezone, refundPolicy, launchReady: settings.launchReady === true, departures, terms, pdConsent };
+}
+
+/** No flag/configuration can qualify a new financial workflow. A separately reviewed change must. */
+export function refundWorkflowQualified(catalog: Catalog): boolean {
+  return catalog.refundPolicy === 'FULL_ONLY';
+}
+
+export function assertProductionContent(catalog: Catalog): void {
+  if (!refundWorkflowQualified(catalog)) throw new Error('REFUND_WORKFLOW_UNQUALIFIED: documented-expense refunds require separate end-to-end qualification');
+  if (!catalog.launchReady) throw new Error('CONTENT_NOT_LAUNCH_READY: production serves launchReady content only');
 }
 
 /** Today's date in the site's timezone, as YYYY-MM-DD. */
@@ -191,7 +214,7 @@ export function todayIn(timezone: string, now: Date): string {
 
 export type NotBookable =
   | 'DEPARTURE_UNKNOWN' | 'DEPARTURE_NOT_OPEN' | 'DEPARTURE_NOT_LISTED' | 'DEPARTURE_DEMO'
-  | 'DEPARTURE_NO_PRICE' | 'DEPARTURE_NO_CAPACITY' | 'DEPARTURE_NO_CONTRACT' | 'DEPARTURE_STARTED';
+  | 'DEPARTURE_NO_PRICE' | 'DEPARTURE_NO_CAPACITY' | 'DEPARTURE_NO_CONTRACT' | 'DEPARTURE_STARTED' | 'REFUND_WORKFLOW_UNQUALIFIED';
 
 export interface Bookable extends Departure {
   readonly priceKopecks: number;
@@ -204,6 +227,7 @@ export interface Bookable extends Departure {
  * deployment allows them (staging), never in production.
  */
 export function bookable(catalog: Catalog, slug: string, now: Date, allowDemo: boolean): Bookable | NotBookable {
+  if (!refundWorkflowQualified(catalog)) return 'REFUND_WORKFLOW_UNQUALIFIED';
   const d = catalog.departures.get(slug);
   if (d === undefined) return 'DEPARTURE_UNKNOWN';
   if (d.bookingStatus !== 'OPEN') return 'DEPARTURE_NOT_OPEN';

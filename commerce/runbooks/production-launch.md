@@ -27,9 +27,16 @@ Do not deploy or take a real payment while any item below is unresolved:
 - the reviewed slice-4 application PR is not merged;
 - the separate Refref host backup/monitor PR is not merged, installed, and restore-tested;
 - `content/site-settings.yml` is not `launchReady: true`;
+- the offer selects `DOCUMENTED_EXPENSES` but expense calculation, partial-return authorization,
+  provider/fiscal execution, idempotency, reconciliation and evidence have not been separately
+  implemented and qualified end-to-end. This PR deliberately refuses new reservations/payments
+  and production startup for that policy; setting `launchReady` or the sales switch cannot qualify it;
 - any OPEN production departure is demo data or lacks real tour, accommodation, carrier, service,
   capacity, price, or other contract facts;
 - the PD-processing instruction from ООО «ООО МИКЛУХА МАКЛАЙ» to ИП Гурьянов А.А. is not signed;
+- Mikluha's own Roskomnadzor notification and the Mikluha UniSender account's acceptance of the
+  applicable Russian-processing terms/version have no owner-held evidence;
+- actual service-completion recording and closing-receipt execution are not separately qualified;
 - the Mikluha database backups do not use their own host paths, S3 prefix, and
   `mikluha-recovery` age identity;
 - live proxy/application logs retain an unredacted `/documents/<token>` request;
@@ -76,8 +83,8 @@ Required production environment:
 COMMERCE_ENVIRONMENT=PRODUCTION
 COMMERCE_ORIGIN=https://book.mikluha-maklai.ru
 SITE_ORIGIN=https://mikluha-maklai.ru
-REFREF_API_BASE=https://<production Refref API>/v1-rc
-REFREF_CHECKOUT_ORIGIN=https://<production Refref checkout origin>
+REFREF_API_BASE=https://api.refref.ru/v1-rc
+REFREF_CHECKOUT_ORIGIN=https://checkout.refref.ru
 DATABASE_URL=<commerce_runtime URL>
 REFREF_BUSINESS_ID=<Mikluha Business UUID>
 REFREF_BUSINESS_SLUG=<Mikluha Business slug>
@@ -87,8 +94,7 @@ UNISENDER_GO_FROM_EMAIL=noreply@mikluha-maklai.ru
 UNISENDER_GO_FROM_NAME=<reviewed sender name>
 ```
 
-Do not set `SOURCE_COMMIT` at runtime. Before launch, replace the two Refref placeholders above with
-the fixed values `https://api.refref.ru/v1-rc` and `https://checkout.refref.ru`. Production accepts
+Do not set `SOURCE_COMMIT` at runtime. Use the literal Refref addresses above. Production accepts
 only the normalized four fixed addresses shown here; any host, port, path, credential, query or
 fragment mismatch refuses startup. Staging remains configurable. Keep the commerce application
 disconnected from public traffic until its database has been bootstrapped and the site candidate
@@ -152,6 +158,27 @@ sales status
 ```
 
 Expected bootstrap result is `SALES=CLOSED`.
+
+### Processing instruction: template is not a signature
+
+Migration 0007 seeds `processing_instruction` with document
+`pd-processing-instruction-refref-v1`, version `1.0`, processor `refref`, status `DRAFT`.
+Only the template reference/hash is populated. `signed_at`, `effective_at`, `sha256` (the signed
+file's hash) and `signed_document_ref` are NULL. Application/operator roles have SELECT only.
+Nothing in this record opens sales or replaces tourist PD-consent evidence or the commercial hash.
+
+Fill and verify the director's name, Refref OGRNIP/address/incident contacts and signing/effective
+dates before signing the form in `commerce/legal/`. After both signatures, the owner stores the
+signed file privately in Russia, calculates its SHA-256 and verifies the stored bytes. Only then,
+through the owner credential and a separately authorized exact SQL packet, record `SIGNED` with
+both dates, `sha256:<actual signed-file digest>` and an opaque private-store reference. Do not
+copy the signed file or a credential-bearing URL into Git, Linear, Refref or public documents.
+This runbook does not attest or perform that write.
+
+The currently recorded real recovery proofs were for schema 6. Applying migration 0007 is an
+owner-only production write; before future admission, obtain fresh logical and PITR recovery
+evidence for schema 7 and its exact recovery image. Existing timers are not a proof of the new
+schema, and this PR does not advance monitor admission.
 
 ## 4. Refref Business admission
 

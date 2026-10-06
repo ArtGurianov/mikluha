@@ -95,6 +95,14 @@ test('a live legal-release mismatch refuses a reservation before writing custome
 });
 
 describe('what can be sold', () => {
+  test('an open database switch cannot admit unqualified documented-expense bookings or write personal data', async () => {
+    assert.equal(await salesOpen(db.pool), true);
+    const blocked = { ...catalog, launchReady: true, refundPolicy: 'DOCUMENTED_EXPENSES' as const };
+    assert.deepEqual(await reserve(deps({ catalog: blocked }), request()), { ok: false, refusal: 'REFUND_WORKFLOW_UNQUALIFIED' });
+    for (const table of ['orders', 'order_contact', 'order_passenger']) {
+      assert.equal((await db.owner.query(`SELECT count(*) AS n FROM ${table}`)).rows[0].n, '0');
+    }
+  });
   test('the full price per seat, frozen on the order', async () => {
     const r = await reserve(deps(), request({ passengers: [tourist(1), tourist(2)] }));
     assert.ok(r.ok);

@@ -168,6 +168,43 @@ const order = async (ref: string) => (await db.owner.query(
   'SELECT status, checkout_attempt_id, hold_reason, payable_kopecks FROM orders WHERE order_ref = $1', [ref])).rows[0];
 
 describe('the paid path', () => {
+  test('a later catalog cannot change the reserved schedule in the accepted application or Refref payment line', async () => {
+    const { ref } = await bookAndResolve();
+    const d = catalog.departures.get('altai-2026-11-01')!;
+    const later = { ...catalog, timezone: 'Europe/Moscow', departures: new Map(catalog.departures).set(d.slug,
+      { ...d, contract: { ...d.contract!, departure: { ...d.contract!.departure, departureTime: '10:00', returnTime: '18:00' } } }) };
+    const shown = await zayavkaOf(db.pool, ref);
+    assert.match(shown!.content, /06:00 \(Asia\/Krasnoyarsk\)/);
+    assert.equal((await pay({ ...deps, catalog: later }, ref, shown!.sha256)).kind, 'REDIRECT');
+    const stored = (await db.owner.query('SELECT snapshot FROM orders WHERE order_ref = $1', [ref])).rows[0].snapshot;
+    assert.equal(stored.lines[0].serviceStartsAt, '2026-10-31T23:00:00Z');
+    assert.equal(stored.lines[0].serviceEndsAt, '2026-11-04T14:00:00Z');
+    assert.equal((await zayavkaOf(db.pool, ref))!.sha256, shown!.sha256);
+    await assert.rejects(db.pool.query("UPDATE orders SET trip_departure_time = '10:00' WHERE order_ref = $1", [ref]), /FROZEN_TRIP_SCHEDULE_IMMUTABLE/);
+  });
+
+  test('legacy unresolved schedule is not guessed from current catalog and cannot start a payment', async () => {
+    const { ref } = await bookAndResolve();
+    // Simulate a historical row carried through migration 0007 (which does NOT backfill times).
+    await db.owner.query('ALTER TABLE orders DISABLE TRIGGER trg_frozen_trip_schedule');
+    try {
+      await db.owner.query('UPDATE orders SET trip_departure_time = NULL, trip_return_time = NULL, trip_timezone = NULL WHERE order_ref = $1', [ref]);
+    } finally { await db.owner.query('ALTER TABLE orders ENABLE TRIGGER trg_frozen_trip_schedule'); }
+    const shown = await zayavkaOf(db.pool, ref);
+    assert.deepEqual(await pay(deps, ref, shown!.sha256), { kind: 'STATUS', code: 'TRIP_SCHEDULE_MISSING' });
+    assert.equal(refref.attempts.size, 0);
+    assert.equal((await order(ref)).status, 'RESERVED');
+  });
+  test('documented-expense policy blocks payment initiation even for an existing resolved order', async () => {
+    const { ref } = await bookAndResolve();
+    const blocked = { ...deps, catalog: { ...catalog, launchReady: true, refundPolicy: 'DOCUMENTED_EXPENSES' as const } };
+    const shown = await zayavkaOf(db.pool, ref);
+    assert.deepEqual(await pay(blocked, ref, shown!.sha256), { kind: 'STATUS', code: 'REFUND_WORKFLOW_UNQUALIFIED' });
+    assert.equal((await order(ref)).status, 'RESERVED');
+    assert.equal((await order(ref)).checkout_attempt_id, null);
+    assert.equal(refref.attempts.size, 0);
+    assert.equal(refref.requests.some((r) => r.path.endsWith('/checkout-attempts') || r.path.endsWith('/payment-session')), false);
+  });
   test('book → handoff → final price → pay → provider; PAID only from the read-back, then fulfilled once', async () => {
     refref.state.discountKopecks = 100_000;
     const booked = await http('POST', '/orders', { form: bookingForm(2) });

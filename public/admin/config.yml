@@ -234,6 +234,27 @@ collections:
         collapsed: true
         hint: "Попадает в Заявку на бронирование и становится частью договора. Пока не заполнено, онлайн-бронирование этого выезда не работает."
         fields:
+          - {name: departureTime, label: "Время отправления (местное HH:MM)", widget: string, required: false, pattern: ["^([01][0-9]|2[0-3]):[0-5][0-9]$", "Например 00:30"]}
+          - {name: returnTime, label: "Ориентировочное время возвращения (местное HH:MM)", widget: string, required: false, pattern: ["^([01][0-9]|2[0-3]):[0-5][0-9]$", "Например 21:00"]}
+          - name: product
+            label: "Индивидуальная программа и состав этого выезда"
+            widget: object
+            required: false
+            hint: "Если задано, полностью заменяет договорные условия направления. Частично заполненный блок запрещает продажу, а не дополняется из другого тура."
+            fields:
+              - {name: destination, label: Регион, widget: string, required: false}
+              - {name: route, label: Маршрут, widget: text, required: false}
+              - name: program
+                label: "Программа по дням"
+                widget: list
+                required: false
+                fields:
+                  - {name: title, label: День, widget: string}
+                  - {name: items, label: "Пункты программы по одному на строку", widget: text}
+              - {name: included, label: "Включено в цену", widget: text, required: false}
+              - {name: excluded, label: "Не включено в цену", widget: text, required: false}
+              - {name: insurance, label: "Отдельное добровольное страхование туриста", widget: text, required: false, hint: "Полис ответственности туроператора сюда не входит."}
+              - {name: risks, label: "Характерные риски и ограничения", widget: text, required: false}
           - {name: departurePoint, label: "Место и время отправления", widget: string, required: false, hint: "Например: «Кемерово, пл. Советов, 10.10.2026 06:00»"}
           - {name: returnPoint, label: "Место и ориентировочное время возвращения", widget: string, required: false}
           - name: accommodation
@@ -387,4 +408,5 @@ collections:
         pattern: ["^[a-z0-9]+(-[a-z0-9]+)*$", "Только латиница в нижнем регистре, цифры и дефис — например public-offer"]
         hint: "Адрес страницы на сайте: например privacy-policy → /privacy-policy/. Только латиница в нижнем регистре, цифры и дефис. После публикации менять не рекомендуется — старый адрес перестанет открываться. Занятые разделами сайта адреса (tours, reports, api, _next, generated, index, 404, robots.txt, sitemap.xml, icon.png, apple-icon.png) недоступны — сборка их отклонит."
       - {name: content, label: "Текст страницы", widget: markdown}
+      - {name: refundPolicy, label: "Политика возвратов (только для oferta)", widget: select, required: false, options: [FULL_ONLY, DOCUMENTED_EXPENSES], hint: "DOCUMENTED_EXPENSES блокирует запуск до отдельной квалификации возвратов. Удаление поля также не разрешает запуск."}
       - {name: updatedAt, label: "Дата обновления текста", widget: datetime, type: date, input_timezone: utc, required: false}

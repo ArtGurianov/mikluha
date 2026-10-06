@@ -27,6 +27,16 @@ export function hasCompleteTourContract(value: unknown): boolean {
     && program.every((day) => day.title !== null && day.items.length > 0);
 }
 
+/** A departure's product is a whole replacement, even when incomplete/null. */
+export function effectiveProduct(tour: unknown, departure: unknown): unknown {
+  const contract = record(departure);
+  return Object.hasOwn(contract, 'product') ? contract.product : tour;
+}
+
+export function hasQualifiedRefundPolicy(value: unknown): boolean {
+  return value === 'FULL_ONLY';
+}
+
 export function hasCompleteDepartureContract(value: unknown): boolean {
   const contract = record(value);
   const accommodation = record(contract.accommodation);
@@ -44,16 +54,19 @@ export function hasCompleteDepartureContract(value: unknown): boolean {
     carrier.baggage,
     carrier.boarding,
   ];
+  const time = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
   const nights = accommodation.nights;
   const services = Array.isArray(contract.services) ? contract.services : [];
 
   return required.every((field) => text(field) !== null)
+    && typeof contract.departureTime === 'string' && time.test(contract.departureTime)
+    && typeof contract.returnTime === 'string' && time.test(contract.returnTime)
     && typeof nights === "number"
     && Number.isSafeInteger(nights)
     && nights >= 0
     && services.every((service) => {
       const item = record(service);
-      return text(item.name) !== null && text(item.supplier) !== null;
+      return text(item.name) !== null && text(item.supplier) !== null && typeof item.included === 'boolean';
     });
 }
 

@@ -1,0 +1,39 @@
+tour: altai
+startDate: "2026-10-29"
+endDate: "2026-11-01"
+bookingStatus: CLOSED
+price: 26500
+capacity: 40
+contract:
+  departureTime: "00:30"
+  returnTime: "21:00"
+  departurePoint: "Летний вокзал, г. Кемерово — точный адрес не подтвержден"
+  returnPoint: "Летний вокзал, г. Кемерово — точный адрес не подтвержден"
+  product:
+    destination: "Горный Алтай"
+    route: null
+    program: []
+    included: null
+    excluded: null
+    insurance: null
+    risks: null
+  accommodation:
+    name: null
+    address: null
+    registryNumber: null
+    roomType: null
+    nights: null
+    meals: null
+    legalEntity: null
+  carrier:
+    legalName: "ИП Абедовская Дарья Игоревна, ИНН 420548575520, ОГРНИП 316420500100532"
+    route: null
+    vehicle: null
+    baggage: null
+    boarding: null
+  services: []
+organizers:
+  - artur
+isListed: false
+isDemo: false
+updatedAt: "2026-10-06"
