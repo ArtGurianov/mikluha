@@ -190,6 +190,7 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
   }));
 
   const legalPages: LegalPageDTO[] = raw.legalPages.map((p) => ({
+    ...(p.refundPolicy === undefined ? {} : { refundPolicy: p.refundPolicy }),
     id: requireSlugConsistency(p, "LegalPage"),
     slug: requiredString(p.slug, `legalPage "${p._slug}" slug`),
     title: requiredString(p.title, `legalPage "${p._slug}" title`),

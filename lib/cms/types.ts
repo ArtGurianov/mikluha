@@ -39,6 +39,10 @@ export interface RawTourContract {
 }
 
 export interface RawDepartureContract {
+  /** Complete per-departure product conditions; replace tour defaults, never partially merge. */
+  product?: RawTourContract | null;
+  departureTime?: string | null;
+  returnTime?: string | null;
   departurePoint?: string | null;
   returnPoint?: string | null;
   accommodation?: {
@@ -135,6 +139,7 @@ export interface RawOrganizer {
 }
 
 export interface RawLegalPage {
+  refundPolicy?: 'FULL_ONLY' | 'DOCUMENTED_EXPENSES' | null;
   title: string | null;
   /** Also the user-facing route slug, unlike other collections' `_slug` — see lib/legal.ts. */
   slug: string | null;
@@ -277,6 +282,7 @@ export interface OrganizerDTO<TImage = ImageAsset> {
 }
 
 export interface LegalPageDTO {
+  refundPolicy?: 'FULL_ONLY' | 'DOCUMENTED_EXPENSES' | null;
   id: string;
   slug: string;
   title: string;

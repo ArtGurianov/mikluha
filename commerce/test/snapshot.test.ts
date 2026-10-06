@@ -57,3 +57,13 @@ test('local trip dates become UTC instants in the site timezone', () => {
   assert.equal(zonedToUtc('2026-11-01', '00:00:00', 'Asia/Krasnoyarsk'), '2026-10-31T17:00:00Z');
   assert.equal(zonedToUtc('2026-07-01', '12:00:00', 'Europe/Moscow'), '2026-07-01T09:00:00Z');
 });
+
+test('exact departure times bind the qualified payment line instead of midnight placeholders', () => {
+  const s = buildSnapshot({ ...deal, departureSlug: 'altai-1', startsOn: '2026-10-29', endsOn: '2026-11-01',
+    startsTime: '00:30', endsTime: '21:00', amountKopecks: 5_300_000 },
+  { merchantId: 'm', referralResolutionId: 'r', termsVersionId: null, discountKopecks: 0 }, { ref: 'o', hash: 'h' });
+  const line = (s.lines as Record<string, Json>[])[0]!;
+  assert.equal(line.unitRef, 'altai-1');
+  assert.equal(line.serviceStartsAt, '2026-10-28T17:30:00Z');
+  assert.equal(line.serviceEndsAt, '2026-11-01T14:00:00Z');
+});
