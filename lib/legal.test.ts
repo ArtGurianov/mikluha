@@ -42,7 +42,8 @@ test("the frozen launch privacy artifacts disclose the transactional email proce
   const consent = readFileSync(join(process.cwd(), "content/legal/soglasie-pd.yml"), "utf8");
 
   for (const artifact of [privacy, consent]) {
-    assert.match(artifact, /UniSender Go/);
+    assert.match(artifact, /Notisend/);
+    assert.doesNotMatch(artifact, /unisender/i);
     assert.match(artifact, /email/);
     assert.match(artifact, /номер заказа/);
     assert.match(artifact, /защищенн(?:ая|ой) ссылк/);

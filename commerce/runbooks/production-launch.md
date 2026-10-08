@@ -34,7 +34,7 @@ Do not deploy or take a real payment while any item below is unresolved:
 - any OPEN production departure is demo data or lacks real tour, accommodation, carrier, service,
   capacity, price, or other contract facts;
 - the PD-processing instruction from ООО «ООО МИКЛУХА МАКЛАЙ» to ИП Гурьянов А.А. is not signed;
-- Mikluha's own Roskomnadzor notification and the Mikluha UniSender account's acceptance of the
+- Mikluha's own Roskomnadzor notification and the Mikluha Notisend account's acceptance of the
   applicable Russian-processing terms/version have no owner-held evidence;
 - actual service-completion recording and closing-receipt execution are not separately qualified;
 - the Mikluha database backups do not use their own host paths, S3 prefix, and
@@ -89,10 +89,17 @@ DATABASE_URL=<commerce_runtime URL>
 REFREF_BUSINESS_ID=<Mikluha Business UUID>
 REFREF_BUSINESS_SLUG=<Mikluha Business slug>
 REFREF_API_KEY=<secret>
-UNISENDER_GO_API_KEY=<secret>
-UNISENDER_GO_FROM_EMAIL=noreply@mikluha-maklai.ru
-UNISENDER_GO_FROM_NAME=<reviewed sender name>
+NOTISEND_API_KEY=<secret>
+NOTISEND_FROM_EMAIL=noreply@mikluha-maklai.ru
+NOTISEND_FROM_NAME=<reviewed sender name>
 ```
+
+Confirm the sender domain in Notisend, then send one staging confirmation to an owner mailbox: it
+must arrive with no unsubscribe link or footer added by the provider. Notisend has no idempotency
+key, so commerce never resends a confirmation whose outcome is unknown. A row in `ATTENTION` with
+`TIMEOUT`, `TRANSPORT`, `HTTP_408`, `HTTP_5xx`, `UNREADABLE_RESPONSE` or `LEASE_EXPIRED` is resent by
+hand only after the Notisend message log shows nothing sent to that recipient since the first
+attempt; the message carries its outbox key in the `X-Mikluha-Outbox-Key` header.
 
 Do not set `SOURCE_COMMIT` at runtime. Use the literal Refref addresses above. Production accepts
 only the normalized four fixed addresses shown here; any host, port, path, credential, query or

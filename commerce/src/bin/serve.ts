@@ -8,7 +8,7 @@
 //   REFREF_API_BASE       fixed in production: https://api.refref.ru/v1-rc
 //   REFREF_CHECKOUT_ORIGIN  fixed in production: https://checkout.refref.ru
 //   REFREF_BUSINESS_ID, REFREF_BUSINESS_SLUG, REFREF_API_KEY   Mikluha's Refref Business and its key
-//   UNISENDER_GO_API_KEY, UNISENDER_GO_FROM_EMAIL, UNISENDER_GO_FROM_NAME
+//   NOTISEND_API_KEY, NOTISEND_FROM_EMAIL, NOTISEND_FROM_NAME   Notisend transactional email (optional NOTISEND_REPLY_TO)
 
 import pg from 'pg';
 
@@ -16,7 +16,7 @@ import { PRODUCTION_BUILD_IDENTITY_FILE, readBuildIdentity } from '../build-iden
 import { assertProductionContent, loadCatalog } from '../catalog.js';
 import { reconcileAll, type CheckoutDeps } from '../checkout.js';
 import { env, environment, MIGRATIONS_DIR, productionAddress } from '../config.js';
-import { processEmailOutbox, UniSenderGoClient } from '../email.js';
+import { NotisendClient, processEmailOutbox } from '../email.js';
 import { LiveSiteReleaseAdmission } from '../legal-admission.js';
 import { jsonLogger } from '../log.js';
 import { schemaHead } from '../migrate.js';
@@ -49,10 +49,10 @@ const checkout: CheckoutDeps = {
     checkoutOrigin, origin: commerceOrigin, siteOrigin,
   },
 };
-const email = new UniSenderGoClient({
-  apiKey: env('UNISENDER_GO_API_KEY'), fromEmail: env('UNISENDER_GO_FROM_EMAIL'),
-  fromName: env('UNISENDER_GO_FROM_NAME'), commerceOrigin,
-  ...(process.env.UNISENDER_GO_REPLY_TO ? { replyTo: process.env.UNISENDER_GO_REPLY_TO } : {}),
+const email = new NotisendClient({
+  apiKey: env('NOTISEND_API_KEY'), fromEmail: env('NOTISEND_FROM_EMAIL'),
+  fromName: env('NOTISEND_FROM_NAME'), commerceOrigin,
+  ...(process.env.NOTISEND_REPLY_TO ? { replyTo: process.env.NOTISEND_REPLY_TO } : {}),
 });
 const server = createCommerceServer({
   pool, catalog, schemaHead: schemaHead(MIGRATIONS_DIR),
