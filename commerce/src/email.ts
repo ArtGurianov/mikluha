@@ -31,6 +31,28 @@ export interface EmailSender {
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const NOTISEND_MESSAGES_URL = 'https://api.notisend.ru/v1/email/messages';
+const MAX_RESPONSE_BYTES = 16_384;
+
+async function boundedJson(response: Response): Promise<unknown> {
+  if (response.body === null) return null;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_RESPONSE_BYTES) return null;
+      chunks.push(value);
+    }
+    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+  } catch { return null; }
+  finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+}
 // The stable outbox key travels as a header, so an operator can match an ambiguous send to the
 // message in the Notisend log. It is not an idempotency key: Notisend does not deduplicate on it.
 export const OUTBOX_KEY_HEADER = 'X-Mikluha-Outbox-Key';
@@ -91,13 +113,14 @@ export class NotisendClient implements EmailSender {
     const timer = setTimeout(() => controller.abort(), this.#config.timeoutMs ?? 15_000);
     try {
       const response = await this.#fetch(this.#config.apiBase ?? NOTISEND_MESSAGES_URL, {
-        method: 'POST', signal: controller.signal,
+        // A redirected request could fail to connect after the original POST was accepted.
+        // Refuse redirects so a PRE_CONNECT error can only describe the first submission.
+        method: 'POST', redirect: 'error', signal: controller.signal,
         headers: { accept: 'application/json', 'content-type': 'application/json',
           authorization: `Bearer ${this.#config.apiKey}` },
         body: JSON.stringify(message),
       });
-      let body: unknown;
-      try { body = await response.json(); } catch { body = null; }
+      const body = await boundedJson(response);
       // A throttled send is refused before it is queued, so it is safe to send again later.
       if (response.status === 429) return { kind: 'NOT_SENT', code: 'HTTP_429', retryAfterMs: rateLimitDelay(body) };
       if (response.status === 408 || response.status >= 500) return { kind: 'AMBIGUOUS', code: `HTTP_${response.status}` };

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { after, before, beforeEach, test } from 'node:test';
 
 import { NotisendClient, OUTBOX_KEY_HEADER, processEmailOutbox, type EmailSender } from '../src/email.js';
@@ -49,6 +50,7 @@ test('Notisend acceptance requires a readable message id and a queued status; pa
   assert.deepEqual(await client.send(input), { kind: 'ACCEPTED', jobId: '4711' });
   assert.equal(requestUrl, 'https://api.notisend.ru/v1/email/messages');
   assert.equal(new Headers(requestInit?.headers).get('authorization'), 'Bearer secret');
+  assert.equal(requestInit?.redirect, 'error');
   const requestBody = String(requestInit?.body);
   const body = JSON.parse(requestBody);
   assert.equal(body.to, 'ivan@example.ru');
@@ -58,6 +60,45 @@ test('Notisend acceptance requires a readable message id and a queued status; pa
   assert.match(body.html, /\/documents\/a{43}/);
   assert.ok(!/unsubscribe|list-unsubscribe/i.test(requestBody));
   for (const forbidden of ['Петров', '3210', '654321', '1990-05-17']) assert.ok(!requestBody.includes(forbidden));
+});
+
+test('a redirect after the original POST cannot become NOT_SENT or leak the document bearer', async () => {
+  let redirectedRequests = 0;
+  const destination = createServer((_request, response) => {
+    redirectedRequests += 1;
+    response.end(JSON.stringify({ id: 1, status: 'queued' }));
+  });
+  await new Promise<void>((resolve) => destination.listen(0, '127.0.0.1', resolve));
+  const destinationAddress = destination.address();
+  assert.ok(destinationAddress !== null && typeof destinationAddress === 'object');
+  const source = createServer((_request, response) => {
+    response.writeHead(307, { location: `http://127.0.0.1:${destinationAddress.port}/foreign` });
+    response.end();
+  });
+  await new Promise<void>((resolve) => source.listen(0, '127.0.0.1', resolve));
+  const sourceAddress = source.address();
+  assert.ok(sourceAddress !== null && typeof sourceAddress === 'object');
+  try {
+    assert.deepEqual(await new NotisendClient({ ...config,
+      apiBase: `http://127.0.0.1:${sourceAddress.port}/messages` }).send(input),
+    { kind: 'AMBIGUOUS', code: 'TRANSPORT' });
+    assert.equal(redirectedRequests, 0);
+  } finally {
+    source.closeAllConnections(); destination.closeAllConnections();
+    await Promise.all([new Promise<void>((resolve) => source.close(() => resolve())),
+      new Promise<void>((resolve) => destination.close(() => resolve()))]);
+  }
+});
+
+test('oversized or broken success bodies remain ambiguous without reflected provider data', async () => {
+  assert.deepEqual(await new NotisendClient(config, respond(200,
+    JSON.stringify({ id: 1, status: 'queued', padding: 'x'.repeat(16_384) }))).send(input),
+  { kind: 'AMBIGUOUS', code: 'UNREADABLE_RESPONSE' });
+  const body = new ReadableStream<Uint8Array>({ start(controller) {
+    controller.error(new Error(`${input.recipient} ${input.accessToken} ${config.apiKey}`));
+  } });
+  assert.deepEqual(await new NotisendClient(config, async () => new Response(body)).send(input),
+    { kind: 'AMBIGUOUS', code: 'UNREADABLE_RESPONSE' });
 });
 
 test('the client says NOT_SENT only when Notisend cannot have queued the message', async () => {
