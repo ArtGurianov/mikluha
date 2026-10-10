@@ -9,7 +9,7 @@ consent, and makes production content fail closed when a sellable departure is n
 contract-ready or still contains explicit demo content.
 
 Email, rate limiting and the booking-page visual redesign stay in slice 3c. The selected
-email provider is UniSender Go, so 3b discloses that processor and its narrow data set now,
+email provider is Notisend (switched on 2026-10-08), so 3b discloses that processor and its narrow data set now,
 but creates no outbox and sends no message. Manual
 EIS tracking and its operator workflow stay in slice 3d. Deployment, production
 credentials, backups, monitoring and the first real payment stay in slice 4.
@@ -42,8 +42,8 @@ also rejects the explicit demo marker `Демо` in any sellable contract field,
 
 The legal collection must contain the operator details, offer, privacy policy, payment
 rules, full-refund launch policy, cookie policy, and personal-data consent. The privacy
-policy names Refref, Alfa and UniSender Go, explains each narrow data flow and the
-retention periods, and states that live data and backups remain in Russia. UniSender
+policy names Refref, Alfa and Notisend, explains each narrow data flow and the
+retention periods, and states that live data and backups remain in Russia. Notisend
 contract/localization evidence is a first-sale gate, not an assumption made by this PR.
 
 ## Verification

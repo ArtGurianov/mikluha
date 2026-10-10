@@ -14,7 +14,8 @@ store. Do not publish signatures or private links. Runtime and operator have SEL
 Tourist PD consent stays in `content/legal/soglasie-pd.yml` and on each order independently. Neither
 the processor instruction nor tourist consent is included in Refref's commercial legal-release
 hash. The processor instruction permits only narrow payment/attribution data; it is not an ЕИС
-mandate or UniSender instruction and does not authorize partial refunds.
+mandate or an instruction for the transactional email provider (Notisend) and does not authorize
+partial refunds.
 
 Authoring basis (checked 2026-10-06):
 
@@ -25,5 +26,5 @@ Authoring basis (checked 2026-10-06):
 
 The offer/refund wording selects documented-expense deductions, but the code intentionally blocks
 that unqualified workflow. Missing real tour facts, supplier/registry evidence, Mikluha RKN
-notification, signed instruction, Mikluha UniSender terms evidence, closing-receipt qualification,
+notification, signed instruction, Mikluha Notisend terms evidence, closing-receipt qualification,
 owner-run schema-7 migration/recovery proofs and the remaining launch gates remain outstanding.

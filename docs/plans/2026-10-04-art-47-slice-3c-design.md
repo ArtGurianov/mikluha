@@ -9,21 +9,22 @@ configure Refref Business, publish DNS, or send a real payment.
 `PAID -> FULFILLED` and insertion of one `BOOKING_CONFIRMATION` row happen in one Postgres
 transaction, after Refref accepts the idempotent fulfilment acknowledgement. A unique
 `(order_id, type)` constraint makes the side effect exactly-once locally. The request that observes
-payment never calls UniSender Go.
+payment never calls Notisend.
 
-A worker claims due rows with a lease and `FOR UPDATE SKIP LOCKED`. UniSender acceptance records the
-provider `job_id`; a definitive refusal becomes `ATTENTION`. Transport, timeout (including HTTP
-408), 429, 5xx and an unreadable success are ambiguous. UniSender rejects a repeated
-`idempotence_key` only for one minute, so the first submission time is persisted and the worker runs
-every ten seconds. An ambiguous retry may start only in the first 40 seconds, leaving more than the
-15-second request timeout as safety margin. A delayed worker, an expired lease outside that window,
-or API error 1573 becomes `ATTENTION` without another send. Longer automatic recovery requires
-Event Dump reconciliation and is outside 3c. The message is transactional and contains no
+The provider is Notisend (owner decision of 2026-10-08, which replaced the provider this design was
+first written for). A worker claims due rows with a lease and `FOR UPDATE SKIP LOCKED` every ten
+seconds. Notisend acceptance records the message `id`; a definitive refusal (4xx, or a `skipped` or
+bounced recipient) becomes `ATTENTION`. Notisend's send API has no idempotency key, so a send is
+repeated only when the message provably was not queued: HTTP 429 after the provider's delay, or a
+connection that never opened, for at most 10 attempts. Transport, timeout (including HTTP 408),
+5xx, an unreadable success and an expired lease are ambiguous and become `ATTENTION` without another
+send. The stable outbox key travels as the `X-Mikluha-Outbox-Key` header for manual reconciliation
+in the Notisend log. The message is transactional and contains no
 unsubscribe mechanism. It sends only the recipient email, order number and protected order URL;
 tourist and identity-document data never enter the provider payload or logs.
 
 Fulfilment creates a 256-bit document-access token, stores only its hash on the order, and places the
-plaintext token in the pending outbox row only until UniSender accepts the message. The protected
+plaintext token in the pending outbox row only until Notisend accepts the message. The protected
 link exposes the order's exact stored offer and Заявка from any browser. This provides reliable
 access to the frozen contractual documents without sending those personal documents through the
 email provider. The message warns the customer not to share the bearer link; the application never
