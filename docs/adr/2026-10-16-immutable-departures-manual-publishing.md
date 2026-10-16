@@ -2,7 +2,7 @@
 
 - **Status:** Proposed; owner-confirmed direction, implementation and merge require review
 - **Date:** 2026-10-16
-- **Supersedes:** the `offers/offerRevision`, `departure_contract_version`, `SYSTEM_RELEASE_HOLD`, automated publish queue, full-descriptor promotion CAS, nightly scheduler and `SOLD_OUT` release machinery proposed in [ADR v2.1](./2026-10-16-control-room-hard-cut.md). ADR v2.1 stays in Git as a record of the earlier decision, not as the active implementation plan for those topics.
+- **Supersedes:** the `offers/offerRevision`, `departure_contract_version`, `SYSTEM_RELEASE_HOLD`, `DEPARTURE_ADMIN_PAUSE`, automated publish queue, full-descriptor promotion CAS, nightly scheduler and `SOLD_OUT` release machinery proposed in [ADR v2.1](./2026-10-16-control-room-hard-cut.md). The per-departure sales switch is the existing `bookingStatus` only. ADR v2.1 remains in Git with an explicit partial-supersession header, not a silently rewritten decision.
 - **Retains:** PostgreSQL single mutable authority, migrations from `0008+`, SSG/Nginx, independent Commerce/Refref and immutable orders/legal evidence, Admin API segregation + MFA/OWNER legal release approval, cloud.ru S3/privacy go-no-go, no default YAML import, noncustodial payments, no CRM or raw tourist PII in Admin, global CLI-only reopen and recovery gates.
 - **Planning:** existing Linear M11/M12/M13 workstreams; no new epic required.
 
@@ -28,25 +28,34 @@ A new commercial price or material correction requires **a new departure record 
 
 ## 3. Replacement and cancellation
 
-- If the original published departure **never concluded a contract** and there are no active reservations or unresolved payment outcomes, replace it by **setting `isListed=false` and sale-admission CLOSED** (do not mark `CANCELLED` solely because of replacement). The old immutable row/slug remains for audit, direct-link fail-closed and referential integrity. A new copied departure gets a new slug/unitRef and starts closed.
+- If the original published departure **never concluded a contract** and there are no active reservations or unresolved payment outcomes, replace it by **setting `isListed=false` and `bookingStatus=CLOSED` in the same guarded transaction** (do not mark `CANCELLED` solely because of replacement). The old immutable row/slug remains for audit, direct-link fail-closed and referential integrity. A new copied departure gets a new slug/unitRef and starts closed.
 - If concluded/paid contracts exist, replacing the public listing does **not** eliminate duties. Use a controlled **CANCELLED** workflow only with verified lawful grounds, client notices, EIS/provider effects, refund/read-back evidence and possible damages. Cancellation and refund are **not** a routine repricing tool. Obtain legal approval for the detailed cancellation procedure.
 - **Never permit cancellation while `PAYMENT_PENDING` or `HELD` outcomes remain unresolved** (or any other ambiguous in-flight provider attempt); reconcile payment truth via Refref read-back first. A currently valid `RESERVED` seat also must be dealt with explicitly before replacement/cancellation; never treat its absence of a paid contract as evidence that no buyer is in progress.
 - No mutation/deletion of completed payment, concluded agreement, provider/evidence or EIS history. `CANCELLED` is business status; `isListed` controls site visibility, and hiding alone must prevent **new** checkout, irrespective of stale static HTML.
 - Russian regulation: Government Decree **13.05.2026 No. 551** on tourist-product services has applied since **01.09.2026**; actual grounds and consumer obligations under law No. 132-FZ and consumer law require a separate reviewed runbook, not an automatic refund-only assumption.
 
-## 4. Admission, locks, pauses and capacity
+## 4. Admission, locks, batch close and capacity
 
-Keep `GLOBAL_OPERATOR_STOP` as the separate **absolute** operator/failsafe switch, re-openable **only through the privileged `commerce_operator` CLI**. Do not grant Admin an indirect global reopen path.
+**Exactly two persisted sale-control levels:**
 
-Use one per-departure `DEPARTURE_ADMIN_PAUSE` with audited OWNER/Admin operations:
-- Admin **Pause departure** sets the per-departure pause.
-- Admin **Pause all departures** sets the same pause for the complete applicable set **in one DB transaction**, after taking the appropriate global/collection gate plus deterministic per-departure locks, so **no new reservation/payment initiation can slip in between rows**. Concurrent creation/opening of new departures must also be fenced by the batch gate/locking protocol. This is a batch operation, not a new persistent fourth global stop.
-- Only authorized OWNER Admin clears Admin pauses, per departure or as reviewed batch; it cannot bypass `GLOBAL_OPERATOR_STOP`, legal gates, readiness, `CANCELLED`, sold capacity or an unresolved payment.
-- `POST /orders`, new payment initiation (`POST /orders/<ref>/pay` and its server-side transition), pause/unpause, capacity change, operator reserve and cancellation use the **same departure transactional lock protocol**. After acquiring the lock, reload the current DB row/status/availability, not a stale YAML/in-memory copy; check global and per-departure gates **inside** the transaction. Preserve already-issued payment attempts and read-back reconciliation when sales pause.
-- **Capacity edits need no Admin pause.** Inside the same departure lock/transaction, reject values below the authoritative seats already committed/taken (including `HELD` and `PAYMENT_PENDING`, and valid `RESERVED` by current expiry semantics), and prevent concurrent overselling. Operator reserve also uses these locks. Capacity itself is not frozen contractual snapshot.
-- **Cancellation uses the same lock and stronger predicates:** block when unresolved payment, outstanding valid reservations, inconsistent provider evidence or legally unqualified existing contracts. Require an explicit workflow and auditable decision. Do not allow `isListed`/status writes to bypass it.
-- An Admin pause is required for explicit exceptional operations which affect whether a departure may sell, **not** for publishing harmless editorial changes or safely updating capacity. There is no separate `SYSTEM_RELEASE_HOLD` or routine global pause around site publication.
-- Initial state of a newly created departure is **CLOSED / not sellable**. OWNER may enable sales only **after** the relevant static public page, exact slug and offer/terms identities are verified at the live site and all independent admission gates pass; the global CLI stop still wins.
+1. Per departure, the sole mutable commercial admission state is **`bookingStatus` = `OPEN` / `CLOSED` / `CANCELLED`**. There is **no** independent `DEPARTURE_ADMIN_PAUSE`, `saleAdmission` field or `SYSTEM_RELEASE_HOLD` (nor a hidden pseudo-state). `isListed` remains a separate public-visibility control: `OPEN` and `isListed=true` are both required for admission. All status transitions and visibility changes are audited and DB-guarded; they are not ordinary CMS publication fields.
+2. Existing **`GLOBAL_OPERATOR_STOP`** remains the absolute emergency/operator gate and can be reopened **only by privileged `commerce_operator` CLI**. Admin never receives that privilege, directly or via an alternate function. Closing an individual departure does not change this global gate.
+
+**Transition authority:** Only **OWNER** may switch `OPEN ↔ CLOSED` through the isolated Admin API under the shared departure lock and live DB validation; the request to set `OPEN` verifies that the departure was first published with an immutable offer, the exact site URL and legal identities passed live HTTP read-back, it is `isListed=true`, it has not started, capacity/contract facts are valid and the global stop is not bypassed. `CANCELLED` is a one-way transition made only through the separately qualified cancellation workflow; neither OWNER nor a bulk restore can casually return it to `OPEN`/`CLOSED`. The website's SSG content cannot write `bookingStatus`; editor publishing `OPEN` text is incapable of opening sales.
+
+**Single-departure "Pause sales":** OWNER changes `bookingStatus: OPEN → CLOSED`; **"Resume sales"** means `CLOSED → OPEN` after the same admission checks, **not** clearing a second pause flag. Creation of new departures always sets `CLOSED` regardless of draft/publication state.
+
+**Batch "Pause all departures":**
+- In **one PostgreSQL transaction**, take an **exclusive batch status-transition advisory lock** shared with every `CLOSED → OPEN` operation; lock the applicable **currently OPEN** departure rows in a deterministic order under the same per-departure locking protocol used by reservations/new payment initiation.
+- Change only the selected `OPEN → CLOSED` departures atomically, and record an auditable batch-operation ID, exact IDs changed and their status-transition generation/version. All-or-nothing commit: external checkout observes either the prebatch admission or CLOSED after the committed change, never a partially applied set of updates.
+- **No special fencing of newly created departures is needed**: DB initializes them CLOSED. However, concurrent attempts to **open** any departure must acquire the same batch advisory lock and serialize against batch close. This is a short-lived transactional lock, **not** a new persistent global stop.
+- **"Resume this batch"** is a separate OWNER action, not automatic on website publication: inspect the recorded IDs and reopen **only those still CLOSED whose last status transition is the matching batch close**, after revalidating live-page/legal/capacity, started-date, isListed and the global operator gate. Do not reopen departures independently closed afterward, newly created departures, CANCELLED, hidden/unqualified departures or all CLOSED departures. An eligible subset may reopen transactionally or the whole restore fails with a clear conflict; never silently broaden its set. Keep batch records for audit, not as a second admission field.
+
+`POST /orders`, **new** payment initiation (`POST /orders/<ref>/pay` and its transition), OWNER `OPEN/CLOSED` transitions, capacity change, operator reserve and cancellation use the **same departure transaction lock protocol** and reread actual state and current seat commitments **inside** the transaction. Global operator stop and `bookingStatus` are checked there, not from stale YAML/runtime cache or the static site. A close prevents subsequent new reservations and new payment initiation after its commit; already-issued provider sessions and Refref read-back/reconciliation continue independently.
+
+**Capacity changes need no pause.** Under the same lock/transaction, refuse capacity below seats already committed/taken (including `PAYMENT_PENDING`, `HELD` and valid `RESERVED`, along with applicable paid/fulfilled obligations); concurrent reservation/capacity edits cannot oversell. No automatic `SOLD_OUT` persisted status. Operator reserve uses the same transaction lock.
+
+**Cancellation uses the same lock and stronger predicates:** refuse unresolved `PAYMENT_PENDING`/`HELD` or ambiguous provider attempts, active valid `RESERVED` and unqualified concluded-contract cases. Require reviewed owner/legal workflow; do not conflate `CLOSED` or `isListed=false` with lawful cancellation. A batch close never cancels concluded contracts. Publishing harmless editorial content requires **no CLOSED transition**. No automatic global stop/reopen or sale-state changes arise from building the static site.
 
 ## 5. Static publication: one job, not a service orchestration subsystem
 
@@ -66,7 +75,7 @@ Use one per-departure `DEPARTURE_ADMIN_PAUSE` with audited OWNER/Admin operation
 | Contract | separately versioned `departure_contract_version` | resolved immutable snapshot stored on published departure, protected against update/delete |
 | Template | published departure can resolve mutable Tour | inheritance resolves **once** at first publication; later Tour edits apply only to future departures |
 | Publisher | queue, CAS, automatic rebase, bounded mismatch repair | **one** exclusive job, fail/manual retry, no background schedule |
-| Release state | `SYSTEM_RELEASE_HOLD` plus operator/admin holds | remove SYSTEM_RELEASE_HOLD; per-departure Admin pause + distinct emergency CLI global stop |
+| Release state | `SYSTEM_RELEASE_HOLD` plus operator/admin holds | **only** per-departure `bookingStatus` OPEN/CLOSED/CANCELLED + independent emergency CLI GLOBAL_OPERATOR_STOP; no per-departure pause field |
 | SOLD_OUT | dedicated derived occupancy release | no automatic static SOLD_OUT release; server-side capacity remains authoritative |
 | Capacity | potential critical Admin change | transactional under departure lock; no pause required |
 | Sale readiness | cross-published price activation | new CLOSED departure: live page read-back then explicit OWNER open |
@@ -79,11 +88,11 @@ The prior ADR remains a historical decision, but **implementation tickets must f
 
 1. Publish departure from a Tour template and full departure override: save exact resolved `TourContract`/`DepartureContract`, dates, zone, slug/unitRef and price; mutate the Tour later and prove existing departure page/contract/Zayavka unchanged. New departures pick up new Tour template.
 2. Try to UPDATE immutable published price, contract, dates, slug, origin Tour binding, published_at reset or DELETE using Admin API and direct DB credentials: both reject, even with zero orders. Admin Clone makes a new CLOSED departure with new slug/unitRef.
-3. Replace a departure without **any concluded contracts or active/ambiguous orders**: atomically CLOSE and `isListed=false`; old slug remains unbookable with intact references/history; it does **not** become CANCELLED. A concluded-contract cancellation goes through separately qualified owner/legal workflow.
-4. Refuse cancellation with outstanding `PAYMENT_PENDING`, `HELD`, ambiguous Refref read-back or valid RESERVED seats. Late provider success after a pause is reconciled, not silently dropped.
-5. In concurrent `reserve`/pay/pause/resize/operator-reserve operations, all use the same departure locking protocol and current DB state; never admit an oversell or payment initiation after a committed pause.
-6. **Pause all** in one transaction: no intermediate window or new departure creation bypass. OWNER unpauses only Admin pauses; CLI-only global operator stop still blocks all sales.
-7. Increase/decrease capacity without Admin pause; reject decrease below current taken seats and preserve hold/expiry rules under concurrent reservations.
+3. Replace a departure without **any concluded contracts or active/ambiguous orders**: under departure lock atomically set **`bookingStatus=CLOSED` and `isListed=false`**; old slug remains unbookable with intact references/history; it does **not** become CANCELLED. A concluded-contract cancellation goes through separately qualified owner/legal workflow.
+4. Refuse cancellation with outstanding `PAYMENT_PENDING`, `HELD`, ambiguous Refref read-back or valid RESERVED seats. Late provider success after a `bookingStatus=CLOSED` transition is reconciled, not silently dropped.
+5. In concurrent `reserve`/pay/OPEN↔CLOSED/resize/operator-reserve operations, all use the same departure locking protocol and current DB state; never admit an oversell or new payment initiation after a committed `bookingStatus=CLOSED`. No second per-departure pause state exists; ordinary content publication cannot change bookingStatus.
+6. **Pause all** in one transaction: atomically move currently OPEN → CLOSED, recording exact departure IDs and status-transition generations in an audit batch. No intermediate partial state; a concurrent **OPEN transition** serializes behind the batch status lock, but creation of a new CLOSED departure needs no extra fence. OWNER **Resume batch** affects only still-CLOSED, last-changed-by-this-batch eligible departures, never manually closed/CANCELLED/unlisted/new departures. CLI-only GLOBAL_OPERATOR_STOP still blocks all sales.
+7. Increase/decrease capacity without setting bookingStatus=CLOSED; reject decrease below current taken seats and preserve hold/expiry rules under concurrent reservations.
 8. Publish only noncontractual images/SEO/copy while existing departures remain sellable; verify unchanged offer snapshots and legal admission. Attempt to change contractual route through shared Tour description used on old departure is rejected/rendered from immutable snapshot.
 9. Publish a new CLOSED departure, verify its exact live URL, content, contract identity and legal refs via HTTP; only then enable its sales. A stale static link after `isListed=false` cannot reserve.
 10. Repeat manual Publish and code deploy concurrently: second job is serialized/rejected by the same exclusive lock. Failures do not promote a stale image or open sales; human re-runs from current state. Coolify auto-deploy and hosted Actions cannot bypass publisher.
@@ -101,10 +110,10 @@ The prior ADR remains a historical decision, but **implementation tickets must f
 
 ## 9. Execution map
 
-- ART-357/358: freeze departure contract facts at first publication, distinct DB grants, snapshots and no-deletion/immutability barriers, with transactional holds/capacity support.
+- ART-357/358: freeze departure contract facts at first publication, distinct DB grants, snapshots and no-deletion/immutability barriers, with **bookingStatus-only per-departure admission**, batch-close audit and transactional capacity support.
 - ART-359: retain legal/code/content compatibility and simplified static-site admission, remove offerRevision price handshake.
 - **ART-360 (first: Coolify PoC):** build immutable public S3 export, DTO parity and **manual single publishing job**. Absorb ART-361 scope; no timer, automatic rebase, multi-job coordinator or inventory releases.
 - **ART-361:** superseded and consolidated into ART-360; mark canceled as planning duplicate (not done/implemented), remove blocking relations in downstream tasks.
 - ART-362: admission for immutable per-departure contract and payment, preserve frozen order/Zayavka; remove stale-price buyer reconfirmation mechanics.
-- ART-365/366: clone and publish new CLOSED departure, limited immutable fields, single-row and one-transaction mass Admin pause, exact locking for checkout/pay/cancel/capacity.
+- ART-365/366: clone and publish new CLOSED departure, immutable fields, OWNER OPEN/CLOSED controls and one-transaction **batch OPEN→CLOSED with selective batch restoration**, exact locking for checkout/pay/cancel/capacity; no DEPARTURE_ADMIN_PAUSE.
 - ART-367/368: disable Coolify auto-deploy, retire GitHub/Sveltia publishing, exact-image tests and locked owner-approved hard cut. None of this authorizes opening sales.
