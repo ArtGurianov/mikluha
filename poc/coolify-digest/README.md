@@ -29,3 +29,13 @@ GO only if all three pass both read-backs: Coolify's stored tag and a finished d
 `/identity` = the chosen commit in the workflow, and the running container's RepoDigests containing
 `ghcr.io/artgurianov/mikluha-digest-poc@<digest>` on the VPS. Anything else is NO-GO; record which
 step failed. Delete the application and the package when the result is recorded.
+
+## Findings (2026-10-18)
+
+- `PATCH docker_registry_image_tag = sha256-<hex>` is stored as sent, and Coolify 4.4.6 runs the
+  container from `image@sha256:<hex>`; RepoDigests on the VPS matched (run 39145500973).
+- Coolify sets `SOURCE_COMMIT=HEAD` in the container at runtime, overriding the image's ENV. A
+  runtime identity read from that variable reports `HEAD`; the commit must be baked into a file
+  at build time (as `commerce/Dockerfile` does).
+- `GET /api/v1/deployments/{uuid}` can answer 404 for a few seconds after `POST /deploy`.
+- Ports Exposes must match the image (3000 here); Coolify's default 80 gives a 502.

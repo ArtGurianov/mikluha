@@ -13,7 +13,12 @@ digest="${2:?usage: verify-running-digest.sh <app-uuid> sha256:<64 hex>}"
 [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "BAD_DIGEST $digest" >&2; exit 2; }
 repo=ghcr.io/artgurianov/mikluha-digest-poc
 
-mapfile -t containers < <(docker ps --quiet --filter "name=^${uuid}")
+# A rolling update briefly runs the old and the new container side by side.
+for _ in $(seq 1 12); do
+  mapfile -t containers < <(docker ps --quiet --filter "name=^${uuid}")
+  [ "${#containers[@]}" -eq 1 ] && break
+  sleep 5
+done
 [ "${#containers[@]}" -eq 1 ] || { echo "FAIL expected one running container for $uuid, found ${#containers[@]}"; exit 1; }
 c="${containers[0]}"
 image_id="$(docker inspect --format '{{.Image}}' "$c")"
