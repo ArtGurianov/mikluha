@@ -15,7 +15,7 @@ OWNER decisions of 2026-10-18:
 3. What a buyer accepted must never be rewritten retroactively.
 4. A quote created at checkout guarantees its price for its validity window regardless of later price changes or an ordinary sales close.
 
-ADR v2.2 froze every contractual field of a departure at its first publication and required a clone for any price change or correction, because a static page built from an earlier snapshot could otherwise advertise one price while Commerce charged another. Under SSR the page and checkout read the same live authority, so that reason disappears. Immutability moves **from the published departure to the accepted order**, where Mikluha already stores it (`orders.unit_price_kopecks`, `amount_kopecks`, trip dates and times, `legal_release_content`, PD consent, frozen booking conditions from ART-47).
+ADR v2.2 froze every contractual field of a departure at its first publication and required a clone for any price change or correction, because a static page built from an earlier snapshot could otherwise advertise one price while Commerce charged another. Under SSR the page and checkout read the same live authority, so that reason disappears. Immutability moves **from the published departure to the accepted order**. Today the order stores only part of it (`unit_price_kopecks`, `amount_kopecks`, trip dates and times, `legal_release_content`, PD consent). Programme, route, accommodation, carrier and services are **not** stored: `writeZayavka` (`commerce/src/checkout.ts:213-237`) reads them from the current catalog at payment time and overwrites an existing Заявка (`ON CONFLICT … DO UPDATE`). With editable departures this becomes a required fix (§3).
 
 ## 2. Decision: SSR storefront reading Commerce
 
@@ -44,15 +44,15 @@ Tour templates resolve into the departure once, when the departure is created or
 
 "Active or concluded orders" means any order in `RESERVED` (unexpired), `PAYMENT_PENDING`, `HELD`, `PAID` or a later non-terminal state.
 
-The order snapshot is the contract: the departure's resolved contractual fields are copied into the order when it is reserved, with the legal release and PD consent already stored there. **Zayavka, receipts and every later document are generated from the order snapshot, never from the current departure** (this requirement of ADR v2.2 §2 stays). A DB trigger rejects UPDATE of the snapshot columns after `RESERVED`.
+The order snapshot is the contract. **New in this ADR:** when the order is reserved, Commerce stores the buyer's complete resolved contract in the order (`contract_snapshot` JSON with schema validation and SHA-256): price, programme, route, accommodation and its registry facts, carrier, included and excluded services, schedule and meeting points, together with the legal release and PD consent already stored there. **Zayavka, receipts and every later document are generated from this snapshot only, never from the current departure** (the requirement of ADR v2.2 §2 stays). A DB trigger rejects UPDATE of the snapshot after `RESERVED`. A Заявка is written once per order; regenerating it before payment re-renders the same snapshot, and after payment it is never overwritten.
 
-No `offerRevision`, no clone-for-new-price and no separate `departure_contract_version` table are introduced. Order snapshots already prove what each buyer accepted; the editorial revision history (§2) proves what the page showed.
+No `offerRevision`, no clone-for-new-price and no separate `departure_contract_version` table are introduced. The order snapshots prove what each buyer accepted; the editorial revision history (§2) proves what the page showed.
 
 ## 4. Execution changes for existing buyers
 
 Editing contractual fields of a departure that has active or concluded orders is not an ordinary edit. Control Room shows the affected orders and requires OWNER to classify the change before it is saved:
 
-- **EQUIVALENT** (within the offer's equivalent-replacement clause): saved, and every affected order receives an individual e-mail through the transactional provider. The send and delivery result are recorded per order as evidence. Social posts may add to it; they never replace it.
+- **EQUIVALENT** (within the offer's equivalent-replacement clause): saved, and every affected order receives an individual e-mail. Sending goes through a small per-order notification record (idempotent per change and order, retried on failure, status visible in Control Room). The provider's acceptance and, where the provider reports it, the delivery status are recorded separately; acceptance alone is not claimed as delivery. Social posts may add to it; they never replace it.
 - **MATERIAL** (dates, a downgrade of accommodation, route or services, anything with a legal effect under No. 132-FZ art. 10 and Decree No. 551): not applied as an edit. It goes through the move/cancel workflow: notice, the buyer's consent, or termination with a refund or compensation under the reviewed runbook (ADR v2.2 §3 cancellation rules apply unchanged).
 
 The classification, the notice and its evidence are audited. The order snapshot is never changed; the change is recorded as an event on the order.
@@ -66,7 +66,7 @@ These rules refine ADR v2.2 §4 and follow the cross-merchant purchase lifecycle
 - **Ordinary per-departure close** (`bookingStatus OPEN → CLOSED`, including batch close): no new reservations or quotes. A quote already issued within its validity may still be accepted and its payment initiated; its seat is already held. This replaces the ADR v2.2 §4 sentence that a close blocks new payment initiation.
 - **`GLOBAL_OPERATOR_STOP` and cancellation:** no new reservations, quotes or payment initiation. Live attempts are cancelled through Refref; seats are released only when Refref confirms the attempt can no longer settle (unchanged).
 - **Late payment** is a recognized financial fact. The attempt carries Refref `latePaymentPolicy`: `HONOR` while the seat is still held and the departure is deliverable; `AUTO_REFUND` when it is not. A payment that arrives after a cancellation follows the cancellation runbook.
-- **Prerequisite:** Refref refuses every reservation-backed Альфа-Банк session with `RESERVATION_TOO_SHORT` while the adapter declares no qualified session lifetime (`docs/28` §11). Mikluha's 30-minute hold (`RESERVATION_MINUTES`) does not help. Qualifying an explicit Альфа session lifetime ≤ hold − 2 minutes blocks M10.5.
+- **Prerequisite:** Refref refuses every reservation-backed Альфа-Банк session with `RESERVATION_TOO_SHORT` while the adapter declares no qualified session lifetime (`docs/28` §11). The rule is checked when payment starts: `now + session lifetime + 2 min` must not exceed the expiry of **that** reservation. So a qualified Альфа session lifetime is needed, and the remaining hold at payment start must cover it (Mikluha holds 30 minutes from reservation, `RESERVATION_MINUTES`). This blocks M10.5.
 
 ## 6. Sales controls
 
@@ -87,7 +87,7 @@ Admin login requires a password and a **TOTP** code (RFC 6238: SHA-1, 6 digits, 
 
 ## 9. Acceptance / negative tests
 
-1. A published departure's description and price are edited with sales open; the next page render and new quotes show the new values; an issued quote and existing orders keep the old price; Zayavka of an older order renders its own snapshot.
+1. A published departure's description and price are edited with sales open; the next page render and new quotes show the new values; an issued quote and existing orders keep the old price; a programme edit does not change the stored `contract_snapshot`; Zayavka of an older order renders its own snapshot.
 2. Editing dates of a departure with an active order is rejected; the same edit succeeds with no orders.
 3. A programme edit on a departure with orders requires EQUIVALENT/MATERIAL classification; EQUIVALENT sends one e-mail per affected order and records delivery evidence; MATERIAL is refused as an edit and routed to the move/cancel workflow.
 4. UPDATE of `slug`/`unitRef`, tour binding, `published_at` or an order snapshot after `RESERVED` fails both through Admin API and with direct DB credentials; DELETE of a published departure fails.
@@ -108,14 +108,14 @@ Admin login requires a password and a **TOTP** code (RFC 6238: SHA-1, 6 digits, 
 
 ## 11. Execution map
 
-- **ART-357:** PostgreSQL 0008+: identity triggers (§3), order snapshot immutability, date lock with active orders, editorial revisions with expected version; drop the freeze-at-first-publication barriers.
+- **ART-357:** PostgreSQL 0008+: identity triggers (§3), the order `contract_snapshot` and its immutability, date lock with active orders, editorial revisions with expected version; drop the freeze-at-first-publication barriers.
 - **ART-358:** content CRUD and publish transaction; no clone-for-price.
 - **ART-359:** legal/code/content compatibility under SSR; remove static-export admission and the S3 content release.
 - **ART-360:** Coolify Docker Image by digest PoC (§8) and the SSR hard cut; no publishing job.
-- **ART-362:** quote rules (§5) and the Альфа session-lifetime prerequisite.
+- **ART-362:** `writeZayavka` and all documents from `contract_snapshot`; quote rules (§5); the Альфа session-lifetime prerequisite.
 - **ART-363:** Admin with TOTP (§7).
 - **ART-364:** media resolver at request time.
-- **ART-365/366:** editors with the §3 table and §4 classification; bookingStatus controls unchanged.
+- **ART-365/366:** editors with the §3 table and §4 classification, the per-order notification record; bookingStatus controls unchanged.
 - **ART-367:** remove Sveltia, Git/YAML writers, `publish.yml` and its nightly schedule, `sync:content`/`validate:out` export steps.
 - **ART-368:** SSR E2E, recovery proofs and the owner-authorized hard cut.
 
