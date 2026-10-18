@@ -1,9 +1,11 @@
-// The deal both Mikluha and Refref hash (refref docs/28 §7): SharedCheckoutSnapshotV1, its
-// `refref-jcs-1` digest, and the resolution input hash (§5).
+// The deal both Mikluha and Refref hash (refref docs/28 §7, migration 000024):
+// SharedCheckoutSnapshotV2 for new attempts, historical V1 for read/replay,
+// the same `refref-jcs-1` digest and resolution input hash (§5).
 //
 // Written from the published contract, not imported from Refref: "both parties compute the digest
-// independently" holds only if this side is not Refref's code. test/snapshot.test.ts proves it
-// agrees with Refref's own vectors (copied into test/refref-rc2-vectors.json).
+// independently" holds only if this side is not Refref's code. test/snapshot.test.ts proves the
+// canonicalizer agrees with Refref's historical vectors. New V2 acceptance is also checked by
+// the contract-shaped fake Refref and checkout integration tests.
 //
 // The fiscal content is FIXED to the one Alfa path that was qualified end to end (Linear ART-47):
 // USN_INCOME, one line, one fiscal item of quantity 1 equal to the whole payment, FULL_PREPAYMENT,
@@ -70,6 +72,18 @@ export const OBLIGATION_REF = 'full';
 /** RBS limits cartItems names to 100 characters (refref Alfa adapter: RECEIPT_ITEM_NAME_LENGTH). */
 export const MAX_ITEM_NAME = 100;
 
+export const SHARED_CHECKOUT_SNAPSHOT_V2 = 'refref.shared-checkout-snapshot/2';
+/**
+ * Merchant-owned Alfa order purpose, distinct from the receipt item title. Fixed from the immutable
+ * order reference, never from today's editable tour catalogue or any passenger data. Exactly one
+ * purpose is frozen in the first attempt's hashed snapshot and replayed without recalculation.
+ * Refref accepts 1–512 UTF-16 units, no controls/edge whitespace (migration 000024).
+ */
+export function paymentPurposeForOrder(orderRef: string): string {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(orderRef)) throw new Error('PAYMENT_PURPOSE_ORDER_REF_INVALID');
+  return `Оплата туристского продукта по заявке ${orderRef}`;
+}
+
 /** UTC instant (second precision, docs/28 §7) of a local wall-clock time in `timezone`. */
 export function zonedToUtc(date: string, time: string, timezone: string): string {
   const guess = new Date(`${date}T${time}Z`);
@@ -130,8 +144,10 @@ export function buildSnapshot(deal: OrderDeal, resolved: Resolved, legal: { ref:
   if (!Number.isSafeInteger(finalAmount) || finalAmount <= 0) throw new Error('SNAPSHOT_PAYABLE_NOT_POSITIVE');
   const name = itemName(deal);
   if ([...name].length > MAX_ITEM_NAME) throw new Error('SNAPSHOT_ITEM_NAME_TOO_LONG');
+  const paymentPurpose = paymentPurposeForOrder(deal.orderRef);
   return {
-    schema: 'refref.shared-checkout-snapshot/1',
+    schema: SHARED_CHECKOUT_SNAPSHOT_V2,
+    paymentPurpose,
     merchantId: resolved.merchantId,
     merchantOrderRef: deal.orderRef,
     currency: 'RUB',
