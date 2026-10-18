@@ -120,7 +120,8 @@ jobs:
           echo "deployment $dep"
           echo "DEPLOYMENT=$dep" >>"$GITHUB_ENV"
           for _ in $(seq 1 90); do
-            status="$(curl -fsS "${COOLIFY_BASE_URL%/}/api/v1/deployments/$dep" -H "Authorization: Bearer $WRITE_TOKEN" | jq -r '.status')"
+            # Just after queueing, the deployment can answer 404 for a few seconds.
+            status="$(curl -fsS "${COOLIFY_BASE_URL%/}/api/v1/deployments/$dep" -H "Authorization: Bearer $WRITE_TOKEN" | jq -r '.status' || echo unknown)"
             case "$status" in
               finished) echo "terminal: $status"; exit 0 ;;
               failed|cancelled-by-user|error) echo "::error::deployment $dep ended $status"; exit 1 ;;
