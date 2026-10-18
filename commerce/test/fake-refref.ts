@@ -77,6 +77,16 @@ export class FakeRefref {
             const ref = m![1]!;
             const existing = this.attempts.get(ref);
             if (existing && (existing.key !== key || existing.body !== text)) { send(409, { error: { code: 'IDEMPOTENCY_KEY_CONFLICT' } }); return; }
+            // Refref schema 25 / migration 000024: new V1 attempts are refused. Historical exact-key
+            // replay is still permitted, so check only if the attempt does not already exist.
+            const purpose = body.snapshot?.paymentPurpose;
+            if (!existing && (body.snapshot?.schema !== 'refref.shared-checkout-snapshot/2'
+              || typeof purpose !== 'string' || purpose.length < 1 || purpose.length > 512
+              || purpose.trim() !== purpose || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(purpose))) {
+              // Migration 000024 raises PAYMENT_PURPOSE_REQUIRED internally. The Refref adapter
+              // exposes only its public 422 SNAPSHOT_INVALID to merchants (no SQL code leakage).
+              send(422, { error: { code: 'SNAPSHOT_INVALID' } }); return;
+            }
             if (snapshotDigest(body.snapshot) !== body.snapshotHash) { send(422, { error: { code: 'SNAPSHOT_HASH_MISMATCH' } }); return; }
             const a = existing ?? { id: `00000000-0000-4000-8000-${String(this.attempts.size + 1).padStart(12, '0')}`, key: key!, body: text,
               snapshotHash: body.snapshotHash, referralResolutionId: body.referralResolutionId,
