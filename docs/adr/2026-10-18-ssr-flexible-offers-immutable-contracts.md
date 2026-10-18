@@ -81,7 +81,7 @@ Admin login requires a password and a **TOTP** code (RFC 6238: SHA-1, 6 digits, 
 ## 8. Code release
 
 - CI runs on GitHub-hosted runners (the repository is public, so minutes are free). It builds the image for the exact `main` SHA and pushes it to GHCR.
-- Coolify deploys it as a **Docker Image application pinned by digest**: `PATCH /api/v1/applications/{uuid}` sets `docker_registry_image_tag` to `sha256-…`, `POST /api/v1/deploy` deploys it, and the workflow follows the deployment to a terminal state and reads `/identity` back to compare the digest. Coolify stays the single deployment controller and history.
+- Coolify deploys it as a **Docker Image application pinned by digest**: `PATCH /api/v1/applications/{uuid}` sets `docker_registry_image_tag` to `sha256-…`, `POST /api/v1/deploy` deploys it, and the workflow follows the deployment to a terminal state. Two independent read-backs follow: `/identity` must report the chosen `sourceCommit` (an image cannot contain its own digest), and the running container's image digest, read from Docker metadata on the host, must equal the chosen digest. Coolify stays the single deployment controller and history.
 - The whole sequence (choose digest → PATCH → deploy → read-back) runs inside **one workflow concurrency group per application**. A digest mismatch on read-back fails the release. Git auto-deploy is disabled.
 - Images are built by CI, never on the VPS.
 
@@ -95,7 +95,7 @@ Admin login requires a password and a **TOTP** code (RFC 6238: SHA-1, 6 digits, 
 6. Price change at 14:10 against a quote issued at 14:00 for 6 500 ₽: acceptance at 14:14 creates an order for 6 500 ₽; a new quote shows the new price.
 7. Ordinary close at 14:05 against a quote issued at 14:00: payment can still be initiated until the quote expires; a new reservation is refused. `GLOBAL_OPERATOR_STOP` blocks both.
 8. The SSR site responds `no-store`, sets no cookies, has no DB or Admin credentials, and keeps serving after a Commerce restart with an error state rather than stale prices.
-9. A release whose `/identity` digest differs from the deployed digest fails; two releases of the same app never interleave PATCH and deploy.
+9. A release fails when `/identity` reports another commit or the running container's digest differs from the chosen one; two releases of the same app never interleave PATCH and deploy.
 10. TOTP: a reused code within its step is rejected; a code outside ±1 step is rejected; CLI reset re-enrolls and is audited.
 11. All ADR v2.2 §7 items not listed as superseded (3–7, 12, 13) still pass, except that item 5 now allows payment initiation for a quote issued before an ordinary close (§5).
 
