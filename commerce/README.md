@@ -94,7 +94,7 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 |---|---|
 | contract hash | `legalReleaseRef` is the offer version; `legalReleaseHash` is `sha256` over the offer's hash and the Заявка's (`contractHash`) |
 | what is paid | one FULL / ORCHESTRATED / PROVIDER obligation: the full price minus any referral discount. One fiscal item of quantity 1 equal to the payment, USN_INCOME, FULL_PREPAYMENT, SERVICE, no VAT. This is the Alfa path that was qualified, and nothing else is built (`src/snapshot.ts`). The digest remains computed independently; historical Refref vectors validate its JCS implementation |
-| Snapshot V2 purpose | New attempts use `refref.shared-checkout-snapshot/2` (Refref migration `000024`) with merchant-owned `paymentPurpose = "Оплата туристского продукта по заявке <orderRef>"`, derived only from an immutable server-generated order reference. It is NOT the fiscal item name, receipt email or tourist data. The purpose is frozen under the snapshot hash and replayed byte-identically. Existing V1 evidence is not rewritten. The fake Refref refuses new V1 attempts; exact real-Refref consumer conformance and independently generated V2 contract vectors are still the separate ART-275 acceptance |
+| Snapshot V2 purpose | New attempts use `refref.shared-checkout-snapshot/2` (Refref migration `000024`) with merchant-owned `paymentPurpose = "Оплата туристского продукта по заявке <orderRef>"`, derived only from an immutable server-generated order reference. It is NOT the fiscal item name, receipt email or tourist data. The purpose is frozen under the snapshot hash and replayed byte-identically. Existing V1 evidence is not rewritten. The fake Refref refuses new V1 attempts. Refref's CI runs the real consumer (see below); live production conformance is still the separate ART-275 acceptance |
 | refund qualification | only the full PROVIDER refund is technically qualified. The published documented-expense policy is not: launch and new payments are blocked until its separate end-to-end workflow qualification; this PR implements no partial refunds |
 | PAID | only from Refref's read-back: the obligation SATISFIED by a SUCCEEDED payment of exactly the payable amount. The customer's return from the bank decides nothing |
 | no second payment | one attempt per order, created with the fixed key `mk-attempt:<ref>`; an unanswered request is repeated identically. Sessions are only re-requested on that attempt: Refref replays a live payment and starts a new one only after a definitive failure |
@@ -106,9 +106,18 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 
 **The Refref Business needs:**
 - an API key with `integrations:checkout` and `integrations:fulfillment`;
-- `COMMERCE_ORIGIN` verified, with destination paths `/return` and `/orders/`;
+- `COMMERCE_ORIGIN` verified, with destination path prefixes `/return` and `/orders` (Refref's
+  `provision-merchant` refuses a prefix that ends in `/`);
 - an Offer per tour slug (`offerRef`) wherever a campaign should apply. The departure is the
   `unitRef`.
+
+**Refref runs this consumer in its CI (ART-275).** Refref pins `src/checkout.ts`, `refref.ts`,
+`snapshot.ts`, `zayavka.ts`, `orders.ts`, `catalog.ts`, `migrate.ts`, `config.ts` and `migrations/`
+byte for byte at a reviewed commit (`refref/scripts/fixtures/mikluha`). Its
+`contract:mikluha-consumer-served` suite runs them against Refref's served runtime on Альфа PROVIDER,
+with the merchant provisioned as above. A change to these files reaches Refref only when Refref moves
+that pin, so a contract break shows up in Refref's CI before production. The suite uses a modelled
+gateway and is not live acceptance.
 
 ## Database roles
 
