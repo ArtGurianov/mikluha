@@ -57,16 +57,22 @@ Editing contractual fields of a departure that has active or concluded orders is
 
 The classification, the notice and its evidence are audited. The order snapshot is never changed; the change is recorded as an event on the order.
 
-## 5. Quote, closing and late payment
+## 5. Quote, closing and merchant-held seats
 
 These rules refine ADR v2.2 §4 and follow the cross-merchant purchase lifecycle of Refref `docs/29` §5:
 
 - A quote is created after the tourist data is entered (Refref vNext). It is payment-admissible until the **earliest** of: 15 minutes, the seat-hold expiry, the departure start, the end of an applied promotion, and a cancellation or emergency stop. A later price change does **not** shorten it.
 - The guarantee is stated in the booking terms shown before acceptance ("the price shown is held for N minutes"), not inferred from the word "quote".
 - **Ordinary per-departure close** (`bookingStatus OPEN → CLOSED`, including batch close): no new reservations or quotes. A quote already issued within its validity may still be accepted and its payment initiated; its seat is already held. This replaces the ADR v2.2 §4 sentence that a close blocks new payment initiation.
-- **`GLOBAL_OPERATOR_STOP` and cancellation:** no new reservations, quotes or payment initiation. Live attempts are cancelled through Refref; seats are released only when Refref confirms the attempt can no longer settle (unchanged).
-- **Late payment** is a recognized financial fact. The attempt carries Refref `latePaymentPolicy`: `HONOR` while the seat is still held and the departure is deliverable; `AUTO_REFUND` when it is not. A payment that arrives after a cancellation follows the cancellation runbook.
-- **Prerequisite:** Refref refuses every reservation-backed Альфа-Банк session with `RESERVATION_TOO_SHORT` while the adapter declares no qualified session lifetime (`docs/28` §11). The rule is checked when payment starts: `now + session lifetime + 2 min` must not exceed the expiry of **that** reservation. So a qualified Альфа session lifetime is needed, and the remaining hold at payment start must cover it (Mikluha holds 30 minutes from reservation, `RESERVATION_MINUTES`). This blocks M10.5.
+- **`GLOBAL_OPERATOR_STOP`:** no new reservations, quotes or payment initiation. It never stops Refref read-back, reconciliation, refunds or fulfilment of paid orders (unchanged, `commerce/src/bin/sales.ts`).
+- **Departure cancellation:** first close new sales, then cancel the open attempts through Refref and reconcile them. The cancellation is not completed while a started payment can still settle; an attempt Refref does not confirm as safely cancelled keeps its seat (ADR v2.2 §3 rule, unchanged).
+- **Merchant-held seats (owner decision I-1, 2026-10-18; Refref `docs/29` §5).** Mikluha does not declare `inventoryReservation` in the Refref attempt and sends no `latePaymentPolicy` (the API carries it only inside a reservation). Refref's `RESERVATION_TOO_SHORT` margin therefore does not apply, and a qualified Альфа session lifetime is **not** a prerequisite of this checkout. The seat is protected by the merchant:
+  1. Before payment starts, the seat is held until the reservation expires (`RESERVATION_MINUTES = 30`). An expired `RESERVED` order with no payment initiated is released only after checking that no operation for it is unfinished.
+  2. Once payment has started, no TTL releases a `PAYMENT_PENDING`, `HELD` or uncertain attempt; retries reuse the existing attempt key and read-back. `ABANDON_AFTER_MINUTES = 60` is only the point at which Commerce asks Refref to cancel an abandoned attempt; if Refref does not confirm the attempt can no longer settle, the seat stays taken, possibly much longer. This is the accepted cost of the model.
+  3. Cancellation as above: never completed while a started payment can still settle.
+  4. `GLOBAL_OPERATOR_STOP` as above.
+- A final Refref outcome is trusted; an unexpected divergence from bank truth is reconciled, never ignored. Fulfilment or refund of a confirmed payment follows the merchant contract workflow. Mikluha never releases a seat or completes a cancellation while a previously initiated payment can still complete.
+- **Snapshot V2 prerequisite:** Refref migration `000024` refuses new checkout attempts whose snapshot is not `refref.shared-checkout-snapshot/2` with `paymentPurpose` (`PAYMENT_PURPOSE_REQUIRED`). Mikluha still builds `/1` (`commerce/src/snapshot.ts:134`, test vectors too), so its first real payment would be refused before any bank session. Moving to V2 is required before any payment (ART-47).
 
 ## 6. Sales controls
 
@@ -96,6 +102,7 @@ Admin login requires a password and a **TOTP** code (RFC 6238: SHA-1, 6 digits, 
 7. Ordinary close at 14:05 against a quote issued at 14:00: payment can still be initiated until the quote expires; a new reservation is refused. `GLOBAL_OPERATOR_STOP` blocks both.
 8. The SSR site responds `no-store`, sets no cookies, has no DB or Admin credentials, and keeps serving after a Commerce restart with an error state rather than stale prices.
 9. A release fails when `/identity` reports another commit or the running container's digest differs from the chosen one; two releases of the same app never interleave PATCH and deploy.
+9a. A payment started at minute 25 keeps its seat after the 30-minute hold and after `ABANDON_AFTER_MINUTES` while Refref has not confirmed the attempt cannot settle; a departure cancellation with that attempt open stays incomplete. A new attempt is sent with snapshot V2 and accepted by Refref; the attempt payload carries no `inventoryReservation`.
 10. TOTP: a reused code within its step is rejected; a code outside ±1 step is rejected; CLI reset re-enrolls and is audited.
 11. All ADR v2.2 §7 items not listed as superseded (3–7, 12, 13) still pass, except that item 5 now allows payment initiation for a quote issued before an ordinary close (§5).
 
@@ -112,7 +119,8 @@ Admin login requires a password and a **TOTP** code (RFC 6238: SHA-1, 6 digits, 
 - **ART-358:** content CRUD and publish transaction; no clone-for-price.
 - **ART-359:** legal/code/content compatibility under SSR; remove static-export admission and the S3 content release.
 - **ART-360:** Coolify Docker Image by digest PoC (§8) and the SSR hard cut; no publishing job.
-- **ART-362:** `writeZayavka` and all documents from `contract_snapshot`; quote rules (§5); the Альфа session-lifetime prerequisite.
+- **ART-362:** `writeZayavka` and all documents from `contract_snapshot`; quote rules and merchant-held seat invariants (§5).
+- **ART-47:** snapshot V2 with `paymentPurpose`; test vectors generated from Refref contracts.
 - **ART-363:** Admin with TOTP (§7).
 - **ART-364:** media resolver at request time.
 - **ART-365/366:** editors with the §3 table and §4 classification, the per-order notification record; bookingStatus controls unchanged.
