@@ -330,7 +330,8 @@ describe('the Заявка: shown before paying, accepted by paying, frozen afte
     assert.equal(invalid.kind, 'ANSWERED');
     if (invalid.kind === 'ANSWERED') {
       assert.equal(invalid.status, 422);
-      assert.equal(errorCode(invalid.body), 'PAYMENT_PURPOSE_REQUIRED');
+      // Refref maps migration 000024's internal PAYMENT_PURPOSE_REQUIRED to its public contract.
+      assert.equal(errorCode(invalid.body), 'SNAPSHOT_INVALID');
     }
   });
 
