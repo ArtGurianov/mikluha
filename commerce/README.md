@@ -18,12 +18,20 @@ static; everything that sells a trip lives here, with its own Postgres.
 - slice 4 application controls: immutable site/commerce build identities, live legal-release
   admission at startup/readiness/reservation/payment, merchant-order recovery after an ambiguous
   attempt create, aggregate PD-free monitor signals, and the owner-run production launch gate.
+- migration 0008 (ADR v2.3 §2–§3, ART-357): tours and departures in PostgreSQL with editorial
+  drafts, immutable published revisions and expected-version publish; immutable published identity
+  (slug/unitRef, tour binding, `published_at`) and no physical delete; the date lock while a
+  departure has active or concluded orders; and every new order's `contract_snapshot` (see
+  "Editable offers, immutable orders"). Content CRUD (ART-358), `bookingStatus`/capacity
+  transitions (ART-366) and documents rendered from the snapshot (ART-362) build on it; the
+  checkout still sells from `content/` until then.
 
 **Next:**
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
-  integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migration 0007
-  needs owner-only application and fresh recovery evidence before future admission. Mikluha
+  integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migrations
+  0007 and 0008 need owner-only application and fresh schema-8 logical and PITR recovery evidence
+  before future admission. Mikluha
   commerce is undeployed; monitor admission, sales and payments remain closed.
 
 ## Generic legal pack and individual application
@@ -122,9 +130,21 @@ require `node scripts/verify-mikluha-pin.mjs --candidate=<release-source-sha>` i
 candidate’s served conformance result. An older green pin does not qualify a new release. The suite
 uses a modelled gateway and is not live acceptance.
 
+## Editable offers, immutable orders (migration 0008)
+
+| | |
+|---|---|
+| draft and publish | `fn_save_*_draft(id, expectedRevision, document, by)` never changes the public row. `fn_publish_*(id, expectedDraftRevision, expectedPublishedVersion, by)` copies the draft into `tour`/`departure` in one transaction under the row lock and appends an immutable `*_revision` (document, sha256, who, which login). A stale tab or a double click gets `DRAFT_REVISION_CONFLICT`/`PUBLISHED_VERSION_CONFLICT` |
+| identity | after the first publication, `slug` (offerRef/unitRef), a departure's tour and `published_at` never change and the row is never deleted, for every login including the owner; revisions are never updated or deleted; TRUNCATE is refused. Orders reference `departure` `ON DELETE RESTRICT` |
+| date lock | `starts_on`, `ends_on`, `departure_time`, `return_time`, `timezone` cannot change while an order is RESERVED (unexpired), PAYMENT_PENDING, HELD, PAID or FULFILLED, matched by `departure_id` or, for orders made from `content/`, by slug. The check takes the same `departure:<slug>` advisory lock as `reserve()`. Only the move/cancel workflow (ADR v2.3 §4, its own migration) will change them |
+| price, programme, description | edited and published freely; they reach new orders only |
+| `contract_snapshot` | written by `reserve()` (`src/contract-snapshot.ts`, schema `mikluha.order-contract/1`, `sha256:` of its RFC 8785 form): price, programme, route, accommodation with registry facts, carrier, included/excluded services, schedule and meeting points. The database checks its shape and that it agrees with the order's slug, dates, times, timezone and price, requires it on every new order, and refuses any later change, NULL or backfill; an order never changes `departure_id`. Orders from before 0008 keep NULL |
+| roles | `commerce_app` reads `tour`/`departure` only. `admin_app` (the isolated Admin API, ADR v2.1 §7) inserts a tour (slug) or departure (slug, tour) and otherwise writes only through the four functions, which refuse any login that belongs to `commerce_app`; it has no access to orders, payments, the switch or ЕИС. No role can change `booking_status`, `capacity` or `is_listed` yet (ART-366): departures stay CLOSED and unlisted |
+
 ## Database roles
 
-The owner applies migrations. There are two other logins, and neither is a member of the other's role:
+The owner applies migrations. There are two other logins, and neither is a member of the other's role
+(migration 0008 adds the `admin_app` role for the Admin API; its login is created with ART-363):
 
 | login | role | can | its credential |
 |---|---|---|---|

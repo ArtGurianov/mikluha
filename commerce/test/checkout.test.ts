@@ -187,11 +187,17 @@ describe('the paid path', () => {
 
   test('legacy unresolved schedule is not guessed from current catalog and cannot start a payment', async () => {
     const { ref } = await bookAndResolve();
-    // Simulate a historical row carried through migration 0007 (which does NOT backfill times).
+    // Simulate a historical row carried through migrations 0007 and 0008 (neither backfills times
+    // or the contract snapshot).
     await db.owner.query('ALTER TABLE orders DISABLE TRIGGER trg_frozen_trip_schedule');
+    await db.owner.query('ALTER TABLE orders DISABLE TRIGGER trg_order_contract_immutable');
     try {
-      await db.owner.query('UPDATE orders SET trip_departure_time = NULL, trip_return_time = NULL, trip_timezone = NULL WHERE order_ref = $1', [ref]);
-    } finally { await db.owner.query('ALTER TABLE orders ENABLE TRIGGER trg_frozen_trip_schedule'); }
+      await db.owner.query(`UPDATE orders SET trip_departure_time = NULL, trip_return_time = NULL, trip_timezone = NULL,
+        contract_snapshot = NULL, contract_snapshot_sha256 = NULL WHERE order_ref = $1`, [ref]);
+    } finally {
+      await db.owner.query('ALTER TABLE orders ENABLE TRIGGER trg_frozen_trip_schedule');
+      await db.owner.query('ALTER TABLE orders ENABLE TRIGGER trg_order_contract_immutable');
+    }
     const shown = await zayavkaOf(db.pool, ref);
     assert.deepEqual(await pay(deps, ref, shown!.sha256), { kind: 'STATUS', code: 'TRIP_SCHEDULE_MISSING' });
     assert.equal(refref.attempts.size, 0);

@@ -85,6 +85,9 @@ jobs:
 
       - run: pnpm run typecheck
 
+      # test/editorial-contract.test.ts restores a pg_dump of the migrated schema with psql.
+      - run: pg_dump --version && psql --version
+
       - run: pnpm test
 
       - name: Image

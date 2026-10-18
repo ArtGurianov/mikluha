@@ -16,6 +16,7 @@ import { randomBytes } from 'node:crypto';
 import type pg from 'pg';
 
 import { bookable, type Catalog, type NotBookable } from './catalog.js';
+import { buildContractSnapshot, contractSnapshotHash } from './contract-snapshot.js';
 import type { Logger } from './log.js';
 import type { LegalReleaseAdmission } from './legal-admission.js';
 
@@ -215,16 +216,20 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
     const orderRef = newOrderRef();
     const reservedUntil = new Date(now.getTime() + RESERVATION_MINUTES * 60_000);
     const amount = departure.priceKopecks * seats;
+    // The buyer's contract, as resolved now: later edits of the departure never reach this order.
+    const contract = buildContractSnapshot(departure, deps.catalog.timezone);
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO orders (order_ref, departure_slug, trip_starts_on, trip_ends_on, seats, unit_price_kopecks,
                            amount_kopecks, status, reserved_until, legal_release_ref, legal_release_hash, legal_release_content,
                            pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at,
-                           adults_only_confirmed, created_at, trip_departure_time, trip_return_time, trip_timezone)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'RESERVED', $8, $9, $10, $11, $12, $13, $14, $15, true, $15, $16, $17, $18) RETURNING id`,
+                           adults_only_confirmed, created_at, trip_departure_time, trip_return_time, trip_timezone,
+                           contract_snapshot, contract_snapshot_sha256)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'RESERVED', $8, $9, $10, $11, $12, $13, $14, $15, true, $15, $16, $17, $18, $19, $20) RETURNING id`,
       [orderRef, departure.slug, departure.startsOn, departure.endsOn, seats, departure.priceKopecks, amount,
         reservedUntil, req.termsRef, req.termsHash, deps.catalog.terms.text, deps.catalog.pdConsent.ref,
         deps.catalog.pdConsent.hash, deps.catalog.pdConsent.text, now,
-        departure.contract.departure.departureTime, departure.contract.departure.returnTime, deps.catalog.timezone]);
+        departure.contract.departure.departureTime, departure.contract.departure.returnTime, deps.catalog.timezone,
+        contract, contractSnapshotHash(contract)]);
     const id = inserted.rows[0]!.id;
     // The customer is tourist №1: their name is that tourist's, by construction.
     await client.query('INSERT INTO order_contact (order_id, full_name, phone, email) VALUES ($1, $2, $3, $4)',
