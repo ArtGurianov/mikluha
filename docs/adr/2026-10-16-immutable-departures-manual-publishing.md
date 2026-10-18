@@ -1,6 +1,7 @@
 # ADR v2.2 — Immutable published departures and manual serialized site publication
 
 - **Status:** Accepted as architecture via [PR #29](https://github.com/ArtGurianov/mikluha/pull/29) (2026-10-16); **not implemented/deployed**. Runtime migrations, Admin changes, publication cutover and sales-opening gates remain separate owner-controlled work.
+- **Partially superseded by [ADR v2.3](./2026-10-18-ssr-flexible-offers-immutable-contracts.md)** (2026-10-18): §2, §5, §6, §7 items 1, 2, 8, 9, 10, 11, §8 and §9, plus the §4 rule that an ordinary close blocks payment initiation for an already issued quote. The text below is retained unedited as historical rationale.
 - **Date:** 2026-10-16
 - **Supersedes:** the `offers/offerRevision`, `departure_contract_version`, `SYSTEM_RELEASE_HOLD`, `DEPARTURE_ADMIN_PAUSE`, automated publish queue, full-descriptor promotion CAS, nightly scheduler and `SOLD_OUT` release machinery proposed in [ADR v2.1](./2026-10-16-control-room-hard-cut.md). The per-departure sales switch is the existing `bookingStatus` only. ADR v2.1 remains in Git with an explicit partial-supersession header, not a silently rewritten decision.
 - **Retains:** PostgreSQL single mutable authority, migrations from `0008+`, SSG/Nginx, independent Commerce/Refref and immutable orders/legal evidence, Admin API segregation + MFA/OWNER legal release approval, cloud.ru S3/privacy go-no-go, no default YAML import, noncustodial payments, no CRM or raw tourist PII in Admin, global CLI-only reopen and recovery gates.

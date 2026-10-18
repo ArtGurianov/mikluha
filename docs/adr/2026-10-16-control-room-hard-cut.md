@@ -1,6 +1,7 @@
 # ADR v2.1 — Mikluha Control Room: unified PostgreSQL authority and Sveltia hard cut
 
 - **Status:** Accepted historically via [PR #28](https://github.com/ArtGurianov/mikluha/pull/28); **partially superseded by [ADR v2.2](./2026-10-16-immutable-departures-manual-publishing.md)** (sections **§4–§6 and §11 items 3–5, 13–18**, plus the per-departure pause proposed in §6). The previous design below is retained unedited as historical rationale; the supersession takes effect only when ADR v2.2 is accepted, and neither ADR implies a completed runtime cutover.
+- **Further superseded by [ADR v2.3](./2026-10-18-ssr-flexible-offers-immutable-contracts.md)** (2026-10-18): the SSR rejection in §12, the sealed S3 content release and build-time media resolver (§4, §8) and "MFA with tested recovery" (§7, now TOTP with operator CLI reset).
 - **Version:** 2.1 (review revision)
 - **Date:** 2026-10-16
 - **Repository baseline:** ArtGurianov/mikluha main at b44bfea795784275b3ca9cf3b6ed5ab4253020b2
