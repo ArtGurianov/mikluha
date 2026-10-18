@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { buildSnapshot, canonical, itemName, MAX_ITEM_NAME, resolutionInputHash, snapshotDigest, zonedToUtc,
+import { buildSnapshot, canonical, itemName, MAX_ITEM_NAME, paymentPurposeForOrder, SHARED_CHECKOUT_SNAPSHOT_V2, resolutionInputHash, snapshotDigest, zonedToUtc,
   type Json, type OrderDeal, type ResolutionLine } from '../src/snapshot.js';
 
 const vectors = JSON.parse(readFileSync(new URL('./refref-rc2-vectors.json', import.meta.url), 'utf8')) as {
@@ -29,10 +29,26 @@ test("Refref's Mikluha snapshot case: the same digest and resolution input hash,
 const deal: OrderDeal = { orderRef: 'mk-abcdefghijkl', tourSlug: 'altai', tourTitle: 'Алтай', departureSlug: 'altai-2026-11-01',
   startsOn: '2026-11-01', endsOn: '2026-11-04', seats: 2, amountKopecks: 6_800_000, timezone: 'Asia/Krasnoyarsk' };
 
+test('new orders use Refref Snapshot V2 with a stable, non-PII Alfa payment purpose', () => {
+  assert.equal(paymentPurposeForOrder(deal.orderRef), 'Оплата туристского продукта по заявке mk-abcdefghijkl');
+  assert.throws(() => paymentPurposeForOrder('bad\nref'), /PAYMENT_PURPOSE_ORDER_REF_INVALID/);
+  assert.throws(() => paymentPurposeForOrder('x'.repeat(513)), /PAYMENT_PURPOSE_ORDER_REF_INVALID/);
+  const s = buildSnapshot(deal, { merchantId: '3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90',
+    referralResolutionId: '7a0e1c3b-5d2f-4e8a-b6c1-9f3d2e4a5b60', termsVersionId: null, discountKopecks: 0 },
+    { ref: 'oferta@2026-10-04', hash: `sha256:${'a'.repeat(64)}` });
+  assert.equal(s.schema, SHARED_CHECKOUT_SNAPSHOT_V2);
+  assert.equal(s.paymentPurpose, paymentPurposeForOrder(deal.orderRef));
+  assert.equal('inventoryReservationRef' in s, false);
+  assert.equal(snapshotDigest(s), snapshotDigest({ ...s }));
+  assert.notEqual(snapshotDigest(s), snapshotDigest({ ...s, paymentPurpose: 'Другой платёж' }));
+});
+
 test('the snapshot is exactly the qualified Alfa path: one PROVIDER line of quantity 1 equal to the payment', () => {
   const s = buildSnapshot(deal, { merchantId: '3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90',
     referralResolutionId: '7a0e1c3b-5d2f-4e8a-b6c1-9f3d2e4a5b60', termsVersionId: null, discountKopecks: 400_000 },
   { ref: 'oferta@2026-10-04', hash: `sha256:${'a'.repeat(64)}` });
+  assert.equal(s.schema, SHARED_CHECKOUT_SNAPSHOT_V2);
+  assert.equal(s.paymentPurpose, 'Оплата туристского продукта по заявке mk-abcdefghijkl');
   assert.equal(s.totalContractAmountKopecks, 6_400_000);
   assert.deepEqual(s.paymentObligations, [{
     obligationRef: 'full', kind: 'FULL', executionMode: 'ORCHESTRATED', fiscalizationMode: 'PROVIDER', amountKopecks: 6_400_000,
