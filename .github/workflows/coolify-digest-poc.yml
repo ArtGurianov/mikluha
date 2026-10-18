@@ -1,0 +1,147 @@
+name: coolify-digest-poc
+
+# ART-360 §1: can a Coolify 4.4.6 Docker Image application be released by registry digest? A synthetic
+# image (poc/coolify-digest) is built here, pushed to GHCR, set on ONE dedicated non-production
+# application by PATCH, deployed, and read back: Coolify's stored tag, the deployment's terminal
+# status, and /identity reporting the chosen commit. The running container's RepoDigests are the
+# second read-back, on the VPS: poc/coolify-digest/verify-running-digest.sh.
+#
+# Run A, then B, then restore A by passing A's digest and commit (no build). A digest Coolify does
+# not store or run exactly is NO-GO; nothing here may point at a real application.
+#
+# Environment `digest-poc` (main only): vars COOLIFY_POC_APP_UUID, POC_IDENTITY_URL; secrets
+# COOLIFY_BASE_URL, COOLIFY_POC_WRITE_TOKEN (read+write, PATCH and read-backs) and
+# COOLIFY_POC_DEPLOY_TOKEN (deploy only). Not the Mikluha site's COOLIFY_API_TOKEN.
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: 'Restore: an already pushed sha256:<64 hex>. Empty builds this ref.'
+        required: false
+        default: ''
+      commit:
+        description: 'Restore: the 40-hex commit that digest was built from.'
+        required: false
+        default: ''
+
+permissions: {}
+
+# Build, PATCH and deploy as one sequence: two releases never interleave.
+concurrency:
+  group: coolify-digest-poc
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/artgurianov/mikluha-digest-poc
+
+jobs:
+  build:
+    if: inputs.digest == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # One linux/amd64 manifest, no attestation index: the digest released is the image's own.
+      - id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: poc/coolify-digest
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          build-args: SOURCE_COMMIT=${{ github.sha }}
+
+  release:
+    needs: build
+    if: always() && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.digest != ''))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: digest-poc
+    permissions: {}
+    env:
+      COOLIFY_BASE_URL: ${{ secrets.COOLIFY_BASE_URL }}
+      WRITE_TOKEN: ${{ secrets.COOLIFY_POC_WRITE_TOKEN }}
+      DEPLOY_TOKEN: ${{ secrets.COOLIFY_POC_DEPLOY_TOKEN }}
+      APP_UUID: ${{ vars.COOLIFY_POC_APP_UUID }}
+      IDENTITY_URL: ${{ vars.POC_IDENTITY_URL }}
+      DIGEST: ${{ inputs.digest != '' && inputs.digest || needs.build.outputs.digest }}
+      COMMIT: ${{ inputs.digest != '' && inputs.commit || github.sha }}
+    steps:
+      - name: Inputs
+        run: |
+          set -euo pipefail
+          : "${COOLIFY_BASE_URL:?}" "${WRITE_TOKEN:?}" "${DEPLOY_TOKEN:?}" "${APP_UUID:?}" "${IDENTITY_URL:?}"
+          [[ "${COOLIFY_BASE_URL%/}" =~ ^https://[^/]+$ ]] || { echo "::error::COOLIFY_BASE_URL must be an https origin"; exit 1; }
+          [[ "$APP_UUID" =~ ^[a-z0-9]{24}$ ]] || { echo "::error::bad COOLIFY_POC_APP_UUID"; exit 1; }
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::digest must be sha256:<64 hex>, got '$DIGEST'"; exit 1; }
+          [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::commit must be 40 hex, got '$COMMIT'"; exit 1; }
+          echo "release $IMAGE@$DIGEST (commit $COMMIT) to $APP_UUID"
+
+      - name: The target is the PoC application, and only it
+        run: |
+          set -euo pipefail
+          app="$(curl -fsS "${COOLIFY_BASE_URL%/}/api/v1/applications/$APP_UUID" -H "Authorization: Bearer $WRITE_TOKEN")"
+          jq '{name, build_pack, docker_registry_image_name, docker_registry_image_tag, fqdn}' <<<"$app"
+          jq -e '.name == "mikluha-digest-poc" and .build_pack == "dockerimage"' <<<"$app" >/dev/null \
+            || { echo "::error::$APP_UUID is not the mikluha-digest-poc Docker Image application"; exit 1; }
+
+      - name: PATCH the digest, then read Coolify's stored value back
+        run: |
+          set -euo pipefail
+          tag="sha256-${DIGEST#sha256:}"
+          jq -n --arg name "$IMAGE" --arg tag "$tag" '{docker_registry_image_name: $name, docker_registry_image_tag: $tag}' \
+            | curl -fsS -X PATCH "${COOLIFY_BASE_URL%/}/api/v1/applications/$APP_UUID" \
+                -H "Authorization: Bearer $WRITE_TOKEN" -H 'Content-Type: application/json' --data-binary @- >/dev/null
+          stored="$(curl -fsS "${COOLIFY_BASE_URL%/}/api/v1/applications/$APP_UUID" -H "Authorization: Bearer $WRITE_TOKEN" \
+            | jq -r '.docker_registry_image_name + " " + .docker_registry_image_tag')"
+          echo "stored: $stored"
+          [ "$stored" = "$IMAGE $tag" ] || { echo "::error::Coolify stored '$stored', not '$IMAGE $tag'"; exit 1; }
+
+      - name: Deploy and follow to a terminal state
+        run: |
+          set -euo pipefail
+          dep="$(curl -fsS -X POST "${COOLIFY_BASE_URL%/}/api/v1/deploy?uuid=$APP_UUID&force=false" \
+            -H "Authorization: Bearer $DEPLOY_TOKEN" | jq -r '.deployments[0].deployment_uuid // empty')"
+          [ -n "$dep" ] || { echo "::error::Coolify queued no deployment"; exit 1; }
+          echo "deployment $dep"
+          echo "DEPLOYMENT=$dep" >>"$GITHUB_ENV"
+          for _ in $(seq 1 90); do
+            status="$(curl -fsS "${COOLIFY_BASE_URL%/}/api/v1/deployments/$dep" -H "Authorization: Bearer $WRITE_TOKEN" | jq -r '.status')"
+            case "$status" in
+              finished) echo "terminal: $status"; exit 0 ;;
+              failed|cancelled-by-user|error) echo "::error::deployment $dep ended $status"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::deployment $dep not terminal after 15 minutes (last: $status)"; exit 1
+
+      - name: /identity reports the chosen commit
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 18); do
+            got="$(curl -fsS --max-time 5 "$IDENTITY_URL" | jq -r '.commit' || true)"
+            [ "$got" = "$COMMIT" ] && { echo "identity: $got"; break; }
+            sleep 10
+          done
+          [ "$got" = "$COMMIT" ] || { echo "::error::/identity reports '$got', not $COMMIT"; exit 1; }
+          {
+            echo "### Coolify digest PoC"
+            echo "- image: \`$IMAGE@$DIGEST\`"
+            echo "- commit: \`$COMMIT\`, deployment \`$DEPLOYMENT\`: finished, /identity matches"
+            echo "- second read-back on the VPS:"
+            echo "  \`ssh adman-vps 'bash -s -- $APP_UUID $DIGEST' < poc/coolify-digest/verify-running-digest.sh\`"
+          } >>"$GITHUB_STEP_SUMMARY"
