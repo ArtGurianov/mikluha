@@ -13,7 +13,7 @@ import { schemaHead } from '../src/migrate.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { maintain, setSalesOpen } from '../src/orders.js';
 import { BookingRateLimiter } from '../src/rate-limit.js';
-import { RefrefClient, type CheckoutAttempt } from '../src/refref.js';
+import { RefrefClient, errorCode, type CheckoutAttempt } from '../src/refref.js';
 import { createCommerceServer } from '../src/server.js';
 import { createWebHandler } from '../src/web.js';
 import { FakeRefref } from './fake-refref.js';
@@ -330,7 +330,7 @@ describe('the Заявка: shown before paying, accepted by paying, frozen afte
     assert.equal(invalid.kind, 'ANSWERED');
     if (invalid.kind === 'ANSWERED') {
       assert.equal(invalid.status, 422);
-      assert.equal((invalid.body as { error?: { code: string } }).error?.code, 'PAYMENT_PURPOSE_REQUIRED');
+      assert.equal(errorCode(invalid.body), 'PAYMENT_PURPOSE_REQUIRED');
     }
   });
 
