@@ -8,6 +8,7 @@ import { after, before, beforeEach, describe, test } from 'node:test';
 import type { Catalog } from '../src/catalog.js';
 import { pay, reconcileAll, verdict, zayavkaOf, type CheckoutDeps } from '../src/checkout.js';
 import { contractHash } from '../src/zayavka.js';
+import { snapshotDigest, type Json } from '../src/snapshot.js';
 import { schemaHead } from '../src/migrate.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { maintain, setSalesOpen } from '../src/orders.js';
@@ -304,11 +305,33 @@ describe('the Заявка: shown before paying, accepted by paying, frozen afte
     }
     await payOrder(ref, cookie);
     const [create] = refref.calls(/\/checkout-attempts$/);
-    const snapshot = (create!.body as { snapshot: { legalReleaseRef: string; legalReleaseHash: string } }).snapshot;
+    const attemptBody = create!.body as { referralResolutionId: string; snapshot: Record<string, Json>;
+      snapshotHash: string; inventoryReservation?: unknown };
+    const snapshot = attemptBody.snapshot;
     const doc = (await db.owner.query('SELECT sha256 FROM order_document')).rows[0];
+    assert.equal(snapshot.schema, 'refref.shared-checkout-snapshot/2');
+    assert.equal(snapshot.paymentPurpose, `Оплата туристского продукта по заявке ${ref}`);
+    assert.equal('inventoryReservationRef' in snapshot, false);
+    assert.equal('inventoryReservation' in attemptBody, false);
+    assert.equal(snapshotDigest(snapshot), attemptBody.snapshotHash);
     assert.equal(snapshot.legalReleaseRef, catalog.terms.ref);
     assert.equal(snapshot.legalReleaseHash, contractHash(catalog.terms.ref, catalog.terms.hash, doc.sha256));
     assert.doesNotMatch(JSON.stringify(snapshot), /soglasie-pd|pdConsent/i);
+
+    // Regression for Refref migration 000024: this NEW attempt must reject V1 even with a valid hash.
+    // Historical V1 fixture vectors are retained for canonicalisation/read-back, never used to sell.
+    const oldV1 = { ...snapshot, schema: 'refref.shared-checkout-snapshot/1' };
+    delete oldV1.paymentPurpose;
+    const invalid = await deps.refref.createAttempt('mk-legacy-attempt', {
+      referralResolutionId: attemptBody.referralResolutionId,
+      snapshot: oldV1,
+      snapshotHash: snapshotDigest(oldV1),
+    }, 'mk-legacy-attempt');
+    assert.equal(invalid.kind, 'ANSWERED');
+    if (invalid.kind === 'ANSWERED') {
+      assert.equal(invalid.status, 422);
+      assert.equal((invalid.body as { error?: { code: string } }).error?.code, 'PAYMENT_PURPOSE_REQUIRED');
+    }
   });
 
   test('a Заявка other than the one stored is refused, and nothing is sent', async () => {
