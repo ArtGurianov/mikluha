@@ -9,7 +9,7 @@
 
 ## 1. Публичный сайт — pure SSG, CMS нет в runtime пользователя
 
-> **Планируемое изменение (ещё не внедрено):** [ADR v2.1 — Control Room hard cut](adr/2026-10-16-control-room-hard-cut.md), merged PR #28, заменяет Sveltia собственной статической Admin и изолированным Admin API после приёмки hard cut. Сам публичный сайт **остаётся pure SSG/Nginx**, а booking Commerce — отдельным backend. Описанный ниже Sveltia-контур пока является текущим, не удалённым состоянием.
+> **Планируемое изменение (ещё не внедрено):** [ADR v2.1 — Control Room hard cut](adr/2026-10-16-control-room-hard-cut.md), merged PR #28, заменяет Sveltia собственной статической Admin и изолированным Admin API после приёмки hard cut. Booking Commerce остаётся отдельным backend. **Последующее решение:** [ADR v2.3](adr/2026-10-18-ssr-flexible-offers-immutable-contracts.md) переводит публичный сайт на **Next.js SSR** (`next start`, `no-store`, чтение публичной проекции Commerce при запросе) вместо static export; HTML не кешируется CDN. Описанный ниже Sveltia/SSG-контур пока является текущим, не удалённым состоянием.
 
 `output: "export"` + Nginx, отдающий статику. Никакого Node.js в runtime
 публичного сайта.
@@ -85,6 +85,8 @@ fail-closed правилами `mikluha-commerce`. Явный маркер «Д�
 
 ## 5. Сайт не собирает пользовательские данные
 
+> **Планируемое уточнение (ещё не внедрено):** при SSR по [ADR v2.3](adr/2026-10-18-ssr-flexible-offers-immutable-contracts.md) решение сохраняется: сайт не ставит cookies, ничего не рендерит под конкретного посетителя и обращается к Commerce на сервере только за публичными данными.
+
 Статический сайт по-прежнему не собирает ничего. Данные, без которых нельзя
 продать поездку (заказ, туристы, контакт для чека), принимает и хранит только
 `mikluha-commerce` (#9). Кнопка бронирования на сайте — обычная ссылка на этот
@@ -125,7 +127,7 @@ UI-компоненты никогда не видят сырой YAML из `con
 
 ## 7. Rebuild при публикации + по расписанию только в дни, когда выезд уходит в прошлое
 
-> **Планируемое изменение (ещё не внедрено):** [ADR v2.1 — Control Room hard cut](adr/2026-10-16-control-room-hard-cut.md), merged PR #28, переносит сборку статической витрины на запечатанные релизы из PostgreSQL / публичного S3 JSON. **Важное последующее решение:** [ADR v2.2 — immutable departures / manual publishing](adr/2026-10-16-immutable-departures-manual-publishing.md) (Proposed) заменяет очередь, scheduled refresh, offerRevision и авто-CAS одним ручным сериализованным job. Первая публикация выезда замораживает цену и полный разрешённый контракт; последующие правки тура не меняют старые выезды. До внедрения действует прежний Sveltia-процесс. Ниже описано текущее GitHub/Sveltia workflow до hard cut.
+> **Планируемое изменение (ещё не внедрено):** [ADR v2.1 — Control Room hard cut](adr/2026-10-16-control-room-hard-cut.md), merged PR #28, переносит сборку статической витрины на запечатанные релизы из PostgreSQL / публичного S3 JSON. **Последующие решения:** [ADR v2.3](adr/2026-10-18-ssr-flexible-offers-immutable-contracts.md) отменяет пересборки и publishing job целиком: SSR читает опубликованную редакцию из PostgreSQL через Commerce, публикация — одна транзакция с проверкой версии; цена и программа выезда редактируемы, неизменяем снимок условий в заказе. Исторически [ADR v2.2 — immutable departures / manual publishing](adr/2026-10-16-immutable-departures-manual-publishing.md) заменял очередь, scheduled refresh, offerRevision и авто-CAS одним ручным сериализованным job. Заморозка цены и контракта при первой публикации из v2.2 отменена v2.3; правки шаблона тура по-прежнему не меняют уже созданные выезды. До внедрения действует прежний Sveltia-процесс. Ниже описано текущее GitHub/Sveltia workflow до hard cut.
 
 Сайт пересобирается по публикации контента (push в `main`, «Опубликовать изменения» в `/admin`)
 и дополнительно — по расписанию `.github/workflows/publish.yml`, сразу после полуночи по
