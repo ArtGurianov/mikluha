@@ -416,19 +416,48 @@ test('schema restore: a logical dump restored into an empty database enforces th
   }
 });
 
-test('reservation commit prevents a waiting schedule update', async () => {
-   const d = await newDeparture();
-   const b = new pg.Client({connectionString: db.url.toString()});
-   await b.connect();
-   try {
-     await db.owner.query('BEGIN');
-     await db.owner.query("SELECT pg_advisory_xact_lock(hashtextextended('departure:' || $1, 0))", [d.slug]);
-     await insertOrder(d);
-     const update = b.query("UPDATE departure SET starts_on=starts_on+7, ends_on=ends_on+7 WHERE id=$1", [d.id])
-       .then(() => 'UPDATED').catch(e => e.message);
-     await new Promise(r=>setTimeout(r,300));
-     await db.owner.query('COMMIT');
-     const result = await update;
-     assert.match(result, /DEPARTURE_SCHEDULE_LOCKED/);
-   } finally { await db.owner.query('ROLLBACK'); await b.end(); }
- });
+test('reserve() holds the schedule lock until its real order commits', async () => {
+  const d = await newDeparture();
+  const c = fixtureCatalog([{ slug: d.slug, startsOn: '2027-06-01', endsOn: '2027-06-04', price: 34000 }]);
+  await setSalesOpen(db.operator, true, 'test', 'concurrent reservation');
+  const editor = new pg.Client({ connectionString: db.url.toString() });
+  await editor.connect();
+  const editorPid = (await editor.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+  const gate = uniq('reserve-gate');
+  // Pause the actual reserve() inside its INSERT, after it acquired the departure lock.
+  await db.owner.query(`CREATE FUNCTION fn_test_pause_reservation() RETURNS trigger LANGUAGE plpgsql AS $f$
+    BEGIN PERFORM pg_advisory_xact_lock(hashtextextended('${gate}',0)); RETURN NEW; END $f$`);
+  await db.owner.query(`CREATE TRIGGER zz_test_pause_reservation BEFORE INSERT ON orders
+    FOR EACH ROW WHEN (NEW.departure_slug = '${d.slug}') EXECUTE FUNCTION fn_test_pause_reservation()`);
+  await db.owner.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [gate]);
+  const waitFor = async (sql: string, args: unknown[]) => {
+    for (let n = 0; n < 100; n++) {
+      if ((await db.owner.query(sql, args)).rows[0].ready) return;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.fail('expected a real blocked database operation');
+  };
+  let booking: ReturnType<typeof reserve> | undefined;
+  let update: Promise<string> | undefined;
+  try {
+    const request: BookingRequest = { departureSlug: d.slug, contact: { phone: '+79039075547', email: 'ivan@example.ru' },
+      passengers: [tourist(1)], adultsOnlyConfirmed: true, termsRef: c.terms.ref, termsHash: c.terms.hash,
+      pdConsentConfirmed: true, pdConsentRef: c.pdConsent.ref, pdConsentHash: c.pdConsent.hash };
+    booking = reserve({ pool: db.pool, catalog: c, log: () => undefined, allowDemo: false, now: () => new Date() }, request);
+    await waitFor(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=$1
+      AND usename='commerce_test_runtime' AND wait_event='advisory') AS ready`, [db.name]);
+    update = editor.query('UPDATE departure SET starts_on=starts_on+7, ends_on=ends_on+7 WHERE id=$1', [d.id])
+      .then(() => 'UPDATED', (error: Error) => error.message);
+    await waitFor('SELECT cardinality(pg_blocking_pids($1)) > 0 AS ready', [editorPid]);
+    await db.owner.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [gate]);
+    assert.equal((await booking).ok, true);
+    assert.match(await update, /DEPARTURE_SCHEDULE_LOCKED/);
+  } finally {
+    await db.owner.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [gate]);
+    await booking?.catch(() => undefined);
+    await update;
+    await editor.end();
+    await db.owner.query('DROP TRIGGER zz_test_pause_reservation ON orders');
+    await db.owner.query('DROP FUNCTION fn_test_pause_reservation()');
+  }
+});
