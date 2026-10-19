@@ -13,7 +13,7 @@ const now = new Date('2026-10-04T06:00:00Z');
 before(async () => { db = await freshDb(); });
 after(async () => { await db.drop(); });
 beforeEach(async () => {
-  await db.owner.query('TRUNCATE order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
   await db.owner.query(`UPDATE sales_switch SET open = true`);
 });
 
@@ -60,6 +60,23 @@ test('Notisend acceptance requires a readable message id and a queued status; pa
   assert.match(body.html, /\/documents\/a{43}/);
   assert.ok(!/unsubscribe|list-unsubscribe/i.test(requestBody));
   for (const forbidden of ['Петров', '3210', '654321', '1990-05-17']) assert.ok(!requestBody.includes(forbidden));
+});
+
+test('an execution-change notice carries OWNER\'s text escaped, its own key and no document bearer', async () => {
+  let requestInit: RequestInit | undefined;
+  const client = new NotisendClient(config, async (_url, init) => {
+    requestInit = init;
+    return new Response(JSON.stringify({ id: 'job-1', status: 'queued' }), { status: 200 });
+  });
+  const result = await client.sendExecutionNotice({ recipient: 'ivan@example.ru', orderRef: 'mk-000000000001',
+    notice: 'Теплоход заменён <b>катером</b>\nтого же класса', noticeKey: 'mk-change:c:mk-000000000001' });
+  assert.deepEqual(result, { kind: 'ACCEPTED', jobId: 'job-1' });
+  const body = JSON.parse(String(requestInit?.body));
+  assert.equal(body.subject, 'Изменение в поездке по заказу mk-000000000001');
+  assert.deepEqual(body.smtp_headers, { [OUTBOX_KEY_HEADER]: 'mk-change:c:mk-000000000001' });
+  assert.match(body.text, /Теплоход заменён <b>катером<\/b>\nтого же класса/);
+  assert.match(body.html, /<p>Теплоход заменён &lt;b&gt;катером&lt;\/b&gt;<\/p><p>того же класса<\/p>/);
+  assert.ok(!/documents|unsubscribe/i.test(String(requestInit?.body)));
 });
 
 test('a redirect after the original POST cannot become NOT_SENT or leak the document bearer', async () => {

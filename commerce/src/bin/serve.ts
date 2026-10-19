@@ -17,6 +17,7 @@ import { assertProductionContent, loadCatalog } from '../catalog.js';
 import { reconcileAll, type CheckoutDeps } from '../checkout.js';
 import { env, environment, MIGRATIONS_DIR, productionAddress } from '../config.js';
 import { NotisendClient, processEmailOutbox } from '../email.js';
+import { processExecutionNotices } from '../execution-notice.js';
 import { LiveSiteReleaseAdmission } from '../legal-admission.js';
 import { jsonLogger } from '../log.js';
 import { schemaHead } from '../migrate.js';
@@ -77,6 +78,7 @@ const emailTick = () => {
   if (emailRunning) return;
   emailRunning = true;
   processEmailOutbox(pool, email, log)
+    .then(() => processExecutionNotices(pool, email, log))
     .catch((e: unknown) => log('email_worker_failed', { error: e instanceof Error ? e.name : 'unknown' }))
     .finally(() => { emailRunning = false; });
 };
