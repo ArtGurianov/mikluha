@@ -30,7 +30,7 @@ export interface TestDb {
   readonly admin: pg.Pool;
   readonly url: URL;
   readonly name: string;
-  drop(): Promise<void>;
+  drop(timeoutMs?: number): Promise<void>;
 }
 
 export async function freshDb(): Promise<TestDb> {
@@ -63,19 +63,31 @@ export async function freshDb(): Promise<TestDb> {
   const pool = as(RUNTIME_ROLE, 12);
   const operator = as(OPERATOR_ROLE, 2);
   const adminPool = as(ADMIN_ROLE, 4);
+  let teardown: Promise<void> | undefined;
   return {
     owner, pool, operator, admin: adminPool, url, name,
-    async drop() {
-      await pool.end();
-      await operator.end();
-      await adminPool.end();
-      // pg-pool removes clients from its list before their socket-end callbacks finish.
-      // Wait for those real close events before DROP, instead of FORCE-killing idle clients
-      // and emitting asynchronous FATAL errors into a test that has already ended.
-      await Promise.all(clientClosures);
-      await owner.end();
-      try { await admin.query(`DROP DATABASE ${name}`); }
-      finally { await admin.end(); }
+    async drop(timeoutMs = 10_000) {
+      // Reuse cleanup after a bounded diagnostic failure, so a test can release its leaked
+      // client and await the same operation instead of ending a pool twice.
+      teardown ??= (async () => {
+        try {
+          await Promise.all([pool.end(), operator.end(), adminPool.end()]);
+          // pg-pool removes clients before their socket-end callbacks finish.
+          await Promise.all(clientClosures);
+          await owner.end();
+          await admin.query(`DROP DATABASE ${name}`);
+        } finally { await admin.end(); }
+      })();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([teardown, new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            const counts = [["runtime", pool], ["operator", operator], ["admin", adminPool]] as const;
+            const detail = counts.map(([label, p]) => `${label}: checkedOut=${p.totalCount - p.idleCount}, waiting=${p.waitingCount}`).join("; ");
+            reject(new Error(`TEST_DATABASE_TEARDOWN_TIMEOUT ${name} after ${timeoutMs}ms (${detail}); release checked-out clients and await drop() again`));
+          }, timeoutMs);
+        })]);
+      } finally { if (timer) clearTimeout(timer); }
     },
   };
 }
