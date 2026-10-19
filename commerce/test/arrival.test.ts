@@ -147,7 +147,7 @@ beforeEach(async () => {
   vnext.reset();
   refref.reset();
   logs.lines.length = 0;
-  await db.owner.query('TRUNCATE order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await db.owner.query('TRUNCATE order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders CASCADE');
   await setSalesOpen(db.operator, true, 'test', 'open');
 });
 

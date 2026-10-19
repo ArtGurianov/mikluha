@@ -82,3 +82,13 @@ Follow-up local validation: commerce 163/163, root lint, commerce typecheck and 
 checks PASS on Node 22.18.0 and disposable PostgreSQL 16. The same 20,000-proof integration
 scenario was also run on an archived `e020747` source snapshot, independently confirming the
 repeated-scan cost. Complexity assertions use comparison counts rather than timing thresholds.
+
+CI integration follow-up: main advanced to `1293569` while this change was being checked. Its
+new execution_change_notice FK to orders makes the arrival test's old TRUNCATE list fail before
+all 14 HTTP tests. The new heap regressions passed. Add CASCADE only to the disposable arrival
+fixture reset, so both the branch schema and main's new referencing table are cleaned. No runtime
+or schema change is needed; validate the same synthetic merge that GitHub checks.
+
+The archived GitHub synthetic merge `e5d4f0759062cbde3d2f6e7334ce2691a0f0b749` plus that
+one-line fixture correction passes commerce 190/190 and typecheck locally. The branch is not
+rebased or merged with main; GitHub rechecks their combination on the final pushed head.
