@@ -116,7 +116,9 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 byte for byte at a reviewed commit (`refref/scripts/fixtures/mikluha`). Its
 `contract:mikluha-consumer-served` suite runs them against Refref's served runtime on Альфа PROVIDER,
 with the merchant provisioned as above. A change to these files reaches Refref only when Refref moves
-that pin, so a contract break shows up in Refref's CI before production. The suite uses a modelled
+that pin. This detects a break only after the pin is advanced; it does not monitor Mikluha HEAD.
+Before releasing a changed consumer, update Refref’s pin to the exact release candidate commit and
+require that candidate’s served conformance result. An older green pin does not qualify a new release. The suite uses a modelled
 gateway and is not live acceptance.
 
 ## Database roles
