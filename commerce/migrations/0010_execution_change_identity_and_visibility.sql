@@ -189,4 +189,3 @@ CREATE OR REPLACE VIEW public_report WITH (security_barrier) AS
    WHERE c.kind = 'report' AND c.published_at IS NOT NULL AND c.is_listed
      AND t.published_at IS NOT NULL AND t.is_listed
      AND (c.departure_id IS NULL OR EXISTS (SELECT 1 FROM public_departure p WHERE p.slug = d.slug));
-
