@@ -22,6 +22,7 @@
 
 import { randomBytes } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
+import { performance } from 'node:perf_hooks';
 
 import type { Logger } from './log.js';
 import type { ArrivalClaimReceipt, RefrefResult } from './refref.js';
@@ -39,6 +40,59 @@ export const ATTEMPT_CEILING_MS = 500;
 export const BUY_BUDGET_MS = 1_500;
 /** Same-context requests closer together than this share one attempt. */
 export const RETRY_INTERVAL_MS = 2_000;
+/** Per-process admission limits, shared by after-response attempts and Buy. */
+export const MAX_ACTIVE_CLAIMS = 16;
+export const MAX_QUEUED_CLAIMS = 64;
+
+type ClaimResult = RefrefResult<ArrivalClaimReceipt>;
+interface QueuedClaim {
+  start(): void;
+  expire(): void;
+}
+
+/** Bounded FIFO: queue time consumes the attempt deadline; overload keeps proof pending. */
+class ClaimQueue {
+  #active = 0;
+  readonly #waiting: QueuedClaim[] = [];
+
+  run(deadline: number, task: (left: number) => Promise<ClaimResult>): Promise<ClaimResult> {
+    if (this.#active >= MAX_ACTIVE_CLAIMS && this.#waiting.length >= MAX_QUEUED_CLAIMS) {
+      return Promise.resolve({ kind: 'UNKNOWN', cause: 'OVERLOADED' });
+    }
+    return new Promise((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const entry: QueuedClaim = {
+        expire: () => {
+          const i = this.#waiting.indexOf(entry);
+          if (i !== -1) this.#waiting.splice(i, 1);
+          resolve({ kind: 'UNKNOWN', cause: 'QUEUE_TIMEOUT' });
+        },
+        start: () => {
+          if (timer !== undefined) clearTimeout(timer);
+          const left = deadline - performance.now();
+          if (left <= 0) { entry.expire(); return; }
+          this.#active++;
+          // Keep the slot until the actual transport settles, including on exceptions.
+          Promise.resolve().then(() => task(left))
+            .catch((): ClaimResult => ({ kind: 'UNKNOWN', cause: 'TRANSPORT' }))
+            .then(resolve).finally(() => {
+              this.#active--;
+              this.#drain();
+            });
+        },
+      };
+      if (this.#active < MAX_ACTIVE_CLAIMS) entry.start();
+      else {
+        this.#waiting.push(entry);
+        timer = setTimeout(entry.expire, Math.max(0, deadline - performance.now()));
+      }
+    });
+  }
+
+  #drain(): void {
+    while (this.#active < MAX_ACTIVE_CLAIMS && this.#waiting.length > 0) this.#waiting.shift()!.start();
+  }
+}
 
 /** Ours: 32 bytes, base64url. Refref accepts 32–128 of these characters; we accept only our own shape. */
 const CONTEXT_ID = /^[A-Za-z0-9_-]{43}$/;
@@ -114,6 +168,7 @@ interface Proof {
   raw: string | null;
   readonly expiresAt: number;
   state: ProofState;
+  confirmedAt: number | null;
   /** A proof never tried yet is never throttled: each arrival gets its own after-response attempt. */
   tried: boolean;
 }
@@ -121,6 +176,7 @@ interface Proof {
 interface Context {
   readonly proofs: Proof[];
   inFlight: Promise<void> | null;
+  scheduled: boolean;
   lastAttemptAt: number;
   /** Refref refused the context as CLOSED, expired or another scope: it is never presented again. */
   closed: boolean;
@@ -133,6 +189,7 @@ interface Context {
 const DEFINITIVE = new Set(['ARRIVAL_ALREADY_CLAIMED', 'ARRIVAL_PROOF_INVALID']);
 /** Codes about the context, not the proof: the context rotates and the proof follows the browser. */
 const CONTEXT_REFUSED = new Set(['CONTEXT_CLOSED', 'CONTEXT_SCOPE_MISMATCH']);
+const CONFIGURATION_REFUSED = new Set(['BROWSER_CONTEXT_IDLE_POLICY_REQUIRED']);
 
 export interface ArrivalDeps {
   readonly refref: ArrivalClaimer | null;
@@ -150,6 +207,9 @@ export interface ArrivalDeps {
 export class Arrivals {
   readonly #contexts = new Map<string, Context>();
   readonly #deps: ArrivalDeps;
+  readonly #claims = new ClaimQueue();
+  readonly #retained = new Set<Proof>();
+  #expiryTimer: ReturnType<typeof setTimeout> | null = null;
   readonly after: AfterResponse;
 
   constructor(deps: ArrivalDeps) {
@@ -162,9 +222,13 @@ export class Arrivals {
   #entry(id: string, create: boolean): Context | undefined {
     let c = this.#contexts.get(id);
     if (c === undefined && create) {
-      c = { proofs: [], inFlight: null, lastAttemptAt: -Infinity, closed: false, successor: null, touchedAt: this.#now() };
+      c = { proofs: [], inFlight: null, scheduled: false, lastAttemptAt: -Infinity, closed: false, successor: null, touchedAt: this.#now() };
       this.#contexts.set(id, c);
-      if (this.#contexts.size > MAX_CONTEXTS) this.#contexts.delete(this.#contexts.keys().next().value!);
+      if (this.#contexts.size > MAX_CONTEXTS) {
+        const oldest = this.#contexts.keys().next().value!;
+        for (const p of this.#contexts.get(oldest)!.proofs) this.#settle(p, 'EXPIRED');
+        this.#contexts.delete(oldest);
+      }
     }
     return c;
   }
@@ -198,11 +262,14 @@ export class Arrivals {
     const c = this.#entry(contextId, true)!;
     c.touchedAt = this.#now();
     if (c.proofs.some((p) => p.raw === proof)) return true;
-    c.proofs.push({ raw: proof, expiresAt: this.#now() + CLAIM_TTL_MS, state: 'PENDING', tried: false });
+    const p: Proof = { raw: proof, expiresAt: this.#now() + CLAIM_TTL_MS, state: 'PENDING', confirmedAt: null, tried: false };
+    c.proofs.push(p);
+    this.#retained.add(p);
+    this.#scheduleExpiry();
     // Settled records go first; a context never holds more than a handful of arrivals.
     while (c.proofs.length > MAX_PROOFS_PER_CONTEXT) {
       const i = c.proofs.findIndex((p) => p.state !== 'PENDING');
-      c.proofs.splice(i === -1 ? 0 : i, 1);
+      for (const removed of c.proofs.splice(i === -1 ? 0 : i, 1)) this.#settle(removed, 'EXPIRED');
     }
     this.#deps.log('arrival_captured', {});
     return true;
@@ -216,8 +283,13 @@ export class Arrivals {
 
   /** After this response, try the context's pending claims (single-flight, throttled). */
   afterResponse(res: ServerResponse, contextId: string): void {
-    if (!this.hasPending(contextId)) return;
-    this.after.schedule(res, () => this.attempt(contextId, ATTEMPT_CEILING_MS, false));
+    const c = this.#contexts.get(contextId);
+    if (c === undefined || c.scheduled || c.inFlight !== null || !this.hasPending(contextId)) return;
+    c.scheduled = true;
+    this.after.schedule(res, () => {
+      c.scheduled = false;
+      return this.attempt(contextId, ATTEMPT_CEILING_MS, false);
+    });
   }
 
   /**
@@ -229,20 +301,23 @@ export class Arrivals {
     const c = this.#contexts.get(contextId);
     if (c === undefined) return Promise.resolve();
     const fresh = () => c.proofs.some((p) => p.state === 'PENDING' && !p.tried);
-    if (c.inFlight !== null) {
-      return fresh() ? c.inFlight.then(() => this.attempt(contextId, ceilingMs, force)) : c.inFlight;
-    }
+    if (c.inFlight !== null) return c.inFlight;
     const now = this.#now();
     this.#expire(c, now);
     if (c.closed || !c.proofs.some((p) => p.state === 'PENDING')) return Promise.resolve();
     if (!force && !fresh() && now - c.lastAttemptAt < RETRY_INTERVAL_MS) return Promise.resolve();
     c.lastAttemptAt = now;
-    const p = this.#claimAll(contextId, c, ceilingMs).finally(() => { c.inFlight = null; });
+    const deadline = performance.now() + Math.min(ATTEMPT_CEILING_MS, Math.max(0, ceilingMs));
+    const p = this.#claimAll(contextId, c, deadline).finally(() => {
+      c.inFlight = null;
+      // A new arrival during this attempt gets one coalesced, tracked follow-up, not a chain per request.
+      if (!c.closed && fresh()) void this.after.run(() => this.attempt(contextId, ATTEMPT_CEILING_MS, false));
+    });
     c.inFlight = p;
     return p;
   }
 
-  async #claimAll(contextId: string, c: Context, ceilingMs: number): Promise<void> {
+  async #claimAll(contextId: string, c: Context, deadline: number): Promise<void> {
     const refref = this.#deps.refref;
     const log = this.#deps.log;
     if (refref === null) {
@@ -254,11 +329,17 @@ export class Arrivals {
     const pending = c.proofs.filter((p) => p.state === 'PENDING' && p.raw !== null);
     for (const p of pending) p.tried = true;
     await Promise.all(pending.map(async (p) => {
-      const r = await refref.claimArrival({ arrivalProof: p.raw!, browserContextId: contextId,
-        storefrontOrigin: this.#deps.storefrontOrigin }, ceilingMs);
+      const r = await this.#claims.run(deadline, (left) => {
+        this.#expire(c, this.#now());
+        if (p.raw === null || p.state !== 'PENDING' || c.closed) {
+          return Promise.resolve({ kind: 'UNKNOWN', cause: 'NO_LONGER_PENDING' });
+        }
+        return refref.claimArrival({ arrivalProof: p.raw, browserContextId: contextId,
+          storefrontOrigin: this.#deps.storefrontOrigin }, Math.min(left, p.expiresAt - this.#now()));
+      });
       if (p.state !== 'PENDING') return;
       if (r.kind === 'ANSWERED' && (r.status === 200 || r.status === 201)) {
-        p.state = 'CONFIRMED'; p.raw = null;
+        this.#settle(p, 'CONFIRMED');
         log('arrival_claim_confirmed', { replay: r.status === 200 });
         return;
       }
@@ -268,24 +349,64 @@ export class Arrivals {
         return;
       }
       const code = errorCode(r.body);
-      if (r.status === 400 || DEFINITIVE.has(code)) {
-        p.state = 'FAILED'; p.raw = null;
+      if (r.status === 401 || r.status === 403 || CONFIGURATION_REFUSED.has(code)) {
+        this.#settle(p, 'FAILED');
+        log('arrival_claim_configuration_failed', { status: r.status, code });
+      } else if (r.status === 400 || DEFINITIVE.has(code)) {
+        this.#settle(p, 'FAILED');
         log('arrival_claim_failed', { code });
       } else if (CONTEXT_REFUSED.has(code)) {
         c.closed = true;
         log('arrival_claim_context_refused', { code });
       } else {
-        // An integration problem (key, scope, idle policy, rate limit): the proof may still be claimed.
+        // An unclassified response is uncertain: preserve proof for exact replay/readback.
         log('arrival_claim_unknown', { cause: code });
       }
     }));
     this.#expire(c, this.#now());
   }
 
+  #settle(p: Proof, state: ProofState): void {
+    p.state = state;
+    if (state === 'CONFIRMED') p.confirmedAt = performance.now();
+    p.raw = null;
+    this.#retained.delete(p);
+    if (this.#retained.size === 0 && this.#expiryTimer !== null) {
+      clearTimeout(this.#expiryTimer);
+      this.#expiryTimer = null;
+    }
+  }
+
+  /** One unref'ed timer for the next expiry, independent of HTTP requests or claims. */
+  #scheduleExpiry(): void {
+    if (this.#expiryTimer !== null || this.#retained.size === 0) return;
+    let earliest = Infinity;
+    for (const p of this.#retained) earliest = Math.min(earliest, p.expiresAt);
+    this.#expiryTimer = setTimeout(() => {
+      this.#expiryTimer = null;
+      const now = this.#now();
+      for (const p of this.#retained) {
+        if (now >= p.expiresAt) {
+          this.#settle(p, 'EXPIRED');
+          this.#deps.log('arrival_claim_expired', {});
+        }
+      }
+      this.#scheduleExpiry();
+    }, Math.max(0, earliest - this.#now()));
+    this.#expiryTimer.unref();
+  }
+
+  /** Credential-free retention diagnostic. Reading it does not expire or mutate anything. */
+  get retainedRawProofs(): number {
+    let count = 0;
+    for (const c of this.#contexts.values()) for (const p of c.proofs) if (p.raw !== null) count++;
+    return count;
+  }
+
   #expire(c: Context, now: number): void {
     for (const p of c.proofs) {
       if (p.state === 'PENDING' && now >= p.expiresAt) {
-        p.state = 'EXPIRED'; p.raw = null;
+        this.#settle(p, 'EXPIRED');
         this.#deps.log('arrival_claim_expired', {});
       }
     }
@@ -297,26 +418,34 @@ export class Arrivals {
    * is TIMEOUT even if it may have committed. Late success never clears a value already frozen.
    */
   async beforeBuy(contextId: string, budgetMs = BUY_BUDGET_MS): Promise<DeliveryDegraded> {
-    const started = Date.now();
+    const deadline = performance.now() + Math.min(BUY_BUDGET_MS, Math.max(0, budgetMs));
     for (;;) {
       const c = this.#contexts.get(contextId);
       if (c === undefined || c.closed || !c.proofs.some((p) => p.state === 'PENDING')) break;
-      const left = budgetMs - (Date.now() - started);
+      const left = deadline - performance.now();
       if (left <= 0) break;
-      await this.attempt(contextId, Math.min(ATTEMPT_CEILING_MS, left), true);
+      // This includes waiting on an existing attempt, queue admission and any newer arrival.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        this.attempt(contextId, Math.min(ATTEMPT_CEILING_MS, left), true),
+        new Promise<void>((resolve) => { timer = setTimeout(resolve, left); }),
+      ]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
       if (this.#deps.refref === null) break;
       // An attempt that ended early with an uncertain outcome is retried after a short pause.
-      if (this.hasPending(contextId)) await new Promise((r) => setTimeout(r, Math.min(50, Math.max(0, budgetMs - (Date.now() - started)))));
+      if (this.hasPending(contextId)) await new Promise((r) => setTimeout(r, Math.min(50, Math.max(0, deadline - performance.now()))));
     }
-    return this.degradation(contextId);
+    return this.degradation(contextId, deadline);
   }
 
   /** What is known now about undelivered proof of this context. */
-  degradation(contextId: string): DeliveryDegraded {
+  degradation(contextId: string, confirmedBy = Infinity): DeliveryDegraded {
     const c = this.#contexts.get(contextId);
     if (c === undefined) return { degraded: false };
     this.#expire(c, this.#now());
-    if (c.proofs.some((p) => p.state === 'PENDING')) return { degraded: true, reason: 'TIMEOUT' };
+    // A late ACK can run before an overdue deadline timer when the event loop was busy.
+    if (c.proofs.some((p) => p.state === 'PENDING' || (p.confirmedAt !== null && p.confirmedAt > confirmedBy))) {
+      return { degraded: true, reason: 'TIMEOUT' };
+    }
     if (c.proofs.some((p) => p.state === 'FAILED')) return { degraded: true, reason: 'FAILED' };
     if (c.proofs.some((p) => p.state === 'EXPIRED')) return { degraded: true, reason: 'EXPIRED' };
     return { degraded: false };

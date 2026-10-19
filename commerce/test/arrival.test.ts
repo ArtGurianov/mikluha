@@ -6,7 +6,7 @@ import type { AddressInfo } from 'node:net';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
 import {
-  ATTEMPT_CEILING_MS, arrivalTarget, Arrivals, BUY_BUDGET_MS, CONTEXT_COOKIE, CONTEXT_MAX_AGE_SECONDS, RETRY_INTERVAL_MS,
+  ATTEMPT_CEILING_MS, arrivalTarget, Arrivals, BUY_BUDGET_MS, CONTEXT_COOKIE, CONTEXT_MAX_AGE_SECONDS, MAX_ACTIVE_CLAIMS, RETRY_INTERVAL_MS,
 } from '../src/arrival.js';
 import type { Catalog } from '../src/catalog.js';
 import type { CheckoutDeps } from '../src/checkout.js';
@@ -39,6 +39,8 @@ class FakeVnext {
   next: Behaviour[] = [];
   now = () => Date.now();
   base = '';
+  active = 0;
+  peak = 0;
   #server: Server | null = null;
   #hung: (() => void)[] = [];
 
@@ -51,6 +53,8 @@ class FakeVnext {
         const body = JSON.parse(text) as { arrivalProof: string; browserContextId: string; storefrontOrigin: string };
         this.requests.push({ path: req.url ?? '', key: req.headers['idempotency-key'] as string | undefined, body });
         const send = (status: number, b: unknown) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); };
+        this.active++; this.peak = Math.max(this.peak, this.active);
+        res.once('close', () => { this.active--; });
         const b = this.next.shift() ?? 'OK';
         if (b === 'HANG') { this.#hung.push(() => res.destroy()); return; }
         if (b === 'ERROR_500') { send(500, { error: { code: 'INTERNAL' } }); return; }
@@ -83,6 +87,7 @@ class FakeVnext {
 
   reset(): void {
     for (const h of this.#hung.splice(0)) h();
+    this.peak = this.active;
     this.requests.length = 0; this.issued.clear(); this.claims.clear(); this.closed.clear(); this.next = [];
   }
 
@@ -102,6 +107,7 @@ let base: string;
 let clock: Date;
 let logs: ReturnType<typeof captureLog>;
 let arrivals: Arrivals;
+let checkoutDeps: CheckoutDeps;
 
 before(async () => {
   db = await freshDb();
@@ -113,7 +119,7 @@ before(async () => {
   await vnext.start();
   logs = captureLog();
   const log: CheckoutDeps['log'] = (e, f) => logs.log(e, f);
-  const deps: CheckoutDeps = {
+  const deps: CheckoutDeps = checkoutDeps = {
     pool: db.pool, catalog, log, now: () => clock,
     refref: new RefrefClient({ apiBase: refref.base, apiKey: 'rk_test', timeoutMs: 1500 }),
     merchant: { businessId: MERCHANT_ID, businessSlug: 'mikluha', checkoutOrigin: 'https://checkout.refref.example',
@@ -147,10 +153,10 @@ beforeEach(async () => {
 
 interface Reply { status: number; location: string | undefined; setCookie: string[]; headers: Record<string, unknown>; body: string }
 
-function http(method: string, path: string, opts: { cookie?: string; form?: Record<string, string> } = {}): Promise<Reply> {
+function http(method: string, path: string, opts: { cookie?: string; form?: Record<string, string>; base?: string } = {}): Promise<Reply> {
   const payload = opts.form ? new URLSearchParams(opts.form).toString() : undefined;
   return new Promise((resolve, reject) => {
-    const req = request(`${base}${path}`, { method, headers: {
+    const req = request(`${opts.base ?? base}${path}`, { method, headers: {
       ...(opts.cookie ? { cookie: opts.cookie } : {}),
       ...(payload ? { 'content-type': 'application/x-www-form-urlencoded', 'content-length': String(Buffer.byteLength(payload)) } : {}),
     } }, (res) => {
@@ -199,6 +205,38 @@ describe('the arrival endpoint', () => {
     assert.equal(vnext.requests.length, 1, 'the mandatory after-response attempt was made');
     assert.deepEqual(vnext.requests[0]!.body, { arrivalProof: proof, browserContextId: idOf(attrs[0]!), storefrontOrigin: COMMERCE });
     assert.equal(vnext.requests[0]!.path, '/v1-vnext/integrations/arrival-claims');
+  });
+
+  test('an arrival burst still redirects while actual outgoing HTTP concurrency stays bounded', async () => {
+    // Give this load test its own transport/server so aborted sockets cannot reach another test.
+    const fake = new FakeVnext();
+    await fake.start();
+    fake.next = Array.from({ length: 200 }, () => 'HANG');
+    const loaded = new Arrivals({ refref: new RefrefClient({ apiBase: fake.base, apiKey: 'rk_test' }),
+      storefrontOrigin: COMMERCE, log: logs.log });
+    const local = createCommerceServer({ pool: db.pool, catalog, schemaHead: schemaHead(MIGRATIONS_DIR),
+      sourceCommit: null, startedAt: new Date() }, createWebHandler(checkoutDeps, false, undefined, loaded));
+    await new Promise<void>((resolve) => local.listen(0, '127.0.0.1', resolve));
+    const localBase = `http://127.0.0.1:${(local.address() as AddressInfo).port}`;
+    try {
+      const replies = await Promise.all(Array.from({ length: 100 }, () =>
+        http('GET', `/arrive?arrival=${fake.issue()}&to=/tours/`, { base: localBase })));
+      for (const r of replies) {
+        assert.equal(r.status, 302);
+        assert.equal(r.location, `${SITE}/tours/`);
+        assert.ok(contextOf(r));
+      }
+      assert.ok(fake.active > 0, 'landings returned while outgoing claims are still hung');
+      await loaded.after.drain();
+      assert.ok(fake.peak <= MAX_ACTIVE_CLAIMS, `peak actual HTTP concurrency: ${fake.peak}`);
+      assert.ok(logs.lines.some((l) => l.includes('OVERLOADED')), 'overflow is explicit');
+      for (const r of replies) assert.deepEqual(loaded.degradation(idOf(contextOf(r)!)), { degraded: true, reason: 'TIMEOUT' });
+    } finally {
+      local.closeAllConnections();
+      await new Promise<void>((resolve) => local.close(() => resolve()));
+      await loaded.after.drain();
+      await fake.stop();
+    }
   });
 
   test('a later arrival in the same browser reuses its context; a click without a cookie gets a new one', async () => {
