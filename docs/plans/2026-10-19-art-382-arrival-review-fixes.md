@@ -24,8 +24,10 @@ frozen result. This has a dedicated regression.
 ## Chosen design
 
 Keep the ephemeral model. One unref'ed timer expires actual raw fields at the next proof deadline,
-independently of requests. A bounded set owns pending proof for expiry; settlement and eviction
-clear both the raw field and that ownership. Staggered deadlines rearm the timer. The diagnostic
+independently of requests. An indexed min-heap owns pending proof for expiry; settlement and eviction
+clear both the raw field and its heap/index entry immediately. The next deadline is O(1);
+insertion, settlement and expiry are O(log n), with no full scan of pending proof. Staggered
+deadlines rearm the timer. The diagnostic
 `retainedRawProofs` reads actual fields without running lazy cleanup and exposes no credentials.
 
 One FIFO per Arrivals instance admits at most 16 actual outbound claims and 64 waiting claims.
@@ -59,6 +61,24 @@ inside that same container. Production/browser qualification (Safari ITP and Web
 policy, verified destination, proxy/application log gate and ART-383 checkout wiring remain
 separate gates. This change does not authorize merge, deployment or opening sales.
 
-Final local results: commerce 159/159, site 75/75, root lint, commerce typecheck/build,
+First correction results (`e020747`): commerce 159/159, site 75/75, root lint, commerce typecheck/build,
 and git diff --check PASS. Exact-head GitHub Actions and the image build are checked after
 committing; their final status is reported with the pushed SHA.
+
+## Follow-up P2: expiry complexity
+
+Review target `e02074762e61ac5b46fd6e5a12d2da7e56441eef`: the timer's Set traversal and
+next-deadline scan repeat for every distinct expiry, approaching O(n²) at high pending counts.
+This finding is confirmed. Replace only the retention index and timer traversal with the indexed
+min-heap described above. Arbitrary removal avoids lazy heap tombstones retaining settled proof;
+a FIFO alone would depend on capture-clock ordering. Claims, TTL, degradation, HTTP routes and
+public Arrivals API retain their existing semantics.
+
+Regression coverage adds 20,000 pending proofs with deadlines one millisecond apart, actual raw
+field erasure without traffic, arbitrary settlement/equal deadlines, and deterministic O(n log n)
+comparison bounds over 20,000 insertions/extractions. Earlier-deadline insertion is also covered.
+
+Follow-up local validation: commerce 163/163, root lint, commerce typecheck and diff whitespace
+checks PASS on Node 22.18.0 and disposable PostgreSQL 16. The same 20,000-proof integration
+scenario was also run on an archived `e020747` source snapshot, independently confirming the
+repeated-scan cost. Complexity assertions use comparison counts rather than timing thresholds.

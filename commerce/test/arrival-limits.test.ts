@@ -47,6 +47,44 @@ test('pending raw proof is erased by the timer at TTL without any further reques
   assert.deepEqual(a.degradation(id), { degraded: true, reason: 'EXPIRED' });
 });
 
+test('20,000 pending proofs expire at staggered deadlines without traffic or lazy cleanup', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: new Date('2026-10-19T00:00:00Z') });
+  let expired = 0;
+  const a = new Arrivals({ refref: null, storefrontOrigin: origin,
+    log: (event) => { if (event === 'arrival_claim_expired') expired++; } });
+  const size = 20_000;
+  let id = '';
+  for (let i = 0; i < size; i++) {
+    if (i % 8 === 0) id = newContextId();
+    a.capture(id, proof(i));
+    t.mock.timers.tick(1);
+  }
+  assert.equal(a.retainedRawProofs, size);
+  t.mock.timers.tick(CLAIM_TTL_MS - size);
+  assert.equal(expired, 1);
+  for (let i = 1; i < size; i++) {
+    t.mock.timers.tick(1);
+    assert.equal(expired, i + 1, 'only the proof due at this millisecond expires');
+  }
+  assert.equal(a.retainedRawProofs, 0, 'actual raw fields were erased without a degradation read');
+});
+
+test('a newly captured earlier deadline rearms the timer after a clock adjustment', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let now = 60_000;
+  const a = new Arrivals({ refref: null, storefrontOrigin: origin, log: () => {}, now: () => new Date(now) });
+  const id = newContextId();
+  a.capture(id, proof(1));
+  now = 0;
+  a.capture(id, proof(2));
+  now = CLAIM_TTL_MS;
+  t.mock.timers.tick(CLAIM_TTL_MS);
+  assert.equal(a.retainedRawProofs, 1);
+  now += 60_000;
+  t.mock.timers.tick(60_000);
+  assert.equal(a.retainedRawProofs, 0);
+});
+
 test('global concurrency and FIFO are bounded, overload remains degraded and can retry', async () => {
   const blocked = blockedClaimer();
   const events: string[] = [];

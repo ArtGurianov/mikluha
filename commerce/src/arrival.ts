@@ -24,6 +24,7 @@ import { randomBytes } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 import { performance } from 'node:perf_hooks';
 
+import { ExpiryQueue } from './expiry-queue.js';
 import type { Logger } from './log.js';
 import type { ArrivalClaimReceipt, RefrefResult } from './refref.js';
 import { errorCode } from './refref.js';
@@ -208,8 +209,9 @@ export class Arrivals {
   readonly #contexts = new Map<string, Context>();
   readonly #deps: ArrivalDeps;
   readonly #claims = new ClaimQueue();
-  readonly #retained = new Set<Proof>();
+  readonly #retained = new ExpiryQueue<Proof>();
   #expiryTimer: ReturnType<typeof setTimeout> | null = null;
+  #expiryTimerAt = Infinity;
   readonly after: AfterResponse;
 
   constructor(deps: ArrivalDeps) {
@@ -379,17 +381,20 @@ export class Arrivals {
 
   /** One unref'ed timer for the next expiry, independent of HTTP requests or claims. */
   #scheduleExpiry(): void {
-    if (this.#expiryTimer !== null || this.#retained.size === 0) return;
-    let earliest = Infinity;
-    for (const p of this.#retained) earliest = Math.min(earliest, p.expiresAt);
+    const earliest = this.#retained.peek()?.expiresAt;
+    if (earliest === undefined) return;
+    if (this.#expiryTimer !== null) {
+      if (this.#expiryTimerAt <= earliest) return;
+      clearTimeout(this.#expiryTimer);
+    }
+    this.#expiryTimerAt = earliest;
     this.#expiryTimer = setTimeout(() => {
       this.#expiryTimer = null;
       const now = this.#now();
-      for (const p of this.#retained) {
-        if (now >= p.expiresAt) {
-          this.#settle(p, 'EXPIRED');
-          this.#deps.log('arrival_claim_expired', {});
-        }
+      let p: Proof | undefined;
+      while ((p = this.#retained.peek()) !== undefined && now >= p.expiresAt) {
+        this.#settle(p, 'EXPIRED');
+        this.#deps.log('arrival_claim_expired', {});
       }
       this.#scheduleExpiry();
     }, Math.max(0, earliest - this.#now()));
