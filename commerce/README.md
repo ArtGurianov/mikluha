@@ -31,12 +31,15 @@ static; everything that sells a trip lives here, with its own Postgres.
   projection (`src/public-content.ts`); and classified execution changes on sold departures with
   one notice per affected order (`src/execution-notice.ts`). See "Content CRUD and execution
   changes".
+- migration 0010 (ART-358 review correction): stable execution-change identity and MATERIAL replay;
+  organizer visibility closes the whole departure and propagates to its reports. Migrations 0008
+  and 0009 retain their original bytes and checksums.
 
 **Next:**
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
   integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migrations
-  0007–0009 need owner-only application and fresh schema-9 logical and PITR recovery evidence
+  0007–0010 need owner-only application and fresh schema-10 logical and PITR recovery evidence
   before future admission. Mikluha commerce is undeployed; monitor admission, sales and payments remain closed.
 
 ## Generic legal pack and individual application
@@ -155,21 +158,42 @@ Comparing against the current mutable price would incorrectly reject a valid ear
 Schema 8 alone does not qualify that future writer. Supplier-name retention and the infrastructure
 role checker’s `admin_app` support remain owner-installation prerequisites.
 
-## Content CRUD and execution changes (migration 0009)
+## Content CRUD and execution changes (migrations 0009–0010)
 
 Nothing is imported from `content/`: a new database holds no content, and every tour, departure,
 report, review, organizer and legal draft is created in Control Room through the Admin API.
 
 | | |
 |---|---|
-| commands | `fn_create_tour`/`_departure`/`_content_item`, `fn_save_*_draft`, `fn_publish_tour`, `fn_publish_departure_change`, `fn_publish_content_item` (SECURITY DEFINER, `admin_app` only); `src/editorial.ts` calls them and maps refusals to `EditorialError` (`conflict` for `DRAFT_REVISION_CONFLICT`/`PUBLISHED_VERSION_CONFLICT`) |
+| commands | `fn_create_tour`/`_departure`/`_content_item`, `fn_save_*_draft`, `fn_publish_tour`, `fn_publish_departure_change`, `fn_publish_content_item` (SECURITY DEFINER, `admin_app` only); `src/editorial.ts` calls them and maps refusals to `EditorialError` (`conflict` for `DRAFT_REVISION_CONFLICT`/`PUBLISHED_VERSION_CONFLICT`/`EXECUTION_CHANGE_CONFLICT`) |
 | template | a new departure starts CLOSED and unlisted with draft revision 1 holding its tour's published contract template, copied whole. If the tour had none, the first publication copies it and advances the draft. `template_tour_version` names the tour revision and never changes; later tour edits reach only departures created later. A departure's own `contract.tour` replaces the template whole |
 | graph | publish refuses a departure of an unpublished tour, an unpublished organizer, a report whose tour or departure is unpublished or whose departure belongs to another tour, a review of an unpublished tour (`RELATION_NOT_PUBLISHED`/`RELATION_MISMATCH`). An OPEN departure cannot lose its price or complete contract (`DEPARTURE_OPEN_REQUIRES_COMPLETE_OFFER`); a CLOSED one may publish an incomplete contract, which `contract_complete` keeps from being sold |
-| listing | only an explicit `isListed: true` lists a tour, report, review or organizer (a tour document without the key is unlisted). The service reads pages through the `public_*` views only: published, listed, and everything the item hangs on published and listed too. `src/public-content.ts` returns a listed departure in the checkout's `Departure` shape with its `publishedVersion`, so the next render and the next quote see the latest publish |
+| listing | only an explicit `isListed: true` lists a tour, report, review or organizer (a tour document without the key is unlisted). The service reads pages through the `public_*` views only: published, listed, and everything the item hangs on published and listed too. A published but unlisted organizer may be linked editorially, but hides the **whole departure** and any reports tied to it; republishing that organizer listed restores visibility without republishing the departure. `src/public-content.ts` returns a listed departure in the checkout's `Departure` shape with its `publishedVersion`, so the next render and the next quote see the latest publish |
 | execution change | a contract change (programme, route, accommodation, carrier, services) of a departure with active or concluded orders (`fn_departure_affected_orders`, as the date lock counts them) needs OWNER's classification and notice text. `EQUIVALENT`: published, one `execution_change_notice` per affected order (unique per change and order), an `EXECUTION_CHANGE_EQUIVALENT` order event. `MATERIAL`: recorded as `ROUTED_TO_MOVE_CANCEL` with an order event and **not** published; the move/cancel workflow is separate. A classification where none is needed is refused. Snapshots never change |
 | notices | sent by the service's mail worker (`processExecutionNotices`, after the confirmation outbox) under the confirmation outbox's rules: retried only when provably not queued, otherwise operator attention, never twice. `ACCEPTED` is the provider's acceptance; only a provider delivery report (`recordNoticeDelivery`) makes it `DELIVERED`. No personal data in the table: the recipient is read from `order_contact` at send time, and an erased contact goes to attention as `NO_RECIPIENT` |
 | legal | drafts only. `fn_publish_content_item` refuses legal pages (`LEGAL_PUBLICATION_NOT_ADMITTED`): legal text is still published by a code release with the legal-release admission (ART-359) |
 | audit | each command writes an `editorial_audit` row (actor, login, draft revision, version, document sha256); a write to `tour`, `departure` or `content_item` outside the commands is audited as `DIRECT_WRITE`. The audit, revisions and execution changes refuse UPDATE, DELETE and TRUNCATE; notices refuse DELETE and only move forward |
+
+Migration 0010 makes `(departure_id, from_version, draft_revision)` unique. An exact MATERIAL retry
+(including a concurrent call) returns the same `changeId`, original affected-order count and version,
+without duplicating order events or audit rows. It does so before recomputing order eligibility.
+A different notice, EQUIVALENT classification or ordinary publication of that identity fails
+`EXECUTION_CHANGE_CONFLICT`; stale version/revision tokens still fail their normal CAS checks.
+A newly saved draft has a new revision. Move/cancel resolution is not implemented here.
+
+**Required integration follow-ups (ART-363/365):**
+
+- `recordNoticeDelivery` is a storage primitive; there is **no runtime delivery-report consumer**
+  yet. ART-365 must connect a verified provider status source, correlate it to the stored
+  `provider_job_id` and notice, and test delivery/bounce, unrelated-job and replay handling.
+  Until then notices stay `ACCEPTED` after provider acceptance; Control Room must display that
+  state without implying delivery. Sending and an HTTP acceptance response are not delivery evidence.
+- ART-363 must validate a live authenticated OWNER session before either execution classification
+  reaches the SQL command. `p_by`/`classified_by` is caller-supplied metadata, **not an authorization
+  check**; `login_role` proves the database login only. The API must derive the actor from the
+  session, persist a verifiable link from classification/change audit to its authentication event,
+  and reject unauthenticated, expired and non-OWNER sessions even if they supply `by: 'owner'`.
+  ART-365 must exercise this through the API; hiding a UI control is insufficient.
 
 Not here: Control Room screens (ART-365), the Admin API process and TOTP (ART-363), the
 `bookingStatus`/`isListed` transitions (ART-366), and the DB-backed quote/reservation writer that

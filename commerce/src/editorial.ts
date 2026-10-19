@@ -15,6 +15,7 @@ export const EDITORIAL_CODES = [
   'DRAFT_REVISION_CONFLICT', 'PUBLISHED_VERSION_CONFLICT',
   'EXECUTION_CHANGE_CLASSIFICATION_REQUIRED', 'EXECUTION_CHANGE_CLASSIFICATION_INVALID', 'EXECUTION_CHANGE_NOT_REQUIRED',
   'EXECUTION_CHANGE_NOTICE_INVALID', 'DEPARTURE_SCHEDULE_LOCKED', 'DEPARTURE_OPEN_REQUIRES_COMPLETE_OFFER',
+  'EXECUTION_CHANGE_CONFLICT',
   'TOUR_DOCUMENT_INVALID', 'DEPARTURE_DOCUMENT_INVALID', 'CONTENT_DOCUMENT_INVALID',
   'TOUR_UNKNOWN', 'DEPARTURE_UNKNOWN', 'CONTENT_UNKNOWN', 'TOUR_NOT_PUBLISHED',
   'RELATION_NOT_PUBLISHED', 'RELATION_MISMATCH', 'LEGAL_PUBLICATION_NOT_ADMITTED',
@@ -23,11 +24,13 @@ export const EDITORIAL_CODES = [
 ] as const;
 export type EditorialCode = typeof EDITORIAL_CODES[number] | 'SLUG_TAKEN';
 
-const CONFLICTS: ReadonlySet<EditorialCode> = new Set(['DRAFT_REVISION_CONFLICT', 'PUBLISHED_VERSION_CONFLICT']);
+const CONFLICTS: ReadonlySet<EditorialCode> = new Set([
+  'DRAFT_REVISION_CONFLICT', 'PUBLISHED_VERSION_CONFLICT', 'EXECUTION_CHANGE_CONFLICT',
+]);
 
 export class EditorialError extends Error {
   readonly code: EditorialCode;
-  /** A stale tab or a double click: reload and try again, nothing was written. */
+  /** Stale versions or an already-classified operation: reload its state; this call wrote nothing. */
   readonly conflict: boolean;
   constructor(code: EditorialCode, message: string) {
     super(message);
@@ -97,6 +100,8 @@ export interface DeparturePublication {
 /**
  * Publish a departure. A contract change on a departure with active or concluded orders needs
  * `change`; anything else must go without it.
+ * An exact MATERIAL retry returns the original result; a different notice or classification for
+ * the same published version and draft revision conflicts (migration 0010).
  */
 export const publishDeparture = (pool: pg.Pool, id: string, expected: Expected, by: string,
   change?: { readonly classification: Classification; readonly notice: string }): Promise<DeparturePublication> =>

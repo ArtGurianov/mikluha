@@ -182,18 +182,22 @@ both dates, `sha256:<actual signed-file digest>` and an opaque private-store ref
 copy the signed file or a credential-bearing URL into Git, Linear, Refref or public documents.
 This runbook does not attest or perform that write.
 
-The currently recorded real recovery proofs were for schema 6. Applying migrations 0007, 0008 and
-0009 is an owner-only production write; before future admission, obtain fresh logical and PITR
-recovery evidence for schema 9 and its exact recovery image. Existing timers are not a proof of the
+The currently recorded real recovery proofs were for schema 6. Applying migrations 0007–0010
+is an owner-only production write; before future admission, obtain fresh logical and PITR
+recovery evidence for schema 10 and its exact recovery image. Existing timers are not a proof of the
 new schema, and this PR does not advance monitor admission.
 
-Schema 9 recovery evidence must show, on the restored copy: `schema_migrations` 1–9 with the
+Schema 10 recovery evidence must show, on the restored copy: `schema_migrations` 1–10 with the
 checksums of this repository; the 0008 triggers present and enforcing (an UPDATE of a published
 departure's slug fails `DEPARTURE_IDENTITY_IMMUTABLE`, its DELETE `DEPARTURE_PUBLISHED_UNDELETABLE`,
 an UPDATE of an order's `contract_snapshot` `ORDER_CONTRACT_SNAPSHOT_IMMUTABLE`, run inside
 `BEGIN … ROLLBACK`); the 0009 history append-only (a DELETE from `editorial_audit` or
 `departure_execution_change` fails `EDITORIAL_HISTORY_IMMUTABLE`) and the execution-change notices
-with their states; and every stored snapshot still matching its `contract_snapshot_sha256`.
+with their states; the 0010 unique execution-change identity and MATERIAL retry behavior, with
+fail-closed departure/report visibility for an unlisted organizer; and every stored snapshot still
+matching its `contract_snapshot_sha256`. Migration 0010 must not rewrite existing execution-change
+history: if a preexisting schema-9 database contains duplicate classification identities, stop
+and resolve that history through a separately reviewed owner procedure before migration admission.
 `test/editorial-contract.test.ts` runs the same checks against a `pg_dump` restore in CI; it is a
 test of the dump format, not recovery evidence for production.
 

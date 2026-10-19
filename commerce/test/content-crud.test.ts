@@ -310,6 +310,70 @@ describe('execution changes on a sold departure', () => {
   });
 });
 
+describe('MATERIAL retry identity', () => {
+  test('retries reuse the operation and cannot change its notice or classification', async () => {
+    const d = await departure();
+    const o = await order(d);
+    const before = await snapshotText(o.ref);
+    const change = { classification: 'MATERIAL' as const, notice: 'Гостевой дом недоступен.' };
+    const first = await edit(d, { contract: { tour: newProgramme(), departure: facts() } }, change);
+    assert.deepEqual(await edit(d, {}, change), first);
+    // Replay uses the recorded operation, not today's set of affected orders.
+    await db.owner.query("UPDATE orders SET reserved_until = now() - interval '1 minute' WHERE id = $1", [o.id]);
+    assert.deepEqual(await edit(d, {}, change), first);
+    for (const replacement of [undefined, { ...change, notice: 'Другой текст.' },
+      { classification: 'EQUIVALENT' as const, notice: change.notice }]) {
+      await assert.rejects(edit(d, {}, replacement),
+        (e: unknown) => e instanceof EditorialError && e.code === 'EXECUTION_CHANGE_CONFLICT' && e.conflict);
+    }
+    assert.equal((await db.owner.query('SELECT count(*)::int AS n FROM departure_execution_change WHERE departure_id = $1', [d.id])).rows[0].n, 1);
+    assert.equal((await db.owner.query("SELECT count(*)::int AS n FROM order_event WHERE event = 'EXECUTION_CHANGE_MATERIAL' AND detail = $1", [first.changeId])).rows[0].n, 1);
+    assert.equal((await db.owner.query("SELECT count(*)::int AS n FROM editorial_audit WHERE entity_id = $1 AND action = 'EXECUTION_CHANGE_MATERIAL'", [d.id])).rows[0].n, 1);
+    assert.equal((await db.owner.query('SELECT published_version FROM departure WHERE id = $1', [d.id])).rows[0].published_version, 1);
+    assert.deepEqual(await snapshotText(o.ref), before);
+  });
+
+  for (const secondClassification of ['MATERIAL', 'EQUIVALENT'] as const) {
+    test(`an overlapping ${secondClassification} call waits for MATERIAL and reuses it or conflicts`, async () => {
+      const d = await departure();
+      const o = await order(d);
+      d.draft = await saveDepartureDraft(db.admin, d.id, d.draft, { ...await draftOf(d.id),
+        contract: { tour: newProgramme(), departure: facts() } }, 'editor');
+      const a = await db.admin.connect();
+      const b = await db.admin.connect();
+      const sql = 'SELECT fn_publish_departure_change($1, $2, $3, $4, $5, $6) AS r';
+      const args = [d.id, d.draft, d.version, 'MATERIAL', 'Гостевой дом недоступен.', 'owner'];
+      let second: Promise<unknown> | undefined;
+      try {
+        await a.query('BEGIN');
+        const first = (await a.query(sql, args)).rows[0].r;
+        const pid = (await b.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        const request = b.query(sql, [d.id, d.draft, d.version, secondClassification, args[4], 'other-tab']);
+        // Attach the rejection handler before releasing the lock.
+        second = secondClassification === 'MATERIAL'
+          ? request.then((r) => assert.deepEqual(r.rows[0].r, first))
+          : assert.rejects(request, /EXECUTION_CHANGE_CONFLICT/);
+        void second.catch(() => undefined);
+        const deadline = Date.now() + 5_000;
+        while (!(await db.owner.query('SELECT cardinality(pg_blocking_pids($1)) > 0 AS blocked', [pid])).rows[0].blocked) {
+          assert.ok(Date.now() < deadline, 'the second publish must overlap the first transaction');
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        await a.query('COMMIT');
+        await second;
+        assert.equal((await db.owner.query('SELECT count(*)::int AS n FROM departure_execution_change WHERE departure_id = $1', [d.id])).rows[0].n, 1);
+        assert.equal((await db.owner.query("SELECT count(*)::int AS n FROM order_event WHERE order_id = $1 AND event LIKE 'EXECUTION_CHANGE_%'", [o.id])).rows[0].n, 1);
+        assert.equal((await db.owner.query('SELECT published_version FROM departure WHERE id = $1', [d.id])).rows[0].published_version, 1);
+      } finally {
+        await a.query('ROLLBACK');
+        await second?.catch(() => undefined);
+        a.release();
+        b.release();
+      }
+    });
+  }
+});
+
 describe('notice delivery', () => {
   class FakeSender implements NoticeSender {
     readonly sent: string[] = [];
@@ -445,6 +509,53 @@ describe('reports, reviews, organizers and legal drafts', () => {
     await saveTourDraft(db.admin, quiet, 0, { slug: quietSlug, title: 'Тихий', contract: null, content: {} }, 'editor');
     await publishTour(db.admin, quiet, { draftRevision: 1, publishedVersion: 0 }, 'owner');
     assert.ok(!(await slugs()).tours.includes(quietSlug));
+  });
+
+  test('a hidden organizer before departure publication hides the whole departure and its reports', async () => {
+    const t = await tour();
+    const visible = await item('organizer', (slug) => ({ slug, name: 'Артур', isListed: true, isDemo: false, content: {} }));
+    const hidden = await item('organizer', (slug) => ({ slug, name: 'Олег', isListed: false, isDemo: false, content: {} }));
+    await publish(visible.id);
+    await publish(hidden.id);
+    const d = await departure({ tourId: t.id, over: { organizers: [visible.slug, hidden.slug] } });
+    await db.owner.query('UPDATE departure SET is_listed = true WHERE id = $1', [d.id]);
+    const report = await item('report', (slug) => ({ slug, title: 'Поездка', tour: t.slug, departure: d.slug,
+      date: null, isListed: true, noindex: false, content: {} }));
+    await publish(report.id);
+    assert.equal(await publicDeparture(db.pool, d.slug), null);
+    assert.deepEqual(await publicDepartures(db.pool, t.slug), []);
+    assert.ok(!(await publicReports(db.pool)).some((r) => r.slug === report.slug));
+    assert.deepEqual((await db.pool.query('SELECT * FROM public_departure_organizer WHERE departure_slug = $1', [d.slug])).rows, []);
+    await saveContentDraft(db.admin, hidden.id, 1, { slug: hidden.slug, name: 'Олег', isListed: true, isDemo: false, content: {} }, 'editor');
+    await publish(hidden.id, 2, 1);
+    assert.deepEqual((await publicDeparture(db.pool, d.slug))!.organizers, [visible.slug, hidden.slug]);
+    assert.ok((await publicReports(db.pool)).some((r) => r.slug === report.slug));
+  });
+
+  test('organizer republication changes departure and report visibility; saving a draft does not', async () => {
+    const t = await tour();
+    const org = await item('organizer', (slug) => ({ slug, name: 'Артур', isListed: true, isDemo: false, content: {} }));
+    await publish(org.id);
+    const d = await departure({ tourId: t.id, over: { organizers: [org.slug] } });
+    await db.owner.query('UPDATE departure SET is_listed = true WHERE id = $1', [d.id]);
+    const report = await item('report', (slug) => ({ slug, title: 'Поездка', tour: t.slug, departure: d.slug,
+      date: null, isListed: true, noindex: false, content: {} }));
+    const tourReport = await item('report', (slug) => ({ slug, title: 'Тур', tour: t.slug, departure: null,
+      date: null, isListed: true, noindex: false, content: {} }));
+    await publish(report.id);
+    await publish(tourReport.id);
+    await saveContentDraft(db.admin, org.id, 1, { slug: org.slug, name: 'Артур', isListed: false, isDemo: false, content: {} }, 'editor');
+    assert.deepEqual((await publicDeparture(db.pool, d.slug))!.organizers, [org.slug]);
+    await publish(org.id, 2, 1);
+    assert.equal(await publicDeparture(db.pool, d.slug), null);
+    assert.deepEqual(await publicDepartures(db.pool, t.slug), []);
+    const reports = await publicReports(db.pool);
+    assert.ok(!reports.some((r) => r.slug === report.slug));
+    assert.ok(reports.some((r) => r.slug === tourReport.slug));
+    await saveContentDraft(db.admin, org.id, 2, { slug: org.slug, name: 'Артур', isListed: true, isDemo: false, content: {} }, 'editor');
+    await publish(org.id, 3, 2);
+    assert.deepEqual((await publicDeparture(db.pool, d.slug))!.organizers, [org.slug]);
+    assert.ok((await publicReports(db.pool)).some((r) => r.slug === report.slug));
   });
 
   test('published identity and history are fixed', async () => {

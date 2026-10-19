@@ -403,6 +403,12 @@ describe('the order contract snapshot', () => {
 test('schema restore: a logical dump restored into an empty database enforces the same invariants', async () => {
   const d = await newDeparture();
   const ref = await insertOrder(d);
+  const doc = (await db.owner.query('SELECT document FROM departure_draft WHERE departure_id = $1', [d.id])).rows[0].document;
+  await db.admin.query('SELECT fn_save_departure_draft($1, $2, $3, $4)', [d.id, d.draft,
+    { ...doc, contract: { ...doc.contract, tour: { ...doc.contract.tour, route: 'Изменённый маршрут' } } }, 'editor']);
+  const changeArgs = [d.id, d.draft + 1, d.version, 'MATERIAL', 'Маршрут недоступен.', 'owner'];
+  const changeSql = 'SELECT fn_publish_departure_change($1, $2, $3, $4, $5, $6) AS r';
+  const change = (await db.admin.query(changeSql, changeArgs)).rows[0].r;
   const { stdout: dump } = await run('pg_dump', ['--no-password', db.url.toString()], { maxBuffer: 64 * 1024 * 1024 });
   const name = `${db.name}_restore`;
   await db.owner.query(`CREATE DATABASE ${name}`);
@@ -425,6 +431,15 @@ test('schema restore: a logical dump restored into an empty database enforces th
     // 0009: the editorial audit is restored and stays append-only.
     assert.ok((await restored.query('SELECT count(*)::int AS n FROM editorial_audit WHERE entity_id = $1', [d.id])).rows[0].n >= 3);
     await assert.rejects(restored.query('DELETE FROM editorial_audit WHERE entity_id = $1', [d.id]), /EDITORIAL_HISTORY_IMMUTABLE/);
+    // 0010: the restored pending operation replays without new events, and its identity is unique.
+    assert.deepEqual((await restored.query(changeSql, changeArgs)).rows[0].r, change);
+    await assert.rejects(restored.query(changeSql, [d.id, d.draft + 1, d.version, 'EQUIVALENT', changeArgs[4], 'owner']),
+      /EXECUTION_CHANGE_CONFLICT/);
+    await assert.rejects(restored.query(`INSERT INTO departure_execution_change
+      (departure_id, classification, outcome, from_version, draft_revision, notice, affected_order_refs, classified_by, login_role, created_at)
+      SELECT departure_id, classification, outcome, from_version, draft_revision, notice, affected_order_refs, classified_by, login_role, created_at
+        FROM departure_execution_change WHERE id = $1`, [change.changeId]), /duplicate key.*departure_execution_change_identity/);
+    assert.equal((await restored.query("SELECT count(*)::int AS n FROM order_event WHERE event = 'EXECUTION_CHANGE_MATERIAL' AND detail = $1", [change.changeId])).rows[0].n, 1);
     const s = (await restored.query('SELECT contract_snapshot AS j, contract_snapshot_sha256 AS h FROM orders WHERE order_ref = $1', [ref])).rows[0];
     assert.ok(contractSnapshotIntact(s.j, s.h));
   } finally {

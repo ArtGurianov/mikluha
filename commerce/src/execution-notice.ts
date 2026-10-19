@@ -100,6 +100,8 @@ export async function processExecutionNotices(pool: pg.Pool, sender: NoticeSende
 /**
  * A provider delivery report for an accepted notice: `delivered` makes it DELIVERED, a bounce makes it
  * operator attention. Returns false when the notice was not waiting for one.
+ * Storage primitive only: no runtime provider-report consumer is wired yet (ART-365). That
+ * integration must verify the status source and correlate provider_job_id before calling this.
  */
 export async function recordNoticeDelivery(pool: pg.Pool, noticeId: string, providerStatus: 'delivered' | 'soft_bounced' | 'hard_bounced',
   at: Date = new Date()): Promise<boolean> {
