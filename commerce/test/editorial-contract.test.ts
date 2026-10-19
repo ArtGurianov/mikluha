@@ -82,7 +82,7 @@ const hashOrDummy = (snapshot: unknown) => {
 
 /** An order of a database departure, written as the owner, its snapshot built as reserve() builds it. */
 async function insertOrder(d: Dep, over: { status?: string; reservedUntil?: Date; snapshot?: unknown; unitPrice?: number;
-  startsOn?: string; departureId?: string | null } = {}): Promise<string> {
+  startsOn?: string; departureId?: string | null; snapshotSha256?: string } = {}): Promise<string> {
   const row = (await db.owner.query(`SELECT slug, to_char(starts_on, 'YYYY-MM-DD') AS starts_on, to_char(ends_on, 'YYYY-MM-DD') AS ends_on,
       departure_time, return_time, timezone, price_kopecks, contract FROM departure WHERE id = $1`, [d.id])).rows[0];
   const bookable = {
@@ -103,7 +103,7 @@ async function insertOrder(d: Dep, over: { status?: string; reservedUntil?: Date
       now(), true, $9, $10, $11, $12, $13)`,
   [ref, over.departureId === undefined ? d.id : over.departureId, row.slug, over.startsOn ?? row.starts_on, row.ends_on, price,
     over.reservedUntil ?? new Date(Date.now() + 30 * 60_000), `sha256:${'a'.repeat(64)}`, row.departure_time, row.return_time,
-    row.timezone, snapshot, hashOrDummy(snapshot)]);
+    row.timezone, snapshot, over.snapshotSha256 ?? hashOrDummy(snapshot)]);
   if (status !== 'RESERVED') await db.owner.query(`UPDATE orders SET status = $2${pending} WHERE order_ref = $1`, [ref, status]);
   return ref;
 }
@@ -367,6 +367,14 @@ describe('the order contract snapshot', () => {
     ]) {
       await assert.rejects(insertOrder(d, { snapshot: broken }), /orders_contract_snapshot_valid/);
     }
+  });
+
+  test('SQL shape/format admission does not attest JCS integrity; the independent verifier refuses a wrong digest', async () => {
+    const d = await newDeparture();
+    const ref = await insertOrder(d, { snapshotSha256: `sha256:${'0'.repeat(64)}` });
+    const row = (await db.owner.query('SELECT contract_snapshot AS s, contract_snapshot_sha256 AS h FROM orders WHERE order_ref=$1', [ref])).rows[0];
+    assert.equal(contractSnapshotIntact(row.s, row.h), false);
+    assert.notEqual(contractSnapshotHash(row.s), row.h);
   });
 
   test('reserve() stores the resolved contract of the departure it sold, and a later catalog does not reach it', async () => {

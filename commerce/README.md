@@ -243,3 +243,10 @@ fails closed. The owner-run deploy, backup, logging, legal/content and first-sal
 The four network addresses above remain configurable in staging. Production compares their
 normalized URLs against the fixed values and refuses startup on any host, port, path, credential,
 query or fragment mismatch.
+
+Schema-8 digest trust boundary: the trusted `reserve()` producer computes the JCS SHA-256. SQL
+checks snapshot shape/order consistency and digest format, not JSON-to-digest equality.
+`contractSnapshotIntact` is the independent verifier and refuses an otherwise well-formed snapshot
+with a wrong digest, including one inserted by a direct owner writer. DB-backed document/reservation
+writers must invoke it and bind the accepted immutable revision before admission (ART-358/362).
+The current content-backed document path is not claimed to enforce this future gate.

@@ -9,3 +9,10 @@ Mikluha conformance pins an exact candidate and does not imply mutable-HEAD qual
 Regression tests cover the reviewed boundaries. No production migration, sales activation,
 merge, or live payment is part of this change. An unspecified privacy duration requires an
 explicit policy; it must not be invented as a migration default.
+
+Follow-up CI review: pg-pool end removes clients before socket-end callbacks complete; FORCE drop
+can terminate those still-closing clients and emit fatal asynchronous activity after a test ends.
+Track real pooled-client end events, await them, and drop without FORCE. A delayed-close regression
+reproduces the original FATAL before the fix and passes afterwards; no database errors are swallowed.
+SQL proves snapshot shape and hash format, not JCS equality. Test the independent verifier on a
+direct-owner insert with a wrong well-formed digest, and keep DB-backed writer qualification explicit.

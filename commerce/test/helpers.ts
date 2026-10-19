@@ -49,11 +49,16 @@ export async function freshDb(): Promise<TestDb> {
         CREATE ROLE ${login} LOGIN PASSWORD '${PASSWORD}' IN ROLE ${role};
       END IF; END $$`);
   }
+  const clientClosures: Promise<void>[] = [];
   const as = (login: string, max: number) => {
     const u = new URL(url);
     u.username = login;
     u.password = PASSWORD;
-    return new pg.Pool({ connectionString: u.toString(), max });
+    const pool = new pg.Pool({ connectionString: u.toString(), max });
+    pool.on('connect', client => {
+      clientClosures.push(new Promise<void>(resolve => { client.once('end', resolve); }));
+    });
+    return pool;
   };
   const pool = as(RUNTIME_ROLE, 12);
   const operator = as(OPERATOR_ROLE, 2);
@@ -64,9 +69,13 @@ export async function freshDb(): Promise<TestDb> {
       await pool.end();
       await operator.end();
       await adminPool.end();
+      // pg-pool removes clients from its list before their socket-end callbacks finish.
+      // Wait for those real close events before DROP, instead of FORCE-killing idle clients
+      // and emitting asynchronous FATAL errors into a test that has already ended.
+      await Promise.all(clientClosures);
       await owner.end();
-      await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);
-      await admin.end();
+      try { await admin.query(`DROP DATABASE ${name}`); }
+      finally { await admin.end(); }
     },
   };
 }

@@ -58,7 +58,8 @@ export function contractSnapshotHash(snapshot: ContractSnapshot): string {
   return `sha256:${createHash('sha256').update(canonical(snapshot as unknown as Json), 'utf8').digest('hex')}`;
 }
 
-/** Whether a stored snapshot still is what its stored hash says: documents render only from one that is. */
+/** Independent JCS integrity check. SQL validates shape/hash format; a future DB-backed document
+ * writer must invoke this verifier before trusting a stored digest. */
 export function contractSnapshotIntact(snapshot: unknown, hash: string | null): snapshot is ContractSnapshot {
   if (snapshot === null || typeof snapshot !== 'object' || hash === null) return false;
   if ((snapshot as { schema?: unknown }).schema !== CONTRACT_SNAPSHOT_SCHEMA) return false;
