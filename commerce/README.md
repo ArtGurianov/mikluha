@@ -22,17 +22,22 @@ static; everything that sells a trip lives here, with its own Postgres.
   drafts, immutable published revisions and expected-version publish; immutable published identity
   (slug/unitRef, tour binding, `published_at`) and no physical delete; the date lock while a
   departure has active or concluded orders; and every new order's `contract_snapshot` (see
-  "Editable offers, immutable orders"). Content CRUD (ART-358), `bookingStatus`/capacity
-  transitions (ART-366) and documents rendered from the snapshot (ART-362) build on it; the
-  checkout still sells from `content/` until then.
+  "Editable offers, immutable orders"). `bookingStatus`/capacity transitions (ART-366) and
+  documents rendered from the snapshot (ART-362) build on it; the checkout still sells from
+  `content/` until then.
+- migration 0009 (ADR v2.3 §2–§4, ART-358): content CRUD for tours, departures, reports, reviews,
+  organizers and legal drafts through audited Admin commands (`src/editorial.ts`); the tour
+  template resolved into a departure once; graph validation at publish; the fail-closed public
+  projection (`src/public-content.ts`); and classified execution changes on sold departures with
+  one notice per affected order (`src/execution-notice.ts`). See "Content CRUD and execution
+  changes".
 
 **Next:**
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
   integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migrations
-  0007 and 0008 need owner-only application and fresh schema-8 logical and PITR recovery evidence
-  before future admission. Mikluha
-  commerce is undeployed; monitor admission, sales and payments remain closed.
+  0007–0009 need owner-only application and fresh schema-9 logical and PITR recovery evidence
+  before future admission. Mikluha commerce is undeployed; monitor admission, sales and payments remain closed.
 
 ## Generic legal pack and individual application
 
@@ -139,7 +144,7 @@ uses a modelled gateway and is not live acceptance.
 | date lock | `starts_on`, `ends_on`, `departure_time`, `return_time`, `timezone` cannot change while an order is RESERVED (unexpired), PAYMENT_PENDING, HELD, PAID or FULFILLED, matched by `departure_id` or, for orders made from `content/`, by slug. The check takes the same `departure:<slug>` advisory lock as `reserve()`. Only the move/cancel workflow (ADR v2.3 §4, its own migration) will change them |
 | price, programme, description | edited and published freely; they reach new orders only |
 | `contract_snapshot` | written by `reserve()` (`src/contract-snapshot.ts`, schema `mikluha.order-contract/1`, `sha256:` of its RFC 8785 form): price, programme, route, accommodation with registry facts, carrier, included/excluded services, schedule and meeting points. The database checks its shape and that it agrees with the order's slug, dates, times, timezone and price, requires it on every new order, and refuses any later change, NULL or backfill; an order never changes `departure_id`. Orders from before 0008 keep NULL |
-| roles | `commerce_app` reads `tour`/`departure` only. `admin_app` (the isolated Admin API, ADR v2.1 §7) inserts a tour (slug) or departure (slug, tour) and otherwise writes only through the four functions, which refuse any login that belongs to `commerce_app`; it has no access to orders, payments, the switch or ЕИС. No role can change `booking_status`, `capacity` or `is_listed` yet (ART-366): departures stay CLOSED and unlisted |
+| roles | `commerce_app` reads `tour`/`departure` only. `admin_app` (the isolated Admin API, ADR v2.1 §7) writes only through the editorial functions, which refuse any login that belongs to `commerce_app` (since 0009 it creates through them too, with no INSERT grant); it has no access to orders, payments, the switch or ЕИС. No role can change `booking_status`, `capacity` or `is_listed` yet (ART-366): departures stay CLOSED and unlisted |
 
 The current `reserve()` still reads `content/` and writes `departure_id = NULL`. For a linked
 PostgreSQL departure the insert trigger checks publication and schedule, not the authority of its
@@ -149,6 +154,26 @@ it must bind the accepted immutable revision/quote to the order and validate its
 Comparing against the current mutable price would incorrectly reject a valid earlier quote.
 Schema 8 alone does not qualify that future writer. Supplier-name retention and the infrastructure
 role checker’s `admin_app` support remain owner-installation prerequisites.
+
+## Content CRUD and execution changes (migration 0009)
+
+Nothing is imported from `content/`: a new database holds no content, and every tour, departure,
+report, review, organizer and legal draft is created in Control Room through the Admin API.
+
+| | |
+|---|---|
+| commands | `fn_create_tour`/`_departure`/`_content_item`, `fn_save_*_draft`, `fn_publish_tour`, `fn_publish_departure_change`, `fn_publish_content_item` (SECURITY DEFINER, `admin_app` only); `src/editorial.ts` calls them and maps refusals to `EditorialError` (`conflict` for `DRAFT_REVISION_CONFLICT`/`PUBLISHED_VERSION_CONFLICT`) |
+| template | a new departure starts CLOSED and unlisted with draft revision 1 holding its tour's published contract template, copied whole. If the tour had none, the first publication copies it and advances the draft. `template_tour_version` names the tour revision and never changes; later tour edits reach only departures created later. A departure's own `contract.tour` replaces the template whole |
+| graph | publish refuses a departure of an unpublished tour, an unpublished organizer, a report whose tour or departure is unpublished or whose departure belongs to another tour, a review of an unpublished tour (`RELATION_NOT_PUBLISHED`/`RELATION_MISMATCH`). An OPEN departure cannot lose its price or complete contract (`DEPARTURE_OPEN_REQUIRES_COMPLETE_OFFER`); a CLOSED one may publish an incomplete contract, which `contract_complete` keeps from being sold |
+| listing | only an explicit `isListed: true` lists a tour, report, review or organizer (a tour document without the key is unlisted). The service reads pages through the `public_*` views only: published, listed, and everything the item hangs on published and listed too. `src/public-content.ts` returns a listed departure in the checkout's `Departure` shape with its `publishedVersion`, so the next render and the next quote see the latest publish |
+| execution change | a contract change (programme, route, accommodation, carrier, services) of a departure with active or concluded orders (`fn_departure_affected_orders`, as the date lock counts them) needs OWNER's classification and notice text. `EQUIVALENT`: published, one `execution_change_notice` per affected order (unique per change and order), an `EXECUTION_CHANGE_EQUIVALENT` order event. `MATERIAL`: recorded as `ROUTED_TO_MOVE_CANCEL` with an order event and **not** published; the move/cancel workflow is separate. A classification where none is needed is refused. Snapshots never change |
+| notices | sent by the service's mail worker (`processExecutionNotices`, after the confirmation outbox) under the confirmation outbox's rules: retried only when provably not queued, otherwise operator attention, never twice. `ACCEPTED` is the provider's acceptance; only a provider delivery report (`recordNoticeDelivery`) makes it `DELIVERED`. No personal data in the table: the recipient is read from `order_contact` at send time, and an erased contact goes to attention as `NO_RECIPIENT` |
+| legal | drafts only. `fn_publish_content_item` refuses legal pages (`LEGAL_PUBLICATION_NOT_ADMITTED`): legal text is still published by a code release with the legal-release admission (ART-359) |
+| audit | each command writes an `editorial_audit` row (actor, login, draft revision, version, document sha256); a write to `tour`, `departure` or `content_item` outside the commands is audited as `DIRECT_WRITE`. The audit, revisions and execution changes refuse UPDATE, DELETE and TRUNCATE; notices refuse DELETE and only move forward |
+
+Not here: Control Room screens (ART-365), the Admin API process and TOTP (ART-363), the
+`bookingStatus`/`isListed` transitions (ART-366), and the DB-backed quote/reservation writer that
+binds an order to the published revision it accepted (ART-362).
 
 ## Database roles
 

@@ -182,16 +182,18 @@ both dates, `sha256:<actual signed-file digest>` and an opaque private-store ref
 copy the signed file or a credential-bearing URL into Git, Linear, Refref or public documents.
 This runbook does not attest or perform that write.
 
-The currently recorded real recovery proofs were for schema 6. Applying migrations 0007 and 0008
-is an owner-only production write; before future admission, obtain fresh logical and PITR recovery
-evidence for schema 8 and its exact recovery image. Existing timers are not a proof of the new
-schema, and this PR does not advance monitor admission.
+The currently recorded real recovery proofs were for schema 6. Applying migrations 0007, 0008 and
+0009 is an owner-only production write; before future admission, obtain fresh logical and PITR
+recovery evidence for schema 9 and its exact recovery image. Existing timers are not a proof of the
+new schema, and this PR does not advance monitor admission.
 
-Schema 8 recovery evidence must show, on the restored copy: `schema_migrations` 1–8 with the
+Schema 9 recovery evidence must show, on the restored copy: `schema_migrations` 1–9 with the
 checksums of this repository; the 0008 triggers present and enforcing (an UPDATE of a published
 departure's slug fails `DEPARTURE_IDENTITY_IMMUTABLE`, its DELETE `DEPARTURE_PUBLISHED_UNDELETABLE`,
 an UPDATE of an order's `contract_snapshot` `ORDER_CONTRACT_SNAPSHOT_IMMUTABLE`, run inside
-`BEGIN … ROLLBACK`); and every stored snapshot still matching its `contract_snapshot_sha256`.
+`BEGIN … ROLLBACK`); the 0009 history append-only (a DELETE from `editorial_audit` or
+`departure_execution_change` fails `EDITORIAL_HISTORY_IMMUTABLE`) and the execution-change notices
+with their states; and every stored snapshot still matching its `contract_snapshot_sha256`.
 `test/editorial-contract.test.ts` runs the same checks against a `pg_dump` restore in CI; it is a
 test of the dump format, not recovery evidence for production.
 
