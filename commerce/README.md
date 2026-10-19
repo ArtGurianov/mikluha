@@ -141,6 +141,15 @@ uses a modelled gateway and is not live acceptance.
 | `contract_snapshot` | written by `reserve()` (`src/contract-snapshot.ts`, schema `mikluha.order-contract/1`, `sha256:` of its RFC 8785 form): price, programme, route, accommodation with registry facts, carrier, included/excluded services, schedule and meeting points. The database checks its shape and that it agrees with the order's slug, dates, times, timezone and price, requires it on every new order, and refuses any later change, NULL or backfill; an order never changes `departure_id`. Orders from before 0008 keep NULL |
 | roles | `commerce_app` reads `tour`/`departure` only. `admin_app` (the isolated Admin API, ADR v2.1 §7) inserts a tour (slug) or departure (slug, tour) and otherwise writes only through the four functions, which refuse any login that belongs to `commerce_app`; it has no access to orders, payments, the switch or ЕИС. No role can change `booking_status`, `capacity` or `is_listed` yet (ART-366): departures stay CLOSED and unlisted |
 
+The current `reserve()` still reads `content/` and writes `departure_id = NULL`. For a linked
+PostgreSQL departure the insert trigger checks publication and schedule, not the authority of its
+price or programme. Snapshot shape, hash and agreement with the order do not prove which published
+revision the buyer accepted. Before the DB-backed reservation writer (ART-358/ART-362) is enabled,
+it must bind the accepted immutable revision/quote to the order and validate its price and contract.
+Comparing against the current mutable price would incorrectly reject a valid earlier quote.
+Schema 8 alone does not qualify that future writer. Supplier-name retention and the infrastructure
+role checker’s `admin_app` support remain owner-installation prerequisites.
+
 ## Database roles
 
 The owner applies migrations. There are two other logins, and neither is a member of the other's role

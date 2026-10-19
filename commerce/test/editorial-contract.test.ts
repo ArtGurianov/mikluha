@@ -415,3 +415,20 @@ test('schema restore: a logical dump restored into an empty database enforces th
     await db.owner.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
   }
 });
+
+test('reservation commit prevents a waiting schedule update', async () => {
+   const d = await newDeparture();
+   const b = new pg.Client({connectionString: db.url.toString()});
+   await b.connect();
+   try {
+     await db.owner.query('BEGIN');
+     await db.owner.query("SELECT pg_advisory_xact_lock(hashtextextended('departure:' || $1, 0))", [d.slug]);
+     await insertOrder(d);
+     const update = b.query("UPDATE departure SET starts_on=starts_on+7, ends_on=ends_on+7 WHERE id=$1", [d.id])
+       .then(() => 'UPDATED').catch(e => e.message);
+     await new Promise(r=>setTimeout(r,300));
+     await db.owner.query('COMMIT');
+     const result = await update;
+     assert.match(result, /DEPARTURE_SCHEDULE_LOCKED/);
+   } finally { await db.owner.query('ROLLBACK'); await b.end(); }
+ });
