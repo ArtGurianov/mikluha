@@ -42,6 +42,10 @@ export interface CheckoutAttempt {
     payment: null | { id: string; status: string; amountKopecks: number; succeededAt?: string | null };
   }[];
 }
+/** vNext (Refref docs/openapi-vnext.yaml ArrivalClaimReceipt): names no partner, campaign or terms. */
+export interface ArrivalClaimReceipt {
+  claimId: string; browserContextId: string; storefrontOrigin: string; claimedAt: string; eligibleUntil: string;
+}
 export interface MerchantOrder {
   id: string; merchantOrderId: string; status: string; checkoutAttempts: CheckoutAttempt[];
 }
@@ -100,7 +104,16 @@ export class RefrefClient {
       + `${encodeURIComponent(attemptId)}/fulfillment-ack`, { status: 'DELIVERED', externalFulfillmentId: orderRef }, key);
   }
 
-  #send<T>(method: string, path: string, body?: unknown, idempotencyKey?: string): Promise<RefrefResult<T>> {
+  /**
+   * vNext claimArrival (docs/29 §3): the claim body is its own idempotency identity, so an exact
+   * repeat replays a committed claim. `deadlineMs` bounds the whole call by wall clock, not only
+   * socket idleness, because the arrival endpoint promises an attempt of about 500 ms.
+   */
+  claimArrival(body: { arrivalProof: string; browserContextId: string; storefrontOrigin: string }, deadlineMs: number) {
+    return this.#send<ArrivalClaimReceipt>('POST', '/integrations/arrival-claims', body, undefined, deadlineMs);
+  }
+
+  #send<T>(method: string, path: string, body?: unknown, idempotencyKey?: string, deadlineMs?: number): Promise<RefrefResult<T>> {
     const payload = body === undefined ? undefined : Buffer.from(JSON.stringify(body), 'utf8');
     const headers: Record<string, string> = { authorization: `Bearer ${this.#key}`, accept: 'application/json' };
     if (payload !== undefined) {
@@ -109,7 +122,9 @@ export class RefrefClient {
     }
     if (idempotencyKey !== undefined) headers['idempotency-key'] = idempotencyKey;
     const secure = this.#base.protocol === 'https:';
-    return new Promise((resolve) => {
+    return new Promise((done) => {
+      let deadline: ReturnType<typeof setTimeout> | undefined;
+      const resolve = (r: RefrefResult<T>) => { if (deadline !== undefined) clearTimeout(deadline); done(r); };
       const req = (secure ? httpsRequest : httpRequest)({
         host: this.#base.hostname, port: this.#base.port === '' ? undefined : Number(this.#base.port),
         method, path: `${this.#base.pathname.replace(/\/$/, '')}${path}`, headers, timeout: this.#timeout,
@@ -132,6 +147,7 @@ export class RefrefClient {
         });
       });
       req.on('timeout', () => req.destroy(new Error('TIMEOUT')));
+      if (deadlineMs !== undefined) deadline = setTimeout(() => req.destroy(new Error('TIMEOUT')), deadlineMs);
       req.on('error', (e) => resolve({ kind: 'UNKNOWN', cause: e.message === 'TIMEOUT' ? 'TIMEOUT' : 'TRANSPORT' }));
       if (payload !== undefined) req.write(payload);
       req.end();

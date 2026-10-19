@@ -261,6 +261,24 @@ log records request paths, disable that access log for this traffic or install a
 mechanism before launch; application-level logging cannot repair a token already stored by the
 proxy. Keep the exact proxy configuration and synthetic-test result as launch evidence.
 
+The Refref vNext arrival proof (`/arrive?arrival=…`, ART-382) is a bearer credential for 30 minutes
+and gets the same gate before vNext is admitted for this origin. Use a synthetic proof that Refref
+never issued:
+
+```bash
+SYNTHETIC_PROOF=ar1.SYNTHETICSYNTHETICSYNTHETICSYNTHETICSYNTHETI
+curl --silent --output /dev/null --write-out '%{http_code} %{redirect_url}\n' \
+  "https://book.mikluha-maklai.ru/arrive?arrival=$SYNTHETIC_PROOF&to=%2F"
+
+docker logs --since 2m coolify-proxy 2>&1 | grep -F "$SYNTHETIC_PROOF"
+docker logs --since 2m "$C" 2>&1 | grep -F "$SYNTHETIC_PROOF"
+```
+
+Expect `302 https://mikluha-maklai.ru/` (no proof in the Location) and no match in either log. The
+reviewed Traefik baseline in `adman-vps-infrastructure` (`config/traefik/data/coolify/proxy/docker-compose.yml`)
+sets no access log today; if one is ever enabled, exclude the `book.*` router or redact the query
+before admitting vNext.
+
 ## 7. Legal-release parity and readiness
 
 Read both public endpoints and compare the immutable fields. Do not copy their output into a shell

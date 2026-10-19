@@ -35,6 +35,9 @@ static; everything that sells a trip lives here, with its own Postgres.
   organizer visibility closes the whole departure and propagates to its reports. Migrations 0008
   and 0009 retain their original bytes and checksums.
 
+- ART-382: the Refref vNext arrival endpoint `/arrive` with the 30-day browser context and the
+  after-response claim (see "Refref vNext arrival"). Not yet used by checkout (ART-383).
+
 **Next:**
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
@@ -119,6 +122,27 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 | fulfilment | PAID → `fulfillment-ack` DELIVERED (key `mk-fulfil:<ref>`) → FULFILLED |
 | personal data to Refref | the receipt email in the payment session, which PROVIDER fiscalization requires. Nothing else |
 | the switch | closed: no new payment session. Reading back, fulfilment and cancellation go on |
+
+## Refref vNext arrival (ART-382, Refref ADR-139 `docs/29` §2, §4, §6, §8)
+
+TOUR conformance profile. Refref's referral link redirects once, straight to this origin; the public
+site is static and cannot capture anything server-side.
+
+```
+GET  /arrive?arrival=<proof>&to=<site path>   context cookie → 302 to the site page, no Refref wait
+```
+
+| | |
+|---|---|
+| browser context | `__Host-mk_ctx`: 32 random bytes, host-only, Secure, HttpOnly, SameSite=Lax, `Max-Age` 30 days (the Mikluha attribution window), re-set by every arrival. One context per browser: a later arrival reuses it. `/book` and `POST /orders` give one to a buyer without a referral. Carries no buyer identity |
+| proof | `src/arrival.ts`: kept in process memory only, tied to the context, at most 30 minutes after capture, erased by an independent timer even without later requests (also cleared on eviction); never in Postgres, a log, a Location or a page. A restart loses it (accepted, `docs/29` §6). No durable queue |
+| exchange | `claimArrival` is launched after the response through a tracked hook (drained on shutdown), ≤ 500 ms of wall clock including queue admission. Per process: at most 16 active HTTP claims and 64 queued claims (shared with Buy); overflow/queue timeout keeps proof pending, logs `arrival_claim_unknown` with `OVERLOADED`/`QUEUE_TIMEOUT` and yields `TIMEOUT`, allowing a later request to retry. Repeated requests of a context coalesce; a newly captured proof during an attempt gets one tracked follow-up. Every later request of the context retries an unconfirmed claim the same way (single-flight, every 2 s at most; a new arrival is never throttled). The repeat is byte-identical, so a committed claim lost in transit reads back as a replay |
+| before Buy | `Arrivals.beforeBuy` spends ≤ 1,500 ms total using a monotonic deadline, including shared in-flight work and queue waiting, and returns the `deliveryDegraded` value to freeze: `TIMEOUT` (still unconfirmed), `FAILED` (definitive proof refusal or configuration rejection: HTTP 401/403 or `BROWSER_CONTEXT_IDLE_POLICY_REQUIRED`; raw proof erased, no retry for that proof, operator event `arrival_claim_configuration_failed` with status/code only), `EXPIRED` (30 minutes passed). Checkout wires it into the vNext resolution in ART-383; the RC.2 handoff is unchanged until then |
+| refused context | `CONTEXT_CLOSED`/`CONTEXT_SCOPE_MISMATCH`: the next request gets a new context and the unconfirmed proof follows the browser (guest storefront, no account boundary); the old ID is never presented again while this process remembers it |
+| redirect | `to` must be a plain absolute path of `SITE_ORIGIN`; anything else (another host, `//`, backslash, control characters, > 512 characters) goes to the home page. Any `arrival` parameter is dropped |
+| to Refref | the proof, the context ID and `COMMERCE_ORIGIN`. Never a tourist's name, document, date of birth, phone or email |
+| Buy | `/book` posts to `POST /orders` on this origin, a top-level same-origin form, so the context cookie arrives. Never call commerce by cross-origin `fetch` without credentials |
+| configuration | `REFREF_VNEXT_API_BASE` (production: `https://api.refref.ru/v1-vnext`), optional until Refref's staged cutover; unset, arrivals still land and checkout declares the proof undelivered. The Refref Business needs `/arrive` as a verified destination of this origin and an owner `browser_context_idle_policy` row for it |
 
 **The Refref Business needs:**
 - an API key with `integrations:checkout` and `integrations:fulfillment`;
