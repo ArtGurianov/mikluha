@@ -1,5 +1,6 @@
 // A fresh database per test file, migrated by the owner, used by a login that is only a member of
-// commerce_app (the service) and one that is only a member of commerce_operator, as in production. TEST_DATABASE_URL is a superuser on a disposable server.
+// commerce_app (the service), one that is only a member of commerce_operator and one that is only a
+// member of admin_app (the Admin API), as in production. TEST_DATABASE_URL is a superuser on a disposable server.
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,6 +17,7 @@ import { migrate } from '../src/migrate.js';
 const ADMIN = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@127.0.0.1:55432/postgres';
 const RUNTIME_ROLE = 'commerce_test_runtime';
 const OPERATOR_ROLE = 'commerce_test_operator';
+const ADMIN_ROLE = 'commerce_test_admin';
 const PASSWORD = 'commerce-test-only';
 
 export interface TestDb {
@@ -24,9 +26,11 @@ export interface TestDb {
   readonly pool: pg.Pool;
   /** An operator's login (commerce_operator). */
   readonly operator: pg.Pool;
+  /** The Admin API's login (admin_app). */
+  readonly admin: pg.Pool;
   readonly url: URL;
   readonly name: string;
-  drop(): Promise<void>;
+  drop(timeoutMs?: number): Promise<void>;
 }
 
 export async function freshDb(): Promise<TestDb> {
@@ -39,28 +43,51 @@ export async function freshDb(): Promise<TestDb> {
   const owner = new pg.Client({ connectionString: url.toString() });
   await owner.connect();
   await migrate(owner, MIGRATIONS_DIR);
-  for (const [login, role] of [[RUNTIME_ROLE, 'commerce_app'], [OPERATOR_ROLE, 'commerce_operator']]) {
+  for (const [login, role] of [[RUNTIME_ROLE, 'commerce_app'], [OPERATOR_ROLE, 'commerce_operator'], [ADMIN_ROLE, 'admin_app']]) {
     await owner.query(`DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${login}') THEN
         CREATE ROLE ${login} LOGIN PASSWORD '${PASSWORD}' IN ROLE ${role};
       END IF; END $$`);
   }
+  const clientClosures: Promise<void>[] = [];
   const as = (login: string, max: number) => {
     const u = new URL(url);
     u.username = login;
     u.password = PASSWORD;
-    return new pg.Pool({ connectionString: u.toString(), max });
+    const pool = new pg.Pool({ connectionString: u.toString(), max });
+    pool.on('connect', client => {
+      clientClosures.push(new Promise<void>(resolve => { client.once('end', resolve); }));
+    });
+    return pool;
   };
   const pool = as(RUNTIME_ROLE, 12);
   const operator = as(OPERATOR_ROLE, 2);
+  const adminPool = as(ADMIN_ROLE, 4);
+  let teardown: Promise<void> | undefined;
   return {
-    owner, pool, operator, url, name,
-    async drop() {
-      await pool.end();
-      await operator.end();
-      await owner.end();
-      await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);
-      await admin.end();
+    owner, pool, operator, admin: adminPool, url, name,
+    async drop(timeoutMs = 10_000) {
+      // Reuse cleanup after a bounded diagnostic failure, so a test can release its leaked
+      // client and await the same operation instead of ending a pool twice.
+      teardown ??= (async () => {
+        try {
+          await Promise.all([pool.end(), operator.end(), adminPool.end()]);
+          // pg-pool removes clients before their socket-end callbacks finish.
+          await Promise.all(clientClosures);
+          await owner.end();
+          await admin.query(`DROP DATABASE ${name}`);
+        } finally { await admin.end(); }
+      })();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([teardown, new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            const counts = [["runtime", pool], ["operator", operator], ["admin", adminPool]] as const;
+            const detail = counts.map(([label, p]) => `${label}: checkedOut=${p.totalCount - p.idleCount}, waiting=${p.waitingCount}`).join("; ");
+            reject(new Error(`TEST_DATABASE_TEARDOWN_TIMEOUT ${name} after ${timeoutMs}ms (${detail}); release checked-out clients and await drop() again`));
+          }, timeoutMs);
+        })]);
+      } finally { if (timer) clearTimeout(timer); }
     },
   };
 }
