@@ -6,5 +6,6 @@
   { "version": 5, "file": "0005_confirmation_outbox.sql" },
   { "version": 6, "file": "0006_eis_filing.sql" },
   { "version": 7, "file": "0007_processing_instruction.sql" },
-  { "version": 8, "file": "0008_editorial_offers_and_contract_snapshot.sql" }
+  { "version": 8, "file": "0008_editorial_offers_and_contract_snapshot.sql" },
+  { "version": 9, "file": "0009_admin_auth.sql" }
 ]

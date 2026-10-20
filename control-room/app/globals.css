@@ -1,0 +1,39 @@
+:root {
+  color-scheme: light;
+  --paper: #fcfaf4;
+  --ink: #332b26;
+  --muted: #74675d;
+  --line: #e6dbce;
+  --card: #fff;
+  --rust: #bd623c;
+  --rust-dark: #914426;
+  --danger: #a3312a;
+  --ok: #2f6b45;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); line-height: 1.5;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+.bar { display: flex; gap: 1rem; align-items: baseline; padding: 1rem clamp(1rem, 4vw, 2rem); border-bottom: 1px solid var(--line); }
+.brand { font-weight: 700; font-size: 1.2rem; }
+main { max-width: 64rem; margin: 2rem auto; padding: 0 clamp(1rem, 4vw, 2rem) 4rem; }
+h1 { font-size: 1.8rem; margin: 0 0 1rem; }
+h2 { font-size: 1.2rem; margin: 1.5rem 0 .75rem; }
+.muted { color: var(--muted); font-size: .9rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 1rem; padding: 1.25rem; margin-bottom: 1rem; }
+form { display: grid; gap: .9rem; max-width: 24rem; }
+label { display: grid; gap: .3rem; font-weight: 600; font-size: .9rem; }
+input { border: 1px solid #cfc1b3; border-radius: .6rem; padding: .65rem .75rem; font: inherit; }
+input:focus, button:focus { outline: 3px solid #d2815866; outline-offset: 2px; }
+button { border: 0; border-radius: 999px; background: var(--rust); color: #fff; padding: .65rem 1.2rem; font: 600 .95rem inherit; cursor: pointer; justify-self: start; }
+button:hover { background: var(--rust-dark); }
+button.secondary { background: transparent; color: var(--rust-dark); border: 1px solid var(--line); }
+button:disabled { opacity: .6; cursor: default; }
+.error { color: var(--danger); font-weight: 600; }
+.ok { color: var(--ok); }
+.tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.tabs button[aria-pressed="true"] { background: var(--ink); }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th, td { text-align: left; border-bottom: 1px solid var(--line); padding: .5rem .4rem; vertical-align: top; }
+.qr { width: 220px; height: 220px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: .5rem; }
+code.secret { font-size: 1rem; letter-spacing: .08em; word-break: break-all; }
+.row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }

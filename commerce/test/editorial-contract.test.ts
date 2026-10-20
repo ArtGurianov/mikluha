@@ -411,7 +411,7 @@ test('schema restore: a logical dump restored into an empty database enforces th
     await restored.connect();
     const versions = (await restored.query('SELECT version, checksum FROM schema_migrations ORDER BY version')).rows;
     assert.deepEqual(versions, (await db.owner.query('SELECT version, checksum FROM schema_migrations ORDER BY version')).rows);
-    assert.equal(versions.at(-1).version, 8);
+    assert.ok(versions.at(-1).version >= 8);
     await assert.rejects(restored.query('UPDATE departure SET slug = $2 WHERE id = $1', [d.id, 'restored-rename']), /DEPARTURE_IDENTITY_IMMUTABLE/);
     await assert.rejects(restored.query('DELETE FROM departure WHERE id = $1', [d.id]), /DEPARTURE_PUBLISHED_UNDELETABLE/);
     await assert.rejects(restored.query("UPDATE departure SET starts_on = starts_on + 7, ends_on = ends_on + 7 WHERE id = $1", [d.id]), /DEPARTURE_SCHEDULE_LOCKED/);

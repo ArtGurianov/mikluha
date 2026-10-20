@@ -25,12 +25,16 @@ static; everything that sells a trip lives here, with its own Postgres.
   "Editable offers, immutable orders"). Content CRUD (ART-358), `bookingStatus`/capacity
   transitions (ART-366) and documents rendered from the snapshot (ART-362) build on it; the
   checkout still sells from `content/` until then.
+- migration 0009 and the isolated Admin API (ADR v2.3 §7, ART-363): password + TOTP at every
+  login, sessions, OWNER-only publishing, the audited SSH reset, `admin_app`/`admin_operator`
+  logins, and the static Control Room in [`../control-room`](../control-room/README.md). See
+  "Admin API" below. Undeployed.
 
 **Next:**
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
   integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migrations
-  0007 and 0008 need owner-only application and fresh schema-8 logical and PITR recovery evidence
+  0007–0009 need owner-only application and fresh schema-9 logical and PITR recovery evidence
   before future admission. Mikluha
   commerce is undeployed; monitor admission, sales and payments remain closed.
 
@@ -152,25 +156,78 @@ role checker’s `admin_app` support remain owner-installation prerequisites.
 
 ## Database roles
 
-The owner applies migrations. There are two other logins, and neither is a member of the other's role
-(migration 0008 adds the `admin_app` role for the Admin API; its login is created with ART-363):
+The owner applies migrations. There are four other logins, and none is a member of another's role:
 
 | login | role | can | its credential |
 |---|---|---|---|
 | `commerce_runtime` | `commerce_app` | orders, personal data, erasure, read the switch | the service's `DATABASE_URL` (Coolify) |
 | `commerce_operator_login` | `commerce_operator` | change the booking switch; read the local ЕИС filing packet/state; record manual ЕИС evidence | root-only `/etc/mikluha-commerce/operator.env` on the host, never in the service |
+| `admin_runtime` | `admin_app` | Admin accounts (read), sessions, login throttle, audit; tours/departures through the 0008 functions; never orders, personal data, payments, the switch or ЕИС | the Admin API's `ADMIN_DATABASE_URL` (Coolify, the Admin API application only) |
+| `admin_operator_login` | `admin_operator` | create Admin accounts, set passwords, reset TOTP, disable, revoke sessions, clear the throttle; sees no password hash, seed or token hash | root-only `/etc/mikluha-commerce/admin-operator.env` on the host, never in a service |
 
 The service can't change the schema, delete orders or touch the switch. If the service is
 compromised or broken, it still can't reopen sales an operator closed. `fn_set_sales_open` also
-refuses any login that belongs to `commerce_app`, whatever the grants say. Once, as the owner:
+refuses any login that belongs to `commerce_app`, whatever the grants say; the editorial functions
+refuse it too, and every Admin function refuses a login that belongs to commerce (and every
+operator function, one that belongs to `admin_app` or `commerce_app`). Once, as the owner:
 
 ```sql
 CREATE ROLE commerce_runtime LOGIN PASSWORD '<from the secret store>' IN ROLE commerce_app;
 CREATE ROLE commerce_operator_login LOGIN PASSWORD '<from the secret store>' IN ROLE commerce_operator;
+CREATE ROLE admin_runtime LOGIN PASSWORD '<from the secret store>' IN ROLE admin_app;
+CREATE ROLE admin_operator_login LOGIN PASSWORD '<from the secret store>' IN ROLE admin_operator;
 ```
 
 `/etc/mikluha-commerce/operator.env` (root, 0600) holds one line:
 `OPERATOR_DATABASE_URL=postgres://commerce_operator_login:…@<db host>/<db>`.
+`/etc/mikluha-commerce/admin-operator.env` (root, 0600) holds one line:
+`ADMIN_OPERATOR_DATABASE_URL=postgres://admin_operator_login:…@<db host>/<db>`.
+
+## Admin API (migration 0009, ART-363)
+
+ADR v2.3 §7 and the shared standard (`adman-vps-infrastructure/runbooks/application-standards.md`
+§1). The Control Room is static files behind its own Nginx (`../control-room`); that Nginx proxies
+exactly `/api/` to the Admin API and nothing else. The Admin API is **the same image as this
+service, a separate container and a separate login**: `node dist/bin/admin-api.js`. It is never
+routed from `book.*` or the public site (the service has no `/api/` route at all), it refuses a
+request for any host but the Control Room's, and it refuses to start if its login reaches anything
+but `admin_app` or if a service, operator or provider credential is in its environment.
+
+| | |
+|---|---|
+| login | password + TOTP code at every login (RFC 6238: SHA-1, 6 digits, 30 s, ±1 step; `src/admin/totp.ts`, the RFC vectors in `test/admin-totp.test.ts`). The matching step is spent in `fn_admin_totp_accept` under the row lock: a code is accepted once, never at or before the last accepted step; a trigger keeps the step moving forward for every login |
+| seed | AES-256-GCM under `ADMIN_TOTP_KEY`, bound to the account id; the database never sees it in clear, the operator cannot read even the ciphertext |
+| enrolment | open for 24 hours after `user add` or `totp reset`: password → QR code (otpauth URI, drawn in the browser) → the first valid code confirms it and signs in. Closed once confirmed. **No recovery codes, no passkey, no web disable** |
+| lost device | `admin-operator totp reset` over SSH: the seed is deleted, every session revoked, a new 24-hour enrolment window opened, and the reset audited with the operator's name, reason and database login |
+| throttle | one limit for password and code attempts together: 10 per 15 minutes per trusted client source (exactly one `X-Forwarded-For` address, as the booking limiter; anything else shares one bucket) and 20 per account. Buckets are HMAC keys, never addresses or logins. `admin-operator throttle clear` lifts a lock-out |
+| session | a random 256-bit token in `__Host-mk_admin` (HttpOnly, Secure, SameSite=Strict, Path=/); the database stores its SHA-256. 30 minutes idle, 12 hours at most (a CHECK). Refresh rotates the token without extending the 12 hours; logout, revocation of another session, password change, disable and TOTP reset revoke. A session cannot exist without an enabled account and a confirmed second factor (a trigger) |
+| writes | only with `Origin` = the Control Room origin, `Sec-Fetch-Site: same-origin` when sent, and a JSON body |
+| roles | OWNER and EDITOR. Drafts: both. Publishing offers, and later terms, privacy, refund/payment policy and PD consent (`legal.publish`, ART-358): OWNER only. Audit: OWNER only. A refused permission is itself audited |
+| execution changes | publishing a departure whose contract differs from the published one is refused (`EXECUTION_CHANGE_CLASSIFICATION_REQUIRED`) while it has active or concluded orders, under the same departure lock as `reserve()`, until the EQUIVALENT/MATERIAL workflow exists (ART-365) |
+| audit | `admin_audit` is append-only for every login, the owner's included; the database stamps the time and the login. No password, code, seed, token or cookie is ever written to it |
+
+Operator commands, as root on the host, in a one-off container from the image on the database's
+network (never `docker exec` into the Admin API). A password goes on stdin, never in argv:
+
+```bash
+admin() { docker run --rm -i --network "$NET" --env-file /etc/mikluha-commerce/admin-operator.env "$IMG" node dist/bin/admin-operator.js "$@"; }
+admin status
+read -rs PW && printf '%s' "$PW" | admin user add <login> --role OWNER --by <who>; unset PW
+read -rs PW && printf '%s' "$PW" | admin user password <login> --by <who>; unset PW
+admin totp reset <login> --by <who> --reason "<why>"
+admin user disable <login> --by <who> --reason "<why>"
+admin sessions revoke <login> --by <who> --reason "<why>"
+admin throttle clear --by <who> --reason "<why>"
+```
+
+Admin API environment (Coolify, its own application; nothing here is shared with the service):
+
+| variable | |
+|---|---|
+| `ADMIN_DATABASE_URL` | `admin_runtime`, a member of `admin_app` only |
+| `ADMIN_ORIGIN` | the Control Room's https origin, e.g. `https://admin.mikluha-maklai.ru` |
+| `ADMIN_TOTP_KEY` | 32 random bytes, base64url (`node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`). Encrypts every seed: losing it means every account re-enrols through `totp reset`; it needs encrypted custody before deployment |
+| `PORT` | default 3000 (the image's healthcheck port) |
 
 ## Commands
 
