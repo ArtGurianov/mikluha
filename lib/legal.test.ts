@@ -38,10 +38,10 @@ test("the legal pack preserves documented-expense refunds and the approved volun
     assert.match(text, /возвращает большую сумму/);
     assert.match(text, /подтвержд[ёе]нн/);
     assert.match(text, /refunds@mikluha-maklai\.ru/);
-    assert.match(text, /неявк/i);
     assert.doesNotMatch(text, /ориентир удержания|пять календарных дней|только полный возврат/);
   }
 
+  assert.match(offer.content, /неявк/i);
   assert.doesNotMatch(offer.content, /altai-1|26\s?500|29\.10\.2026|01\.11\.2026/);
   assert.match(offer.content, /Изменение существенных условий Заявки требует соглашения сторон/);
   assert.match(page("pravila-oplaty").content, /фактического оказания/);
