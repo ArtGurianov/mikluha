@@ -1,6 +1,6 @@
 tour: altai
-startDate: "2026-10-29"
-endDate: "2026-11-01"
+startDate: "2027-01-05"
+endDate: "2027-01-08"
 bookingStatus: CLOSED
 price: 26500
 capacity: 40
@@ -18,11 +18,11 @@ contract:
     insurance: null
     risks: null
   accommodation:
-    name: null
+    name: "Мини-отель «Фараонова дача»"
     address: null
-    registryNumber: null
+    registryNumber: "С042024009867"
     roomType: null
-    nights: null
+    nights: 3
     meals: null
     legalEntity: null
   carrier:
@@ -36,4 +36,4 @@ organizers:
   - artur
 isListed: false
 isDemo: false
-updatedAt: "2026-10-06"
+updatedAt: "2026-10-20"
