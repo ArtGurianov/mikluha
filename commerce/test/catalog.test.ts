@@ -65,8 +65,11 @@ test('the real Altai draft keeps rescheduled dates, listed hotel registry ID and
   const source = readFileSync(join(MIGRATIONS_DIR, '..', '..', 'content', 'departures', 'altai-1.yml'), 'utf8');
   assert.match(source, /name: "Мини-отель «Фараонова дача»"/);
   assert.match(source, /registryNumber: "С042024009867"/);
+  assert.match(source, /Дворникова, д\\. 7А/);
+  assert.match(source, /legalEntity: "ООО «АЖУР» \\(ИНН 0400006053, ОГРН 1170400004697, КПП 040001001\\)"/);
+  assert.match(source, /category: "нет категории"/);
   assert.match(source, /nights: 3/);
-  // The official address and supplier evidence are still missing: no sellable contract.
+  // Registry extract resolves the address and owner identity, but rooms, meals and other contract fields are still missing.
   assert.equal(d.contract, null);
 });
 
