@@ -32,8 +32,8 @@ Neither old YAML nor a mutable departure may rewrite an accepted order.
 
 ## Reward versus buyer and fiscal obligations
 
-P7 uses the planned tour end plus 14 calendar days (the latest service anchor of
-the purchase), not a merchant SERVICE_RENDERED switch or a fiscal closing
+P7 uses the planned tour end plus 14 calendar days (the latest anchor among the
+purchase's eligible services, D1.1), not a merchant SERVICE_RENDERED switch or a fiscal closing
 receipt. Approved moves cannot add more than 30 calendar days to the initial
 deadline or reopen an expired window. Customer rights and actual
 rendering/fiscal evidence remain independent.
@@ -48,12 +48,15 @@ reconciliation qualified separately.
 
 The Commission is computed once from the after-discount total (P6 rounding) and
 is never split per tourist. Cancelling one tourist of three, with a partial
-refund, preserves the whole Commission (D1/D4). It is zeroed only when the whole
-booking is cancelled — directly, or by provably non-overlapping cancellations
-covering all seats (several documents about the same tourist do not add up) —
-with an independently successful positive refund of this booking (any amount,
+refund, preserves the whole Commission (D1/D4). It is zeroed only when every eligible service of the booking is cancelled —
+directly, or by provably non-overlapping cancellations covering all seats
+(several documents about the same tourist do not add up) — with an independently
+successful refund whose positive amount is allocated to eligible lines by an
+immutable per-line breakdown equal to the bank amount (D1.2; any amount,
 including a partial one when actual costs are lawfully retained) and a timely
-upheld claim. Compensation, no refund and a refund without full cancellation
+upheld claim. A non-eligible add-on (for example a transfer outside the
+campaign) neither extends the deadline nor blocks cancellation, and a refund
+only for it never zeros the Commission (D1.1). Compensation, no refund and a refund without full cancellation
 preserve the reward. Normal cancellation affects only held PENDING and never
 creates partner debt.
 
