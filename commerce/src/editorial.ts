@@ -5,6 +5,9 @@
 
 import type pg from 'pg';
 
+/** A pool, or one client inside a transaction (the Admin API audits a publish in the same one). */
+export type Queryable = pg.Pool | pg.PoolClient;
+
 export type ContentKind = 'report' | 'review' | 'organizer' | 'legal';
 export type Classification = 'EQUIVALENT' | 'MATERIAL';
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
@@ -51,30 +54,30 @@ function refusal(e: unknown): never {
   throw e;
 }
 
-async function call<T>(pool: pg.Pool, sql: string, args: unknown[]): Promise<T> {
+async function call<T>(pool: Queryable, sql: string, args: unknown[]): Promise<T> {
   try {
     return (await pool.query<{ r: T }>(sql, args)).rows[0]!.r;
   } catch (e) { return refusal(e); }
 }
 
-export const createTour = (pool: pg.Pool, slug: string, by: string): Promise<string> =>
+export const createTour = (pool: Queryable, slug: string, by: string): Promise<string> =>
   call(pool, 'SELECT fn_create_tour($1, $2) AS r', [slug, by]);
 
 /** The new departure is CLOSED and unlisted, with draft revision 1 holding the tour's template. */
-export const createDeparture = (pool: pg.Pool, tourId: string, slug: string, by: string): Promise<string> =>
+export const createDeparture = (pool: Queryable, tourId: string, slug: string, by: string): Promise<string> =>
   call(pool, 'SELECT fn_create_departure($1, $2, $3) AS r', [tourId, slug, by]);
 
-export const createContentItem = (pool: pg.Pool, kind: ContentKind, slug: string, by: string): Promise<string> =>
+export const createContentItem = (pool: Queryable, kind: ContentKind, slug: string, by: string): Promise<string> =>
   call(pool, 'SELECT fn_create_content_item($1, $2, $3) AS r', [kind, slug, by]);
 
 /** Save draft never changes what the public sees. `expectedRevision` is the draft revision the editor saw (0: none). */
-export const saveTourDraft = (pool: pg.Pool, id: string, expectedRevision: number, document: Document, by: string): Promise<number> =>
+export const saveTourDraft = (pool: Queryable, id: string, expectedRevision: number, document: Document, by: string): Promise<number> =>
   call(pool, 'SELECT fn_save_tour_draft($1, $2, $3, $4) AS r', [id, expectedRevision, document, by]);
 
-export const saveDepartureDraft = (pool: pg.Pool, id: string, expectedRevision: number, document: Document, by: string): Promise<number> =>
+export const saveDepartureDraft = (pool: Queryable, id: string, expectedRevision: number, document: Document, by: string): Promise<number> =>
   call(pool, 'SELECT fn_save_departure_draft($1, $2, $3, $4) AS r', [id, expectedRevision, document, by]);
 
-export const saveContentDraft = (pool: pg.Pool, id: string, expectedRevision: number, document: Document, by: string): Promise<number> =>
+export const saveContentDraft = (pool: Queryable, id: string, expectedRevision: number, document: Document, by: string): Promise<number> =>
   call(pool, 'SELECT fn_save_content_draft($1, $2, $3, $4) AS r', [id, expectedRevision, document, by]);
 
 export interface Expected {
@@ -83,10 +86,10 @@ export interface Expected {
   readonly publishedVersion: number;
 }
 
-export const publishTour = (pool: pg.Pool, id: string, expected: Expected, by: string): Promise<number> =>
+export const publishTour = (pool: Queryable, id: string, expected: Expected, by: string): Promise<number> =>
   call(pool, 'SELECT fn_publish_tour($1, $2, $3, $4) AS r', [id, expected.draftRevision, expected.publishedVersion, by]);
 
-export const publishContentItem = (pool: pg.Pool, id: string, expected: Expected, by: string): Promise<number> =>
+export const publishContentItem = (pool: Queryable, id: string, expected: Expected, by: string): Promise<number> =>
   call(pool, 'SELECT fn_publish_content_item($1, $2, $3, $4) AS r', [id, expected.draftRevision, expected.publishedVersion, by]);
 
 export interface DeparturePublication {
@@ -103,13 +106,13 @@ export interface DeparturePublication {
  * An exact MATERIAL retry returns the original result; a different notice or classification for
  * the same published version and draft revision conflicts (migration 0010).
  */
-export const publishDeparture = (pool: pg.Pool, id: string, expected: Expected, by: string,
+export const publishDeparture = (pool: Queryable, id: string, expected: Expected, by: string,
   change?: { readonly classification: Classification; readonly notice: string }): Promise<DeparturePublication> =>
   call(pool, 'SELECT fn_publish_departure_change($1, $2, $3, $4, $5, $6) AS r',
     [id, expected.draftRevision, expected.publishedVersion, change?.classification ?? null, change?.notice ?? null, by]);
 
 /** What Control Room shows before asking for a classification: order references and states, no personal data. */
-export async function affectedOrders(pool: pg.Pool, departureId: string): Promise<{ orderRef: string; status: string }[]> {
+export async function affectedOrders(pool: Queryable, departureId: string): Promise<{ orderRef: string; status: string }[]> {
   try {
     const { rows } = await pool.query<{ order_ref: string; status: string }>(
       'SELECT order_ref, status FROM fn_departure_affected_orders($1)', [departureId]);
@@ -127,7 +130,7 @@ export interface NoticeStatus {
 }
 
 /** The per-order notices of one execution change, for Control Room. */
-export async function changeNotices(pool: pg.Pool, changeId: string): Promise<NoticeStatus[]> {
+export async function changeNotices(pool: Queryable, changeId: string): Promise<NoticeStatus[]> {
   const { rows } = await pool.query<{ order_id: string; state: NoticeStatus['state']; attempts: number;
     last_error_code: string | null; accepted_at: Date | null; delivered_at: Date | null }>(
     `SELECT order_id, state, attempts, last_error_code, accepted_at, delivered_at FROM execution_change_notice

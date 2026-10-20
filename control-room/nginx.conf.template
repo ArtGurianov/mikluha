@@ -1,0 +1,79 @@
+# Control Room (ART-363): the static export, plus exactly one proxied prefix, /api/, to the isolated
+# Admin API. Nothing else is proxied. The public site and book.* never route here, and this server
+# never routes to them. Rendered by the nginx image's envsubst at start; only ${ADMIN_API_UPSTREAM}
+# is substituted (host:port of the Admin API container on the Control Room's private network).
+
+# One bound on all login, enrolment and refresh traffic together, in front of the Admin API's own
+# per-source, per-account and in-process limits. Behind Traefik every request arrives from the proxy's
+# address, so this zone is keyed on a constant: it is a global cap, not a per-client one.
+limit_req_zone $server_name zone=admin_auth:1m rate=2r/s;
+
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+    server_tokens off;
+
+    # Request logs would hold admin addresses; who did what is in the Admin API's own audit.
+    access_log off;
+
+    # Docker's embedded DNS, re-resolved every 10 s: a redeployed Admin API (new address) needs no
+    # reload here, and Nginx starts even while the API is down (it answers 502 until it is back).
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    # nginx does not inherit add_header into a location that sets its own: repeated where needed.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Robots-Tag "noindex, nofollow" always;
+    add_header Cache-Control "no-store" always;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    error_page 404 /404.html;
+    location = /404.html {
+        internal;
+    }
+
+    # Content-hashed build output.
+    location /_next/static/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    # At server level, so both /api/ locations below see it.
+    set $admin_api http://${ADMIN_API_UPSTREAM};
+
+    location /api/ {
+        # Draft documents are at most 256 KiB (migration 0008); the API refuses more on its own too.
+        client_max_body_size 320k;
+        # A variable upstream passes the original request URI unchanged.
+        proxy_pass $admin_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        # The Admin API refuses any other host, so a misrouted proxy fails closed.
+        proxy_set_header Host $host;
+        # Traefik replaces any client-sent X-Forwarded-For with the one client address it saw; pass it
+        # through unchanged so the login throttle keys on it (the API trusts exactly one address).
+        proxy_set_header X-Forwarded-For $http_x_forwarded_for;
+        proxy_set_header X-Real-IP "";
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+        proxy_buffering off;
+
+        # The proxy settings above are inherited; proxy_pass is not, so it is repeated.
+        location /api/auth/ {
+            client_max_body_size 4k;
+            limit_req zone=admin_auth burst=20 nodelay;
+            limit_req_status 429;
+            proxy_pass $admin_api;
+        }
+    }
+}

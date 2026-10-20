@@ -93,3 +93,35 @@ jobs:
       - name: Image
         working-directory: .
         run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=${{ github.event.pull_request.head.sha }} -t mikluha-commerce:ci .
+
+  # The static Control Room (control-room/README.md, ART-363): its own package; `build` ends with the
+  # no-secret check over the exported files, and the image is built as Coolify would.
+  control-room:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: control-room
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: control-room/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - run: pnpm run typecheck
+
+      - run: pnpm test
+
+      - run: pnpm run build
+
+      - name: Image
+        run: docker build --build-arg SOURCE_COMMIT=${{ github.event.pull_request.head.sha }} -t mikluha-control-room:ci .

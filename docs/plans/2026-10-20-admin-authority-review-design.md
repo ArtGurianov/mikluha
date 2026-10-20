@@ -1,0 +1,11 @@
+# ART-363 review corrections
+
+The supplied review requires SQL prevention for the single `admin_runtime` credential, replay-proof audit and historical verification after key rotation. Reconciliation after a bypass would permit an unauthorized financial/editorial change before detection. A verification secret in PostgreSQL would expand custody and duplicate API authentication. The bounded choice is a second, disjoint publication capability.
+
+`admin_app` keeps authentication, sessions, reads and drafts. It loses every publish/classify EXECUTE grant. `admin_publisher` has only publication, minimal live-account/session reads and locks, and attested audit insertion. The isolated Admin API uses its independent credential after OWNER admission and rechecks the live session under the existing account → session locks inside the publication transaction. Startup rejects mixed capabilities. The publication credential and the API process remain trusted authorities; this does not promise protection after their compromise.
+
+Audit signs a random event UUID, key version, actual DB login and event content. UUID uniqueness plus DB-stamped, append-only identity/time/login prevents copied valid rows from creating new trusted events; a new UUID or changed login invalidates the signature. Independent active audit keys sign new events; retained old keys only verify. A missing historical key produces UNVERIFIABLE, while a bad MAC under a known key produces FORGED. Missing active configuration stops startup.
+
+Migration 0011 has not been applied on the host according to ART-363/PR #44 implementation evidence and is corrected before first installation. Do not rewrite any applied migration: an installation that already has earlier 0011 bytes requires a separate forward migration. Migration, role creation, credential installation, key custody and deployment remain owner-authorized ART-393 steps.
+
+Validation: real PostgreSQL login privilege tests, HTTP OWNER/non-OWNER/forged/revoked session tests, revocation races, actual valid-signature replay, key rotation and lost-key tests, full commerce suite and hosted CI. Infrastructure #13 records the fifth capability and its recursive closure in backup/restore drift comparison; its final commit gets independent Local CI attestation. No host mutation or custody capture is part of this change.

@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "public/admin/sveltia-cms.js",
     // A separate service with its own package and checks (commerce/README.md).
     "commerce/**",
+    // The static Control Room: its own package and build (control-room/README.md).
+    "control-room/**",
   ]),
 ]);
 

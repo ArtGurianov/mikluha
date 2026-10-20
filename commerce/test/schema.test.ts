@@ -53,7 +53,7 @@ test('0010 upgrades populated schema 9 without rewriting its history and closes 
     await client.query('SELECT fn_publish_departure($1, 2, 0, $2)', [dep, 'owner']);
     await client.query('UPDATE departure SET is_listed = true WHERE id = $1', [dep]);
     assert.equal((await client.query('SELECT count(*)::int AS n FROM public_departure')).rows[0].n, 1);
-    assert.deepEqual(await migrate(client, MIGRATIONS_DIR), [10]);
+    assert.deepEqual(await migrate(client, MIGRATIONS_DIR), Array.from({ length: schemaHead(MIGRATIONS_DIR) - 9 }, (_, i) => 10 + i));
     assert.deepEqual((await client.query('SELECT * FROM schema_migrations WHERE version <= 9 ORDER BY version')).rows, history);
     assert.equal((await client.query('SELECT count(*)::int AS n FROM public_departure')).rows[0].n, 0);
     assert.equal((await client.query('SELECT count(*)::int AS n FROM departure_revision WHERE departure_id = $1', [dep])).rows[0].n, 1);

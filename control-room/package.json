@@ -1,0 +1,26 @@
+{
+  "name": "mikluha-control-room",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Static Control Room for the isolated Admin API (ART-363). Not part of the public site.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && node scripts/check-bundle.mjs out",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "next": "16.3.1",
+    "qrcode": "^1.5.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@10.29.3"
+}

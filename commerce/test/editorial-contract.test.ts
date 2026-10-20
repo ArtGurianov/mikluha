@@ -50,7 +50,7 @@ async function publishedTour(): Promise<{ id: string; slug: string }> {
   const slug = uniq('tour');
   const id = (await db.admin.query<{ id: string }>('SELECT fn_create_tour($1, $2) AS id', [slug, 'editor'])).rows[0]!.id;
   await db.admin.query('SELECT fn_save_tour_draft($1, 0, $2, $3)', [id, tourDoc(slug), 'editor']);
-  await db.admin.query('SELECT fn_publish_tour($1, 1, 0, $2)', [id, 'owner']);
+  await db.publisher.query('SELECT fn_publish_tour($1, 1, 0, $2)', [id, 'owner']);
   return { id, slug };
 }
 
@@ -68,10 +68,10 @@ async function newDeparture(publish = true, over: Record<string, unknown> = {}):
 }
 
 /** Save `over` as a new draft, then publish it with the versions just seen. */
-async function republish(d: Dep, over: Record<string, unknown>, pool: pg.Pool = db.admin): Promise<void> {
+async function republish(d: Dep, over: Record<string, unknown>, pool: pg.Pool = db.publisher): Promise<void> {
   if (Object.keys(over).length > 0 || d.version > 0) {
     const doc = (await db.owner.query('SELECT document FROM departure_draft WHERE departure_id = $1', [d.id])).rows[0].document;
-    await pool.query('SELECT fn_save_departure_draft($1, $2, $3, $4)', [d.id, d.draft, { ...doc, ...over }, 'editor']);
+    await db.admin.query('SELECT fn_save_departure_draft($1, $2, $3, $4)', [d.id, d.draft, { ...doc, ...over }, 'editor']);
     d.draft += 1;
   }
   await pool.query('SELECT fn_publish_departure($1, $2, $3, $4)', [d.id, d.draft, d.version, 'owner']);
@@ -140,7 +140,7 @@ describe('roles', () => {
   test('a login that is both Admin and service is refused by the editorial functions themselves', async () => {
     await db.owner.query(`DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'commerce_test_admin_service') THEN
-        CREATE ROLE commerce_test_admin_service LOGIN PASSWORD 'commerce-test-only' IN ROLE admin_app, commerce_app;
+        CREATE ROLE commerce_test_admin_service LOGIN PASSWORD 'commerce-test-only' IN ROLE admin_app, admin_publisher, commerce_app;
       END IF; END $$`);
     const u = new URL(db.url);
     u.username = 'commerce_test_admin_service';
@@ -158,28 +158,28 @@ describe('editorial revisions', () => {
     const d = await newDeparture();
     await db.admin.query('SELECT fn_save_departure_draft($1, 2, $2, $3)', [d.id, departureDoc(d.slug, { priceKopecks: 3_900_000 }), 'editor']);
     assert.equal(Number((await publicRow(d.id)).price_kopecks), 3_400_000);
-    await db.admin.query('SELECT fn_publish_departure($1, 3, 1, $2)', [d.id, 'owner']);
+    await db.publisher.query('SELECT fn_publish_departure($1, 3, 1, $2)', [d.id, 'owner']);
     const row = await publicRow(d.id);
     assert.equal(Number(row.price_kopecks), 3_900_000);
     assert.equal(row.published_version, 2);
     const revs = (await db.admin.query('SELECT version, draft_revision, document, document_sha256, published_by, login_role FROM departure_revision WHERE departure_id = $1 ORDER BY version', [d.id])).rows;
     assert.deepEqual(revs.map((r) => [r.version, r.draft_revision, r.document.priceKopecks, r.published_by, r.login_role]),
-      [[1, 2, 3_400_000, 'owner', 'commerce_test_admin'], [2, 3, 3_900_000, 'owner', 'commerce_test_admin']]);
+      [[1, 2, 3_400_000, 'owner', 'commerce_test_admin_publisher'], [2, 3, 3_900_000, 'owner', 'commerce_test_admin_publisher']]);
     for (const r of revs) assert.match(r.document_sha256, /^sha256:[0-9a-f]{64}$/);
   });
 
   test('a stale draft revision or published version is a conflict, not an overwrite', async () => {
     const d = await newDeparture();
     await assert.rejects(db.admin.query('SELECT fn_save_departure_draft($1, 0, $2, $3)', [d.id, departureDoc(d.slug), 'tab']), /DRAFT_REVISION_CONFLICT/);
-    await assert.rejects(db.admin.query('SELECT fn_publish_departure($1, 1, 0, $2)', [d.id, 'tab']), /PUBLISHED_VERSION_CONFLICT/);
-    await assert.rejects(db.admin.query('SELECT fn_publish_departure($1, 7, 1, $2)', [d.id, 'tab']), /DRAFT_REVISION_CONFLICT/);
+    await assert.rejects(db.publisher.query('SELECT fn_publish_departure($1, 1, 0, $2)', [d.id, 'tab']), /PUBLISHED_VERSION_CONFLICT/);
+    await assert.rejects(db.publisher.query('SELECT fn_publish_departure($1, 7, 1, $2)', [d.id, 'tab']), /DRAFT_REVISION_CONFLICT/);
   });
 
   test('two concurrent publishes with one expected version: one wins, the other conflicts', async () => {
     const d = await newDeparture();
     await db.admin.query('SELECT fn_save_departure_draft($1, 2, $2, $3)', [d.id, departureDoc(d.slug, { priceKopecks: 3_500_000 }), 'editor']);
-    const a = await db.admin.connect();
-    const b = await db.admin.connect();
+    const a = await db.publisher.connect();
+    const b = await db.publisher.connect();
     try {
       await a.query('BEGIN');
       await a.query('SELECT fn_publish_departure($1, 3, 1, $2)', [d.id, 'tab-a']);
@@ -193,9 +193,9 @@ describe('editorial revisions', () => {
 
   test('an invalid document or an unpublished tour is refused at publish', async () => {
     const d = await newDeparture(false, { timezone: 'Mars/Olympus' });
-    await assert.rejects(db.admin.query('SELECT fn_publish_departure($1, 2, 0, $2)', [d.id, 'owner']), /DEPARTURE_DOCUMENT_INVALID/);
+    await assert.rejects(db.publisher.query('SELECT fn_publish_departure($1, 2, 0, $2)', [d.id, 'owner']), /DEPARTURE_DOCUMENT_INVALID/);
     await db.admin.query('SELECT fn_save_departure_draft($1, 2, $2, $3)', [d.id, { ...departureDoc(d.slug), extra: 1 }, 'editor']);
-    await assert.rejects(db.admin.query('SELECT fn_publish_departure($1, 3, 0, $2)', [d.id, 'owner']), /DEPARTURE_DOCUMENT_INVALID/);
+    await assert.rejects(db.publisher.query('SELECT fn_publish_departure($1, 3, 0, $2)', [d.id, 'owner']), /DEPARTURE_DOCUMENT_INVALID/);
     // A departure of an unpublished tour cannot even be created (0009): nothing to resolve it from.
     const tour = (await db.admin.query('SELECT fn_create_tour($1, $2) AS id', [uniq('tour'), 'editor'])).rows[0].id;
     await assert.rejects(db.admin.query('SELECT fn_create_departure($1, $2, $3)', [tour, uniq('x'), 'editor']), /TOUR_NOT_PUBLISHED/);
@@ -232,7 +232,7 @@ describe('identity', () => {
     const d = await newDeparture(false);
     const renamed = uniq('renamed');
     await db.admin.query('SELECT fn_save_departure_draft($1, 2, $2, $3)', [d.id, departureDoc(renamed), 'editor']);
-    await db.admin.query('SELECT fn_publish_departure($1, 3, 0, $2)', [d.id, 'owner']);
+    await db.publisher.query('SELECT fn_publish_departure($1, 3, 0, $2)', [d.id, 'owner']);
     assert.equal((await publicRow(d.id)).slug, renamed);
   });
 
@@ -306,7 +306,7 @@ describe('date lock', () => {
     const tour = await publishedTour();
     const id = (await db.admin.query('SELECT fn_create_departure($1, $2, $3) AS id', [tour.id, 'altai-legacy', 'editor'])).rows[0].id;
     await db.admin.query('SELECT fn_save_departure_draft($1, 1, $2, $3)', [id, departureDoc('altai-legacy'), 'editor']);
-    await assert.rejects(db.admin.query('SELECT fn_publish_departure($1, 2, 0, $2)', [id, 'owner']), /DEPARTURE_SCHEDULE_LOCKED/);
+    await assert.rejects(db.publisher.query('SELECT fn_publish_departure($1, 2, 0, $2)', [id, 'owner']), /DEPARTURE_SCHEDULE_LOCKED/);
     await db.owner.query("UPDATE orders SET status = 'EXPIRED', closed_at = now() WHERE departure_slug = 'altai-legacy'");
   });
 
@@ -332,7 +332,7 @@ describe('the order contract snapshot', () => {
     const doc = (await db.owner.query('SELECT document FROM departure_draft WHERE departure_id = $1', [d.id])).rows[0].document;
     await db.admin.query('SELECT fn_save_departure_draft($1, $2, $3, $4)', [d.id, d.draft,
       { ...doc, contract: { ...contract, tour: { ...contract.tour, program: [{ title: 'День 1', items: ['Новая программа'] }] } } }, 'editor']);
-    await db.admin.query('SELECT fn_publish_departure_change($1, $2, $3, $4, $5, $6)',
+    await db.publisher.query('SELECT fn_publish_departure_change($1, $2, $3, $4, $5, $6)',
       [d.id, d.draft + 1, d.version, 'EQUIVALENT', 'Экскурсия заменена равноценной', 'owner']);
     const afterRow = (await db.owner.query('SELECT contract_snapshot::text AS s, contract_snapshot_sha256 AS h, contract_snapshot AS j, unit_price_kopecks FROM orders WHERE order_ref = $1', [ref])).rows[0];
     assert.equal(afterRow.s, before.s);
@@ -408,7 +408,7 @@ test('schema restore: a logical dump restored into an empty database enforces th
     { ...doc, contract: { ...doc.contract, tour: { ...doc.contract.tour, route: 'Изменённый маршрут' } } }, 'editor']);
   const changeArgs = [d.id, d.draft + 1, d.version, 'MATERIAL', 'Маршрут недоступен.', 'owner'];
   const changeSql = 'SELECT fn_publish_departure_change($1, $2, $3, $4, $5, $6) AS r';
-  const change = (await db.admin.query(changeSql, changeArgs)).rows[0].r;
+  const change = (await db.publisher.query(changeSql, changeArgs)).rows[0].r;
   const { stdout: dump } = await run('pg_dump', ['--no-password', db.url.toString()], { maxBuffer: 64 * 1024 * 1024 });
   const name = `${db.name}_restore`;
   await db.owner.query(`CREATE DATABASE ${name}`);

@@ -1,6 +1,6 @@
 // A fresh database per test file, migrated by the owner, used by a login that is only a member of
-// commerce_app (the service), one that is only a member of commerce_operator and one that is only a
-// member of admin_app (the Admin API), as in production. TEST_DATABASE_URL is a superuser on a disposable server.
+// commerce_app (the service), one that is only a member of commerce_operator, one that is only a
+// member of admin_app (the Admin API) and one that is only a member of admin_operator, as in production. TEST_DATABASE_URL is a superuser on a disposable server.
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,6 +18,8 @@ const ADMIN = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@127
 const RUNTIME_ROLE = 'commerce_test_runtime';
 const OPERATOR_ROLE = 'commerce_test_operator';
 const ADMIN_ROLE = 'commerce_test_admin';
+const PUBLISHER_ROLE = 'commerce_test_admin_publisher';
+const ADMIN_OPERATOR_ROLE = 'commerce_test_admin_operator';
 const PASSWORD = 'commerce-test-only';
 
 export interface TestDb {
@@ -28,6 +30,9 @@ export interface TestDb {
   readonly operator: pg.Pool;
   /** The Admin API's login (admin_app). */
   readonly admin: pg.Pool;
+  readonly publisher: pg.Pool;
+  /** An admin operator's login (admin_operator), as over SSH. */
+  readonly adminOperator: pg.Pool;
   readonly url: URL;
   readonly name: string;
   drop(timeoutMs?: number): Promise<void>;
@@ -43,7 +48,8 @@ export async function freshDb(): Promise<TestDb> {
   const owner = new pg.Client({ connectionString: url.toString() });
   await owner.connect();
   await migrate(owner, MIGRATIONS_DIR);
-  for (const [login, role] of [[RUNTIME_ROLE, 'commerce_app'], [OPERATOR_ROLE, 'commerce_operator'], [ADMIN_ROLE, 'admin_app']]) {
+  for (const [login, role] of [[RUNTIME_ROLE, 'commerce_app'], [OPERATOR_ROLE, 'commerce_operator'], [ADMIN_ROLE, 'admin_app'],
+    [ADMIN_OPERATOR_ROLE, 'admin_operator'], [PUBLISHER_ROLE, 'admin_publisher']]) {
     await owner.query(`DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${login}') THEN
         CREATE ROLE ${login} LOGIN PASSWORD '${PASSWORD}' IN ROLE ${role};
@@ -63,15 +69,17 @@ export async function freshDb(): Promise<TestDb> {
   const pool = as(RUNTIME_ROLE, 12);
   const operator = as(OPERATOR_ROLE, 2);
   const adminPool = as(ADMIN_ROLE, 4);
+  const publisher = as(PUBLISHER_ROLE, 4);
+  const adminOperator = as(ADMIN_OPERATOR_ROLE, 2);
   let teardown: Promise<void> | undefined;
   return {
-    owner, pool, operator, admin: adminPool, url, name,
+    owner, pool, operator, admin: adminPool, adminOperator, publisher, url, name,
     async drop(timeoutMs = 10_000) {
       // Reuse cleanup after a bounded diagnostic failure, so a test can release its leaked
       // client and await the same operation instead of ending a pool twice.
       teardown ??= (async () => {
         try {
-          await Promise.all([pool.end(), operator.end(), adminPool.end()]);
+          await Promise.all([pool.end(), operator.end(), adminPool.end(), adminOperator.end(), publisher.end()]);
           // pg-pool removes clients before their socket-end callbacks finish.
           await Promise.all(clientClosures);
           await owner.end();
