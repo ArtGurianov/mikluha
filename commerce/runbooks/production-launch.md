@@ -182,16 +182,22 @@ both dates, `sha256:<actual signed-file digest>` and an opaque private-store ref
 copy the signed file or a credential-bearing URL into Git, Linear, Refref or public documents.
 This runbook does not attest or perform that write.
 
-The currently recorded real recovery proofs were for schema 6. Applying migrations 0007 and 0008
-is an owner-only production write; before future admission, obtain fresh logical and PITR recovery
-evidence for schema 8 and its exact recovery image. Existing timers are not a proof of the new
-schema, and this PR does not advance monitor admission.
+The currently recorded real recovery proofs were for schema 6. Applying migrations 0007–0010
+is an owner-only production write; before future admission, obtain fresh logical and PITR
+recovery evidence for schema 10 and its exact recovery image. Existing timers are not a proof of the
+new schema, and this PR does not advance monitor admission.
 
-Schema 8 recovery evidence must show, on the restored copy: `schema_migrations` 1–8 with the
+Schema 10 recovery evidence must show, on the restored copy: `schema_migrations` 1–10 with the
 checksums of this repository; the 0008 triggers present and enforcing (an UPDATE of a published
 departure's slug fails `DEPARTURE_IDENTITY_IMMUTABLE`, its DELETE `DEPARTURE_PUBLISHED_UNDELETABLE`,
 an UPDATE of an order's `contract_snapshot` `ORDER_CONTRACT_SNAPSHOT_IMMUTABLE`, run inside
-`BEGIN … ROLLBACK`); and every stored snapshot still matching its `contract_snapshot_sha256`.
+`BEGIN … ROLLBACK`); the 0009 history append-only (a DELETE from `editorial_audit` or
+`departure_execution_change` fails `EDITORIAL_HISTORY_IMMUTABLE`) and the execution-change notices
+with their states; the 0010 unique execution-change identity and MATERIAL retry behavior, with
+fail-closed departure/report visibility for an unlisted organizer; and every stored snapshot still
+matching its `contract_snapshot_sha256`. Migration 0010 must not rewrite existing execution-change
+history: if a preexisting schema-9 database contains duplicate classification identities, stop
+and resolve that history through a separately reviewed owner procedure before migration admission.
 `test/editorial-contract.test.ts` runs the same checks against a `pg_dump` restore in CI; it is a
 test of the dump format, not recovery evidence for production.
 
@@ -254,6 +260,24 @@ Both searches must return no match. Do not test with a real document token. If t
 log records request paths, disable that access log for this traffic or install a reviewed redaction
 mechanism before launch; application-level logging cannot repair a token already stored by the
 proxy. Keep the exact proxy configuration and synthetic-test result as launch evidence.
+
+The Refref vNext arrival proof (`/arrive?arrival=…`, ART-382) is a bearer credential for 30 minutes
+and gets the same gate before vNext is admitted for this origin. Use a synthetic proof that Refref
+never issued:
+
+```bash
+SYNTHETIC_PROOF=ar1.SYNTHETICSYNTHETICSYNTHETICSYNTHETICSYNTHETI
+curl --silent --output /dev/null --write-out '%{http_code} %{redirect_url}\n' \
+  "https://book.mikluha-maklai.ru/arrive?arrival=$SYNTHETIC_PROOF&to=%2F"
+
+docker logs --since 2m coolify-proxy 2>&1 | grep -F "$SYNTHETIC_PROOF"
+docker logs --since 2m "$C" 2>&1 | grep -F "$SYNTHETIC_PROOF"
+```
+
+Expect `302 https://mikluha-maklai.ru/` (no proof in the Location) and no match in either log. The
+reviewed Traefik baseline in `adman-vps-infrastructure` (`config/traefik/data/coolify/proxy/docker-compose.yml`)
+sets no access log today; if one is ever enabled, exclude the `book.*` router or redact the query
+before admitting vNext.
 
 ## 7. Legal-release parity and readiness
 

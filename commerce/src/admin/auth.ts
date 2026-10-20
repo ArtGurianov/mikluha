@@ -1,4 +1,4 @@
-// Admin accounts, the login throttle, sessions and audit (migration 0009). Every write here runs as
+// Admin accounts, the login throttle, sessions and audit (migration 0011). Every write here runs as
 // the Admin API's own login (admin_app); the database refuses what this module should never do.
 
 import { createHash, createHmac, hkdfSync, randomBytes } from 'node:crypto';
@@ -98,44 +98,50 @@ export interface Session {
   readonly adminId: string;
   readonly login: string;
   readonly role: Role;
-  readonly createdAt: Date;
   readonly idleExpiresAt: Date;
   readonly absoluteExpiresAt: Date;
+  /** The AUTH.LOGIN audit row of the password + TOTP login that admitted this session. */
+  readonly authAuditId: number;
 }
 
 export interface IssuedSession { readonly token: string; readonly session: Session }
 
-/** A random 256-bit token; the database keeps only its SHA-256. */
-export async function openSession(db: pg.Pool | pg.PoolClient, account: Pick<Account, 'id' | 'login' | 'role'>, now: Date,
-  rotated?: { from: string; absoluteExpiresAt: Date }): Promise<IssuedSession> {
+type SessionRow = { out_session_id: string; out_auth_audit_id: string; out_idle_expires_at: Date; out_absolute_expires_at: Date };
+const issued = (account: Pick<Account, 'id' | 'login' | 'role'>, token: string, r: SessionRow): IssuedSession => ({ token,
+  session: { id: r.out_session_id, adminId: account.id, login: account.login, role: account.role, authAuditId: Number(r.out_auth_audit_id),
+    idleExpiresAt: r.out_idle_expires_at, absoluteExpiresAt: r.out_absolute_expires_at } });
+
+/**
+ * Spends the matched TOTP step, writes AUTH.LOGIN and opens the session, in one database call
+ * (fn_admin_login). Undefined when the step was already spent. A random 256-bit token; the database
+ * keeps only its SHA-256.
+ */
+export async function login(pool: pg.Pool, account: Pick<Account, 'id' | 'login' | 'role'>, step: number, confirming: boolean,
+  now: Date): Promise<IssuedSession | undefined> {
   const token = randomBytes(32).toString('base64url');
-  const absolute = rotated?.absoluteExpiresAt ?? new Date(now.getTime() + SESSION_ABSOLUTE_MS);
-  const idle = new Date(Math.min(now.getTime() + SESSION_IDLE_MS, absolute.getTime()));
-  const { rows } = await db.query<{ id: string; created_at: Date }>(`INSERT INTO admin_session
-    (admin_id, token_sha256, created_at, last_seen_at, idle_expires_at, absolute_expires_at, rotated_from)
-    VALUES ($1, $2, $3, $3, $4, $5, $6) RETURNING id, created_at`,
-  [account.id, tokenHash(token), now, idle, absolute, rotated?.from ?? null]);
-  return { token, session: { id: rows[0]!.id, adminId: account.id, login: account.login, role: account.role,
-    createdAt: rows[0]!.created_at, idleExpiresAt: idle, absoluteExpiresAt: absolute } };
+  const { rows } = await pool.query<SessionRow>('SELECT * FROM fn_admin_login($1, $2, $3, $4, $5, $6)',
+    [account.id, step, confirming, tokenHash(token), now, SESSION_IDLE_MS / 1000]);
+  return rows[0] && issued(account, token, rows[0]);
 }
 
 /** The live session a token names, its idle expiry moved forward; undefined for anything else. */
 export async function touchSession(pool: pg.Pool, token: string, now: Date): Promise<Session | undefined> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return undefined;
-  const { rows } = await pool.query<{ id: string; admin_id: string; login: string; role: Role; created_at: Date; idle_expires_at: Date; absolute_expires_at: Date }>(
+  const { rows } = await pool.query<{ id: string; admin_id: string; login: string; role: Role; idle_expires_at: Date;
+    absolute_expires_at: Date; auth_audit_id: string }>(
     `UPDATE admin_session s SET last_seen_at = $2,
        idle_expires_at = least($2::timestamptz + make_interval(secs => $3), s.absolute_expires_at)
      FROM admin_user u
      WHERE s.token_sha256 = $1 AND u.id = s.admin_id AND u.disabled_at IS NULL AND s.revoked_at IS NULL
        AND s.idle_expires_at > $2 AND s.absolute_expires_at > $2
-     RETURNING s.id, s.admin_id, u.login, u.role, s.created_at, s.idle_expires_at, s.absolute_expires_at`,
+     RETURNING s.id, s.admin_id, u.login, u.role, s.idle_expires_at, s.absolute_expires_at, s.auth_audit_id`,
   [tokenHash(token), now, SESSION_IDLE_MS / 1000]);
   const r = rows[0];
-  return r && { id: r.id, adminId: r.admin_id, login: r.login, role: r.role, createdAt: r.created_at,
-    idleExpiresAt: r.idle_expires_at, absoluteExpiresAt: r.absolute_expires_at };
+  return r && { id: r.id, adminId: r.admin_id, login: r.login, role: r.role, idleExpiresAt: r.idle_expires_at,
+    absoluteExpiresAt: r.absolute_expires_at, authAuditId: Number(r.auth_audit_id) };
 }
 
-export type RevokeReason = 'LOGOUT' | 'REFRESH' | 'REVOKED';
+export type RevokeReason = 'LOGOUT' | 'REVOKED';
 
 /** Revokes a live session of this account; false if there was none to revoke. */
 export async function revokeSession(db: pg.Pool | pg.PoolClient, adminId: string, sessionId: string, reason: RevokeReason, now: Date): Promise<boolean> {
@@ -144,20 +150,12 @@ export async function revokeSession(db: pg.Pool | pg.PoolClient, adminId: string
   return rowCount === 1;
 }
 
-/** A new token for the same session lifetime; the old one stops working in the same transaction. */
-export async function rotateSession(pool: pg.Pool, current: Session, now: Date): Promise<IssuedSession | undefined> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    if (!await revokeSession(client, current.adminId, current.id, 'REFRESH', now)) { await client.query('ROLLBACK'); return undefined; }
-    const issued = await openSession(client, { id: current.adminId, login: current.login, role: current.role }, now,
-      { from: current.id, absoluteExpiresAt: current.absoluteExpiresAt });
-    await client.query('COMMIT');
-    return issued;
-  } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
-  } finally { client.release(); }
+/** A new token for the same session lifetime and authentication; the old one stops working at once. */
+export async function rotateSession(pool: pg.Pool, token: string, current: Session, now: Date): Promise<IssuedSession | undefined> {
+  const fresh = randomBytes(32).toString('base64url');
+  const { rows } = await pool.query<SessionRow>('SELECT * FROM fn_admin_session_rotate($1, $2, $3, $4)',
+    [tokenHash(token), tokenHash(fresh), now, SESSION_IDLE_MS / 1000]);
+  return rows[0] && issued({ id: current.adminId, login: current.login, role: current.role }, fresh, rows[0]);
 }
 
 export async function liveSessions(pool: pg.Pool, adminId: string, now: Date) {

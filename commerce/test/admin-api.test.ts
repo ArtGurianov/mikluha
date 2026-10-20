@@ -268,36 +268,79 @@ describe('the boundary', () => {
     assert.ok(!JSON.stringify(log.body).includes(PASSWORD));
   });
 
-  test('a contract change of a departure with orders waits for its classification workflow', async () => {
+  test('publishing and classification: OWNER only, from the live session, linked to its login', async () => {
     const owner = await enrolled('exec-owner');
+    const editor = await enrolled('exec-editor', 'EDITOR');
     const tour = (await call('POST', '/api/tours', { cookie: owner.cookie, body: { slug: 'exec-tour' } })).body.id as string;
     await call('PUT', `/api/tours/${tour}/draft`, { cookie: owner.cookie,
       body: { expectedRevision: 0, document: { slug: 'exec-tour', title: 'Алтай', contract: null, content: {} } } });
-    await call('POST', `/api/tours/${tour}/publish`, { cookie: owner.cookie, body: { expectedDraftRevision: 1, expectedPublishedVersion: 0 } });
-    const dep = (await call('POST', '/api/departures', { cookie: owner.cookie, body: { slug: 'altai-admin', tourId: tour } })).body.id as string;
+    assert.equal((await call('POST', `/api/tours/${tour}/publish`, { cookie: owner.cookie, body: { expectedDraftRevision: 1, expectedPublishedVersion: 0 } })).status, 200);
+    const dep = (await call('POST', '/api/departures', { cookie: editor.cookie, body: { slug: 'altai-admin', tourId: tour } })).body.id as string;
     const { tour: t, departure: { departureTime: _d, returnTime: _r, ...d } } = catalog.departures.get('altai-admin')!.contract!;
     const doc = { slug: 'altai-admin', startsOn: '2027-07-01', endsOn: '2027-07-04', departureTime: '06:00', returnTime: '21:00',
       timezone: 'Asia/Krasnoyarsk', priceKopecks: 3_000_000, contract: { tour: t, departure: d }, content: {} };
-    const save = (rev: number, document: unknown) => call('PUT', `/api/departures/${dep}/draft`, { cookie: owner.cookie, body: { expectedRevision: rev, document } });
-    const pub = (draft: number, version: number) => call('POST', `/api/departures/${dep}/publish`, { cookie: owner.cookie,
-      body: { expectedDraftRevision: draft, expectedPublishedVersion: version } });
-    assert.equal((await save(0, doc)).status, 200);
-    assert.equal((await pub(1, 0)).status, 200);
+    const save = (rev: number, document: unknown) => call('PUT', `/api/departures/${dep}/draft`, { cookie: editor.cookie, body: { expectedRevision: rev, document } });
+    const pub = (cookie: string | undefined, draft: number, version: number, extra: Record<string, unknown> = {}) =>
+      call('POST', `/api/departures/${dep}/publish`, { ...(cookie ? { cookie } : {}),
+        body: { expectedDraftRevision: draft, expectedPublishedVersion: version, ...extra } });
+    // A new departure starts with draft revision 1 (the tour template, ART-358).
+    assert.equal((await save(1, doc)).status, 200);
+    assert.deepEqual((await pub(owner.cookie, 2, 0)).body, { outcome: 'PUBLISHED', version: 1, changeId: null, affectedOrders: 0 });
 
-    await setSalesOpen(db.operator, true, 'test', 'an order for the guard');
+    await setSalesOpen(db.operator, true, 'test', 'an order for the classification');
     const r = await reserve({ pool: db.pool, catalog, log: () => undefined, allowDemo: false, now: () => new Date() }, {
       departureSlug: 'altai-admin', contact: { phone: '+79039075547', email: 'ivan@example.ru' }, passengers: [tourist(1)],
       adultsOnlyConfirmed: true, termsRef: catalog.terms.ref, termsHash: catalog.terms.hash, pdConsentConfirmed: true,
       pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash });
     assert.ok(r.ok);
 
-    const programme = { ...doc, contract: { tour: { ...t, route: 'Другой маршрут' }, departure: d } };
-    assert.equal((await save(1, programme)).status, 200);
-    const refused = await pub(2, 1);
-    assert.deepEqual([refused.status, refused.body.error], [409, 'EXECUTION_CHANGE_CLASSIFICATION_REQUIRED']);
+    assert.equal((await save(2, { ...doc, contract: { tour: { ...t, route: 'Другой маршрут' }, departure: d } })).status, 200);
+    const unclassified = await pub(owner.cookie, 3, 1);
+    assert.deepEqual([unclassified.status, unclassified.body.error], [409, 'EXECUTION_CHANGE_CLASSIFICATION_REQUIRED']);
+    const change = { classification: 'EQUIVALENT', notice: 'Маршрут заменён равноценным.', by: 'owner' };
+    // Naming the owner in the request is worth nothing: no session, a revoked one, or an editor's.
+    assert.equal((await pub(undefined, 3, 1, change)).status, 401);
+    const second = await login('exec-owner', owner.seed);
+    await call('POST', '/api/auth/logout', { cookie: second, body: {} });
+    assert.equal((await pub(second, 3, 1, change)).status, 401);
+    assert.deepEqual((await pub(editor.cookie, 3, 1, change)).body, { error: 'FORBIDDEN' });
+
+    const listed = await call('GET', `/api/departures/${dep}/affected-orders`, { cookie: editor.cookie });
+    assert.deepEqual(listed.body.orders, [{ orderRef: r.ok ? r.orderRef : '', status: 'RESERVED' }]);
+    const applied = await pub(owner.cookie, 3, 1, change);
+    assert.equal(applied.status, 200, JSON.stringify(applied.body));
+    assert.deepEqual([applied.body.outcome, applied.body.version, applied.body.affectedOrders], ['APPLIED', 2, 1]);
+    const changeId = applied.body.changeId as string;
+    const recorded = (await db.owner.query('SELECT classified_by, login_role FROM departure_execution_change WHERE id = $1', [changeId])).rows[0];
+    assert.deepEqual(recorded, { classified_by: 'admin:exec-owner', login_role: 'commerce_test_admin' });
+    // The Admin audit of the classification names the session and the password + TOTP login behind it.
+    const link = (await db.owner.query(`SELECT a.actor, l.action AS auth_action, l.actor AS auth_actor, l.entity_id = a.details->>'sessionId' AS same_session
+      FROM admin_audit a JOIN admin_audit l ON l.id = (a.details->>'authAuditId')::bigint
+      WHERE a.action = 'DEPARTURE.EXECUTION_CHANGE_EQUIVALENT' AND a.details->>'changeId' = $1`, [changeId])).rows;
+    assert.deepEqual(link, [{ actor: 'exec-owner', auth_action: 'AUTH.LOGIN', auth_actor: 'exec-owner', same_session: true }]);
+    const notices = await call('GET', `/api/changes/${changeId}/notices`, { cookie: editor.cookie });
+    assert.deepEqual((notices.body.notices as { state: string }[]).map(n => n.state), ['PENDING']);
+
     // A price is edited freely; it reaches new quotes only.
-    assert.equal((await save(2, { ...doc, priceKopecks: 3_200_000 })).status, 200);
-    assert.deepEqual((await pub(3, 1)).body, { version: 2 });
+    assert.equal((await save(3, { ...doc, contract: { tour: { ...t, route: 'Другой маршрут' }, departure: d }, priceKopecks: 3_200_000 })).status, 200);
+    assert.deepEqual((await pub(owner.cookie, 4, 2)).body, { outcome: 'PUBLISHED', version: 3, changeId: null, affectedOrders: 0 });
+  });
+
+  test('content and legal items are created by editors and published by the OWNER', async () => {
+    const owner = await enrolled('content-owner');
+    const editor = await enrolled('content-editor', 'EDITOR');
+    const created = await call('POST', '/api/content', { cookie: editor.cookie, body: { kind: 'organizer', slug: 'artur' } });
+    assert.equal(created.status, 201);
+    const id = created.body.id as string;
+    const doc = { slug: 'artur', name: 'Артур', isListed: false, isDemo: false, content: {} };
+    assert.equal((await call('PUT', `/api/content/${id}/draft`, { cookie: editor.cookie, body: { expectedRevision: 0, document: doc } })).status, 200);
+    const body = { expectedDraftRevision: 1, expectedPublishedVersion: 0 };
+    assert.equal((await call('POST', `/api/content/${id}/publish`, { cookie: editor.cookie, body })).status, 403);
+    assert.deepEqual((await call('POST', `/api/content/${id}/publish`, { cookie: owner.cookie, body })).body,
+      { outcome: 'PUBLISHED', version: 1, changeId: null, affectedOrders: 0 });
+    assert.equal((await call('POST', '/api/content', { cookie: editor.cookie, body: { kind: 'secret', slug: 'x' } })).status, 422);
+    const list = await call('GET', '/api/content', { cookie: editor.cookie });
+    assert.ok((list.body.items as { slug: string }[]).some(i => i.slug === 'artur'));
   });
 
   test('the throttle counts password and code attempts together, per source and per account', async () => {

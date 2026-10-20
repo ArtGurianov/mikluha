@@ -5,6 +5,7 @@
 //   GET  /return?rt=&state=          the handoff's return: state checked, referral resolved
 //   GET  /orders/<ref>               the order, read back from Refref first; the final price to accept
 //   POST /orders/<ref>/pay           accept the final price → the provider's payment page
+//   GET  /arrive?arrival=&to=        Refref vNext arrival: context cookie, proof kept, 302 to the site (arrival.ts)
 //
 // Ownership of an order is the state secret in a __Host- cookie (HttpOnly, Secure, SameSite=Lax):
 // another browser cannot see or pay someone's order, and a cross-site form cannot post with it.
@@ -12,6 +13,7 @@
 import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
+import { arrivalTarget, Arrivals, CONTEXT_COOKIE, contextCookie, validProof } from './arrival.js';
 import { bookable } from './catalog.js';
 import { handoffUrl, issueState, onReturn, ownsOrder, pay, reconcileOrder, zayavkaOf, type CheckoutDeps } from './checkout.js';
 import { countryName, MAX_SEATS_PER_ORDER, reserve, type BookingRequest, type TouristInput } from './orders.js';
@@ -53,8 +55,12 @@ function page(res: ServerResponse, status: number, title: string, body: string, 
   res.end(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${extraHead}${STYLES}<title>${esc(title)}</title></head><body><header><div class="bar"><a class="brand" href="/">Миклуха</a><span class="secure">Защищённое бронирование</span></div></header><main>${body}</main></body></html>`);
 }
 
-function redirect(res: ServerResponse, location: string, cookies: string[] = []): void {
-  res.writeHead(303, { location, ...SECURITY_HEADERS, ...(cookies.length ? { 'set-cookie': cookies } : {}) });
+function redirect(res: ServerResponse, location: string, cookies: string[] = [], status = 303): void {
+  // writeHead would replace a context cookie set earlier in this request: keep both.
+  const prior = res.getHeader('set-cookie');
+  const all = [...cookies, ...(Array.isArray(prior) ? prior : prior === undefined ? [] : [String(prior)])];
+  res.removeHeader('set-cookie');
+  res.writeHead(status, { location, ...SECURITY_HEADERS, ...(all.length ? { 'set-cookie': all } : {}) });
   res.end();
 }
 
@@ -106,7 +112,37 @@ const MESSAGES: Record<string, string> = {
 };
 const message = (code: string) => MESSAGES[code] ?? `Не удалось продолжить бронирование (код ${esc(code)}).`;
 
-export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter = new BookingRateLimiter()) {
+export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter = new BookingRateLimiter(),
+  arrivals = new Arrivals({ refref: null, storefrontOrigin: deps.merchant.origin, log: deps.log, ...(deps.now ? { now: deps.now } : {}) })) {
+  /**
+   * The browser's ACTIVE context for this request. Every buyer gets one on the purchase path, referral
+   * or not (docs/29 §4); a context Refref refused is replaced and never presented again.
+   */
+  function context(req: IncomingMessage, res: ServerResponse, issue: boolean): string | undefined {
+    const cookie = cookies(req).get(CONTEXT_COOKIE);
+    const c = arrivals.resolveContext(cookie);
+    if (!c.isNew) return c.id;
+    if (!issue && !c.rotated) return undefined;
+    res.setHeader('set-cookie', [contextCookie(c.id)]);
+    return c.id;
+  }
+
+  /**
+   * Refref's referral redirect lands here. Never blocks the buyer: a missing or malformed proof is
+   * dropped and the buyer still goes to the page. The proof never reaches a log or the Location.
+   */
+  function arrive(req: IncomingMessage, res: ServerResponse, url: URL) {
+    const proofs = url.searchParams.getAll('arrival');
+    const cookie = cookies(req).get(CONTEXT_COOKIE);
+    const c = arrivals.resolveContext(cookie);
+    if (proofs.length === 1 && validProof(proofs[0]!)) arrivals.capture(c.id, proofs[0]!);
+    else if (proofs.length > 0) deps.log('arrival_proof_rejected', { reason: proofs.length > 1 ? 'MULTIPLE' : 'MALFORMED' });
+    // Re-set even a known context: the 30-day window runs from the latest arrival, like Refref's.
+    res.setHeader('set-cookie', [contextCookie(c.id)]);
+    arrivals.afterResponse(res, c.id);
+    redirect(res, arrivalTarget(deps.merchant.siteOrigin, url.searchParams.get('to')), [], 302);
+  }
+
   async function bookForm(res: ServerResponse, slug: string) {
     const d = bookable(deps.catalog, slug, (deps.now ?? (() => new Date()))(), allowDemo);
     if (typeof d === 'string') { page(res, 404, 'Бронирование', `<p>${esc(message(d))}</p>`); return; }
@@ -275,6 +311,12 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
   return async function handle(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
     const m = /^\/orders\/([^/]+)(\/pay)?$/.exec(url.pathname);
     const shared = /^\/documents\/([^/]+)$/.exec(url.pathname);
+    if (req.method === 'GET' && url.pathname === '/arrive') { arrive(req, res, url); return true; }
+    // Resolved once per request. The purchase path (the form and Buy) gives every buyer a context;
+    // every request of a context retries its unconfirmed claims after the response (docs/29 §6).
+    const purchase = (req.method === 'GET' && url.pathname === '/book') || (req.method === 'POST' && url.pathname === '/orders');
+    const ctx = context(req, res, purchase);
+    if (ctx !== undefined) arrivals.afterResponse(res, ctx);
     if (m && !ORDER_REF.test(m[1]!)) { page(res, 404, 'Заказ', '<p>Заказ не найден.</p>'); return true; }
     if (req.method === 'GET' && url.pathname === '/book') { await bookForm(res, url.searchParams.get('departure') ?? ''); return true; }
     if (req.method === 'POST' && url.pathname === '/orders') { await createOrder(req, res); return true; }

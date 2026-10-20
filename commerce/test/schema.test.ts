@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+
+import pg from 'pg';
 
 import { loadCatalog } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
@@ -20,6 +22,47 @@ test('migrations apply once; an applied migration that changed is refused', asyn
   cpSync(MIGRATIONS_DIR, dir, { recursive: true });
   writeFileSync(join(dir, '0001_orders.sql'), '-- rewritten history\n');
   await assert.rejects(migrate(db.owner, dir), /MIGRATION_CHANGED/);
+});
+
+test('0010 upgrades populated schema 9 without rewriting its history and closes organizer visibility', async () => {
+  const name = `${db.name}_upgrade`;
+  const url = new URL(db.url);
+  url.pathname = `/${name}`;
+  const client = new pg.Client({ connectionString: url.toString() });
+  const dir = mkdtempSync(join(tmpdir(), 'commerce-schema9-'));
+  await db.owner.query(`CREATE DATABASE ${name}`);
+  try {
+    await client.connect();
+    cpSync(MIGRATIONS_DIR, dir, { recursive: true });
+    const journal = JSON.parse(readFileSync(join(dir, 'journal.json'), 'utf8'));
+    writeFileSync(join(dir, 'journal.json'), JSON.stringify(journal.filter((e: { version: number }) => e.version <= 9)));
+    assert.deepEqual(await migrate(client, dir), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const history = (await client.query('SELECT * FROM schema_migrations ORDER BY version')).rows;
+    const tour = (await client.query("SELECT fn_create_tour('upgrade-tour', 'owner') AS id")).rows[0].id;
+    await client.query('SELECT fn_save_tour_draft($1, 0, $2, $3)', [tour,
+      { slug: 'upgrade-tour', title: 'Алтай', isListed: true, contract: null, content: {} }, 'owner']);
+    await client.query('SELECT fn_publish_tour($1, 1, 0, $2)', [tour, 'owner']);
+    const org = (await client.query("SELECT fn_create_content_item('organizer', 'upgrade-organizer', 'owner') AS id")).rows[0].id;
+    await client.query('SELECT fn_save_content_draft($1, 0, $2, $3)', [org,
+      { slug: 'upgrade-organizer', name: 'Артур', isListed: false, isDemo: false, content: {} }, 'owner']);
+    await client.query('SELECT fn_publish_content_item($1, 1, 0, $2)', [org, 'owner']);
+    const dep = (await client.query("SELECT fn_create_departure($1, 'upgrade-departure', 'owner') AS id", [tour])).rows[0].id;
+    await client.query('SELECT fn_save_departure_draft($1, 1, $2, $3)', [dep,
+      { slug: 'upgrade-departure', startsOn: '2027-06-01', endsOn: '2027-06-04', departureTime: '06:00', returnTime: '21:00',
+        timezone: 'Asia/Krasnoyarsk', priceKopecks: null, contract: null, content: {}, organizers: ['upgrade-organizer'] }, 'owner']);
+    await client.query('SELECT fn_publish_departure($1, 2, 0, $2)', [dep, 'owner']);
+    await client.query('UPDATE departure SET is_listed = true WHERE id = $1', [dep]);
+    assert.equal((await client.query('SELECT count(*)::int AS n FROM public_departure')).rows[0].n, 1);
+    assert.deepEqual(await migrate(client, MIGRATIONS_DIR), Array.from({ length: schemaHead(MIGRATIONS_DIR) - 9 }, (_, i) => 10 + i));
+    assert.deepEqual((await client.query('SELECT * FROM schema_migrations WHERE version <= 9 ORDER BY version')).rows, history);
+    assert.equal((await client.query('SELECT count(*)::int AS n FROM public_departure')).rows[0].n, 0);
+    assert.equal((await client.query('SELECT count(*)::int AS n FROM departure_revision WHERE departure_id = $1', [dep])).rows[0].n, 1);
+    assert.deepEqual(await migrate(client, MIGRATIONS_DIR), []);
+  } finally {
+    await client.end();
+    await db.owner.query(`DROP DATABASE ${name}`);
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('ready only at exactly this build\'s schema', async () => {

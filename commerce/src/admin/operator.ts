@@ -1,4 +1,4 @@
-// Admin account operations for an OPERATOR over SSH (migration 0009, admin_operator). Never the Admin
+// Admin account operations for an OPERATOR over SSH (migration 0011, admin_operator). Never the Admin
 // API's login: the database refuses a login that belongs to admin_app or to commerce. Every command
 // is audited by the database itself.
 

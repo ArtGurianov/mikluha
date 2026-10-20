@@ -7,16 +7,21 @@
 //   SITE_ORIGIN           fixed in production: https://mikluha-maklai.ru
 //   REFREF_API_BASE       fixed in production: https://api.refref.ru/v1-rc
 //   REFREF_CHECKOUT_ORIGIN  fixed in production: https://checkout.refref.ru
+//   REFREF_VNEXT_API_BASE  optional until Refref's staged vNext cutover; fixed in production:
+//                         https://api.refref.ru/v1-vnext. Unset: /arrive still sets the context and
+//                         redirects, but no proof can be claimed (checkout declares it degraded).
 //   REFREF_BUSINESS_ID, REFREF_BUSINESS_SLUG, REFREF_API_KEY   Mikluha's Refref Business and its key
 //   NOTISEND_API_KEY, NOTISEND_FROM_EMAIL, NOTISEND_FROM_NAME   Notisend transactional email (optional NOTISEND_REPLY_TO)
 
 import pg from 'pg';
 
+import { ATTEMPT_CEILING_MS, Arrivals } from '../arrival.js';
 import { PRODUCTION_BUILD_IDENTITY_FILE, readBuildIdentity } from '../build-identity.js';
 import { assertProductionContent, loadCatalog } from '../catalog.js';
 import { reconcileAll, type CheckoutDeps } from '../checkout.js';
 import { env, environment, MIGRATIONS_DIR, productionAddress } from '../config.js';
 import { NotisendClient, processEmailOutbox } from '../email.js';
+import { processExecutionNotices } from '../execution-notice.js';
 import { LiveSiteReleaseAdmission } from '../legal-admission.js';
 import { jsonLogger } from '../log.js';
 import { schemaHead } from '../migrate.js';
@@ -36,6 +41,8 @@ const commerceOrigin = productionAddress(which, 'COMMERCE_ORIGIN', env('COMMERCE
 const siteOrigin = productionAddress(which, 'SITE_ORIGIN', env('SITE_ORIGIN'));
 const refrefApiBase = productionAddress(which, 'REFREF_API_BASE', env('REFREF_API_BASE'));
 const checkoutOrigin = productionAddress(which, 'REFREF_CHECKOUT_ORIGIN', env('REFREF_CHECKOUT_ORIGIN'));
+const vnextApiBase = process.env.REFREF_VNEXT_API_BASE
+  ? productionAddress(which, 'REFREF_VNEXT_API_BASE', process.env.REFREF_VNEXT_API_BASE) : null;
 const legalAdmission = which === 'PRODUCTION'
   ? new LiveSiteReleaseAdmission(siteOrigin, { sourceCommit: identity.sourceCommit, catalog }) : undefined;
 if (legalAdmission !== undefined) await legalAdmission.verify();
@@ -49,6 +56,11 @@ const checkout: CheckoutDeps = {
     checkoutOrigin, origin: commerceOrigin, siteOrigin,
   },
 };
+const arrivals = new Arrivals({
+  refref: vnextApiBase === null ? null
+    : new RefrefClient({ apiBase: vnextApiBase, apiKey: env('REFREF_API_KEY'), timeoutMs: ATTEMPT_CEILING_MS }),
+  storefrontOrigin: commerceOrigin, log,
+});
 const email = new NotisendClient({
   apiKey: env('NOTISEND_API_KEY'), fromEmail: env('NOTISEND_FROM_EMAIL'),
   fromName: env('NOTISEND_FROM_NAME'), commerceOrigin,
@@ -58,9 +70,10 @@ const server = createCommerceServer({
   pool, catalog, schemaHead: schemaHead(MIGRATIONS_DIR),
   sourceCommit: identity.sourceCommit, startedAt: new Date(), ...(legalAdmission ? { legalAdmission } : {}),
   onError: (e) => log('request_failed', { error: e instanceof Error ? e.name : 'unknown' }),
-}, createWebHandler(checkout, which === 'STAGING'));
+}, createWebHandler(checkout, which === 'STAGING', undefined, arrivals));
 const port = Number(process.env.PORT ?? 3000);
-server.listen(port, '0.0.0.0', () => log('listening', { port, environment: which, departures: catalog.departures.size }));
+server.listen(port, '0.0.0.0', () => log('listening', { port, environment: which, departures: catalog.departures.size,
+  arrivalExchange: vnextApiBase !== null }));
 
 let maintenanceRunning = false;
 const maintenanceTick = () => {
@@ -77,6 +90,7 @@ const emailTick = () => {
   if (emailRunning) return;
   emailRunning = true;
   processEmailOutbox(pool, email, log)
+    .then(() => processExecutionNotices(pool, email, log))
     .catch((e: unknown) => log('email_worker_failed', { error: e instanceof Error ? e.name : 'unknown' }))
     .finally(() => { emailRunning = false; });
 };
@@ -88,7 +102,8 @@ emailTick();
 const stop = () => {
   clearInterval(maintenanceTimer);
   clearInterval(emailTimer);
-  server.close(() => { pool.end().finally(() => process.exit(0)); });
+  // After-response claims are part of the requests they follow: let them finish (each ≤ 500 ms).
+  server.close(() => { arrivals.after.drain().then(() => pool.end()).finally(() => process.exit(0)); });
 };
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);

@@ -80,6 +80,9 @@ const preConnectError = (e: unknown): string | undefined => {
   return typeof code === 'string' && PRE_CONNECT_ERRORS.has(code) ? code : undefined;
 };
 
+const escapeHtml = (v: string): string => v.replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
 export class NotisendClient implements EmailSender {
   readonly #config: EmailConfig;
   readonly #fetch: Fetcher;
@@ -103,11 +106,31 @@ export class NotisendClient implements EmailSender {
       `<p style="margin:24px 0"><a href="${url}" style="display:inline-block;border-radius:999px;background:#c8693e;color:#fff;text-decoration:none;padding:13px 20px;font-weight:700">Открыть заказ и документы</a></p>` +
       `<p style="color:#6f6258;font-size:14px">Билеты и ваучеры будут отправлены отдельно не позднее чем за 24 часа до начала поездки.</p>` +
       `</div></div></body></html>`;
-    const smtpHeaders: Record<string, string> = { [OUTBOX_KEY_HEADER]: input.outboxKey };
+    return this.#post(input.recipient, `Бронирование ${input.orderRef} подтверждено`, text, html, input.outboxKey);
+  }
+
+  /** ADR v2.3 §4: an EQUIVALENT execution change, told to one order's customer in OWNER's words. */
+  async sendExecutionNotice(input: { recipient: string; orderRef: string; notice: string; noticeKey: string }): Promise<SendResult> {
+    const text = `Изменение в программе поездки\n\nНомер заказа: ${input.orderRef}\n\n${input.notice}\n\n` +
+      'Замена равноценная и сделана в рамках условий Оферты. Ваш договор и сохранённые документы заказа не меняются. ' +
+      'Если у вас есть вопросы, ответьте на это письмо.';
+    const paragraphs = input.notice.split(/\n+/).map((p) => `<p>${escapeHtml(p)}</p>`).join('');
+    const html = `<!doctype html><html lang="ru"><body style="margin:0;background:#faf7f0;color:#3b3029;font-family:Arial,sans-serif">` +
+      `<div style="max-width:600px;margin:0 auto;padding:32px 20px"><div style="border-radius:20px;background:#fff;border:1px solid #e3d8cb;padding:32px">` +
+      `<p style="margin:0 0 8px;color:#23617a;font-size:13px;letter-spacing:.08em;text-transform:uppercase">Миклуха</p>` +
+      `<h1 style="margin:0 0 16px;font-size:28px;line-height:1.15">Изменение в программе поездки</h1>` +
+      `<p>Номер заказа: <strong>${escapeHtml(input.orderRef)}</strong></p>${paragraphs}` +
+      `<p style="color:#6f6258;font-size:14px">Замена равноценная и сделана в рамках условий Оферты. Ваш договор и сохранённые документы заказа не меняются. Если у вас есть вопросы, ответьте на это письмо.</p>` +
+      `</div></div></body></html>`;
+    return this.#post(input.recipient, `Изменение в поездке по заказу ${input.orderRef}`, text, html, input.noticeKey);
+  }
+
+  async #post(recipient: string, subject: string, text: string, html: string, outboxKey: string): Promise<SendResult> {
+    const smtpHeaders: Record<string, string> = { [OUTBOX_KEY_HEADER]: outboxKey };
     if (this.#config.replyTo !== undefined) smtpHeaders['Reply-To'] = this.#config.replyTo;
     const message = {
-      from_email: this.#config.fromEmail, from_name: this.#config.fromName, to: input.recipient,
-      subject: `Бронирование ${input.orderRef} подтверждено`, text, html, smtp_headers: smtpHeaders,
+      from_email: this.#config.fromEmail, from_name: this.#config.fromName, to: recipient,
+      subject, text, html, smtp_headers: smtpHeaders,
     };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.#config.timeoutMs ?? 15_000);

@@ -14,7 +14,7 @@ const catalog = fixtureCatalog([{ slug: 'altai-eis', startsOn: '2026-11-01', end
 before(async () => { db = await freshDb(); });
 after(async () => { await db.drop(); });
 beforeEach(async () => {
-  await db.owner.query('TRUNCATE order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
   await db.owner.query('UPDATE sales_switch SET open = true');
 });
 

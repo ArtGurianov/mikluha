@@ -22,21 +22,32 @@ static; everything that sells a trip lives here, with its own Postgres.
   drafts, immutable published revisions and expected-version publish; immutable published identity
   (slug/unitRef, tour binding, `published_at`) and no physical delete; the date lock while a
   departure has active or concluded orders; and every new order's `contract_snapshot` (see
-  "Editable offers, immutable orders"). Content CRUD (ART-358), `bookingStatus`/capacity
-  transitions (ART-366) and documents rendered from the snapshot (ART-362) build on it; the
-  checkout still sells from `content/` until then.
-- migration 0009 and the isolated Admin API (ADR v2.3 §7, ART-363): password + TOTP at every
-  login, sessions, OWNER-only publishing, the audited SSH reset, `admin_app`/`admin_operator`
-  logins, and the static Control Room in [`../control-room`](../control-room/README.md). See
-  "Admin API" below. Undeployed.
+  "Editable offers, immutable orders"). `bookingStatus`/capacity transitions (ART-366) and
+  documents rendered from the snapshot (ART-362) build on it; the checkout still sells from
+  `content/` until then.
+- migration 0009 (ADR v2.3 §2–§4, ART-358): content CRUD for tours, departures, reports, reviews,
+  organizers and legal drafts through audited Admin commands (`src/editorial.ts`); the tour
+  template resolved into a departure once; graph validation at publish; the fail-closed public
+  projection (`src/public-content.ts`); and classified execution changes on sold departures with
+  one notice per affected order (`src/execution-notice.ts`). See "Content CRUD and execution
+  changes".
+- migration 0010 (ART-358 review correction): stable execution-change identity and MATERIAL replay;
+  organizer visibility closes the whole departure and propagates to its reports. Migrations 0008
+  and 0009 retain their original bytes and checksums.
+
+- ART-382: the Refref vNext arrival endpoint `/arrive` with the 30-day browser context and the
+  after-response claim (see "Refref vNext arrival"). Not yet used by checkout (ART-383).
+- migration 0011 and the isolated Admin API (ADR v2.3 §7, ART-363): password + TOTP at every
+  login, sessions, OWNER-only publishing and classification bound to the signed-in session, the
+  audited SSH reset, `admin_app`/`admin_operator` logins, and the static Control Room in
+  [`../control-room`](../control-room/README.md). See "Admin API" below. Undeployed.
 
 **Next:**
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
   integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migrations
-  0007–0009 need owner-only application and fresh schema-9 logical and PITR recovery evidence
-  before future admission. Mikluha
-  commerce is undeployed; monitor admission, sales and payments remain closed.
+  0007–0011 need owner-only application and fresh schema-11 logical and PITR recovery evidence
+  before future admission. Mikluha commerce is undeployed; monitor admission, sales and payments remain closed.
 
 ## Generic legal pack and individual application
 
@@ -116,6 +127,27 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 | personal data to Refref | the receipt email in the payment session, which PROVIDER fiscalization requires. Nothing else |
 | the switch | closed: no new payment session. Reading back, fulfilment and cancellation go on |
 
+## Refref vNext arrival (ART-382, Refref ADR-139 `docs/29` §2, §4, §6, §8)
+
+TOUR conformance profile. Refref's referral link redirects once, straight to this origin; the public
+site is static and cannot capture anything server-side.
+
+```
+GET  /arrive?arrival=<proof>&to=<site path>   context cookie → 302 to the site page, no Refref wait
+```
+
+| | |
+|---|---|
+| browser context | `__Host-mk_ctx`: 32 random bytes, host-only, Secure, HttpOnly, SameSite=Lax, `Max-Age` 30 days (the Mikluha attribution window), re-set by every arrival. One context per browser: a later arrival reuses it. `/book` and `POST /orders` give one to a buyer without a referral. Carries no buyer identity |
+| proof | `src/arrival.ts`: kept in process memory only, tied to the context, at most 30 minutes after capture, erased by an independent timer even without later requests (also cleared on eviction); never in Postgres, a log, a Location or a page. A restart loses it (accepted, `docs/29` §6). No durable queue |
+| exchange | `claimArrival` is launched after the response through a tracked hook (drained on shutdown), ≤ 500 ms of wall clock including queue admission. Per process: at most 16 active HTTP claims and 64 queued claims (shared with Buy); overflow/queue timeout keeps proof pending, logs `arrival_claim_unknown` with `OVERLOADED`/`QUEUE_TIMEOUT` and yields `TIMEOUT`, allowing a later request to retry. Repeated requests of a context coalesce; a newly captured proof during an attempt gets one tracked follow-up. Every later request of the context retries an unconfirmed claim the same way (single-flight, every 2 s at most; a new arrival is never throttled). The repeat is byte-identical, so a committed claim lost in transit reads back as a replay |
+| before Buy | `Arrivals.beforeBuy` spends ≤ 1,500 ms total using a monotonic deadline, including shared in-flight work and queue waiting, and returns the `deliveryDegraded` value to freeze: `TIMEOUT` (still unconfirmed), `FAILED` (definitive proof refusal or configuration rejection: HTTP 401/403 or `BROWSER_CONTEXT_IDLE_POLICY_REQUIRED`; raw proof erased, no retry for that proof, operator event `arrival_claim_configuration_failed` with status/code only), `EXPIRED` (30 minutes passed). Checkout wires it into the vNext resolution in ART-383; the RC.2 handoff is unchanged until then |
+| refused context | `CONTEXT_CLOSED`/`CONTEXT_SCOPE_MISMATCH`: the next request gets a new context and the unconfirmed proof follows the browser (guest storefront, no account boundary); the old ID is never presented again while this process remembers it |
+| redirect | `to` must be a plain absolute path of `SITE_ORIGIN`; anything else (another host, `//`, backslash, control characters, > 512 characters) goes to the home page. Any `arrival` parameter is dropped |
+| to Refref | the proof, the context ID and `COMMERCE_ORIGIN`. Never a tourist's name, document, date of birth, phone or email |
+| Buy | `/book` posts to `POST /orders` on this origin, a top-level same-origin form, so the context cookie arrives. Never call commerce by cross-origin `fetch` without credentials |
+| configuration | `REFREF_VNEXT_API_BASE` (production: `https://api.refref.ru/v1-vnext`), optional until Refref's staged cutover; unset, arrivals still land and checkout declares the proof undelivered. The Refref Business needs `/arrive` as a verified destination of this origin and an owner `browser_context_idle_policy` row for it |
+
 **The Refref Business needs:**
 - an API key with `integrations:checkout` and `integrations:fulfillment`;
 - `COMMERCE_ORIGIN` verified, with destination path prefixes `/return` and `/orders` (Refref's
@@ -143,7 +175,7 @@ uses a modelled gateway and is not live acceptance.
 | date lock | `starts_on`, `ends_on`, `departure_time`, `return_time`, `timezone` cannot change while an order is RESERVED (unexpired), PAYMENT_PENDING, HELD, PAID or FULFILLED, matched by `departure_id` or, for orders made from `content/`, by slug. The check takes the same `departure:<slug>` advisory lock as `reserve()`. Only the move/cancel workflow (ADR v2.3 §4, its own migration) will change them |
 | price, programme, description | edited and published freely; they reach new orders only |
 | `contract_snapshot` | written by `reserve()` (`src/contract-snapshot.ts`, schema `mikluha.order-contract/1`, `sha256:` of its RFC 8785 form): price, programme, route, accommodation with registry facts, carrier, included/excluded services, schedule and meeting points. The database checks its shape and that it agrees with the order's slug, dates, times, timezone and price, requires it on every new order, and refuses any later change, NULL or backfill; an order never changes `departure_id`. Orders from before 0008 keep NULL |
-| roles | `commerce_app` reads `tour`/`departure` only. `admin_app` (the isolated Admin API, ADR v2.1 §7) inserts a tour (slug) or departure (slug, tour) and otherwise writes only through the four functions, which refuse any login that belongs to `commerce_app`; it has no access to orders, payments, the switch or ЕИС. No role can change `booking_status`, `capacity` or `is_listed` yet (ART-366): departures stay CLOSED and unlisted |
+| roles | `commerce_app` reads `tour`/`departure` only. `admin_app` (the isolated Admin API, ADR v2.1 §7) writes only through the editorial functions, which refuse any login that belongs to `commerce_app` (since 0009 it creates through them too, with no INSERT grant); it has no access to orders, payments, the switch or ЕИС. No role can change `booking_status`, `capacity` or `is_listed` yet (ART-366): departures stay CLOSED and unlisted |
 
 The current `reserve()` still reads `content/` and writes `departure_id = NULL`. For a linked
 PostgreSQL departure the insert trigger checks publication and schedule, not the authority of its
@@ -154,6 +186,47 @@ Comparing against the current mutable price would incorrectly reject a valid ear
 Schema 8 alone does not qualify that future writer. Supplier-name retention and the infrastructure
 role checker’s `admin_app` support remain owner-installation prerequisites.
 
+## Content CRUD and execution changes (migrations 0009–0010)
+
+Nothing is imported from `content/`: a new database holds no content, and every tour, departure,
+report, review, organizer and legal draft is created in Control Room through the Admin API.
+
+| | |
+|---|---|
+| commands | `fn_create_tour`/`_departure`/`_content_item`, `fn_save_*_draft`, `fn_publish_tour`, `fn_publish_departure_change`, `fn_publish_content_item` (SECURITY DEFINER, `admin_app` only); `src/editorial.ts` calls them and maps refusals to `EditorialError` (`conflict` for `DRAFT_REVISION_CONFLICT`/`PUBLISHED_VERSION_CONFLICT`/`EXECUTION_CHANGE_CONFLICT`) |
+| template | a new departure starts CLOSED and unlisted with draft revision 1 holding its tour's published contract template, copied whole. If the tour had none, the first publication copies it and advances the draft. `template_tour_version` names the tour revision and never changes; later tour edits reach only departures created later. A departure's own `contract.tour` replaces the template whole |
+| graph | publish refuses a departure of an unpublished tour, an unpublished organizer, a report whose tour or departure is unpublished or whose departure belongs to another tour, a review of an unpublished tour (`RELATION_NOT_PUBLISHED`/`RELATION_MISMATCH`). An OPEN departure cannot lose its price or complete contract (`DEPARTURE_OPEN_REQUIRES_COMPLETE_OFFER`); a CLOSED one may publish an incomplete contract, which `contract_complete` keeps from being sold |
+| listing | only an explicit `isListed: true` lists a tour, report, review or organizer (a tour document without the key is unlisted). The service reads pages through the `public_*` views only: published, listed, and everything the item hangs on published and listed too. A published but unlisted organizer may be linked editorially, but hides the **whole departure** and any reports tied to it; republishing that organizer listed restores visibility without republishing the departure. `src/public-content.ts` returns a listed departure in the checkout's `Departure` shape with its `publishedVersion`, so the next render and the next quote see the latest publish |
+| execution change | a contract change (programme, route, accommodation, carrier, services) of a departure with active or concluded orders (`fn_departure_affected_orders`, as the date lock counts them) needs OWNER's classification and notice text. `EQUIVALENT`: published, one `execution_change_notice` per affected order (unique per change and order), an `EXECUTION_CHANGE_EQUIVALENT` order event. `MATERIAL`: recorded as `ROUTED_TO_MOVE_CANCEL` with an order event and **not** published; the move/cancel workflow is separate. A classification where none is needed is refused. Snapshots never change |
+| notices | sent by the service's mail worker (`processExecutionNotices`, after the confirmation outbox) under the confirmation outbox's rules: retried only when provably not queued, otherwise operator attention, never twice. `ACCEPTED` is the provider's acceptance; only a provider delivery report (`recordNoticeDelivery`) makes it `DELIVERED`. No personal data in the table: the recipient is read from `order_contact` at send time, and an erased contact goes to attention as `NO_RECIPIENT` |
+| legal | drafts only. `fn_publish_content_item` refuses legal pages (`LEGAL_PUBLICATION_NOT_ADMITTED`): legal text is still published by a code release with the legal-release admission (ART-359) |
+| audit | each command writes an `editorial_audit` row (actor, login, draft revision, version, document sha256); a write to `tour`, `departure` or `content_item` outside the commands is audited as `DIRECT_WRITE`. The audit, revisions and execution changes refuse UPDATE, DELETE and TRUNCATE; notices refuse DELETE and only move forward |
+
+Migration 0010 makes `(departure_id, from_version, draft_revision)` unique. An exact MATERIAL retry
+(including a concurrent call) returns the same `changeId`, original affected-order count and version,
+without duplicating order events or audit rows. It does so before recomputing order eligibility.
+A different notice, EQUIVALENT classification or ordinary publication of that identity fails
+`EXECUTION_CHANGE_CONFLICT`; stale version/revision tokens still fail their normal CAS checks.
+A newly saved draft has a new revision. Move/cancel resolution is not implemented here.
+
+**Required integration follow-ups (ART-363/365):**
+
+- `recordNoticeDelivery` is a storage primitive; there is **no runtime delivery-report consumer**
+  yet. ART-365 must connect a verified provider status source, correlate it to the stored
+  `provider_job_id` and notice, and test delivery/bounce, unrelated-job and replay handling.
+  Until then notices stay `ACCEPTED` after provider acceptance; Control Room must display that
+  state without implying delivery. Sending and an HTTP acceptance response are not delivery evidence.
+- ART-363 must validate a live authenticated OWNER session before either execution classification
+  reaches the SQL command. `p_by`/`classified_by` is caller-supplied metadata, **not an authorization
+  check**; `login_role` proves the database login only. The API must derive the actor from the
+  session, persist a verifiable link from classification/change audit to its authentication event,
+  and reject unauthenticated, expired and non-OWNER sessions even if they supply `by: 'owner'`.
+  ART-365 must exercise this through the API; hiding a UI control is insufficient.
+
+Not here: Control Room screens (ART-365), the Admin API process and TOTP (ART-363), the
+`bookingStatus`/`isListed` transitions (ART-366), and the DB-backed quote/reservation writer that
+binds an order to the published revision it accepted (ART-362).
+
 ## Database roles
 
 The owner applies migrations. There are four other logins, and none is a member of another's role:
@@ -162,7 +235,7 @@ The owner applies migrations. There are four other logins, and none is a member 
 |---|---|---|---|
 | `commerce_runtime` | `commerce_app` | orders, personal data, erasure, read the switch | the service's `DATABASE_URL` (Coolify) |
 | `commerce_operator_login` | `commerce_operator` | change the booking switch; read the local ЕИС filing packet/state; record manual ЕИС evidence | root-only `/etc/mikluha-commerce/operator.env` on the host, never in the service |
-| `admin_runtime` | `admin_app` | Admin accounts (read), sessions, login throttle, audit; tours/departures through the 0008 functions; never orders, personal data, payments, the switch or ЕИС | the Admin API's `ADMIN_DATABASE_URL` (Coolify, the Admin API application only) |
+| `admin_runtime` | `admin_app` | Admin accounts (read), sessions (through `fn_admin_login`), login throttle, audit; content through the editorial functions (0008–0010); never orders, personal data, payments, the switch or ЕИС | the Admin API's `ADMIN_DATABASE_URL` (Coolify, the Admin API application only) |
 | `admin_operator_login` | `admin_operator` | create Admin accounts, set passwords, reset TOTP, disable, revoke sessions, clear the throttle; sees no password hash, seed or token hash | root-only `/etc/mikluha-commerce/admin-operator.env` on the host, never in a service |
 
 The service can't change the schema, delete orders or touch the switch. If the service is
@@ -183,7 +256,7 @@ CREATE ROLE admin_operator_login LOGIN PASSWORD '<from the secret store>' IN ROL
 `/etc/mikluha-commerce/admin-operator.env` (root, 0600) holds one line:
 `ADMIN_OPERATOR_DATABASE_URL=postgres://admin_operator_login:…@<db host>/<db>`.
 
-## Admin API (migration 0009, ART-363)
+## Admin API (migration 0011, ART-363)
 
 ADR v2.3 §7 and the shared standard (`adman-vps-infrastructure/runbooks/application-standards.md`
 §1). The Control Room is static files behind its own Nginx (`../control-room`); that Nginx proxies
@@ -195,15 +268,15 @@ but `admin_app` or if a service, operator or provider credential is in its envir
 
 | | |
 |---|---|
-| login | password + TOTP code at every login (RFC 6238: SHA-1, 6 digits, 30 s, ±1 step; `src/admin/totp.ts`, the RFC vectors in `test/admin-totp.test.ts`). The matching step is spent in `fn_admin_totp_accept` under the row lock: a code is accepted once, never at or before the last accepted step; a trigger keeps the step moving forward for every login |
+| login | password + TOTP code at every login (RFC 6238: SHA-1, 6 digits, 30 s, ±1 step; `src/admin/totp.ts`, the RFC vectors in `test/admin-totp.test.ts`). `fn_admin_login` spends the matching step under the row lock, writes `AUTH.LOGIN` and opens the session in one call: a code is accepted once, never at or before the last accepted step, and `admin_app` has no other way to create a session (a trigger keeps the step moving forward for every login) |
 | seed | AES-256-GCM under `ADMIN_TOTP_KEY`, bound to the account id; the database never sees it in clear, the operator cannot read even the ciphertext |
 | enrolment | open for 24 hours after `user add` or `totp reset`: password → QR code (otpauth URI, drawn in the browser) → the first valid code confirms it and signs in. Closed once confirmed. **No recovery codes, no passkey, no web disable** |
 | lost device | `admin-operator totp reset` over SSH: the seed is deleted, every session revoked, a new 24-hour enrolment window opened, and the reset audited with the operator's name, reason and database login |
 | throttle | one limit for password and code attempts together: 10 per 15 minutes per trusted client source (exactly one `X-Forwarded-For` address, as the booking limiter; anything else shares one bucket) and 20 per account. Buckets are HMAC keys, never addresses or logins. `admin-operator throttle clear` lifts a lock-out |
 | session | a random 256-bit token in `__Host-mk_admin` (HttpOnly, Secure, SameSite=Strict, Path=/); the database stores its SHA-256. 30 minutes idle, 12 hours at most (a CHECK). Refresh rotates the token without extending the 12 hours; logout, revocation of another session, password change, disable and TOTP reset revoke. A session cannot exist without an enabled account and a confirmed second factor (a trigger) |
 | writes | only with `Origin` = the Control Room origin, `Sec-Fetch-Site: same-origin` when sent, and a JSON body |
-| roles | OWNER and EDITOR. Drafts: both. Publishing offers, and later terms, privacy, refund/payment policy and PD consent (`legal.publish`, ART-358): OWNER only. Audit: OWNER only. A refused permission is itself audited |
-| execution changes | publishing a departure whose contract differs from the published one is refused (`EXECUTION_CHANGE_CLASSIFICATION_REQUIRED`) while it has active or concluded orders, under the same departure lock as `reserve()`, until the EQUIVALENT/MATERIAL workflow exists (ART-365) |
+| roles | OWNER and EDITOR. Create and save drafts of tours, departures, reports, reviews, organizers and legal drafts: both. Publish any of them (offers, terms, privacy, refund/payment policy, PD consent) and classify execution changes: OWNER only. Audit: OWNER only. A refused permission is itself audited |
+| publish and classify | OWNER only, decided from the live session alone: the editorial actor is the session's `admin:<login>`, never a name in the request, so an unauthenticated, expired, revoked or EDITOR session is refused even when it says `by: 'owner'`. An execution change on a sold departure takes `{classification, notice}` (ADR v2.3 §4; the rules are migration 0009/0010's `fn_publish_departure_change`). The publish and its Admin audit row commit together, and that row names the session and its `AUTH.LOGIN` row (`details.sessionId`, `details.authAuditId`), so every classification is traceable to the password + TOTP login behind it. Affected orders are shown as references and states only |
 | audit | `admin_audit` is append-only for every login, the owner's included; the database stamps the time and the login. No password, code, seed, token or cookie is ever written to it |
 
 Operator commands, as root on the host, in a one-off container from the image on the database's

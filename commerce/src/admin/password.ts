@@ -1,5 +1,5 @@
 // Admin passwords: scrypt (N=16384, r=8, p=1), a 16-byte salt and a 64-byte key, both base64url.
-// The same encoding the database checks (migration 0009, admin_user.password_scrypt).
+// The same encoding the database checks (migration 0011, admin_user.password_scrypt).
 
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 

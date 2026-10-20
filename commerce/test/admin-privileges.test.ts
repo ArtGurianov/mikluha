@@ -1,4 +1,4 @@
-// Migration 0009 with direct database credentials (ART-363): cross-service privilege escalation
+// Migration 0011 with direct database credentials (ART-363): cross-service privilege escalation
 // fails in every direction. The public service cannot reach Admin; the Admin API cannot reach orders,
 // payments, the booking switch or account management; the operator never sees a secret; and the
 // owner's own login cannot rewrite the audit or replay a TOTP step.
@@ -50,7 +50,8 @@ describe('the public service (commerce_app) cannot reach Admin', () => {
     await denied(db.pool, "INSERT INTO admin_audit (actor, action, outcome) VALUES ('x', 'FORGED', 'OK')");
     await denied(db.pool, 'SELECT fn_admin_totp_begin($1, $2)', [ownerId, 'v1.a.b.c']);
     await denied(db.pool, 'SELECT fn_admin_totp_accept($1, 1, true)', [ownerId]);
-    await denied(db.pool, 'SELECT fn_admin_departure_has_active_orders(gen_random_uuid())');
+    await denied(db.pool, "SELECT * FROM fn_admin_login($1, 1, false, $2, now(), 1800)", [ownerId, 'a'.repeat(64)]);
+    await denied(db.pool, "SELECT * FROM fn_admin_session_rotate($1, $2, now(), 1800)", ['a'.repeat(64), 'b'.repeat(64)]);
     await denied(db.pool, "SELECT fn_admin_reset_totp('priv-owner', 'svc', 'takeover')");
     await denied(db.pool, "SELECT fn_admin_create_user('svc', 'OWNER', $1, 'svc')", [`scrypt:v1:16384:8:1:${'A'.repeat(22)}:${'A'.repeat(86)}`]);
   });
@@ -92,25 +93,44 @@ describe('the Admin API (admin_app) cannot reach commerce or manage accounts', (
     await denied(db.admin, "UPDATE admin_session SET absolute_expires_at = now() + interval '1 year'");
   });
 
-  test('no session without a confirmed second factor, and revoked stays revoked', async () => {
-    const hash = 'f'.repeat(64);
-    await denied(db.admin, `INSERT INTO admin_session (admin_id, token_sha256, created_at, last_seen_at, idle_expires_at, absolute_expires_at)
-      VALUES ($1, $2, now(), now(), now() + interval '5 minutes', now() + interval '1 hour')`, [ownerId, hash], /ADMIN_SESSION_NOT_ADMISSIBLE/);
+  test('a session begins only with a spent TOTP step and names the login that admitted it', async () => {
+    const sessionSql = `INSERT INTO admin_session (admin_id, token_sha256, created_at, last_seen_at, idle_expires_at, absolute_expires_at, auth_audit_id)
+      VALUES ($1, $2, now(), now(), now() + interval '5 minutes', now() + $3::interval, $4)`;
+    await denied(db.admin, sessionSql, [ownerId, 'f'.repeat(64), '1 hour', 1]);
+    await denied(db.admin, 'SELECT fn_admin_totp_accept($1, 1, false)', [ownerId]);
+    const login = (step: number, hash: string) => db.admin.query(
+      'SELECT * FROM fn_admin_login($1, $2, false, $3, now(), 1800)', [ownerId, step, hash]);
+    await denied(db.admin, 'SELECT * FROM fn_admin_login($1, 1, false, $2, now(), 1800)', [ownerId, 'f'.repeat(64)], /TOTP_NOT_ENROLLED/);
+
     await db.owner.query(`INSERT INTO admin_totp (admin_id, seed_ciphertext, last_accepted_step, enrolled_at, confirmed_at)
       VALUES ($1, $2, 10, now(), now())`, [ownerId, encryptSeed(Buffer.alloc(32, 1), ownerId, Buffer.alloc(20, 2))]);
-    await denied(db.admin, `INSERT INTO admin_session (admin_id, token_sha256, created_at, last_seen_at, idle_expires_at, absolute_expires_at)
-      VALUES ($1, $2, now(), now(), now() + interval '5 minutes', now() + interval '13 hours')`, [ownerId, hash], /admin_session_check/);
-    const id = (await db.admin.query(`INSERT INTO admin_session (admin_id, token_sha256, created_at, last_seen_at, idle_expires_at, absolute_expires_at)
-      VALUES ($1, $2, now(), now(), now() + interval '5 minutes', now() + interval '1 hour') RETURNING id`, [ownerId, hash])).rows[0].id;
-    await db.admin.query("UPDATE admin_session SET revoked_at = now(), revoked_reason = 'LOGOUT' WHERE id = $1", [id]);
-    await denied(db.admin, 'UPDATE admin_session SET revoked_at = NULL, revoked_reason = NULL WHERE id = $1', [id], /ADMIN_SESSION_REVOKED/);
-    await denied(db.admin, "UPDATE admin_session SET idle_expires_at = now() + interval '5 minutes' WHERE id = $1", [id], /ADMIN_SESSION_REVOKED/);
+    assert.equal((await login(10, 'a'.repeat(64))).rowCount, 0, 'a spent step opens nothing');
+    assert.equal((await login(9, 'a'.repeat(64))).rowCount, 0, 'an earlier step opens nothing');
+    const opened = (await login(11, 'e'.repeat(64))).rows[0];
+    const auth = (await db.owner.query('SELECT action, outcome, actor, login_role, entity_id, details FROM admin_audit WHERE id = $1',
+      [opened.out_auth_audit_id])).rows[0];
+    assert.deepEqual(auth, { action: 'AUTH.LOGIN', outcome: 'OK', actor: 'priv-owner', login_role: 'commerce_test_admin',
+      entity_id: opened.out_session_id, details: { totpStep: 11, enrolment: false } });
+    assert.equal((await login(11, 'b'.repeat(64))).rowCount, 0, 'the same code never opens a second session');
 
-    // A spent step is never accepted again, through the API's own function.
-    assert.equal((await db.admin.query('SELECT fn_admin_totp_accept($1, 10, false) AS ok', [ownerId])).rows[0].ok, false);
-    assert.equal((await db.admin.query('SELECT fn_admin_totp_accept($1, 9, false) AS ok', [ownerId])).rows[0].ok, false);
-    assert.equal((await db.admin.query('SELECT fn_admin_totp_accept($1, 11, false) AS ok', [ownerId])).rows[0].ok, true);
+    // Refresh keeps the authentication and the 12-hour limit; the old token is spent.
+    const rotated = (await db.admin.query('SELECT * FROM fn_admin_session_rotate($1, $2, now(), 1800)', ['e'.repeat(64), 'd'.repeat(64)])).rows[0];
+    assert.equal(rotated.out_auth_audit_id, opened.out_auth_audit_id);
+    assert.equal(rotated.out_absolute_expires_at.getTime(), opened.out_absolute_expires_at.getTime());
+    assert.equal((await db.admin.query('SELECT * FROM fn_admin_session_rotate($1, $2, now(), 1800)', ['e'.repeat(64), 'c'.repeat(64)])).rowCount, 0);
+
+    // Revoked stays revoked.
+    await db.admin.query("UPDATE admin_session SET revoked_at = now(), revoked_reason = 'LOGOUT' WHERE id = $1", [rotated.out_session_id]);
+    await denied(db.admin, 'UPDATE admin_session SET revoked_at = NULL, revoked_reason = NULL WHERE id = $1', [rotated.out_session_id], /ADMIN_SESSION_REVOKED/);
+    await denied(db.admin, "UPDATE admin_session SET idle_expires_at = now() + interval '5 minutes' WHERE id = $1", [rotated.out_session_id], /ADMIN_SESSION_REVOKED/);
     await denied(db.admin, 'SELECT fn_admin_totp_begin($1, $2)', [ownerId, 'v1.a.b.c'], /TOTP_ALREADY_ENROLLED/);
+
+    // Even the owner's direct writes cannot open a session for an account without a confirmed
+    // second factor, or one longer than 12 hours.
+    const fresh = await createUser(db.adminOperator, 'priv-fresh', 'EDITOR', 'correct horse battery staple', 'art');
+    const row = (await db.owner.query("INSERT INTO admin_audit (actor, action, outcome) VALUES ('owner', 'TEST.LOGIN', 'OK') RETURNING id")).rows[0].id;
+    await denied(db.owner as unknown as pg.Pool, sessionSql, [fresh, '9'.repeat(64), '1 hour', row], /ADMIN_SESSION_NOT_ADMISSIBLE/);
+    await denied(db.owner as unknown as pg.Pool, sessionSql, [ownerId, '8'.repeat(64), '13 hours', row], /admin_session_check/);
   });
 
   test('the audit is append-only, and its login is the database\'s word, not the caller\'s', async () => {
@@ -139,8 +159,7 @@ describe('the admin operator sees state, never secrets', () => {
 describe('logins that cross services are refused whatever their grants', () => {
   test('an Admin login that is also the service', async () => {
     const both = await loginIn('commerce_test_admin_and_service', 'admin_app', 'commerce_app');
-    await denied(both, 'SELECT fn_admin_totp_accept($1, 99, false)', [ownerId], /ADMIN_COMMERCE_LOGIN/);
-    await denied(both, 'SELECT fn_admin_departure_has_active_orders(gen_random_uuid())', [], /ADMIN_COMMERCE_LOGIN/);
+    await denied(both, "SELECT * FROM fn_admin_login($1, 99, false, $2, now(), 1800)", [ownerId, 'c'.repeat(64)], /ADMIN_COMMERCE_LOGIN/);
     await assert.rejects(assertAdminLogin(both), /ADMIN_LOGIN_NOT_ISOLATED/);
     await assert.rejects(assertAdminLogin(db.pool), /ADMIN_LOGIN_NOT_ISOLATED/);
     await assert.rejects(assertAdminLogin(db.adminOperator), /ADMIN_LOGIN_NOT_ISOLATED/);
@@ -160,7 +179,8 @@ describe('the owner\'s own login', () => {
   test('cannot rewrite the audit or move a TOTP step backwards', async () => {
     await denied(db.owner as unknown as pg.Pool, "UPDATE admin_audit SET actor = 'someone else'", [], /ADMIN_AUDIT_APPEND_ONLY/);
     await denied(db.owner as unknown as pg.Pool, 'DELETE FROM admin_audit', [], /ADMIN_AUDIT_APPEND_ONLY/);
-    await denied(db.owner as unknown as pg.Pool, 'TRUNCATE admin_audit', [], /ADMIN_AUDIT_APPEND_ONLY/);
+    await denied(db.owner as unknown as pg.Pool, 'TRUNCATE admin_audit', [], /ADMIN_AUDIT_APPEND_ONLY|referenced in a foreign key/);
+    await denied(db.owner as unknown as pg.Pool, 'TRUNCATE admin_audit CASCADE', [], /ADMIN_AUDIT_APPEND_ONLY/);
     await denied(db.owner as unknown as pg.Pool, 'UPDATE admin_totp SET last_accepted_step = 0 WHERE admin_id = $1', [ownerId], /ADMIN_TOTP_REPLAY/);
     await denied(db.owner as unknown as pg.Pool, "UPDATE admin_totp SET seed_ciphertext = 'v1.a.b.c' WHERE admin_id = $1", [ownerId], /ADMIN_TOTP_REPLAY/);
   });

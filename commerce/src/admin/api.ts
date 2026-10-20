@@ -15,8 +15,16 @@
 //   POST /api/tours                        {slug}                        (OWNER, EDITOR)
 //   PUT  /api/tours/<id>/draft             {expectedRevision, document}  (OWNER, EDITOR)
 //   POST /api/tours/<id>/publish           {expectedDraftRevision, expectedPublishedVersion}  (OWNER)
-//   … the same for /api/departures (create takes {slug, tourId})
+//   … the same for /api/departures (create takes {slug, tourId}; publish also {classification,
+//   notice} for an execution change, ADR v2.3 §4) and /api/content (create takes {kind, slug}:
+//   report, review, organizer or legal)
+//   GET  /api/departures/<id>/affected-orders   order references and states only (OWNER, EDITOR)
+//   GET  /api/changes/<id>/notices              per-order notice states (OWNER, EDITOR)
 //   GET  /api/audit?before=<id>            (OWNER)
+//
+// Publishing and classifying are the OWNER's, decided from the live session alone: the actor is
+// `admin:<login>` of that session, never a name from the request, and the Admin audit row of every
+// publish names the session and the AUTH.LOGIN row of the password + TOTP login behind it.
 //
 // Session: a __Host- cookie (HttpOnly, Secure, SameSite=Strict, Path=/), 30 minutes idle, 12 hours
 // at most. Every state-changing request must come from the admin origin itself (Origin, and
@@ -26,10 +34,15 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import type pg from 'pg';
 
+import {
+  affectedOrders, changeNotices, createContentItem, createDeparture, createTour, EditorialError, publishContentItem,
+  publishDeparture, publishTour, saveContentDraft, saveDepartureDraft, saveTourDraft, type Classification, type ContentKind,
+  type Document,
+} from '../editorial.js';
 import type { Logger } from '../log.js';
 import { BookingRateLimiter } from '../rate-limit.js';
 import {
-  allowed, audit, consumeLoginAttempt, findAccount, liveSessions, openSession, RateLimited, revokeSession,
+  allowed, audit, consumeLoginAttempt, findAccount, liveSessions, login as openLogin, RateLimited, revokeSession,
   rotateSession, throttleKey, touchSession, type Account, type IssuedSession, type Permission, type Session,
 } from './auth.js';
 import { UNKNOWN_ACCOUNT_HASH, verifyPassword } from './password.js';
@@ -212,8 +225,11 @@ export function createAdminServer(deps: AdminDeps): Server {
     return account;
   }
 
-  /** The second factor: the matching step is spent in the database, once. */
-  async function secondFactor(account: Account, code: unknown, confirming: boolean): Promise<void> {
+  /**
+   * The second factor. The matching step is spent, AUTH.LOGIN written and the session opened in one
+   * database call (fn_admin_login): a code is accepted once, and no session exists without one.
+   */
+  async function secondFactor(account: Account, code: unknown, confirming: boolean): Promise<IssuedSession> {
     const { rows } = await deps.pool.query<{ seed_ciphertext: string; confirmed_at: Date | null }>(
       'SELECT seed_ciphertext, confirmed_at FROM admin_totp WHERE admin_id = $1', [account.id]);
     const row = rows[0];
@@ -223,28 +239,21 @@ export function createAdminServer(deps: AdminDeps): Server {
       throw confirming ? new HttpError(409, 'TOTP_ALREADY_ENROLLED') : new HttpError(403, 'TOTP_ENROLLMENT_REQUIRED');
     }
     const step = matchingStep(decryptSeed(deps.totpKey, account.id, row.seed_ciphertext), code, now());
-    let accepted = false;
+    let issued: IssuedSession | undefined;
     if (step !== undefined) {
-      try {
-        accepted = (await deps.pool.query<{ ok: boolean }>('SELECT fn_admin_totp_accept($1, $2, $3) AS ok',
-          [account.id, step, confirming])).rows[0]!.ok;
-      } catch (e) { throw dbError(e); }
+      try { issued = await openLogin(deps.pool, account, step, confirming, now()); } catch (e) { throw dbError(e); }
     }
-    if (!accepted) {
+    if (issued === undefined) {
       await audit(deps.pool, { adminId: account.id, actor: account.login, action: 'AUTH.LOGIN', outcome: 'REFUSED',
         details: { reason: step === undefined ? 'CODE' : 'CODE_REUSED' } });
       throw new HttpError(401, 'INVALID_CREDENTIALS');
     }
+    return issued;
   }
 
   async function login(req: IncomingMessage, res: ServerResponse) {
     const body = await readJson(req, MAX_AUTH_BODY);
-    const account = await credentials(req, body);
-    await secondFactor(account, body.code, false);
-    const issued = await openSession(deps.pool, account, now());
-    await audit(deps.pool, { adminId: account.id, actor: account.login, action: 'AUTH.LOGIN', outcome: 'OK',
-      entityType: 'admin_session', entityId: issued.session.id });
-    signedIn(res, issued);
+    signedIn(res, await secondFactor(await credentials(req, body), body.code, false));
   }
 
   async function enroll(req: IncomingMessage, res: ServerResponse) {
@@ -265,20 +274,28 @@ export function createAdminServer(deps: AdminDeps): Server {
 
   async function confirmEnrollment(req: IncomingMessage, res: ServerResponse) {
     const body = await readJson(req, MAX_AUTH_BODY);
-    const account = await credentials(req, body);
-    await secondFactor(account, body.code, true);
-    const issued = await openSession(deps.pool, account, now());
-    await audit(deps.pool, { adminId: account.id, actor: account.login, action: 'TOTP.ENROLLED', outcome: 'OK' });
-    await audit(deps.pool, { adminId: account.id, actor: account.login, action: 'AUTH.LOGIN', outcome: 'OK',
-      entityType: 'admin_session', entityId: issued.session.id });
-    signedIn(res, issued);
+    signedIn(res, await secondFactor(await credentials(req, body), body.code, true));
   }
 
   // ---------------------------------------------------------------------------------------------
-  // Editorial: thin, role-checked calls of migration 0008's functions. The actor recorded in each
-  // revision is `admin:<login>`; the database adds which login wrote it.
+  // Editorial: role-checked calls of the editorial commands (src/editorial.ts, migrations 0008–0010).
+  // The actor is always the session's own `admin:<login>`; the database adds which login wrote it.
 
+  type Kind = 'tour' | 'departure' | 'content';
+  const TABLE: Record<Kind, { table: string; key: string }> = {
+    tour: { table: 'tour', key: 'tour_id' }, departure: { table: 'departure', key: 'departure_id' },
+    content: { table: 'content_item', key: 'item_id' },
+  };
+  const CONTENT_KINDS: readonly ContentKind[] = ['report', 'review', 'organizer', 'legal'];
   const actor = (s: Session) => `admin:${s.login}`;
+
+  /** Editorial refusals by their kind: a conflict to reload, a bad input, an unknown row, or a rule. */
+  function editorialError(e: unknown): HttpError {
+    if (!(e instanceof EditorialError)) return dbError(e);
+    if (e.code.endsWith('_UNKNOWN')) return new HttpError(404, e.code);
+    if (e.code.endsWith('_INVALID')) return new HttpError(422, e.code);
+    return new HttpError(409, e.code);
+  }
 
   async function listTours(res: ServerResponse) {
     const { rows } = await deps.pool.query(`SELECT t.id, t.slug, t.title, t.published_version AS "publishedVersion",
@@ -295,87 +312,99 @@ export function createAdminServer(deps: AdminDeps): Server {
     send(res, 200, { departures: rows.map(r => ({ ...r, priceKopecks: r.priceKopecks === null ? null : Number(r.priceKopecks) })) });
   }
 
-  async function readEntity(res: ServerResponse, kind: 'tour' | 'departure', id: string) {
-    const { rows } = await deps.pool.query(`SELECT to_jsonb(x) AS row FROM ${kind} x WHERE id = $1`, [id]);
+  async function listContent(res: ServerResponse) {
+    const { rows } = await deps.pool.query(`SELECT c.id, c.kind, c.slug, c.published_version AS "publishedVersion",
+      c.published_at AS "publishedAt", d.revision AS "draftRevision"
+      FROM content_item c LEFT JOIN content_item_draft d ON d.item_id = c.id ORDER BY c.kind, c.created_at`);
+    send(res, 200, { items: rows });
+  }
+
+  async function readEntity(res: ServerResponse, kind: Kind, id: string) {
+    const { table, key } = TABLE[kind];
+    const { rows } = await deps.pool.query(`SELECT to_jsonb(x) AS row FROM ${table} x WHERE id = $1`, [id]);
     if (rows[0] === undefined) throw new HttpError(404, `${kind.toUpperCase()}_UNKNOWN`);
     const draft = (await deps.pool.query(`SELECT revision, document, updated_by AS "updatedBy", updated_at AS "updatedAt"
-      FROM ${kind}_draft WHERE ${kind}_id = $1`, [id])).rows[0] ?? null;
+      FROM ${table}_draft WHERE ${key} = $1`, [id])).rows[0] ?? null;
     const revisions = (await deps.pool.query(`SELECT version, draft_revision AS "draftRevision", document_sha256 AS "documentSha256",
-      published_by AS "publishedBy", published_at AS "publishedAt" FROM ${kind}_revision WHERE ${kind}_id = $1 ORDER BY version DESC`, [id])).rows;
+      published_by AS "publishedBy", published_at AS "publishedAt" FROM ${table}_revision WHERE ${key} = $1 ORDER BY version DESC`, [id])).rows;
     send(res, 200, { [kind]: rows[0].row, draft, revisions });
   }
 
-  async function create(req: IncomingMessage, res: ServerResponse, kind: 'tour' | 'departure') {
+  async function create(req: IncomingMessage, res: ServerResponse, kind: Kind) {
     const s = await authorize(req, 'editorial.draft');
     const body = await readJson(req, MAX_AUTH_BODY);
     const slug = str(body.slug, 100);
-    const tourId = kind === 'departure' ? str(body.tourId, 36) : undefined;
-    if (slug === undefined || (kind === 'departure' && (tourId === undefined || !UUID.test(tourId)))) throw new HttpError(422, 'INVALID');
+    if (slug === undefined) throw new HttpError(422, 'INVALID');
     let id: string;
     try {
-      id = kind === 'tour'
-        ? (await deps.pool.query<{ id: string }>('INSERT INTO tour (slug) VALUES ($1) RETURNING id', [slug])).rows[0]!.id
-        : (await deps.pool.query<{ id: string }>('INSERT INTO departure (slug, tour_id) VALUES ($1, $2) RETURNING id', [slug, tourId])).rows[0]!.id;
-    } catch (e) { throw dbError(e); }
-    await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: `${kind.toUpperCase()}.CREATED`, outcome: 'OK', entityType: kind, entityId: id });
+      if (kind === 'tour') id = await createTour(deps.pool, slug, actor(s));
+      else if (kind === 'departure') {
+        const tourId = str(body.tourId, 36);
+        if (tourId === undefined || !UUID.test(tourId)) throw new HttpError(422, 'INVALID');
+        id = await createDeparture(deps.pool, tourId, slug, actor(s));
+      } else {
+        const contentKind = CONTENT_KINDS.find(k => k === body.kind);
+        if (contentKind === undefined) throw new HttpError(422, 'INVALID');
+        id = await createContentItem(deps.pool, contentKind, slug, actor(s));
+      }
+    } catch (e) { throw e instanceof HttpError ? e : editorialError(e); }
+    await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: `${kind.toUpperCase()}.CREATED`, outcome: 'OK',
+      entityType: TABLE[kind].table, entityId: id });
     send(res, 201, { id });
   }
 
-  async function saveDraft(req: IncomingMessage, res: ServerResponse, kind: 'tour' | 'departure', id: string) {
+  async function saveDraft(req: IncomingMessage, res: ServerResponse, kind: Kind, id: string) {
     const s = await authorize(req, 'editorial.draft');
     const body = await readJson(req, MAX_EDITORIAL_BODY);
     const expected = int(body.expectedRevision);
     const document = body.document;
     if (expected === undefined || document === null || typeof document !== 'object' || Array.isArray(document)) throw new HttpError(422, 'INVALID');
+    const save = kind === 'tour' ? saveTourDraft : kind === 'departure' ? saveDepartureDraft : saveContentDraft;
     let revision: number;
-    try {
-      revision = (await deps.pool.query<{ r: number }>(`SELECT fn_save_${kind}_draft($1, $2, $3, $4) AS r`,
-        [id, expected, document, actor(s)])).rows[0]!.r;
-    } catch (e) { throw dbError(e); }
+    try { revision = await save(deps.pool, id, expected, document as Document, actor(s)); } catch (e) { throw editorialError(e); }
     await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: `${kind.toUpperCase()}.DRAFT_SAVED`, outcome: 'OK',
-      entityType: kind, entityId: id, details: { revision } });
+      entityType: TABLE[kind].table, entityId: id, details: { revision } });
     send(res, 200, { revision });
   }
 
-  async function publish(req: IncomingMessage, res: ServerResponse, kind: 'tour' | 'departure', id: string) {
+  /**
+   * OWNER only, from the live session alone. An execution change on a sold departure takes its
+   * classification and customer notice here (EQUIVALENT applies it with one notice per order;
+   * MATERIAL publishes nothing and routes it to move/cancel). The publish and its Admin audit row,
+   * which names this session and its AUTH.LOGIN row, commit together.
+   */
+  async function publish(req: IncomingMessage, res: ServerResponse, kind: Kind, id: string) {
     const s = await authorize(req, 'editorial.publish');
     const body = await readJson(req, MAX_AUTH_BODY);
-    const draft = int(body.expectedDraftRevision);
-    const published = int(body.expectedPublishedVersion);
-    if (draft === undefined || published === undefined) throw new HttpError(422, 'INVALID');
+    const expected = { draftRevision: int(body.expectedDraftRevision), publishedVersion: int(body.expectedPublishedVersion) };
+    if (expected.draftRevision === undefined || expected.publishedVersion === undefined) throw new HttpError(422, 'INVALID');
+    let change: { classification: Classification; notice: string } | undefined;
+    if (body.classification !== undefined && body.classification !== null) {
+      if (kind !== 'departure' || (body.classification !== 'EQUIVALENT' && body.classification !== 'MATERIAL')
+          || typeof body.notice !== 'string') throw new HttpError(422, 'EXECUTION_CHANGE_CLASSIFICATION_INVALID');
+      change = { classification: body.classification, notice: body.notice };
+    }
+    const at = { draftRevision: expected.draftRevision, publishedVersion: expected.publishedVersion };
     const client = await deps.pool.connect();
-    let version: number;
     try {
       await client.query('BEGIN');
-      if (kind === 'departure') await executionChangeGuard(client, id);
-      version = (await client.query<{ v: number }>(`SELECT fn_publish_${kind}($1, $2, $3, $4) AS v`, [id, draft, published, actor(s)])).rows[0]!.v;
-      await audit(client, { adminId: s.adminId, actor: s.login, action: `${kind.toUpperCase()}.PUBLISHED`, outcome: 'OK',
-        entityType: kind, entityId: id, details: { version, draftRevision: draft } });
+      let result: { outcome: string; version: number; changeId: string | null; affectedOrders: number };
+      if (kind === 'departure') result = await publishDeparture(client, id, at, actor(s), change);
+      else {
+        const version = await (kind === 'tour' ? publishTour : publishContentItem)(client, id, at, actor(s));
+        result = { outcome: 'PUBLISHED', version, changeId: null, affectedOrders: 0 };
+      }
+      await audit(client, { adminId: s.adminId, actor: s.login, outcome: 'OK', entityType: TABLE[kind].table, entityId: id,
+        action: result.outcome === 'PUBLISHED' ? `${kind.toUpperCase()}.PUBLISHED`
+          : result.outcome === 'APPLIED' ? 'DEPARTURE.EXECUTION_CHANGE_EQUIVALENT' : 'DEPARTURE.EXECUTION_CHANGE_MATERIAL',
+        details: { sessionId: s.id, authAuditId: s.authAuditId, version: result.version, outcome: result.outcome,
+          changeId: result.changeId, affectedOrders: result.affectedOrders, draftRevision: at.draftRevision } });
       await client.query('COMMIT');
+      send(res, 200, result);
     } catch (e) {
       await client.query('ROLLBACK');
-      if (e instanceof HttpError) throw e;
-      throw dbError(e);
+      throw e instanceof HttpError ? e : editorialError(e);
     } finally { client.release(); }
-    send(res, 200, { version });
-  }
-
-  /**
-   * ADR v2.3 §4: a contract change of a departure that has active or concluded orders is not an
-   * ordinary edit. Until its EQUIVALENT/MATERIAL workflow exists (ART-365), such a publish is refused.
-   * Under the same departure lock reserve() takes, so no order slips in between.
-   */
-  async function executionChangeGuard(client: pg.PoolClient, id: string) {
-    const { rows } = await client.query<{ slug: string; changed: boolean }>(`SELECT d.slug,
-        d.published_at IS NOT NULL AND d.contract IS DISTINCT FROM nullif(r.document->'contract', 'null'::jsonb) AS changed
-      FROM departure d LEFT JOIN departure_draft r ON r.departure_id = d.id WHERE d.id = $1`, [id]);
-    const d = rows[0];
-    if (d === undefined) throw new HttpError(404, 'DEPARTURE_UNKNOWN');
-    if (!d.changed) return;
-    await client.query("SELECT pg_advisory_xact_lock(hashtextextended('departure:' || $1, 0))", [d.slug]);
-    if ((await client.query<{ a: boolean }>('SELECT fn_admin_departure_has_active_orders($1) AS a', [id])).rows[0]!.a) {
-      throw new HttpError(409, 'EXECUTION_CHANGE_CLASSIFICATION_REQUIRED');
-    }
   }
 
   async function auditLog(req: IncomingMessage, res: ServerResponse, url: URL) {
@@ -398,7 +427,7 @@ export function createAdminServer(deps: AdminDeps): Server {
     if (path === '/api/auth/session' && method === 'GET') { send(res, 200, sessionBody(await session(req))); return; }
     if (path === '/api/auth/refresh' && method === 'POST') {
       const s = await session(req);
-      const issued = await rotateSession(deps.pool, s, now());
+      const issued = await rotateSession(deps.pool, cookieToken(req)!, s, now());
       if (issued === undefined) throw new HttpError(401, 'UNAUTHENTICATED');
       await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: 'AUTH.REFRESHED', outcome: 'OK',
         entityType: 'admin_session', entityId: issued.session.id });
@@ -431,12 +460,27 @@ export function createAdminServer(deps: AdminDeps): Server {
     }
     if (path === '/api/audit' && method === 'GET') return auditLog(req, res, url);
 
-    const m = /^\/api\/(tours|departures)(?:\/([0-9a-f-]{36})(?:\/(draft|publish))?)?$/.exec(path);
+    const orders = /^\/api\/departures\/([0-9a-f-]{36})\/affected-orders$/.exec(path);
+    if (orders && method === 'GET' && UUID.test(orders[1]!)) {
+      await authorize(req, 'editorial.read');
+      try { send(res, 200, { orders: await affectedOrders(deps.pool, orders[1]!) }); } catch (e) { throw editorialError(e); }
+      return;
+    }
+    const notices = /^\/api\/changes\/([0-9a-f-]{36})\/notices$/.exec(path);
+    if (notices && method === 'GET' && UUID.test(notices[1]!)) {
+      await authorize(req, 'editorial.read');
+      send(res, 200, { notices: await changeNotices(deps.pool, notices[1]!) });
+      return;
+    }
+    const m = /^\/api\/(tours|departures|content)(?:\/([0-9a-f-]{36})(?:\/(draft|publish))?)?$/.exec(path);
     if (m) {
-      const kind = m[1] === 'tours' ? 'tour' : 'departure';
+      const kind: Kind = m[1] === 'tours' ? 'tour' : m[1] === 'departures' ? 'departure' : 'content';
       const id = m[2];
       if (id !== undefined && !UUID.test(id)) throw new HttpError(404, 'NOT_FOUND');
-      if (id === undefined && method === 'GET') { await authorize(req, 'editorial.read'); return kind === 'tour' ? listTours(res) : listDepartures(res); }
+      if (id === undefined && method === 'GET') {
+        await authorize(req, 'editorial.read');
+        return kind === 'tour' ? listTours(res) : kind === 'departure' ? listDepartures(res) : listContent(res);
+      }
       if (id === undefined && method === 'POST') return create(req, res, kind);
       if (id !== undefined && m[3] === undefined && method === 'GET') { await authorize(req, 'editorial.read'); return readEntity(res, kind, id); }
       if (id !== undefined && m[3] === 'draft' && method === 'PUT') return saveDraft(req, res, kind, id);

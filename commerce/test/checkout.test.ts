@@ -60,7 +60,7 @@ beforeEach(async () => {
   clock = new Date('2026-10-04T06:00:00Z');
   refref.reset();
   logs.lines.length = 0;
-  await db.owner.query('TRUNCATE order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
   await setSalesOpen(db.operator, true, 'test', 'open');
 });
 
