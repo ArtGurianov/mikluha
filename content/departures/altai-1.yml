@@ -19,12 +19,13 @@ contract:
     risks: null
   accommodation:
     name: "Мини-отель «Фараонова дача»"
-    address: null
+    address: "649240, Республика Алтай, м.р-н Чемальский, с.п. Чемальское, с. Чемал, ул. Дворникова, д. 7А"
     registryNumber: "С042024009867"
+    category: "нет категории"
     roomType: null
     nights: 3
     meals: null
-    legalEntity: null
+    legalEntity: "ООО «АЖУР» (ИНН 0400006053, ОГРН 1170400004697, КПП 040001001)"
   carrier:
     legalName: "ИП Абедовская Дарья Игоревна, ИНН 420548575520, ОГРНИП 316420500100532"
     route: null
