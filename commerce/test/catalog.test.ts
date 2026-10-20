@@ -51,7 +51,7 @@ test('departure requires exact valid times and services never default to include
   assert.equal(tourContract({ destination: 'Алтай', route: 'Река', included: 'Проезд', risks: 'Горы', program: [] }), null);
 });
 
-test('the real Altai draft keeps rescheduled dates, verified hotel identity and closed launch boundary', () => {
+test('the real Altai draft keeps rescheduled dates, listed hotel registry ID and closed launch boundary', () => {
   const catalog = loadCatalog(join(MIGRATIONS_DIR, '..', '..', 'content'));
   const d = catalog.departures.get('altai-1')!;
   assert.equal(catalog.launchReady, false);
