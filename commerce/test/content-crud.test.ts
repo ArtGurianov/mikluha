@@ -39,7 +39,7 @@ async function tour(opts: { template?: Document | null; listed?: boolean } = {})
   const id = await createTour(db.admin, slug, 'editor');
   await saveTourDraft(db.admin, id, 0, { slug, title: 'Алтай', isListed: opts.listed ?? true,
     contract: opts.template === undefined ? template() : opts.template, content: { summary: 'Тур' } }, 'editor');
-  await publishTour(db.admin, id, { draftRevision: 1, publishedVersion: 0 }, 'owner');
+  await publishTour(db.publisher, id, { draftRevision: 1, publishedVersion: 0 }, 'owner');
   return { id, slug, draft: 1, version: 1 };
 }
 
@@ -68,7 +68,7 @@ async function edit(d: Dep, over: Document, change?: Parameters<typeof publishDe
   if (Object.keys(over).length > 0) {
     d.draft = await saveDepartureDraft(db.admin, d.id, d.draft, { ...await draftOf(d.id), ...over }, 'editor');
   }
-  const r = await publishDeparture(db.admin, d.id, { draftRevision: d.draft, publishedVersion: d.version }, 'owner', change);
+  const r = await publishDeparture(db.publisher, d.id, { draftRevision: d.draft, publishedVersion: d.version }, 'owner', change);
   d.version = r.version;
   return r;
 }
@@ -150,7 +150,7 @@ describe('templates resolve once', () => {
     const first = await departure({ tourId: t.id });
     await saveTourDraft(db.admin, t.id, 1, { slug: t.slug, title: 'Алтай', isListed: true, contract: template({ route: 'Маршрут B' }),
       content: { summary: 'Тур' } }, 'editor');
-    await publishTour(db.admin, t.id, { draftRevision: 2, publishedVersion: 1 }, 'owner');
+    await publishTour(db.publisher, t.id, { draftRevision: 2, publishedVersion: 1 }, 'owner');
     await edit(first, { priceKopecks: 3_500_000 });
     const second = await departure({ tourId: t.id });
     const route = async (d: Dep) => (await db.owner.query(`SELECT contract #>> '{tour,route}' AS r, template_tour_version AS v
@@ -165,8 +165,8 @@ describe('templates resolve once', () => {
     assert.equal((await draftOf(d.id)).contract, null);
     await saveTourDraft(db.admin, t.id, 1, { slug: t.slug, title: 'Алтай', isListed: true, contract: template({ route: 'Поздний шаблон' }),
       content: {} }, 'editor');
-    await publishTour(db.admin, t.id, { draftRevision: 2, publishedVersion: 1 }, 'owner');
-    const r = await publishDeparture(db.admin, d.id, { draftRevision: 2, publishedVersion: 0 }, 'owner');
+    await publishTour(db.publisher, t.id, { draftRevision: 2, publishedVersion: 1 }, 'owner');
+    const r = await publishDeparture(db.publisher, d.id, { draftRevision: 2, publishedVersion: 0 }, 'owner');
     assert.equal(r.outcome, 'PUBLISHED');
     const row = (await db.owner.query('SELECT contract, template_tour_version FROM departure WHERE id = $1', [d.id])).rows[0];
     assert.equal(row.contract.tour.route, 'Поздний шаблон');
@@ -187,7 +187,7 @@ describe('templates resolve once', () => {
     const slug = uniq('tour');
     const id = await createTour(db.admin, slug, 'editor');
     await saveTourDraft(db.admin, id, 0, { slug, title: 'Алтай', contract: template({ route: '' }), content: {} }, 'editor');
-    await assert.rejects(publishTour(db.admin, id, { draftRevision: 1, publishedVersion: 0 }, 'owner'), refused('TOUR_DOCUMENT_INVALID'));
+    await assert.rejects(publishTour(db.publisher, id, { draftRevision: 1, publishedVersion: 0 }, 'owner'), refused('TOUR_DOCUMENT_INVALID'));
   });
 });
 
@@ -218,12 +218,12 @@ describe('editable offers', () => {
 
   test('a stale draft revision or published version is a typed conflict', async () => {
     const d = await departure();
-    await assert.rejects(publishDeparture(db.admin, d.id, { draftRevision: d.draft, publishedVersion: 0 }, 'tab'),
+    await assert.rejects(publishDeparture(db.publisher, d.id, { draftRevision: d.draft, publishedVersion: 0 }, 'tab'),
       (e: unknown) => e instanceof EditorialError && e.code === 'PUBLISHED_VERSION_CONFLICT' && e.conflict);
     await assert.rejects(saveDepartureDraft(db.admin, d.id, d.draft - 1, await draftOf(d.id), 'tab'),
       (e: unknown) => e instanceof EditorialError && e.code === 'DRAFT_REVISION_CONFLICT' && e.conflict);
     const both = await Promise.allSettled([1, 2].map(() =>
-      publishDeparture(db.admin, d.id, { draftRevision: d.draft, publishedVersion: d.version }, 'tab')));
+      publishDeparture(db.publisher, d.id, { draftRevision: d.draft, publishedVersion: d.version }, 'tab')));
     assert.deepEqual(both.map((x) => x.status).sort(), ['fulfilled', 'rejected']);
     const lost = both.find((x) => x.status === 'rejected') as PromiseRejectedResult;
     assert.equal((lost.reason as EditorialError).code, 'PUBLISHED_VERSION_CONFLICT');
@@ -259,7 +259,7 @@ describe('execution changes on a sold departure', () => {
     const d = await departure();
     await order(d);
     await assert.rejects(edit(d, { contract: { tour: newProgramme(), departure: facts() } }), refused('EXECUTION_CHANGE_CLASSIFICATION_REQUIRED'));
-    await assert.rejects(db.admin.query('SELECT fn_publish_departure($1, $2, $3, $4)', [d.id, d.draft, d.version, 'owner']),
+    await assert.rejects(db.publisher.query('SELECT fn_publish_departure($1, $2, $3, $4)', [d.id, d.draft, d.version, 'owner']),
       /EXECUTION_CHANGE_CLASSIFICATION_REQUIRED/);
     await assert.rejects(edit(d, {}, { classification: 'EQUIVALENT', notice: '  ' }), refused('EXECUTION_CHANGE_NOTICE_INVALID'));
     assert.equal((await db.owner.query('SELECT published_version FROM departure WHERE id = $1', [d.id])).rows[0].published_version, 1);
@@ -339,8 +339,8 @@ describe('MATERIAL retry identity', () => {
       const o = await order(d);
       d.draft = await saveDepartureDraft(db.admin, d.id, d.draft, { ...await draftOf(d.id),
         contract: { tour: newProgramme(), departure: facts() } }, 'editor');
-      const a = await db.admin.connect();
-      const b = await db.admin.connect();
+      const a = await db.publisher.connect();
+      const b = await db.publisher.connect();
       const sql = 'SELECT fn_publish_departure_change($1, $2, $3, $4, $5, $6) AS r';
       const args = [d.id, d.draft, d.version, 'MATERIAL', 'Гостевой дом недоступен.', 'owner'];
       let second: Promise<unknown> | undefined;
@@ -440,7 +440,7 @@ describe('reports, reviews, organizers and legal drafts', () => {
     return { id, slug };
   }
   const publish = (id: string, draftRevision = 1, publishedVersion = 0) =>
-    publishContentItem(db.admin, id, { draftRevision, publishedVersion }, 'owner');
+    publishContentItem(db.publisher, id, { draftRevision, publishedVersion }, 'owner');
 
   test('the graph is checked at publish', async () => {
     const draftTour = await createTour(db.admin, uniq('draft-tour'), 'editor');
@@ -496,7 +496,7 @@ describe('reports, reviews, organizers and legal drafts', () => {
     // Unlisting the tour hides everything that hangs on it.
     await db.admin.query('SELECT fn_save_tour_draft($1, 1, $2, $3)', [t.id, { slug: t.slug, title: 'Алтай', isListed: false,
       contract: template(), content: {} }, 'editor']);
-    await publishTour(db.admin, t.id, { draftRevision: 2, publishedVersion: 1 }, 'owner');
+    await publishTour(db.publisher, t.id, { draftRevision: 2, publishedVersion: 1 }, 'owner');
     s = await slugs();
     assert.ok(!s.tours.includes(t.slug));
     assert.deepEqual(s.departures, []);
@@ -507,7 +507,7 @@ describe('reports, reviews, organizers and legal drafts', () => {
     const quiet = await createTour(db.admin, uniq('quiet'), 'editor');
     const quietSlug = (await db.owner.query('SELECT slug FROM tour WHERE id = $1', [quiet])).rows[0].slug;
     await saveTourDraft(db.admin, quiet, 0, { slug: quietSlug, title: 'Тихий', contract: null, content: {} }, 'editor');
-    await publishTour(db.admin, quiet, { draftRevision: 1, publishedVersion: 0 }, 'owner');
+    await publishTour(db.publisher, quiet, { draftRevision: 1, publishedVersion: 0 }, 'owner');
     assert.ok(!(await slugs()).tours.includes(quietSlug));
   });
 
@@ -578,7 +578,7 @@ describe('audit', () => {
     assert.deepEqual(rows.map((r) => [r.action, r.actor, r.login_role, r.draft_revision, r.version]), [
       ['CREATE', 'editor', 'commerce_test_admin', 1, null],
       ['SAVE_DRAFT', 'editor', 'commerce_test_admin', 2, null],
-      ['PUBLISH', 'owner', 'commerce_test_admin', 2, 1],
+      ['PUBLISH', 'owner', 'commerce_test_admin_publisher', 2, 1],
     ]);
     await db.owner.query('UPDATE departure SET is_listed = true WHERE id = $1', [d.id]);
     const direct = (await db.owner.query(`SELECT action, actor, detail FROM editorial_audit WHERE entity_id = $1 ORDER BY id DESC LIMIT 1`,

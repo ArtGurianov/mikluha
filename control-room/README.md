@@ -49,5 +49,5 @@ docker build --build-arg SOURCE_COMMIT=$(git rev-parse HEAD) control-room
 Two Coolify applications, by image digest (ADR v2.3 §8): this image on the admin domain, and the
 commerce image with `node dist/bin/admin-api.js` as the Admin API, on a private network shared only
 with this Nginx and the database, with no public domain of its own. The Admin API's environment and
-`admin_runtime`/`admin_operator_login` credentials are new custody items for
+`admin_runtime`/`admin_publish_runtime`/`admin_operator_login` credentials and versioned audit keyring are new custody items for
 `adman-vps-infrastructure` before that deployment.

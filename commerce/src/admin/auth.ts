@@ -95,11 +95,12 @@ const SECRET_KEY = /password|code|seed|secret|token|cookie|authorization/i;
 /** Writes one audit row with the Admin API's attestation over exactly what is stored. */
 export async function audit(db: Queryable, keys: AdminKeys, e: AuditEntry): Promise<void> {
   const details = Object.fromEntries(Object.entries(e.details ?? {}).map(([k, v]) => [k, SECRET_KEY.test(k) ? '[REDACTED]' : v]));
-  const row = { adminId: e.adminId ?? null, actor: e.actor, action: e.action, outcome: e.outcome,
+  const loginRole = (await db.query<{ role: string }>('SELECT session_user AS role')).rows[0]!.role;
+  const row = { eventId: randomUUID(), keyId: keys.auditKeyId, loginRole, adminId: e.adminId ?? null, actor: e.actor, action: e.action, outcome: e.outcome,
     entityType: e.entityType ?? null, entityId: e.entityId ?? null, details };
-  await db.query(`INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-  [row.adminId, row.actor, row.action, row.outcome, row.entityType, row.entityId, details, attest(keys.audit, row)]);
+  await db.query(`INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation, event_id, key_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+  [row.adminId, row.actor, row.action, row.outcome, row.entityType, row.entityId, details, attest(keys.audit, row), row.eventId, row.keyId]);
 }
 
 export interface Account {
@@ -145,10 +146,12 @@ export async function login(pool: pg.Pool, keys: AdminKeys, account: Pick<Accoun
   confirming: boolean, now: Date): Promise<IssuedSession | undefined> {
   const token = randomBytes(32).toString('base64url');
   const sessionId = randomUUID();
-  const attestation = attest(keys.audit, { adminId: account.id, actor: account.login, action: 'AUTH.LOGIN', outcome: 'OK',
+  const eventId = randomUUID();
+  const loginRole = (await pool.query<{ role: string }>('SELECT session_user AS role')).rows[0]!.role;
+  const attestation = attest(keys.audit, { eventId, keyId: keys.auditKeyId, loginRole, adminId: account.id, actor: account.login, action: 'AUTH.LOGIN', outcome: 'OK',
     entityType: 'admin_session', entityId: sessionId, details: { totpStep: step, enrolment: confirming } });
-  const { rows } = await pool.query<SessionRow>('SELECT * FROM fn_admin_login($1, $2, $3, $4, $5, $6, $7, $8)',
-    [sessionId, account.id, step, confirming, tokenMac(keys.session, token), now, SESSION_IDLE_MS / 1000, attestation]);
+  const { rows } = await pool.query<SessionRow>('SELECT * FROM fn_admin_login($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+    [sessionId, account.id, step, confirming, tokenMac(keys.session, token), now, SESSION_IDLE_MS / 1000, attestation, eventId, keys.auditKeyId]);
   return rows[0] && issued(account, token, rows[0]);
 }
 
@@ -178,9 +181,11 @@ export async function touchSession(db: Queryable, keys: AdminKeys, token: string
  * Admin API's own revocation take, so a disable, a TOTP reset, a password change or a revocation
  * either commits before this check (which then fails) or waits until this transaction is done.
  */
-export async function lockSession(client: pg.PoolClient, keys: AdminKeys, token: string, adminId: string, now: Date): Promise<Session | undefined> {
+export async function lockSession(client: pg.PoolClient, keys: AdminKeys, token: string, adminId: string, now: () => Date): Promise<Session | undefined> {
   if (!(await client.query<{ ok: boolean }>('SELECT fn_admin_lock_account($1) AS ok', [adminId])).rows[0]!.ok) return undefined;
-  const s = await touchSession(client, keys, token, now);
+  // Wait for both locks before sampling time: a session can expire while queued for either one.
+  await client.query('SELECT id FROM admin_session WHERE token_mac = $1 FOR UPDATE', [tokenMac(keys.session, token)]);
+  const s = await touchSession(client, keys, token, now());
   return s?.adminId === adminId ? s : undefined;
 }
 

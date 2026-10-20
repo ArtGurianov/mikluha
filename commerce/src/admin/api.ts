@@ -41,7 +41,7 @@ import {
 } from '../editorial.js';
 import type { Logger } from '../log.js';
 import { BookingRateLimiter } from '../rate-limit.js';
-import { adminKeys, verifyAttestation, type DetailValue } from './attestation.js';
+import { adminKeys, auditEvidence, type AuditKeyring, type DetailValue } from './attestation.js';
 import {
   allowed, audit, consumeLoginAttempt, findAccount, GlobalLoginLimit, liveSessions, lockSession, login as openLogin, RateLimited,
   revokeSession, rotateSession, touchSession, type Account, type IssuedSession, type Permission, type Session,
@@ -57,7 +57,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export interface AdminDeps {
   readonly pool: pg.Pool;
+  readonly publisherPool: pg.Pool;
   readonly totpKey: Buffer;
+  readonly auditKeys: AuditKeyring;
   /** The Control Room's origin, e.g. https://admin.mikluha-maklai.ru: the only one allowed to write. */
   readonly origin: string;
   readonly schemaHead: number;
@@ -136,16 +138,18 @@ function dbError(e: unknown): HttpError {
   throw e;
 }
 
-/** The Admin API's login must be admin_app's and nothing else's: never the service, never an operator. */
-export async function assertAdminLogin(pool: pg.Pool): Promise<void> {
+/** Each API credential reaches only its own capability; neither can assume the other. */
+export async function assertAdminLogin(pool: pg.Pool, capability: 'admin_app' | 'admin_publisher' = 'admin_app'): Promise<void> {
   const { rows } = await pool.query<Record<string, boolean>>(`SELECT
+    session_user = current_user AS unmasked,
     pg_has_role(current_user, 'admin_app', 'MEMBER') AS admin,
+    pg_has_role(current_user, 'admin_publisher', 'MEMBER') AS publisher,
     pg_has_role(current_user, 'commerce_app', 'MEMBER') AS commerce,
     pg_has_role(current_user, 'commerce_operator', 'MEMBER') AS commerce_operator,
     pg_has_role(current_user, 'admin_operator', 'MEMBER') AS admin_operator,
-    (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user) AS privileged`);
+    (SELECT rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication FROM pg_roles WHERE rolname = current_user) AS privileged`);
   const r = rows[0]!;
-  if (!r.admin || r.commerce || r.commerce_operator || r.admin_operator || r.privileged) throw new Error('ADMIN_LOGIN_NOT_ISOLATED');
+  if (!r.unmasked || (capability === 'admin_app' ? !r.admin || r.publisher : !r.publisher || r.admin) || r.commerce || r.commerce_operator || r.admin_operator || r.privileged) throw new Error('ADMIN_LOGIN_NOT_ISOLATED');
 }
 
 /** Credentials of the public service or an operator must never be in this process's environment. */
@@ -168,7 +172,7 @@ export function adminOrigin(value: string): string {
 export function createAdminServer(deps: AdminDeps): Server {
   const now = deps.now ?? (() => new Date());
   const host = new URL(deps.origin).host;
-  const keys = adminKeys(deps.totpKey);
+  const keys = adminKeys(deps.totpKey, deps.auditKeys);
   const loginLimit = deps.loginLimit ?? new GlobalLoginLimit();
 
   async function readiness() {
@@ -390,12 +394,12 @@ export function createAdminServer(deps: AdminDeps): Server {
       change = { classification: body.classification, notice: body.notice };
     }
     const at = { draftRevision: expected.draftRevision, publishedVersion: expected.publishedVersion };
-    const client = await deps.pool.connect();
+    const client = await deps.publisherPool.connect();
     try {
       await client.query('BEGIN');
       // The session again, inside this transaction and held to its end: a revocation or disable
       // that committed after authorize() refuses this publish; one that comes later waits for it.
-      const live = await lockSession(client, keys, cookieToken(req)!, s.adminId, now());
+      const live = await lockSession(client, keys, cookieToken(req)!, s.adminId, now);
       if (live === undefined || live.id !== s.id) throw new HttpError(401, 'UNAUTHENTICATED');
       if (!allowed(live.role, 'editorial.publish')) throw new HttpError(403, 'FORBIDDEN');
       let result: { outcome: string; version: number; changeId: string | null; affectedOrders: number };
@@ -419,8 +423,8 @@ export function createAdminServer(deps: AdminDeps): Server {
 
   /**
    * The audit with its evidence: ATTESTED rows were written by this Admin API (their MAC verifies);
-   * FORGED rows carry a MAC that does not, so they were written with the database's credentials
-   * alone; OPERATOR rows come from an operator's or the owner's login, which carries none.
+   * FORGED means invalid under a known key; UNVERIFIABLE means its historical key is unavailable.
+   * OPERATOR rows come from the operator/owner login and carry none.
    */
   async function auditLog(req: IncomingMessage, res: ServerResponse, url: URL) {
     await authorize(req, 'audit.read');
@@ -428,11 +432,11 @@ export function createAdminServer(deps: AdminDeps): Server {
     if (!Number.isSafeInteger(before) || before < 1) throw new HttpError(422, 'INVALID');
     const { rows } = await deps.pool.query<{ id: string; at: Date; loginRole: string; adminId: string | null; actor: string;
       action: string; outcome: 'OK' | 'REFUSED'; entityType: string | null; entityId: string | null;
-      details: Record<string, DetailValue>; attestation: string | null }>(`SELECT id, at, login_role AS "loginRole",
-      admin_id AS "adminId", actor, action, outcome, entity_type AS "entityType", entity_id AS "entityId", details, attestation
+      details: Record<string, DetailValue>; attestation: string | null; eventId: string; keyId: string }>(`SELECT id, at, login_role AS "loginRole",
+      admin_id AS "adminId", actor, action, outcome, entity_type AS "entityType", entity_id AS "entityId", details, attestation, event_id AS "eventId", key_id AS "keyId"
       FROM admin_audit WHERE id < $1 ORDER BY id DESC LIMIT 100`, [before]);
     send(res, 200, { entries: rows.map(({ attestation, adminId, ...r }) => ({ ...r, id: Number(r.id),
-      evidence: attestation === null ? 'OPERATOR' : verifyAttestation(keys.audit, { ...r, adminId }, attestation) ? 'ATTESTED' : 'FORGED' })) });
+      evidence: auditEvidence(keys, { ...r, adminId }, attestation) })) });
   }
 
   async function route(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {

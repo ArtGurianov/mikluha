@@ -14,6 +14,9 @@ test("the bundle check refuses credentials and server configuration", () => {
   const leaks = {
     "a.js": 'const u="postgres://admin:pw@db/mikluha"',
     "b.js": "process.env.ADMIN_TOTP_KEY",
+    "publisher.js": "process.env.ADMIN_PUBLISH_DATABASE_URL",
+    "audit.js": "process.env.ADMIN_AUDIT_KEY",
+    "previous.js": "process.env.ADMIN_AUDIT_PREVIOUS_KEYS",
     "c.js": `t="ghp_${"a".repeat(36)}"`,
     "d.js": "k='AKIAABCDEFGHIJKLMNOP'",
     "e.js": "-----BEGIN OPENSSH PRIVATE KEY-----",

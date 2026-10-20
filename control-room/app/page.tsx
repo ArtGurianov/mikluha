@@ -16,8 +16,8 @@ interface Departure {
 }
 interface AuditEntry {
   id: number; at: string; actor: string; action: string; outcome: string; entityType: string | null; entityId: string | null;
-  /** ATTESTED: written by the Admin API; FORGED: its MAC does not verify; OPERATOR: an operator's or the owner's login. */
-  evidence: "ATTESTED" | "FORGED" | "OPERATOR";
+  /** ATTESTED: written by the Admin API; FORGED: invalid MAC; UNVERIFIABLE: historical key unavailable; OPERATOR: an operator's or the owner's login. */
+  evidence: "ATTESTED" | "FORGED" | "UNVERIFIABLE" | "OPERATOR";
 }
 
 type Tab = "sessions" | "tours" | "departures" | "audit";
@@ -177,8 +177,8 @@ function Audit({ fail }: { fail: (e: unknown) => void }) {
               <td>{time(e.at)}</td><td>{e.actor}</td><td>{e.action}</td>
               <td className={e.outcome === "OK" ? "ok" : "error"}>{e.outcome}</td>
               <td>{e.entityType ? `${e.entityType} ${e.entityId ?? ""}` : "—"}</td>
-              <td className={e.evidence === "FORGED" ? "error" : undefined}>
-                {e.evidence === "ATTESTED" ? "Admin API" : e.evidence === "OPERATOR" ? "оператор" : "НЕ ПОДТВЕРЖДЕНО"}
+              <td className={(e.evidence === "FORGED" || e.evidence === "UNVERIFIABLE") ? "error" : undefined}>
+                {e.evidence === "ATTESTED" ? "Admin API" : e.evidence === "OPERATOR" ? "оператор" : e.evidence === "UNVERIFIABLE" ? "КЛЮЧ НЕДОСТУПЕН" : "НЕ ПОДТВЕРЖДЕНО"}
               </td>
             </tr>
           ))}

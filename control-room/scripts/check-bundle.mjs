@@ -6,7 +6,7 @@ import { join, relative } from "node:path";
 
 export const FORBIDDEN = [
   ["database URL", /postgres(ql)?:\/\//i],
-  ["server-side variable", /\b(ADMIN_TOTP_KEY|ADMIN_DATABASE_URL|ADMIN_OPERATOR_DATABASE_URL|OPERATOR_DATABASE_URL|DATABASE_URL|REFREF_API_KEY|NOTISEND_API_KEY|COOLIFY_[A-Z_]+|AWS_SECRET_ACCESS_KEY|S3_SECRET_ACCESS_KEY)\b/],
+  ["server-side variable", /\b(ADMIN_TOTP_KEY|ADMIN_AUDIT_KEY|ADMIN_AUDIT_KEY_ID|ADMIN_AUDIT_PREVIOUS_KEYS|ADMIN_PUBLISH_DATABASE_URL|ADMIN_DATABASE_URL|ADMIN_OPERATOR_DATABASE_URL|OPERATOR_DATABASE_URL|DATABASE_URL|REFREF_API_KEY|NOTISEND_API_KEY|COOLIFY_[A-Z_]+|AWS_SECRET_ACCESS_KEY|S3_SECRET_ACCESS_KEY)\b/],
   ["GitHub token", /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}/],
   ["AWS-style access key", /\b(AKIA|ASIA)[A-Z0-9]{16}\b/],
   ["private key", /-----BEGIN [A-Z ]*PRIVATE KEY-----/],

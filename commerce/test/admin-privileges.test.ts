@@ -50,7 +50,7 @@ describe('the public service (commerce_app) cannot reach Admin', () => {
     await denied(db.pool, "INSERT INTO admin_audit (actor, action, outcome) VALUES ('x', 'FORGED', 'OK')");
     await denied(db.pool, 'SELECT fn_admin_totp_begin($1, $2)', [ownerId, 'v1.a.b.c']);
     await denied(db.pool, 'SELECT fn_admin_totp_accept($1, 1, true)', [ownerId]);
-    await denied(db.pool, 'SELECT * FROM fn_admin_login(gen_random_uuid(), $1, 1, false, $2, now(), 1800, $2)', [ownerId, 'a'.repeat(64)]);
+    await denied(db.pool, 'SELECT * FROM fn_admin_login(gen_random_uuid(), $1, 1, false, $2, now(), 1800, $2, gen_random_uuid(), \'test-1\')', [ownerId, 'a'.repeat(64)]);
     await denied(db.pool, "SELECT * FROM fn_admin_session_rotate($1, $2, now(), 1800)", ['a'.repeat(64), 'b'.repeat(64)]);
     await denied(db.pool, "SELECT fn_admin_reset_totp('priv-owner', 'svc', 'takeover')");
     await denied(db.pool, "SELECT fn_admin_create_user('svc', 'OWNER', $1, 'svc')", [`scrypt:v1:16384:8:1:${'A'.repeat(22)}:${'A'.repeat(86)}`]);
@@ -99,8 +99,8 @@ describe('the Admin API (admin_app) cannot reach commerce or manage accounts', (
     await denied(db.admin, sessionSql, [ownerId, 'f'.repeat(64), '1 hour', 1]);
     await denied(db.admin, 'SELECT fn_admin_totp_accept($1, 1, false)', [ownerId]);
     const login = (step: number, hash: string) => db.admin.query(
-      'SELECT * FROM fn_admin_login(gen_random_uuid(), $1, $2, false, $3, now(), 1800, $3)', [ownerId, step, hash]);
-    await denied(db.admin, 'SELECT * FROM fn_admin_login(gen_random_uuid(), $1, 1, false, $2, now(), 1800, $2)', [ownerId, 'f'.repeat(64)], /TOTP_NOT_ENROLLED/);
+      'SELECT * FROM fn_admin_login(gen_random_uuid(), $1, $2, false, $3, now(), 1800, $3, gen_random_uuid(), \'test-1\')', [ownerId, step, hash]);
+    await denied(db.admin, 'SELECT * FROM fn_admin_login(gen_random_uuid(), $1, 1, false, $2, now(), 1800, $2, gen_random_uuid(), \'test-1\')', [ownerId, 'f'.repeat(64)], /TOTP_NOT_ENROLLED/);
 
     await db.owner.query(`INSERT INTO admin_totp (admin_id, seed_ciphertext, last_accepted_step, enrolled_at, confirmed_at)
       VALUES ($1, $2, 10, now(), now())`, [ownerId, encryptSeed(Buffer.alloc(32, 1), ownerId, Buffer.alloc(20, 2))]);
@@ -135,10 +135,13 @@ describe('the Admin API (admin_app) cannot reach commerce or manage accounts', (
 
   test('the audit is append-only, and its login is the database\'s word, not the caller\'s', async () => {
     await denied(db.admin, "INSERT INTO admin_audit (actor, action, outcome) VALUES ('api', 'TEST.ENTRY', 'OK')", [], /ADMIN_AUDIT_ATTESTATION_REQUIRED/);
-    await db.admin.query("INSERT INTO admin_audit (actor, action, outcome, attestation) VALUES ('api', 'TEST.ENTRY', 'OK', $1)", ['0'.repeat(64)]);
+    await db.admin.query("INSERT INTO admin_audit (actor, action, outcome, attestation, event_id, key_id) VALUES ('api', 'TEST.ENTRY', 'OK', $1, gen_random_uuid(), 'test-1')", ['0'.repeat(64)]);
     await denied(db.admin, 'UPDATE admin_audit SET outcome = $1', ['REFUSED']);
     await denied(db.admin, 'DELETE FROM admin_audit');
     await denied(db.admin, "INSERT INTO admin_audit (actor, action, outcome, login_role) VALUES ('api', 'TEST.ENTRY', 'OK', 'owner')");
+    await denied(db.admin, "INSERT INTO admin_audit (actor, action, outcome, at) VALUES ('api', 'TEST.ENTRY', 'OK', now() - interval '1 day')");
+    await denied(db.admin, 'UPDATE admin_audit SET at = now(), login_role = session_user');
+    await denied(db.admin, 'UPDATE admin_audit SET id = id + 1', [], /only be updated to DEFAULT/);
     const row = (await db.owner.query("SELECT login_role FROM admin_audit WHERE action = 'TEST.ENTRY'")).rows[0];
     assert.equal(row.login_role, 'commerce_test_admin');
   });
@@ -160,7 +163,7 @@ describe('the admin operator sees state, never secrets', () => {
 describe('logins that cross services are refused whatever their grants', () => {
   test('an Admin login that is also the service', async () => {
     const both = await loginIn('commerce_test_admin_and_service', 'admin_app', 'commerce_app');
-    await denied(both, 'SELECT * FROM fn_admin_login(gen_random_uuid(), $1, 99, false, $2, now(), 1800, $2)', [ownerId, 'c'.repeat(64)], /ADMIN_COMMERCE_LOGIN/);
+    await denied(both, 'SELECT * FROM fn_admin_login(gen_random_uuid(), $1, 99, false, $2, now(), 1800, $2, gen_random_uuid(), \'test-1\')', [ownerId, 'c'.repeat(64)], /ADMIN_COMMERCE_LOGIN/);
     await assert.rejects(assertAdminLogin(both), /ADMIN_LOGIN_NOT_ISOLATED/);
     await assert.rejects(assertAdminLogin(db.pool), /ADMIN_LOGIN_NOT_ISOLATED/);
     await assert.rejects(assertAdminLogin(db.adminOperator), /ADMIN_LOGIN_NOT_ISOLATED/);
@@ -168,7 +171,7 @@ describe('logins that cross services are refused whatever their grants', () => {
   });
 
   test('an operator login that is also the Admin API or the service', async () => {
-    for (const [name, role] of [['commerce_test_admin_op_api', 'admin_app'], ['commerce_test_admin_op_svc', 'commerce_app']] as const) {
+    for (const [name, role] of [['commerce_test_admin_op_api', 'admin_app'], ['commerce_test_admin_op_svc', 'commerce_app'], ['commerce_test_admin_op_pub', 'admin_publisher']] as const) {
       const both = await loginIn(name, 'admin_operator', role);
       await denied(both, "SELECT fn_admin_reset_totp('priv-owner', 'x', 'takeover')", [], /ADMIN_OPERATOR_SERVICE_LOGIN/);
       await denied(both, "SELECT fn_admin_clear_throttle('x', 'y')", [], /ADMIN_OPERATOR_SERVICE_LOGIN/);
@@ -184,5 +187,46 @@ describe('the owner\'s own login', () => {
     await denied(db.owner as unknown as pg.Pool, 'TRUNCATE admin_audit CASCADE', [], /ADMIN_AUDIT_APPEND_ONLY/);
     await denied(db.owner as unknown as pg.Pool, 'UPDATE admin_totp SET last_accepted_step = 0 WHERE admin_id = $1', [ownerId], /ADMIN_TOTP_REPLAY/);
     await denied(db.owner as unknown as pg.Pool, "UPDATE admin_totp SET seed_ciphertext = 'v1.a.b.c' WHERE admin_id = $1", [ownerId], /ADMIN_TOTP_REPLAY/);
+  });
+});
+
+
+describe('publication has a disjoint database authority', () => {
+  test('the real admin_app login cannot publish, classify, SET ROLE or grant itself publication', async () => {
+    assert.equal((await db.admin.query('SELECT session_user AS role')).rows[0].role, 'commerce_test_admin');
+    for (const sql of [
+      "SELECT fn_publish_tour(gen_random_uuid(), 1, 0, 'owner')",
+      "SELECT fn_publish_departure(gen_random_uuid(), 1, 0, 'owner')",
+      "SELECT fn_publish_departure_change(gen_random_uuid(), 1, 0, 'MATERIAL', 'notice', 'owner')",
+      "SELECT fn_publish_content_item(gen_random_uuid(), 1, 0, 'owner')",
+      'SET ROLE admin_publisher',
+      'SET SESSION AUTHORIZATION commerce_test_admin_publisher',
+      'GRANT admin_publisher TO commerce_test_admin',
+      'GRANT EXECUTE ON FUNCTION fn_publish_tour(uuid, int, int, text) TO admin_app',
+    ]) await denied(db.admin, sql);
+    // Inspect every executable SECURITY DEFINER entry point: only login/enrolment/session/account
+    // locking and draft commands remain; none may trampoline to a publication command.
+    const functions = (await db.admin.query(`SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.prosecdef AND has_function_privilege(current_user, p.oid, 'EXECUTE') ORDER BY 1`)).rows;
+    assert.deepEqual(functions.map(r => r.proname), ['fn_admin_lock_account', 'fn_admin_login', 'fn_admin_session_rotate',
+      'fn_admin_totp_begin', 'fn_create_content_item', 'fn_create_departure', 'fn_create_tour', 'fn_departure_affected_orders',
+      'fn_save_content_draft', 'fn_save_departure_draft', 'fn_save_tour_draft']);
+  });
+
+  test('publisher cannot authenticate, draft, manage accounts or reach commerce; startup rejects merged capabilities', async () => {
+    await assertAdminLogin(db.admin);
+    await assertAdminLogin(db.publisher, 'admin_publisher');
+    await assert.rejects(assertAdminLogin(db.publisher), /ADMIN_LOGIN_NOT_ISOLATED/);
+    await assert.rejects(assertAdminLogin(db.admin, 'admin_publisher'), /ADMIN_LOGIN_NOT_ISOLATED/);
+    for (const sql of ['SELECT * FROM admin_totp', 'SELECT password_scrypt FROM admin_user',
+      'SELECT * FROM orders', "SELECT fn_create_tour('publisher-draft', 'owner')",
+      "SELECT fn_admin_reset_totp('priv-owner', 'publisher', 'takeover')", 'SET ROLE admin_app']) await denied(db.publisher, sql);
+    // A privileged session_user cannot hide behind SET ROLE to pass startup isolation.
+    await db.owner.query('SET ROLE admin_app');
+    try { await assert.rejects(assertAdminLogin(db.owner as unknown as pg.Pool), /ADMIN_LOGIN_NOT_ISOLATED/); }
+    finally { await db.owner.query('RESET ROLE'); }
+    const mixed = await loginIn('commerce_test_admin_and_publisher', 'admin_app', 'admin_publisher');
+    await assert.rejects(assertAdminLogin(mixed), /ADMIN_LOGIN_NOT_ISOLATED/);
+    await assert.rejects(assertAdminLogin(mixed, 'admin_publisher'), /ADMIN_LOGIN_NOT_ISOLATED/);
   });
 });

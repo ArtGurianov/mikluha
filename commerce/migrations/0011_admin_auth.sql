@@ -17,11 +17,12 @@
 --              over). Only an enabled account with a confirmed second factor has one. Revoked stays
 --              revoked.
 --   evidence   every audit row the Admin API writes carries an attestation: a MAC over the row,
---              under the same environment secret. The database stores it and cannot make one, so an
+--              under an independent versioned audit key. The database stores it and cannot make one, so an
 --              AUTH.LOGIN row, or a publish that names it, written with this database's credentials
---              alone fails verification (src/admin/attestation.ts). What admin_app's credential still
---              can do without the Admin API (call the editorial functions of 0008-0010 directly) leaves
---              no attested row behind, and is told apart that way, not prevented.
+--              alone fails verification (src/admin/attestation.ts). Publication and execution-change
+--              classification require the separate admin_publisher capability. admin_app cannot
+--              publish, grant that capability or SET ROLE to it. The API uses the separate credential
+--              only after OWNER admission, with the account/session locks held to commit.
 --   audit      append-only, for every login: the database records when and through which login.
 --
 -- Roles. admin_app (the Admin API's login) reads accounts, opens and refreshes sessions only through
@@ -34,6 +35,9 @@
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'admin_app') THEN
     CREATE ROLE admin_app NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'admin_publisher') THEN
+    CREATE ROLE admin_publisher NOLOGIN;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'admin_operator') THEN
     CREATE ROLE admin_operator NOLOGIN;
@@ -75,6 +79,10 @@ CREATE TABLE admin_audit (
   entity_id   text CHECK (length(entity_id) BETWEEN 1 AND 120),
   details     jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(details) = 'object' AND length(details::text) <= 4096),
   -- The Admin API's MAC over this row (src/admin/attestation.ts); NULL for operator and owner rows.
+  event_id    uuid UNIQUE,
+  key_id      text CHECK (key_id ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'),
+  CHECK ((attestation IS NULL AND event_id IS NULL AND key_id IS NULL)
+      OR (attestation IS NOT NULL AND event_id IS NOT NULL AND key_id IS NOT NULL)),
   attestation text CHECK (attestation ~ '^[0-9a-f]{64}$')
 );
 CREATE INDEX admin_audit_at ON admin_audit (at DESC);
@@ -121,7 +129,8 @@ BEGIN
   NEW.at := now();
   NEW.login_role := session_user;
   -- The Admin API attests every row it writes; one without is not the Admin API's.
-  IF NEW.attestation IS NULL AND pg_has_role(session_user, 'admin_app', 'MEMBER')
+  IF NEW.attestation IS NULL AND (pg_has_role(session_user, 'admin_app', 'MEMBER')
+      OR pg_has_role(session_user, 'admin_publisher', 'MEMBER'))
      AND NOT (SELECT rolsuper FROM pg_roles WHERE rolname = session_user) THEN
     RAISE EXCEPTION 'ADMIN_AUDIT_ATTESTATION_REQUIRED' USING ERRCODE = '23514';
   END IF;
@@ -253,7 +262,7 @@ END $fn$ LANGUAGE plpgsql;
 -- only this database's credentials, a caller gets a row whose token MAC matches no token and whose
 -- attestation does not verify.
 CREATE FUNCTION fn_admin_login(p_session_id uuid, p_admin_id uuid, p_step bigint, p_confirming boolean, p_token_mac text,
-  p_now timestamptz, p_idle_seconds int, p_attestation text)
+  p_now timestamptz, p_idle_seconds int, p_attestation text, p_event_id uuid, p_key_id text)
 RETURNS TABLE (out_session_id uuid, out_auth_audit_id bigint, out_idle_expires_at timestamptz, out_absolute_expires_at timestamptz)
 SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
 DECLARE
@@ -269,9 +278,9 @@ BEGIN
   v_idle := least(p_now + make_interval(secs => p_idle_seconds), v_absolute);
   IF NOT fn_admin_totp_accept(p_admin_id, p_step, p_confirming) THEN RETURN; END IF;
   SELECT login INTO v_login FROM admin_user WHERE id = p_admin_id;
-  INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation)
+  INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation, event_id, key_id)
     VALUES (p_admin_id, v_login, 'AUTH.LOGIN', 'OK', 'admin_session', p_session_id::text,
-            jsonb_build_object('totpStep', p_step, 'enrolment', p_confirming), p_attestation)
+            jsonb_build_object('totpStep', p_step, 'enrolment', p_confirming), p_attestation, p_event_id, p_key_id)
     RETURNING id INTO v_audit;
   INSERT INTO admin_session (id, admin_id, token_mac, created_at, last_seen_at, idle_expires_at, absolute_expires_at, auth_audit_id)
     VALUES (p_session_id, p_admin_id, p_token_mac, p_now, p_now, v_idle, v_absolute, v_audit);
@@ -320,7 +329,8 @@ END $fn$ LANGUAGE plpgsql;
 
 CREATE FUNCTION fn_admin_operator_actor(p_by text) RETURNS text SET search_path = pg_catalog, public AS $fn$
 BEGIN
-  IF (pg_has_role(session_user, 'admin_app', 'MEMBER') OR pg_has_role(session_user, 'commerce_app', 'MEMBER'))
+  IF (pg_has_role(session_user, 'admin_app', 'MEMBER') OR pg_has_role(session_user, 'admin_publisher', 'MEMBER')
+      OR pg_has_role(session_user, 'commerce_app', 'MEMBER'))
      AND NOT (SELECT rolsuper FROM pg_roles WHERE rolname = session_user) THEN
     RAISE EXCEPTION 'ADMIN_OPERATOR_SERVICE_LOGIN: % belongs to a service', session_user USING ERRCODE = '42501';
   END IF;
@@ -460,7 +470,7 @@ GRANT SELECT ON schema_migrations TO admin_app;
 GRANT SELECT ON admin_user, admin_totp, admin_session, admin_login_throttle, admin_audit TO admin_app;
 GRANT UPDATE (last_seen_at, idle_expires_at, revoked_at, revoked_reason) ON admin_session TO admin_app;
 GRANT INSERT, UPDATE (attempts), DELETE ON admin_login_throttle TO admin_app;
-GRANT INSERT (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation) ON admin_audit TO admin_app;
+GRANT INSERT (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation, event_id, key_id) ON admin_audit TO admin_app, admin_publisher;
 
 -- The operator sees accounts and their state, never a password hash or a seed.
 GRANT SELECT (id, login, role, password_changed_at, totp_enrollment_until, created_at, disabled_at) ON admin_user TO admin_operator;
@@ -477,7 +487,7 @@ REVOKE ALL ON FUNCTION fn_admin_session_revocation_final() FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_not_commerce() FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_totp_begin(uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_totp_accept(uuid, bigint, boolean) FROM PUBLIC;
-REVOKE ALL ON FUNCTION fn_admin_login(uuid, uuid, bigint, boolean, text, timestamptz, int, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION fn_admin_login(uuid, uuid, bigint, boolean, text, timestamptz, int, text, uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_session_rotate(text, text, timestamptz, int) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_lock_account(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_operator_actor(text) FROM PUBLIC;
@@ -492,7 +502,7 @@ REVOKE ALL ON FUNCTION fn_admin_revoke_sessions(text, text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_clear_throttle(text, text) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION fn_admin_totp_begin(uuid, text) TO admin_app;
-GRANT EXECUTE ON FUNCTION fn_admin_login(uuid, uuid, bigint, boolean, text, timestamptz, int, text) TO admin_app;
+GRANT EXECUTE ON FUNCTION fn_admin_login(uuid, uuid, bigint, boolean, text, timestamptz, int, text, uuid, text) TO admin_app;
 GRANT EXECUTE ON FUNCTION fn_admin_session_rotate(text, text, timestamptz, int) TO admin_app;
 GRANT EXECUTE ON FUNCTION fn_admin_lock_account(uuid) TO admin_app;
 GRANT EXECUTE ON FUNCTION fn_admin_create_user(text, text, text, text) TO admin_operator;
@@ -501,3 +511,19 @@ GRANT EXECUTE ON FUNCTION fn_admin_reset_totp(text, text, text) TO admin_operato
 GRANT EXECUTE ON FUNCTION fn_admin_set_disabled(text, boolean, text, text) TO admin_operator;
 GRANT EXECUTE ON FUNCTION fn_admin_revoke_sessions(text, text, text) TO admin_operator;
 GRANT EXECUTE ON FUNCTION fn_admin_clear_throttle(text, text) TO admin_operator;
+
+-- OWNER publication uses a second, disjoint API login, never admin_runtime. It has no account,
+-- enrolment, login, draft, operator or commerce command. The live session is rechecked under the
+-- same account -> session lock order as revocation. No secret or approval token is stored in SQL.
+GRANT SELECT (id, login, role, disabled_at) ON admin_user TO admin_publisher;
+GRANT SELECT ON admin_session TO admin_publisher;
+GRANT UPDATE (last_seen_at, idle_expires_at) ON admin_session TO admin_publisher;
+GRANT EXECUTE ON FUNCTION fn_admin_lock_account(uuid) TO admin_publisher;
+REVOKE EXECUTE ON FUNCTION fn_publish_tour(uuid, int, int, text) FROM admin_app;
+REVOKE EXECUTE ON FUNCTION fn_publish_departure(uuid, int, int, text) FROM admin_app;
+REVOKE EXECUTE ON FUNCTION fn_publish_departure_change(uuid, int, int, text, text, text) FROM admin_app;
+REVOKE EXECUTE ON FUNCTION fn_publish_content_item(uuid, int, int, text) FROM admin_app;
+GRANT EXECUTE ON FUNCTION fn_publish_tour(uuid, int, int, text) TO admin_publisher;
+GRANT EXECUTE ON FUNCTION fn_publish_departure(uuid, int, int, text) TO admin_publisher;
+GRANT EXECUTE ON FUNCTION fn_publish_departure_change(uuid, int, int, text, text, text) TO admin_publisher;
+GRANT EXECUTE ON FUNCTION fn_publish_content_item(uuid, int, int, text) TO admin_publisher;

@@ -38,7 +38,7 @@ before(async () => {
   db = await freshDb();
   catalog = fixtureCatalog([{ slug: 'altai-admin', startsOn: '2027-07-01', endsOn: '2027-07-04', price: 30000 }]);
   clock = new Date();
-  server = createAdminServer({ pool: db.admin, totpKey: KEY, origin: ORIGIN, schemaHead: schemaHead(MIGRATIONS_DIR),
+  server = createAdminServer({ pool: db.admin, publisherPool: db.publisher, totpKey: KEY, auditKeys: { id: 'audit-1', key: Buffer.alloc(32, 12) }, origin: ORIGIN, schemaHead: schemaHead(MIGRATIONS_DIR),
     sourceCommit: null, startedAt: new Date(), log: () => undefined, now: () => clock });
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
   port = (server.address() as AddressInfo).port;
@@ -260,7 +260,7 @@ describe('the boundary', () => {
     const stale = await call('POST', `/api/tours/${id}/publish`, { cookie: owner.cookie, body: { expectedDraftRevision: 1, expectedPublishedVersion: 0 } });
     assert.deepEqual([stale.status, stale.body.error], [409, 'PUBLISHED_VERSION_CONFLICT']);
     const rev = (await db.owner.query('SELECT published_by, login_role FROM tour_revision WHERE tour_id = $1', [id])).rows[0];
-    assert.deepEqual(rev, { published_by: 'admin:pub-owner', login_role: 'commerce_test_admin' });
+    assert.deepEqual(rev, { published_by: 'admin:pub-owner', login_role: 'commerce_test_admin_publisher' });
 
     assert.equal((await call('GET', '/api/audit', { cookie: editor.cookie })).status, 403);
     const log = await call('GET', '/api/audit', { cookie: owner.cookie });
@@ -315,7 +315,7 @@ describe('the boundary', () => {
     assert.deepEqual([applied.body.outcome, applied.body.version, applied.body.affectedOrders], ['APPLIED', 2, 1]);
     const changeId = applied.body.changeId as string;
     const recorded = (await db.owner.query('SELECT classified_by, login_role FROM departure_execution_change WHERE id = $1', [changeId])).rows[0];
-    assert.deepEqual(recorded, { classified_by: 'admin:exec-owner', login_role: 'commerce_test_admin' });
+    assert.deepEqual(recorded, { classified_by: 'admin:exec-owner', login_role: 'commerce_test_admin_publisher' });
     // The Admin audit of the classification names the session and the password + TOTP login behind it.
     const link = (await db.owner.query(`SELECT a.actor, l.action AS auth_action, l.actor AS auth_actor, l.entity_id = a.details->>'sessionId' AS same_session
       FROM admin_audit a JOIN admin_audit l ON l.id = (a.details->>'authAuditId')::bigint
@@ -413,7 +413,7 @@ describe('review of ART-363: what the database credential alone cannot do, and r
     // its own choosing and any later step, with no password and no code.
     const token = Buffer.alloc(32, 7).toString('base64url');
     const victimId = (await db.owner.query("SELECT id FROM admin_user WHERE login = 'forge-victim'")).rows[0].id;
-    const forged = (await db.admin.query('SELECT * FROM fn_admin_login(gen_random_uuid(), $1, $2, false, $3, now(), 1800, $4)',
+    const forged = (await db.admin.query('SELECT * FROM fn_admin_login(gen_random_uuid(), $1, $2, false, $3, now(), 1800, $4, gen_random_uuid(), \'audit-1\')',
       [victimId, totpStep(clock) + 1000, createHash('sha256').update(token).digest('hex'), 'f'.repeat(64)])).rows[0];
     assert.ok(forged, 'the database cannot tell: it opens the row');
     assert.equal((await call('GET', '/api/auth/session', { cookie: token })).status, 401);
@@ -436,16 +436,50 @@ describe('review of ART-363: what the database credential alone cannot do, and r
     const tour = await draftTour(owner.cookie, 'chain-tour');
     assert.equal((await call('POST', `/api/tours/${tour}/publish`, { cookie: owner.cookie,
       body: { expectedDraftRevision: 1, expectedPublishedVersion: 0 } })).status, 200);
-    await db.admin.query(`INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation)
-      SELECT admin_id, actor, action, outcome, entity_type, entity_id, details, $2 FROM admin_audit WHERE action = 'TOUR.PUBLISHED' AND entity_id = $1`,
+    await db.admin.query(`INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation, event_id, key_id)
+      SELECT admin_id, actor, action, outcome, entity_type, entity_id, details, $2, gen_random_uuid(), key_id FROM admin_audit WHERE action = 'TOUR.PUBLISHED' AND entity_id = $1`,
     [tour, '0'.repeat(64)]);
+    // Replaying the actual valid signature with its event identity is rejected by SQL uniqueness.
+    await assert.rejects(db.admin.query(`INSERT INTO admin_audit
+      (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation, event_id, key_id)
+      SELECT admin_id, actor, action, outcome, entity_type, entity_id, details, attestation, event_id, key_id
+      FROM admin_audit WHERE action = 'TOUR.PUBLISHED' AND entity_id = $1 AND attestation <> $2`, [tour, '0'.repeat(64)]),
+    /duplicate key value/);
+    // Changing only the identity cannot rescue the copied valid MAC (nor can its changed DB login).
+    await db.admin.query(`INSERT INTO admin_audit
+      (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation, event_id, key_id)
+      SELECT admin_id, actor, action, outcome, entity_type, entity_id, details, attestation, gen_random_uuid(), key_id
+      FROM admin_audit WHERE action = 'TOUR.PUBLISHED' AND entity_id = $1 AND attestation <> $2`, [tour, '0'.repeat(64)]);
     const log = (await call('GET', '/api/audit', { cookie: owner.cookie })).body.entries as
       { action: string; entityId: string | null; evidence: string; details: { authAuditId?: number } }[];
     const published = log.filter(e => e.action === 'TOUR.PUBLISHED' && e.entityId === tour);
-    assert.deepEqual(published.map(e => e.evidence).sort(), ['ATTESTED', 'FORGED']);
+    assert.deepEqual(published.map(e => e.evidence).sort(), ['ATTESTED', 'FORGED', 'FORGED']);
     const attested = published.find(e => e.evidence === 'ATTESTED')!;
     const login = (await db.owner.query('SELECT action, actor FROM admin_audit WHERE id = $1', [attested.details.authAuditId])).rows[0];
     assert.deepEqual(login, { action: 'AUTH.LOGIN', actor: 'chain-owner' });
+  });
+
+  test('audit history remains attested with verify-only old keys and becomes UNVERIFIABLE if they are lost', async () => {
+    const owner = await enrolled('key-history-owner');
+    const originalPort = port;
+    for (const keep of [true, false]) {
+      const previous = keep ? new Map([['audit-1', Buffer.alloc(32, 12)]]) : new Map<string, Buffer>();
+      const rotated = createAdminServer({ pool: db.admin, publisherPool: db.publisher, totpKey: KEY,
+        auditKeys: { id: 'audit-2', key: Buffer.alloc(32, 13), previous }, origin: ORIGIN, schemaHead: schemaHead(MIGRATIONS_DIR),
+        sourceCommit: null, startedAt: new Date(), log: () => undefined, now: () => clock });
+      await new Promise<void>(r => rotated.listen(0, '127.0.0.1', r));
+      port = (rotated.address() as AddressInfo).port;
+      try {
+        const log = (await call('GET', '/api/audit', { cookie: owner.cookie })).body.entries as
+          { actor: string; action: string; evidence: string }[];
+        assert.deepEqual(log.filter(e => e.actor === 'key-history-owner' && e.action === 'AUTH.LOGIN').map(e => e.evidence),
+          [keep ? 'ATTESTED' : 'UNVERIFIABLE']);
+      } finally {
+        port = originalPort;
+        rotated.closeAllConnections();
+        await new Promise(r => rotated.close(r));
+      }
+    }
   });
 
   test('revoked after the permission check but before the publish: the publish is refused', async () => {
@@ -481,6 +515,36 @@ describe('review of ART-363: what the database credential alone cannot do, and r
     assert.equal((await db.owner.query('SELECT published_version FROM tour WHERE id = $1', [tour])).rows[0].published_version, null);
   });
 
+  test('an OWNER session that expires while the account lock is queued cannot publish', async () => {
+    const owner = await enrolled('expiry-queued-owner');
+    const tour = await draftTour(owner.cookie, 'expiry-queued-tour');
+    const initialClock = clock;
+    let pending: Promise<Res> | undefined;
+    await db.owner.query('BEGIN');
+    try {
+      await db.owner.query("SELECT id FROM admin_user WHERE login = 'expiry-queued-owner' FOR UPDATE");
+      pending = call('POST', `/api/tours/${tour}/publish`, { cookie: owner.cookie,
+        body: { expectedDraftRevision: 1, expectedPublishedVersion: 0 } });
+      let blocked = false;
+      for (let n = 0; n < 200; n++) {
+        blocked = (await db.owner.query(`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = $1
+          AND usename = 'commerce_test_admin_publisher' AND cardinality(pg_blocking_pids(pid)) > 0) AS ready`, [db.name])).rows[0].ready;
+        if (blocked) break;
+        await new Promise(r => setTimeout(r, 10));
+      }
+      assert.ok(blocked, 'publish must have reached its account-lock wait');
+      clock = new Date(clock.getTime() + SESSION_ABSOLUTE_MS + 1);
+      await db.owner.query('COMMIT');
+      const result = await pending;
+      assert.deepEqual([result.status, result.body.error], [401, 'UNAUTHENTICATED']);
+      assert.equal((await db.owner.query('SELECT published_version FROM tour WHERE id = $1', [tour])).rows[0].published_version, null);
+    } finally {
+      await db.owner.query('ROLLBACK');
+      await pending?.catch(() => undefined);
+      clock = initialClock;
+    }
+  });
+
   test('a disable that comes while a publish runs waits for it, and the session is gone after', async () => {
     const owner = await enrolled('race-owner2');
     const tour = await draftTour(owner.cookie, 'race-tour2');
@@ -504,7 +568,7 @@ describe('review of ART-363: what the database credential alone cannot do, and r
     let disable: Promise<string> | undefined;
     try {
       publish = call('POST', `/api/tours/${tour}/publish`, { cookie: owner.cookie, body: { expectedDraftRevision: 1, expectedPublishedVersion: 0 } });
-      await waitFor(`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = $1 AND usename = 'commerce_test_admin'
+      await waitFor(`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = $1 AND usename = 'commerce_test_admin_publisher'
         AND wait_event = 'advisory') AS ready`, [db.name]);
       const operatorPid = (await operator.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
       disable = operator.query("SELECT fn_admin_set_disabled('race-owner2', true, 'art', 'disabled mid-publish')")
@@ -526,7 +590,7 @@ describe('review of ART-363: what the database credential alone cannot do, and r
   });
 
   test('past the global limit, attempts are refused before the database; spent windows are pruned off the login path', async () => {
-    const limited = createAdminServer({ pool: db.admin, totpKey: KEY, origin: ORIGIN, schemaHead: schemaHead(MIGRATIONS_DIR),
+    const limited = createAdminServer({ pool: db.admin, publisherPool: db.publisher, totpKey: KEY, auditKeys: { id: 'audit-1', key: Buffer.alloc(32, 12) }, origin: ORIGIN, schemaHead: schemaHead(MIGRATIONS_DIR),
       sourceCommit: null, startedAt: new Date(), log: () => undefined, now: () => clock, loginLimit: new GlobalLoginLimit(2) });
     await new Promise<void>(r => limited.listen(0, '127.0.0.1', r));
     const saved = port;
