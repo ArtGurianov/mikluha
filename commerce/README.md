@@ -39,7 +39,7 @@ static; everything that sells a trip lives here, with its own Postgres.
   after-response claim (see "Refref vNext arrival"). Not yet used by checkout (ART-383).
 - migration 0011 and the isolated Admin API (ADR v2.3 §7, ART-363): password + TOTP at every
   login, sessions, OWNER-only publishing and classification bound to the signed-in session, the
-  audited SSH reset, `admin_app`/`admin_operator` logins, and the static Control Room in
+  audited SSH reset, `admin_app`/`admin_publisher`/`admin_operator` capabilities, and the static Control Room in
   [`../control-room`](../control-room/README.md). See "Admin API" below. Undeployed.
 
 **Next:**
@@ -229,7 +229,7 @@ binds an order to the published revision it accepted (ART-362).
 
 ## Database roles
 
-The owner applies migrations. There are four other logins, and none is a member of another's role:
+The owner applies migrations. There are five other logins, and none is a member of another's role:
 
 | login | role | can | its credential |
 |---|---|---|---|
