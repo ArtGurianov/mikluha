@@ -33,7 +33,7 @@ test("the legal pack preserves documented-expense refunds and the approved volun
     assert.match(text, /2 суток \(48 часов\).*30%/);
     assert.match(text, /2 суток \(48 часов\) и менее.*0%/);
     assert.match(text, /добровольн/);
-    assert.match(text, /не является.*фиксированной неустойкой/);
+    assert.match(text, /а не фиксированной неустойкой/);
     assert.match(text, /При отсутствии документально подтверждённых фактически понесённых расходов.*удержание какой-либо суммы не допускается/);
     assert.match(text, /возвращает большую сумму/);
     assert.match(text, /подтвержд[ёе]нн/);
