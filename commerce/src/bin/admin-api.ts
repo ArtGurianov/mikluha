@@ -9,6 +9,7 @@
 import pg from 'pg';
 
 import { adminOrigin, ADMIN_SERVICE, assertAdminEnvironment, assertAdminLogin, createAdminServer } from '../admin/api.js';
+import { pruneLoginThrottle } from '../admin/auth.js';
 import { parseTotpKey } from '../admin/totp.js';
 import { PRODUCTION_BUILD_IDENTITY_FILE, readBuildIdentity } from '../build-identity.js';
 import { env, MIGRATIONS_DIR } from '../config.js';
@@ -27,6 +28,11 @@ const server = createAdminServer({ pool, totpKey, origin, schemaHead: schemaHead
 const port = Number(process.env.PORT ?? 3000);
 server.listen(port, '0.0.0.0', () => log('listening', { port }));
 
-const stop = () => { server.close(() => { pool.end().finally(() => process.exit(0)); }); };
+// Spent throttle windows are dropped here, never on the login path.
+const pruneTimer = setInterval(() => {
+  pruneLoginThrottle(pool, new Date()).catch((e: unknown) => log('throttle_prune_failed', { error: e instanceof Error ? e.name : 'unknown' }));
+}, 5 * 60_000);
+
+const stop = () => { clearInterval(pruneTimer); server.close(() => { pool.end().finally(() => process.exit(0)); }); };
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);

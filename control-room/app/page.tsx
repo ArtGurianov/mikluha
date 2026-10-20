@@ -14,7 +14,11 @@ interface Departure {
   id: string; slug: string; startsOn: string | null; endsOn: string | null; priceKopecks: number | null;
   bookingStatus: string; isListed: boolean; publishedVersion: number | null; draftRevision: number | null;
 }
-interface AuditEntry { id: number; at: string; actor: string; action: string; outcome: string; entityType: string | null; entityId: string | null }
+interface AuditEntry {
+  id: number; at: string; actor: string; action: string; outcome: string; entityType: string | null; entityId: string | null;
+  /** ATTESTED: written by the Admin API; FORGED: its MAC does not verify; OPERATOR: an operator's or the owner's login. */
+  evidence: "ATTESTED" | "FORGED" | "OPERATOR";
+}
 
 type Tab = "sessions" | "tours" | "departures" | "audit";
 
@@ -166,13 +170,16 @@ function Audit({ fail }: { fail: (e: unknown) => void }) {
   return (
     <div className="card">
       <table>
-        <thead><tr><th>Время</th><th>Кто</th><th>Действие</th><th>Итог</th><th>Объект</th></tr></thead>
+        <thead><tr><th>Время</th><th>Кто</th><th>Действие</th><th>Итог</th><th>Объект</th><th>Подлинность</th></tr></thead>
         <tbody>
           {entries.map(e => (
             <tr key={e.id}>
               <td>{time(e.at)}</td><td>{e.actor}</td><td>{e.action}</td>
               <td className={e.outcome === "OK" ? "ok" : "error"}>{e.outcome}</td>
               <td>{e.entityType ? `${e.entityType} ${e.entityId ?? ""}` : "—"}</td>
+              <td className={e.evidence === "FORGED" ? "error" : undefined}>
+                {e.evidence === "ATTESTED" ? "Admin API" : e.evidence === "OPERATOR" ? "оператор" : "НЕ ПОДТВЕРЖДЕНО"}
+              </td>
             </tr>
           ))}
         </tbody>

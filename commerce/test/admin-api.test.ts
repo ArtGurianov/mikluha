@@ -2,13 +2,14 @@
 // step window, sessions (refresh, logout, idle and absolute expiry, revocation), same-origin writes,
 // the throttle, OWNER-only publishing, the SSH reset path and the audit it leaves.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, describe, test } from 'node:test';
 
 import { ADMIN_SERVICE, assertAdminEnvironment, createAdminServer, adminOrigin, SESSION_COOKIE } from '../src/admin/api.js';
-import { SESSION_ABSOLUTE_MS, SESSION_IDLE_MS, THROTTLE_SOURCE_LIMIT, THROTTLE_ACCOUNT_LIMIT } from '../src/admin/auth.js';
-import { clearThrottle, createUser, resetTotp, setDisabled } from '../src/admin/operator.js';
+import { GlobalLoginLimit, pruneLoginThrottle, SESSION_ABSOLUTE_MS, SESSION_IDLE_MS, THROTTLE_SOURCE_LIMIT, THROTTLE_ACCOUNT_LIMIT } from '../src/admin/auth.js';
+import { clearThrottle, createUser, resetTotp, revokeSessions, setDisabled } from '../src/admin/operator.js';
 import { base32Decode, hotp, totpStep, TOTP_STEP_SECONDS } from '../src/admin/totp.js';
 import type { Catalog } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
@@ -17,6 +18,8 @@ import type { CheckoutDeps } from '../src/checkout.js';
 import { reserve, setSalesOpen } from '../src/orders.js';
 import { createCommerceServer } from '../src/server.js';
 import { createWebHandler } from '../src/web.js';
+import pg from 'pg';
+
 import { fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
 
 const ORIGIN = 'https://admin.mikluha.test';
@@ -390,6 +393,160 @@ describe('lost device: the operator CLI reset over SSH', () => {
     await db.owner.query("UPDATE admin_user SET totp_enrollment_until = now() - interval '1 second' WHERE login = 'late-owner'");
     const r = await call('POST', '/api/auth/enroll', { body: { login: 'late-owner', password: PASSWORD } });
     assert.deepEqual([r.status, r.body.error], [403, 'TOTP_ENROLLMENT_CLOSED']);
+  });
+});
+
+describe('review of ART-363: what the database credential alone cannot do, and revocation races', () => {
+  const tourDoc = (slug: string) => ({ slug, title: 'Алтай', contract: null, content: {} });
+
+  async function draftTour(cookie: string, slug: string): Promise<string> {
+    const id = (await call('POST', '/api/tours', { cookie, body: { slug } })).body.id as string;
+    assert.equal((await call('PUT', `/api/tours/${id}/draft`, { cookie, body: { expectedRevision: 0, document: tourDoc(slug) } })).status, 200);
+    return id;
+  }
+
+  test('a session forged with admin_runtime alone is never accepted, and its AUTH.LOGIN is FORGED', async () => {
+    const victim = await enrolled('forge-victim');
+    const auditor = await enrolled('forge-auditor');
+    const tour = await draftTour(auditor.cookie, 'forge-tour');
+    // Everything the Admin API's database login can do: open a session for the OWNER with a token of
+    // its own choosing and any later step, with no password and no code.
+    const token = Buffer.alloc(32, 7).toString('base64url');
+    const victimId = (await db.owner.query("SELECT id FROM admin_user WHERE login = 'forge-victim'")).rows[0].id;
+    const forged = (await db.admin.query('SELECT * FROM fn_admin_login(gen_random_uuid(), $1, $2, false, $3, now(), 1800, $4)',
+      [victimId, totpStep(clock) + 1000, createHash('sha256').update(token).digest('hex'), 'f'.repeat(64)])).rows[0];
+    assert.ok(forged, 'the database cannot tell: it opens the row');
+    assert.equal((await call('GET', '/api/auth/session', { cookie: token })).status, 401);
+    assert.equal((await call('POST', `/api/tours/${tour}/publish`, { cookie: token,
+      body: { expectedDraftRevision: 1, expectedPublishedVersion: 0 } })).status, 401);
+    assert.equal((await db.owner.query('SELECT published_version FROM tour WHERE id = $1', [tour])).rows[0].published_version, null);
+
+    const log = (await call('GET', '/api/audit', { cookie: auditor.cookie })).body.entries as
+      { id: number; action: string; actor: string; entityId: string | null; evidence: string }[];
+    const evidence = (pred: (e: (typeof log)[number]) => boolean) => log.filter(pred).map(e => e.evidence);
+    assert.deepEqual(evidence(e => e.action === 'AUTH.LOGIN' && e.entityId === forged.out_session_id), ['FORGED']);
+    assert.ok(evidence(e => e.action === 'AUTH.LOGIN' && e.actor === 'forge-victim' && e.entityId !== forged.out_session_id)
+      .every(v => v === 'ATTESTED'));
+    assert.deepEqual([...new Set(evidence(e => e.action === 'USER.CREATED'))], ['OPERATOR']);
+    void victim;
+  });
+
+  test('a publish names its session and an attested AUTH.LOGIN; a row written by the database alone does not verify', async () => {
+    const owner = await enrolled('chain-owner');
+    const tour = await draftTour(owner.cookie, 'chain-tour');
+    assert.equal((await call('POST', `/api/tours/${tour}/publish`, { cookie: owner.cookie,
+      body: { expectedDraftRevision: 1, expectedPublishedVersion: 0 } })).status, 200);
+    await db.admin.query(`INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation)
+      SELECT admin_id, actor, action, outcome, entity_type, entity_id, details, $2 FROM admin_audit WHERE action = 'TOUR.PUBLISHED' AND entity_id = $1`,
+    [tour, '0'.repeat(64)]);
+    const log = (await call('GET', '/api/audit', { cookie: owner.cookie })).body.entries as
+      { action: string; entityId: string | null; evidence: string; details: { authAuditId?: number } }[];
+    const published = log.filter(e => e.action === 'TOUR.PUBLISHED' && e.entityId === tour);
+    assert.deepEqual(published.map(e => e.evidence).sort(), ['ATTESTED', 'FORGED']);
+    const attested = published.find(e => e.evidence === 'ATTESTED')!;
+    const login = (await db.owner.query('SELECT action, actor FROM admin_audit WHERE id = $1', [attested.details.authAuditId])).rows[0];
+    assert.deepEqual(login, { action: 'AUTH.LOGIN', actor: 'chain-owner' });
+  });
+
+  test('revoked after the permission check but before the publish: the publish is refused', async () => {
+    const owner = await enrolled('race-owner');
+    const tour = await draftTour(owner.cookie, 'race-tour');
+    // Headers now, body later: authorize() runs, then the request waits for its body.
+    tick(1);
+    const seen = clock.toISOString();
+    const pending = new Promise<Res>((resolve, reject) => {
+      const req = request({ host: '127.0.0.1', port, method: 'POST', path: `/api/tours/${tour}/publish`, headers: {
+        host: HOST, origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.250',
+        cookie: `${SESSION_COOKIE}=${owner.cookie}`, 'transfer-encoding': 'chunked' } }, (res) => {
+        let raw = '';
+        res.setEncoding('utf8');
+        res.on('data', (c: string) => { raw += c; });
+        res.on('end', () => resolve({ status: res.statusCode!, body: raw ? JSON.parse(raw) : {}, cookie: undefined, setCookie: undefined, headers: res.headers }));
+      });
+      req.on('error', reject);
+      req.flushHeaders();
+      void (async () => {
+        for (let n = 0; n < 200; n++) {
+          const r = await db.owner.query(`SELECT s.last_seen_at = $1::timestamptz AS ok FROM admin_session s JOIN admin_user u ON u.id = s.admin_id
+            WHERE u.login = 'race-owner' AND s.revoked_at IS NULL ORDER BY s.created_at DESC LIMIT 1`, [seen]);
+          if (r.rows[0]?.ok) break;
+          await new Promise(res => setTimeout(res, 10));
+        }
+        await revokeSessions(db.adminOperator, 'race-owner', 'art', 'revoked mid-request');
+        req.end(JSON.stringify({ expectedDraftRevision: 1, expectedPublishedVersion: 0 }));
+      })().catch(reject);
+    });
+    const r = await pending;
+    assert.deepEqual([r.status, r.body.error], [401, 'UNAUTHENTICATED']);
+    assert.equal((await db.owner.query('SELECT published_version FROM tour WHERE id = $1', [tour])).rows[0].published_version, null);
+  });
+
+  test('a disable that comes while a publish runs waits for it, and the session is gone after', async () => {
+    const owner = await enrolled('race-owner2');
+    const tour = await draftTour(owner.cookie, 'race-tour2');
+    const gate = `race-gate-${tour}`;
+    await db.owner.query(`CREATE FUNCTION fn_test_pause_publish() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN PERFORM pg_advisory_xact_lock(hashtextextended('${gate}', 0)); RETURN NEW; END $f$`);
+    await db.owner.query(`CREATE TRIGGER zz_test_pause_publish BEFORE INSERT ON tour_revision
+      FOR EACH ROW WHEN (NEW.tour_id = '${tour}') EXECUTE FUNCTION fn_test_pause_publish()`);
+    await db.owner.query('SELECT pg_advisory_lock(hashtextextended($1, 0))', [gate]);
+    const operator = new pg.Client({ connectionString: (() => { const u = new URL(db.url); u.username = 'commerce_test_admin_operator';
+      u.password = 'commerce-test-only'; return u.toString(); })() });
+    await operator.connect();
+    const waitFor = async (sql: string, args: unknown[]) => {
+      for (let n = 0; n < 200; n++) {
+        if ((await db.owner.query(sql, args)).rows[0].ready) return;
+        await new Promise(res => setTimeout(res, 10));
+      }
+      assert.fail('expected a blocked database operation');
+    };
+    let publish: Promise<Res> | undefined;
+    let disable: Promise<string> | undefined;
+    try {
+      publish = call('POST', `/api/tours/${tour}/publish`, { cookie: owner.cookie, body: { expectedDraftRevision: 1, expectedPublishedVersion: 0 } });
+      await waitFor(`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = $1 AND usename = 'commerce_test_admin'
+        AND wait_event = 'advisory') AS ready`, [db.name]);
+      const operatorPid = (await operator.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+      disable = operator.query("SELECT fn_admin_set_disabled('race-owner2', true, 'art', 'disabled mid-publish')")
+        .then(() => 'DISABLED', (e: Error) => e.message);
+      await waitFor('SELECT cardinality(pg_blocking_pids($1)) > 0 AS ready', [operatorPid]);
+      await db.owner.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [gate]);
+      const published = await publish;
+      assert.deepEqual([published.status, published.body.version], [200, 1]);
+      assert.equal(await disable, 'DISABLED');
+      assert.equal((await call('GET', '/api/auth/session', { cookie: owner.cookie })).status, 401);
+    } finally {
+      await db.owner.query('SELECT pg_advisory_unlock_all()');
+      await publish?.catch(() => undefined);
+      await disable;
+      await operator.end();
+      await db.owner.query('DROP TRIGGER zz_test_pause_publish ON tour_revision');
+      await db.owner.query('DROP FUNCTION fn_test_pause_publish()');
+    }
+  });
+
+  test('past the global limit, attempts are refused before the database; spent windows are pruned off the login path', async () => {
+    const limited = createAdminServer({ pool: db.admin, totpKey: KEY, origin: ORIGIN, schemaHead: schemaHead(MIGRATIONS_DIR),
+      sourceCommit: null, startedAt: new Date(), log: () => undefined, now: () => clock, loginLimit: new GlobalLoginLimit(2) });
+    await new Promise<void>(r => limited.listen(0, '127.0.0.1', r));
+    const saved = port;
+    port = (limited.address() as AddressInfo).port;
+    try {
+      const rows = async () => (await db.owner.query('SELECT coalesce(sum(attempts), 0)::int AS n FROM admin_login_throttle')).rows[0].n as number;
+      const attempt = () => call('POST', '/api/auth/login', { body: { login: `nobody-${ipCounter}`, password: 'x', code: '000000' } });
+      assert.deepEqual([(await attempt()).status, (await attempt()).status], [401, 401]);
+      const before = await rows();
+      const third = await attempt();
+      assert.equal(third.status, 429);
+      assert.equal(await rows(), before, 'a refused attempt writes no throttle row');
+    } finally {
+      port = saved;
+      limited.closeAllConnections();
+      await new Promise(r => limited.close(r));
+    }
+    await db.owner.query("INSERT INTO admin_login_throttle VALUES ($1, now() - interval '2 hours', 1)", [`source:${'a'.repeat(64)}`]);
+    assert.ok(await pruneLoginThrottle(db.admin, new Date()) >= 1);
+    assert.equal((await db.owner.query("SELECT count(*)::int AS n FROM admin_login_throttle WHERE window_start < now() - interval '1 hour'")).rows[0].n, 0);
   });
 });
 

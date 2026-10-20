@@ -24,7 +24,8 @@ looks like a credential or a server-side configuration name.
 ## Runtime
 
 `nginx.conf.template`: CSP `default-src 'self'` with `connect-src 'self'`, `frame-ancestors 'none'`,
-`no-store` HTML, no access log, `/api/` limited to 320 KiB bodies. The Admin API address comes from
+`no-store` HTML, no access log, `/api/` limited to 320 KiB bodies, and `/api/auth/` capped for all
+clients together (2 requests/s, burst 20) in front of the Admin API's own throttle. The Admin API address comes from
 `ADMIN_API_UPSTREAM` (default `mikluha-admin-api:3000`) and is resolved through Docker's DNS every
 10 s, so an Admin API redeploy needs no Nginx reload and Nginx starts while the API is down.
 `X-Forwarded-For` from Traefik (one client address) is passed through unchanged for the login

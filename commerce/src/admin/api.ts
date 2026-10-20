@@ -41,9 +41,10 @@ import {
 } from '../editorial.js';
 import type { Logger } from '../log.js';
 import { BookingRateLimiter } from '../rate-limit.js';
+import { adminKeys, verifyAttestation, type DetailValue } from './attestation.js';
 import {
-  allowed, audit, consumeLoginAttempt, findAccount, liveSessions, login as openLogin, RateLimited, revokeSession,
-  rotateSession, throttleKey, touchSession, type Account, type IssuedSession, type Permission, type Session,
+  allowed, audit, consumeLoginAttempt, findAccount, GlobalLoginLimit, liveSessions, lockSession, login as openLogin, RateLimited,
+  revokeSession, rotateSession, touchSession, type Account, type IssuedSession, type Permission, type Session,
 } from './auth.js';
 import { UNKNOWN_ACCOUNT_HASH, verifyPassword } from './password.js';
 import { decryptSeed, encryptSeed, matchingStep, newSeed } from './totp.js';
@@ -64,6 +65,8 @@ export interface AdminDeps {
   readonly startedAt: Date;
   readonly log: Logger;
   readonly now?: () => Date;
+  /** All login attempts together, refused in memory past its limit (default GLOBAL_LOGIN_LIMIT_PER_MINUTE). */
+  readonly loginLimit?: GlobalLoginLimit;
 }
 
 const HEADERS = {
@@ -165,7 +168,8 @@ export function adminOrigin(value: string): string {
 export function createAdminServer(deps: AdminDeps): Server {
   const now = deps.now ?? (() => new Date());
   const host = new URL(deps.origin).host;
-  const limiterKey = throttleKey(deps.totpKey);
+  const keys = adminKeys(deps.totpKey);
+  const loginLimit = deps.loginLimit ?? new GlobalLoginLimit();
 
   async function readiness() {
     try {
@@ -185,7 +189,7 @@ export function createAdminServer(deps: AdminDeps): Server {
 
   async function session(req: IncomingMessage): Promise<Session> {
     const token = cookieToken(req);
-    const s = token === undefined ? undefined : await touchSession(deps.pool, token, now());
+    const s = token === undefined ? undefined : await touchSession(deps.pool, keys, token, now());
     if (s === undefined) throw new HttpError(401, 'UNAUTHENTICATED');
     return s;
   }
@@ -193,7 +197,7 @@ export function createAdminServer(deps: AdminDeps): Server {
   async function authorize(req: IncomingMessage, permission: Permission): Promise<Session> {
     const s = await session(req);
     if (!allowed(s.role, permission)) {
-      await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: 'PERMISSION.DENIED', outcome: 'REFUSED', details: { permission } });
+      await audit(deps.pool, keys, { adminId: s.adminId, actor: s.login, action: 'PERMISSION.DENIED', outcome: 'REFUSED', details: { permission } });
       throw new HttpError(403, 'FORBIDDEN');
     }
     return s;
@@ -210,7 +214,8 @@ export function createAdminServer(deps: AdminDeps): Server {
   async function credentials(req: IncomingMessage, body: Record<string, unknown>): Promise<Account> {
     const login = str(body.login, 64) ?? '';
     try {
-      await consumeLoginAttempt(deps.pool, limiterKey, { source: BookingRateLimiter.clientIp(req.headers), login }, now());
+      loginLimit.consume(now());
+      await consumeLoginAttempt(deps.pool, keys.throttle, { source: BookingRateLimiter.clientIp(req.headers), login }, now());
     } catch (e) {
       if (e instanceof RateLimited) throw new HttpError(429, 'RATE_LIMITED', { 'retry-after': String(e.retryAfterSeconds) });
       throw e;
@@ -218,7 +223,7 @@ export function createAdminServer(deps: AdminDeps): Server {
     const account = login === '' ? undefined : await findAccount(deps.pool, login);
     const ok = await verifyPassword(body.password, account?.passwordScrypt ?? UNKNOWN_ACCOUNT_HASH);
     if (account === undefined || !ok || account.disabled) {
-      await audit(deps.pool, { adminId: account?.id ?? null, actor: account?.login ?? 'anonymous', action: 'AUTH.LOGIN',
+      await audit(deps.pool, keys, { adminId: account?.id ?? null, actor: account?.login ?? 'anonymous', action: 'AUTH.LOGIN',
         outcome: 'REFUSED', details: { reason: 'CREDENTIALS' } });
       throw new HttpError(401, 'INVALID_CREDENTIALS');
     }
@@ -234,17 +239,17 @@ export function createAdminServer(deps: AdminDeps): Server {
       'SELECT seed_ciphertext, confirmed_at FROM admin_totp WHERE admin_id = $1', [account.id]);
     const row = rows[0];
     if (row === undefined || (row.confirmed_at !== null) === confirming) {
-      await audit(deps.pool, { adminId: account.id, actor: account.login, action: 'AUTH.LOGIN', outcome: 'REFUSED',
+      await audit(deps.pool, keys, { adminId: account.id, actor: account.login, action: 'AUTH.LOGIN', outcome: 'REFUSED',
         details: { reason: confirming ? 'NOT_ENROLLING' : 'ENROLLMENT_REQUIRED' } });
       throw confirming ? new HttpError(409, 'TOTP_ALREADY_ENROLLED') : new HttpError(403, 'TOTP_ENROLLMENT_REQUIRED');
     }
     const step = matchingStep(decryptSeed(deps.totpKey, account.id, row.seed_ciphertext), code, now());
     let issued: IssuedSession | undefined;
     if (step !== undefined) {
-      try { issued = await openLogin(deps.pool, account, step, confirming, now()); } catch (e) { throw dbError(e); }
+      try { issued = await openLogin(deps.pool, keys, account, step, confirming, now()); } catch (e) { throw dbError(e); }
     }
     if (issued === undefined) {
-      await audit(deps.pool, { adminId: account.id, actor: account.login, action: 'AUTH.LOGIN', outcome: 'REFUSED',
+      await audit(deps.pool, keys, { adminId: account.id, actor: account.login, action: 'AUTH.LOGIN', outcome: 'REFUSED',
         details: { reason: step === undefined ? 'CODE' : 'CODE_REUSED' } });
       throw new HttpError(401, 'INVALID_CREDENTIALS');
     }
@@ -264,11 +269,11 @@ export function createAdminServer(deps: AdminDeps): Server {
       await deps.pool.query('SELECT fn_admin_totp_begin($1, $2)', [account.id, encryptSeed(deps.totpKey, account.id, seed)]);
     } catch (e) {
       const refused = dbError(e);
-      await audit(deps.pool, { adminId: account.id, actor: account.login, action: 'TOTP.ENROLL_STARTED', outcome: 'REFUSED',
+      await audit(deps.pool, keys, { adminId: account.id, actor: account.login, action: 'TOTP.ENROLL_STARTED', outcome: 'REFUSED',
         details: { reason: refused.code } });
       throw refused;
     }
-    await audit(deps.pool, { adminId: account.id, actor: account.login, action: 'TOTP.ENROLL_STARTED', outcome: 'OK' });
+    await audit(deps.pool, keys, { adminId: account.id, actor: account.login, action: 'TOTP.ENROLL_STARTED', outcome: 'OK' });
     send(res, 200, { secret, otpauthUri });
   }
 
@@ -348,7 +353,7 @@ export function createAdminServer(deps: AdminDeps): Server {
         id = await createContentItem(deps.pool, contentKind, slug, actor(s));
       }
     } catch (e) { throw e instanceof HttpError ? e : editorialError(e); }
-    await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: `${kind.toUpperCase()}.CREATED`, outcome: 'OK',
+    await audit(deps.pool, keys, { adminId: s.adminId, actor: s.login, action: `${kind.toUpperCase()}.CREATED`, outcome: 'OK',
       entityType: TABLE[kind].table, entityId: id });
     send(res, 201, { id });
   }
@@ -362,7 +367,7 @@ export function createAdminServer(deps: AdminDeps): Server {
     const save = kind === 'tour' ? saveTourDraft : kind === 'departure' ? saveDepartureDraft : saveContentDraft;
     let revision: number;
     try { revision = await save(deps.pool, id, expected, document as Document, actor(s)); } catch (e) { throw editorialError(e); }
-    await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: `${kind.toUpperCase()}.DRAFT_SAVED`, outcome: 'OK',
+    await audit(deps.pool, keys, { adminId: s.adminId, actor: s.login, action: `${kind.toUpperCase()}.DRAFT_SAVED`, outcome: 'OK',
       entityType: TABLE[kind].table, entityId: id, details: { revision } });
     send(res, 200, { revision });
   }
@@ -388,13 +393,18 @@ export function createAdminServer(deps: AdminDeps): Server {
     const client = await deps.pool.connect();
     try {
       await client.query('BEGIN');
+      // The session again, inside this transaction and held to its end: a revocation or disable
+      // that committed after authorize() refuses this publish; one that comes later waits for it.
+      const live = await lockSession(client, keys, cookieToken(req)!, s.adminId, now());
+      if (live === undefined || live.id !== s.id) throw new HttpError(401, 'UNAUTHENTICATED');
+      if (!allowed(live.role, 'editorial.publish')) throw new HttpError(403, 'FORBIDDEN');
       let result: { outcome: string; version: number; changeId: string | null; affectedOrders: number };
       if (kind === 'departure') result = await publishDeparture(client, id, at, actor(s), change);
       else {
         const version = await (kind === 'tour' ? publishTour : publishContentItem)(client, id, at, actor(s));
         result = { outcome: 'PUBLISHED', version, changeId: null, affectedOrders: 0 };
       }
-      await audit(client, { adminId: s.adminId, actor: s.login, outcome: 'OK', entityType: TABLE[kind].table, entityId: id,
+      await audit(client, keys, { adminId: s.adminId, actor: s.login, outcome: 'OK', entityType: TABLE[kind].table, entityId: id,
         action: result.outcome === 'PUBLISHED' ? `${kind.toUpperCase()}.PUBLISHED`
           : result.outcome === 'APPLIED' ? 'DEPARTURE.EXECUTION_CHANGE_EQUIVALENT' : 'DEPARTURE.EXECUTION_CHANGE_MATERIAL',
         details: { sessionId: s.id, authAuditId: s.authAuditId, version: result.version, outcome: result.outcome,
@@ -407,13 +417,22 @@ export function createAdminServer(deps: AdminDeps): Server {
     } finally { client.release(); }
   }
 
+  /**
+   * The audit with its evidence: ATTESTED rows were written by this Admin API (their MAC verifies);
+   * FORGED rows carry a MAC that does not, so they were written with the database's credentials
+   * alone; OPERATOR rows come from an operator's or the owner's login, which carries none.
+   */
   async function auditLog(req: IncomingMessage, res: ServerResponse, url: URL) {
     await authorize(req, 'audit.read');
     const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
     if (!Number.isSafeInteger(before) || before < 1) throw new HttpError(422, 'INVALID');
-    const { rows } = await deps.pool.query(`SELECT id, at, login_role AS "loginRole", actor, action, outcome,
-      entity_type AS "entityType", entity_id AS "entityId", details FROM admin_audit WHERE id < $1 ORDER BY id DESC LIMIT 100`, [before]);
-    send(res, 200, { entries: rows.map(r => ({ ...r, id: Number(r.id) })) });
+    const { rows } = await deps.pool.query<{ id: string; at: Date; loginRole: string; adminId: string | null; actor: string;
+      action: string; outcome: 'OK' | 'REFUSED'; entityType: string | null; entityId: string | null;
+      details: Record<string, DetailValue>; attestation: string | null }>(`SELECT id, at, login_role AS "loginRole",
+      admin_id AS "adminId", actor, action, outcome, entity_type AS "entityType", entity_id AS "entityId", details, attestation
+      FROM admin_audit WHERE id < $1 ORDER BY id DESC LIMIT 100`, [before]);
+    send(res, 200, { entries: rows.map(({ attestation, adminId, ...r }) => ({ ...r, id: Number(r.id),
+      evidence: attestation === null ? 'OPERATOR' : verifyAttestation(keys.audit, { ...r, adminId }, attestation) ? 'ATTESTED' : 'FORGED' })) });
   }
 
   async function route(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
@@ -427,19 +446,19 @@ export function createAdminServer(deps: AdminDeps): Server {
     if (path === '/api/auth/session' && method === 'GET') { send(res, 200, sessionBody(await session(req))); return; }
     if (path === '/api/auth/refresh' && method === 'POST') {
       const s = await session(req);
-      const issued = await rotateSession(deps.pool, cookieToken(req)!, s, now());
+      const issued = await rotateSession(deps.pool, keys, cookieToken(req)!, s, now());
       if (issued === undefined) throw new HttpError(401, 'UNAUTHENTICATED');
-      await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: 'AUTH.REFRESHED', outcome: 'OK',
+      await audit(deps.pool, keys, { adminId: s.adminId, actor: s.login, action: 'AUTH.REFRESHED', outcome: 'OK',
         entityType: 'admin_session', entityId: issued.session.id });
       signedIn(res, issued);
       return;
     }
     if (path === '/api/auth/logout' && method === 'POST') {
       const token = cookieToken(req);
-      const s = token === undefined ? undefined : await touchSession(deps.pool, token, now());
+      const s = token === undefined ? undefined : await touchSession(deps.pool, keys, token, now());
       if (s !== undefined) {
         await revokeSession(deps.pool, s.adminId, s.id, 'LOGOUT', now());
-        await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: 'AUTH.LOGOUT', outcome: 'OK', entityType: 'admin_session', entityId: s.id });
+        await audit(deps.pool, keys, { adminId: s.adminId, actor: s.login, action: 'AUTH.LOGOUT', outcome: 'OK', entityType: 'admin_session', entityId: s.id });
       }
       send(res, 200, { ok: true }, { 'set-cookie': CLEAR_COOKIE });
       return;
@@ -454,7 +473,7 @@ export function createAdminServer(deps: AdminDeps): Server {
       const id = str((await readJson(req, MAX_AUTH_BODY)).sessionId, 36);
       if (id === undefined || !UUID.test(id)) throw new HttpError(422, 'INVALID');
       if (!await revokeSession(deps.pool, s.adminId, id, 'REVOKED', now())) throw new HttpError(404, 'SESSION_UNKNOWN');
-      await audit(deps.pool, { adminId: s.adminId, actor: s.login, action: 'SESSION.REVOKED', outcome: 'OK', entityType: 'admin_session', entityId: id });
+      await audit(deps.pool, keys, { adminId: s.adminId, actor: s.login, action: 'SESSION.REVOKED', outcome: 'OK', entityType: 'admin_session', entityId: id });
       send(res, 200, { ok: true }, id === s.id ? { 'set-cookie': CLEAR_COOKIE } : {});
       return;
     }

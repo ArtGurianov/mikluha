@@ -9,11 +9,19 @@
 --              Enrolment is open for 24 hours after an operator creates the account or resets its
 --              TOTP, and closes at the first confirmed code. No recovery codes, no web disable: a lost
 --              device is `admin-operator totp reset` over SSH, audited, which revokes every session.
---   sessions   only the SHA-256 of a random token. A session is opened only by fn_admin_login, in the
---              same transaction that spends a TOTP step and writes its AUTH.LOGIN audit row, and it
---              names that row for its whole life (refresh carries it over): every Admin action done
---              under a session is traceable to the authentication that admitted it. Only an enabled
---              account with a confirmed second factor has one. Revoked stays revoked.
+--   sessions   only a MAC of a random token, keyed by a secret the Admin API derives from its
+--              environment key: a row written with this database's credentials alone names no token
+--              anyone holds, so it can never be presented over HTTP. A session is opened only by
+--              fn_admin_login, in the same transaction that spends a TOTP step and writes its
+--              AUTH.LOGIN audit row, and it names that row for its whole life (refresh carries it
+--              over). Only an enabled account with a confirmed second factor has one. Revoked stays
+--              revoked.
+--   evidence   every audit row the Admin API writes carries an attestation: a MAC over the row,
+--              under the same environment secret. The database stores it and cannot make one, so an
+--              AUTH.LOGIN row, or a publish that names it, written with this database's credentials
+--              alone fails verification (src/admin/attestation.ts). What admin_app's credential still
+--              can do without the Admin API (call the editorial functions of 0008-0010 directly) leaves
+--              no attested row behind, and is told apart that way, not prevented.
 --   audit      append-only, for every login: the database records when and through which login.
 --
 -- Roles. admin_app (the Admin API's login) reads accounts, opens and refreshes sessions only through
@@ -65,14 +73,17 @@ CREATE TABLE admin_audit (
   outcome     text NOT NULL CHECK (outcome IN ('OK', 'REFUSED')),
   entity_type text CHECK (entity_type ~ '^[a-z_]{1,40}$'),
   entity_id   text CHECK (length(entity_id) BETWEEN 1 AND 120),
-  details     jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(details) = 'object' AND length(details::text) <= 4096)
+  details     jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(details) = 'object' AND length(details::text) <= 4096),
+  -- The Admin API's MAC over this row (src/admin/attestation.ts); NULL for operator and owner rows.
+  attestation text CHECK (attestation ~ '^[0-9a-f]{64}$')
 );
 CREATE INDEX admin_audit_at ON admin_audit (at DESC);
 
 CREATE TABLE admin_session (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   admin_id            uuid NOT NULL REFERENCES admin_user(id) ON DELETE RESTRICT,
-  token_sha256        text NOT NULL UNIQUE CHECK (token_sha256 ~ '^[0-9a-f]{64}$'),
+  -- HMAC-SHA256 of the token under the Admin API's session key, never the token itself.
+  token_mac           text NOT NULL UNIQUE CHECK (token_mac ~ '^[0-9a-f]{64}$'),
   created_at          timestamptz NOT NULL,
   last_seen_at        timestamptz NOT NULL,
   idle_expires_at     timestamptz NOT NULL,
@@ -98,6 +109,8 @@ CREATE TABLE admin_login_throttle (
   attempts     int NOT NULL CHECK (attempts >= 1),
   PRIMARY KEY (bucket, window_start)
 );
+-- Old windows are pruned by the Admin API's timer, outside the login path.
+CREATE INDEX admin_login_throttle_window ON admin_login_throttle (window_start);
 
 
 -- ---------------------------------------------------------------------------------------------
@@ -107,6 +120,11 @@ CREATE FUNCTION fn_admin_audit_stamp() RETURNS trigger SET search_path = pg_cata
 BEGIN
   NEW.at := now();
   NEW.login_role := session_user;
+  -- The Admin API attests every row it writes; one without is not the Admin API's.
+  IF NEW.attestation IS NULL AND pg_has_role(session_user, 'admin_app', 'MEMBER')
+     AND NOT (SELECT rolsuper FROM pg_roles WHERE rolname = session_user) THEN
+    RAISE EXCEPTION 'ADMIN_AUDIT_ATTESTATION_REQUIRED' USING ERRCODE = '23514';
+  END IF;
   RETURN NEW;
 END $fn$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_admin_audit_stamp BEFORE INSERT ON admin_audit
@@ -229,42 +247,52 @@ BEGIN
 END $fn$ LANGUAGE plpgsql;
 
 -- The only way a session begins: the step a code matched is spent (fn_admin_totp_accept), the
--- AUTH.LOGIN row is written, and the session that names it is opened, all at once. Nothing is
--- returned when the step is not accepted (a code already used, or an earlier one).
-CREATE FUNCTION fn_admin_login(p_admin_id uuid, p_step bigint, p_confirming boolean, p_token_sha256 text,
-  p_now timestamptz, p_idle_seconds int)
+-- AUTH.LOGIN row is written with the Admin API's attestation, and the session that names it is
+-- opened, all at once. Nothing is returned when the step is not accepted (a code already used, or an
+-- earlier one). The database cannot check the step against the seed, nor the attestation: holding
+-- only this database's credentials, a caller gets a row whose token MAC matches no token and whose
+-- attestation does not verify.
+CREATE FUNCTION fn_admin_login(p_session_id uuid, p_admin_id uuid, p_step bigint, p_confirming boolean, p_token_mac text,
+  p_now timestamptz, p_idle_seconds int, p_attestation text)
 RETURNS TABLE (out_session_id uuid, out_auth_audit_id bigint, out_idle_expires_at timestamptz, out_absolute_expires_at timestamptz)
 SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
 DECLARE
   v_login text;
-  v_session uuid := gen_random_uuid();
   v_audit bigint;
   v_absolute timestamptz := p_now + interval '12 hours';
   v_idle timestamptz;
 BEGIN
   PERFORM fn_admin_not_commerce();
-  IF p_now IS NULL OR p_idle_seconds IS NULL OR p_idle_seconds NOT BETWEEN 60 AND 43200 THEN
+  IF p_session_id IS NULL OR p_now IS NULL OR p_idle_seconds IS NULL OR p_idle_seconds NOT BETWEEN 60 AND 43200 THEN
     RAISE EXCEPTION 'ADMIN_SESSION_LIFETIME_INVALID' USING ERRCODE = '22023';
   END IF;
   v_idle := least(p_now + make_interval(secs => p_idle_seconds), v_absolute);
   IF NOT fn_admin_totp_accept(p_admin_id, p_step, p_confirming) THEN RETURN; END IF;
   SELECT login INTO v_login FROM admin_user WHERE id = p_admin_id;
-  IF p_confirming THEN
-    INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id)
-      VALUES (p_admin_id, v_login, 'TOTP.ENROLLED', 'OK', 'admin_user', v_login);
-  END IF;
-  INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id, details)
-    VALUES (p_admin_id, v_login, 'AUTH.LOGIN', 'OK', 'admin_session', v_session::text,
-            jsonb_build_object('totpStep', p_step, 'enrolment', p_confirming))
+  INSERT INTO admin_audit (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation)
+    VALUES (p_admin_id, v_login, 'AUTH.LOGIN', 'OK', 'admin_session', p_session_id::text,
+            jsonb_build_object('totpStep', p_step, 'enrolment', p_confirming), p_attestation)
     RETURNING id INTO v_audit;
-  INSERT INTO admin_session (id, admin_id, token_sha256, created_at, last_seen_at, idle_expires_at, absolute_expires_at, auth_audit_id)
-    VALUES (v_session, p_admin_id, p_token_sha256, p_now, p_now, v_idle, v_absolute, v_audit);
-  RETURN QUERY SELECT v_session, v_audit, v_idle, v_absolute;
+  INSERT INTO admin_session (id, admin_id, token_mac, created_at, last_seen_at, idle_expires_at, absolute_expires_at, auth_audit_id)
+    VALUES (p_session_id, p_admin_id, p_token_mac, p_now, p_now, v_idle, v_absolute, v_audit);
+  RETURN QUERY SELECT p_session_id, v_audit, v_idle, v_absolute;
+END $fn$ LANGUAGE plpgsql;
+
+-- The account row share-locked to the end of the caller's transaction, if it is enabled. A publish
+-- takes it before its session row, the order every operator command takes them, so a disable, a
+-- reset, a password change or a revocation either committed before (and the publish is refused) or
+-- waits until the publish is done. admin_app holds no UPDATE right that a direct FOR SHARE would need.
+CREATE FUNCTION fn_admin_lock_account(p_admin_id uuid) RETURNS boolean
+SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
+BEGIN
+  PERFORM fn_admin_not_commerce();
+  PERFORM 1 FROM admin_user WHERE id = p_admin_id AND disabled_at IS NULL FOR SHARE;
+  RETURN FOUND;
 END $fn$ LANGUAGE plpgsql;
 
 -- Refresh: a live session's token is replaced. The new session keeps the 12-hour limit and the
 -- authentication of the old one, which is revoked in the same transaction.
-CREATE FUNCTION fn_admin_session_rotate(p_token_sha256 text, p_new_token_sha256 text, p_now timestamptz, p_idle_seconds int)
+CREATE FUNCTION fn_admin_session_rotate(p_token_mac text, p_new_token_mac text, p_now timestamptz, p_idle_seconds int)
 RETURNS TABLE (out_session_id uuid, out_auth_audit_id bigint, out_idle_expires_at timestamptz, out_absolute_expires_at timestamptz)
 SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
 DECLARE
@@ -276,14 +304,14 @@ BEGIN
   IF p_now IS NULL OR p_idle_seconds IS NULL OR p_idle_seconds NOT BETWEEN 60 AND 43200 THEN
     RAISE EXCEPTION 'ADMIN_SESSION_LIFETIME_INVALID' USING ERRCODE = '22023';
   END IF;
-  SELECT * INTO s FROM admin_session WHERE token_sha256 = p_token_sha256 AND revoked_at IS NULL
+  SELECT * INTO s FROM admin_session WHERE token_mac = p_token_mac AND revoked_at IS NULL
     AND idle_expires_at > p_now AND absolute_expires_at > p_now FOR UPDATE;
   IF NOT FOUND THEN RETURN; END IF;
   UPDATE admin_session SET revoked_at = p_now, revoked_reason = 'REFRESH' WHERE id = s.id;
   v_idle := least(p_now + make_interval(secs => p_idle_seconds), s.absolute_expires_at);
-  INSERT INTO admin_session (id, admin_id, token_sha256, created_at, last_seen_at, idle_expires_at, absolute_expires_at,
+  INSERT INTO admin_session (id, admin_id, token_mac, created_at, last_seen_at, idle_expires_at, absolute_expires_at,
       rotated_from, auth_audit_id)
-    VALUES (v_session, s.admin_id, p_new_token_sha256, p_now, p_now, v_idle, s.absolute_expires_at, s.id, s.auth_audit_id);
+    VALUES (v_session, s.admin_id, p_new_token_mac, p_now, p_now, v_idle, s.absolute_expires_at, s.id, s.auth_audit_id);
   RETURN QUERY SELECT v_session, s.auth_audit_id, v_idle, s.absolute_expires_at;
 END $fn$ LANGUAGE plpgsql;
 
@@ -432,7 +460,7 @@ GRANT SELECT ON schema_migrations TO admin_app;
 GRANT SELECT ON admin_user, admin_totp, admin_session, admin_login_throttle, admin_audit TO admin_app;
 GRANT UPDATE (last_seen_at, idle_expires_at, revoked_at, revoked_reason) ON admin_session TO admin_app;
 GRANT INSERT, UPDATE (attempts), DELETE ON admin_login_throttle TO admin_app;
-GRANT INSERT (admin_id, actor, action, outcome, entity_type, entity_id, details) ON admin_audit TO admin_app;
+GRANT INSERT (admin_id, actor, action, outcome, entity_type, entity_id, details, attestation) ON admin_audit TO admin_app;
 
 -- The operator sees accounts and their state, never a password hash or a seed.
 GRANT SELECT (id, login, role, password_changed_at, totp_enrollment_until, created_at, disabled_at) ON admin_user TO admin_operator;
@@ -449,8 +477,9 @@ REVOKE ALL ON FUNCTION fn_admin_session_revocation_final() FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_not_commerce() FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_totp_begin(uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_totp_accept(uuid, bigint, boolean) FROM PUBLIC;
-REVOKE ALL ON FUNCTION fn_admin_login(uuid, bigint, boolean, text, timestamptz, int) FROM PUBLIC;
+REVOKE ALL ON FUNCTION fn_admin_login(uuid, uuid, bigint, boolean, text, timestamptz, int, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_session_rotate(text, text, timestamptz, int) FROM PUBLIC;
+REVOKE ALL ON FUNCTION fn_admin_lock_account(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_operator_actor(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_operator_reason(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_operator_user(text) FROM PUBLIC;
@@ -463,8 +492,9 @@ REVOKE ALL ON FUNCTION fn_admin_revoke_sessions(text, text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_admin_clear_throttle(text, text) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION fn_admin_totp_begin(uuid, text) TO admin_app;
-GRANT EXECUTE ON FUNCTION fn_admin_login(uuid, bigint, boolean, text, timestamptz, int) TO admin_app;
+GRANT EXECUTE ON FUNCTION fn_admin_login(uuid, uuid, bigint, boolean, text, timestamptz, int, text) TO admin_app;
 GRANT EXECUTE ON FUNCTION fn_admin_session_rotate(text, text, timestamptz, int) TO admin_app;
+GRANT EXECUTE ON FUNCTION fn_admin_lock_account(uuid) TO admin_app;
 GRANT EXECUTE ON FUNCTION fn_admin_create_user(text, text, text, text) TO admin_operator;
 GRANT EXECUTE ON FUNCTION fn_admin_set_password(text, text, text) TO admin_operator;
 GRANT EXECUTE ON FUNCTION fn_admin_reset_totp(text, text, text) TO admin_operator;
