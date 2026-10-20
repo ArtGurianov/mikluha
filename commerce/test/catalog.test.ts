@@ -51,17 +51,22 @@ test('departure requires exact valid times and services never default to include
   assert.equal(tourContract({ destination: 'Алтай', route: 'Река', included: 'Проезд', risks: 'Горы', program: [] }), null);
 });
 
-test('the real Altai draft keeps supplied facts, missing conditions and closed launch boundary', () => {
+test('the real Altai draft keeps rescheduled dates, verified hotel identity and closed launch boundary', () => {
   const catalog = loadCatalog(join(MIGRATIONS_DIR, '..', '..', 'content'));
   const d = catalog.departures.get('altai-1')!;
   assert.equal(catalog.launchReady, false);
   assert.equal(catalog.refundPolicy, 'DOCUMENTED_EXPENSES');
-  assert.equal(d.startsOn, '2026-10-29');
-  assert.equal(d.endsOn, '2026-11-01');
+  assert.equal(d.startsOn, '2027-01-05');
+  assert.equal(d.endsOn, '2027-01-08');
   assert.equal(d.priceKopecks, 2_650_000);
   assert.equal(d.capacity, 40);
   assert.equal(d.bookingStatus, 'CLOSED');
   assert.equal(d.isListed, false);
+  const source = readFileSync(join(MIGRATIONS_DIR, '..', '..', 'content', 'departures', 'altai-1.yml'), 'utf8');
+  assert.match(source, /name: "Мини-отель «Фараонова дача»"/);
+  assert.match(source, /registryNumber: "С042024009867"/);
+  assert.match(source, /nights: 3/);
+  // The official address and supplier evidence are still missing: no sellable contract.
   assert.equal(d.contract, null);
 });
 
