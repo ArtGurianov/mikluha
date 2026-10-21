@@ -1,5 +1,10 @@
 # mikluha-commerce
 
+For the approved Refref v9 product rules (ADR-140 revision 7: one Commission per
+booking) and the still-unimplemented purchase-manifest contract, see [TOUR contract status](../docs/refref-v9-contract-status.md).
+The current full-only Alfa qualification below does not qualify merchant-owned
+partial refunds or v9 reward cancellation.
+
 Mikluha's booking and payment service (`docs/DECISIONS.md` #9, Linear ART-47). The public site stays
 static; everything that sells a trip lives here, with its own Postgres.
 
