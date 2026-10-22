@@ -28,7 +28,7 @@ eis() { docker run --rm --network "$NET" --env-file /etc/mikluha-commerce/operat
 The legal transmission deadline is the 15th of the month following contract conclusion, but not
 later than the trip starts. Our internal target is **24 hours before departure** to allow
 corrections; it is not a claim that the ЕИС statute itself sets that 24-hour deadline. For a sale
-in October for `altai-1` on 29 October, the trip-start limit takes precedence. The separate duty
+in December 2026 for `altai-1` departing on 5 January 2027, the trip-start limit takes precedence. The separate duty
 to deliver travel/transport/accommodation documents is not fulfilled just by recording ЕИС state.
 
 1. Confirm Refref read-back and commerce show the real order paid/fulfilled. Record only non-secret

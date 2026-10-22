@@ -1,6 +1,6 @@
 tour: altai
-startDate: "2026-10-29"
-endDate: "2026-11-01"
+startDate: "2027-01-05"
+endDate: "2027-01-08"
 bookingStatus: CLOSED
 price: 26500
 capacity: 40
@@ -18,13 +18,14 @@ contract:
     insurance: null
     risks: null
   accommodation:
-    name: null
-    address: null
-    registryNumber: null
+    name: "Мини-отель «Фараонова дача»"
+    address: "649240, Республика Алтай, м.р-н Чемальский, с.п. Чемальское, с. Чемал, ул. Дворникова, д. 7А"
+    registryNumber: "С042024009867"
+    category: "нет категории"
     roomType: null
-    nights: null
+    nights: 3
     meals: null
-    legalEntity: null
+    legalEntity: "ООО «АЖУР» (ИНН 0400006053, ОГРН 1170400004697, КПП 040001001)"
   carrier:
     legalName: "ИП Абедовская Дарья Игоревна, ИНН 420548575520, ОГРНИП 316420500100532"
     route: null
@@ -36,4 +37,4 @@ organizers:
   - artur
 isListed: false
 isDemo: false
-updatedAt: "2026-10-06"
+updatedAt: "2026-10-20"
