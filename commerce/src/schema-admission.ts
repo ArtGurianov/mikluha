@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import type { SchemaReadiness } from './schema-readiness.js';
 
 /** Per-operation admission, separate from routing/health and the legal-release gate.
@@ -5,6 +7,7 @@ import type { SchemaReadiness } from './schema-readiness.js';
  */
 export class SchemaAdmission {
   #stopping = false;
+  readonly #request = new AsyncLocalStorage<{ active: boolean }>();
   readonly #pending = new Set<Promise<SchemaReadiness>>();
   constructor(private readonly check: () => Promise<SchemaReadiness>) {}
 
@@ -29,11 +32,24 @@ export class SchemaAdmission {
     return pending.finally(() => { this.#pending.delete(pending); });
   }
 
-  /** Register an obligation before shutdown; wait for response close, then recheck live schema.
-   * Only registration before drain grants this ticket; ordinary run/status still refuse new work.
+  /** Only this live, already-admitted request may extend its drain obligation.
+   * The shared lease is revoked on return, including in detached async descendants.
+   */
+  runRequest(work: () => Promise<unknown>): Promise<SchemaReadiness> {
+    return this.run(async () => {
+      const lease = { active: true };
+      try { await this.#request.run(lease, work); }
+      finally { lease.active = false; }
+    });
+  }
+
+  canScheduleFromRequest(): boolean { return this.#request.getStore()?.active === true; }
+
+  /** Register before shutdown or from a still-live admitted request. Wait for response close,
+   * then recheck live schema; ordinary new run/status still refuse during drain.
    */
   schedule(start: Promise<void>, work: () => Promise<unknown>): Promise<SchemaReadiness> {
-    if (this.#stopping) return Promise.resolve({ status: 'NOT_READY', reason: 'RUNTIME_DRAINING' });
+    if (this.#stopping && !this.canScheduleFromRequest()) return Promise.resolve({ status: 'NOT_READY', reason: 'RUNTIME_DRAINING' });
     const pending = (async () => {
       await start;
       let result: SchemaReadiness;
@@ -48,7 +64,8 @@ export class SchemaAdmission {
 
   async drain(): Promise<void> {
     this.#stopping = true;
-    await Promise.allSettled([...this.#pending]);
+    // An admitted request can register a response-close ticket before it returns.
+    while (this.#pending.size > 0) await Promise.allSettled([...this.#pending]);
   }
 }
 

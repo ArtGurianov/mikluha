@@ -44,3 +44,16 @@ Integration with main ART-327 preserves the business-sabotage job. Its SQL mutan
 inside disposable scratch copies, with SQL and lock restored together, so failures still require
 the selected business assertion rather than an integrity/setup error. Committed history and lock
 checks remain strict. The actual merge also exercises the two-parent DAG validation path.
+
+
+## Final shutdown review
+
+A request admitted before SIGTERM may register its Arrival obligation after shutdown begins but
+before the handler returns. AsyncLocalStorage carries a private live request lease; its active flag
+is revoked in finally so detached descendants cannot register after return. Workers and new HTTP
+requests receive no such lease. Both AfterResponse and SchemaAdmission require that lease to accept
+late registration; every ticket still checks live schema before sending. Admission drain repeatedly
+awaits its pending set so tickets added by an in-flight request cannot outlive pool shutdown. Tests
+cover actual HTTP wiring, real SIGTERM, incompatible schema, unrelated async contexts and revoked
+detached descendants. Snapshot caching for migration history remains deferred without a performance
+need; it has no effect on the correctness boundary.

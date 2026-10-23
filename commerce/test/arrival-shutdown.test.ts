@@ -64,3 +64,51 @@ test('proof captured while a registered claim is in flight finishes in the same 
   second.emit('close'); release(); await stopped; await after.drain();
   assert.equal(sends, 2); assert.equal(arrivals.hasPending(id), false); assert.equal(after.pending, 0);
 });
+
+for (const compatible of [true, false]) {
+  test(`in-flight admitted HTTP request registers after SIGTERM; live schema ${compatible ? 'allows claim' : 'refuses claim'}`, async () => {
+    let schemaReady = true, sends = 0;
+    const admission = new SchemaAdmission(async () => schemaReady ? { status: 'READY' } : { status: 'NOT_READY', reason: 'SCHEMA_AHEAD_INCOMPATIBLE' });
+    const after = new AfterResponse(admission);
+    const arrivals = new Arrivals({ after, storefrontOrigin: 'https://book.example.invalid', log: () => {},
+      refref: { claimArrival: async () => { sends++; return receipt; } } });
+    const id = newContextId(), res = response();
+    let entered!: () => void, continueRequest!: () => void;
+    const started = new Promise<void>(r => { entered = r; });
+    const resume = new Promise<void>(r => { continueRequest = r; });
+    const request = admission.runRequest(async () => {
+      entered(); await resume;
+      arrivals.capture(id, proof(1)); arrivals.afterResponse(res, id);
+    });
+    await started;
+    let draining: Promise<void> | undefined, completed = false;
+    const stop = () => { after.stop(); draining = admission.drain().then(() => { completed = true; }); };
+    process.once('SIGTERM', stop);
+    try {
+      process.kill(process.pid, 'SIGTERM'); while (!draining) await tick();
+      assert.equal((await admission.runRequest(async () => { sends++; })).reason, 'RUNTIME_DRAINING');
+      // A different async context cannot borrow the live request's permission.
+      const foreign = response(); after.schedule(foreign, async () => { sends++; }); foreign.emit('close');
+      continueRequest(); await request;
+      assert.equal(after.pending, 1); assert.equal(completed, false);
+      schemaReady = compatible; res.emit('close'); await draining; await after.drain();
+      assert.equal(sends, compatible ? 1 : 0); assert.equal(completed, true);
+    } finally { process.removeListener('SIGTERM', stop); continueRequest(); res.emit('close'); await request; await draining; }
+  });
+}
+
+test('detached descendants cannot register after their admitted request has returned', async () => {
+  const admission = new SchemaAdmission(async () => ({ status: 'READY' }));
+  const after = new AfterResponse(admission);
+  let release!: () => void, sends = 0;
+  const later = new Promise<void>(r => { release = r; });
+  let detached!: Promise<void>;
+  await admission.runRequest(async () => {
+    detached = later.then(() => {
+      const res = response(); after.schedule(res, async () => { sends++; }); res.emit('close');
+    });
+  });
+  after.stop(); const draining = admission.drain();
+  release(); await detached; await draining; await after.drain();
+  assert.equal(sends, 0); assert.equal(after.pending, 0);
+});

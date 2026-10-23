@@ -145,11 +145,11 @@ export interface ArrivalClaimer {
 export class AfterResponse {
   readonly #tasks = new Set<Promise<void>>();
   #stopping = false;
-  constructor(private readonly admission?: Pick<SchemaAdmission, 'run' | 'schedule'>) {}
+  constructor(private readonly admission?: Pick<SchemaAdmission, 'run' | 'schedule' | 'canScheduleFromRequest'>) {}
 
-  /** Register NOW, before response close. A pre-drain ticket rechecks schema at execution. */
+  /** Register before response close, including from a live admitted request during drain. */
   schedule(res: ServerResponse, task: () => Promise<void>, settled?: () => void): void {
-    if (this.#stopping) { settled?.(); return; }
+    if (this.#stopping && !this.admission?.canScheduleFromRequest()) { settled?.(); return; }
     const start = new Promise<void>(resolve => {
       if (res.closed) resolve();
       else res.once('close', resolve);

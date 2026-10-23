@@ -158,3 +158,30 @@ test('commerce readyz reads schema once, preserves independent legal admission a
     assert.equal(queries, 2); assert.equal(legalChecks, 2);
   } finally { await close(server); }
 });
+
+test('HTTP request admitted before shutdown can register its arrival before returning', async () => {
+  const { Arrivals, newContextId } = await import('../src/arrival.js');
+  const admission = new SchemaAdmission(() => schemaReadiness(db.pool, build));
+  const after = new AfterResponse(admission);
+  let sends = 0;
+  const arrivals = new Arrivals({ after, storefrontOrigin: 'https://book.example.invalid', log: () => {},
+    refref: { claimArrival: async () => { sends++; return { kind: 'ANSWERED', status: 201, body: {
+      claimId: 'test', browserContextId: 'test', storefrontOrigin: 'https://book.example.invalid',
+      claimedAt: '2026-10-23T00:00:00Z', eligibleUntil: '2026-11-22T00:00:00Z',
+    } }; } } });
+  const entered = defer(), release = defer(), id = newContextId();
+  const server = createCommerceServer({ pool: db.pool, admission, ...build, catalog: fixtureCatalog([]), startedAt: new Date() }, async (_req, res) => {
+    entered.resolve(); await release.promise;
+    arrivals.capture(id, `ar1.${'a'.repeat(43)}`); arrivals.afterResponse(res, id);
+    res.end('ok'); return true;
+  });
+  const port = await listen(server);
+  const request = call(port, '/arrive'); await entered.promise;
+  after.stop(); const admitted = admission.drain();
+  const closed = new Promise<void>(resolve => server.close(() => resolve()));
+  try {
+    release.resolve(); assert.equal(await request, 200);
+    await Promise.all([admitted, closed]); await after.drain();
+    assert.equal(sends, 1); assert.equal(arrivals.hasPending(id), false);
+  } finally { release.resolve(); await request; await close(server); }
+});

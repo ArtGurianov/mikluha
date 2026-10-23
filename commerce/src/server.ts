@@ -75,7 +75,7 @@ export function createCommerceServer(deps: ServerDeps, routes?: RouteHandler): S
       return;
     }
     if (routes === undefined) { send(404, { error: 'NOT_FOUND' }); return; }
-    admission.run(async () => {
+    admission.runRequest(async () => {
       if (!await routes(req, res, url)) send(404, { error: 'NOT_FOUND' });
     }).then(r => {
       if (r.status !== 'READY') send(503, { error: 'SCHEMA_NOT_ADMITTED', reason: r.reason });

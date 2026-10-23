@@ -581,7 +581,10 @@ integration tests check direct HTTP refusal, unchanged order/outbox state, zero 
 per-step rechecks and drain races. These checks do not authorize production rollout.
 
 Arrival tasks are tracked when scheduled, **before** response close. SIGTERM/SIGINT stops registration
-of new work. A pre-registered ticket waits for response close and rechecks live schema even while
+of new work. A still-live HTTP request admitted before shutdown can also register its own ticket
+before its handler returns. This permission is async-context scoped and revoked on return, including
+for detached descendants; unrelated callbacks and new requests cannot borrow it. Drain waits for
+these late registrations as well. A registered ticket waits for response close and rechecks live schema even while
 ordinary admission returns RUNTIME_DRAINING, then completes its bounded attempt. Fresh proofs
 coalesced into an already registered task remain part of that drain obligation. There is no blanket
 schema bypass during shutdown. Tests deliver real SIGTERM before close, then verify exactly one
