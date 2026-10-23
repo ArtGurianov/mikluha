@@ -98,6 +98,9 @@ jobs:
 
       - run: pnpm test
 
+      - name: Business-invariant sabotage sensitivity (ART-327)
+        run: pnpm run test:sabotage
+
       # Integration build uses the default test-merge checkout and its actual SHA.
       - name: Merge-tree image
         working-directory: .

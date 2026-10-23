@@ -38,3 +38,9 @@ DAG checks retain edit-then-revert and per-branch lock protection. Registered Ar
 ## Revised merged plan
 
 Validate every relevant parent/child snapshot and latest base prefix; test stale docs/CMS branches and merges. Keep merge-tree tests and build a separately checked exact-HEAD image, asserting expected source identity inside the probe. Reuse the schema result on readyz. Track response-close obligations immediately and prohibit new registrations at shutdown while draining existing tickets and coalesced fresh proofs. Run real-signal negative tests, the full PostgreSQL suite, the exact-image probe and final-head CI.
+
+
+Integration with main ART-327 preserves the business-sabotage job. Its SQL mutants are rehashed only
+inside disposable scratch copies, with SQL and lock restored together, so failures still require
+the selected business assertion rather than an integrity/setup error. Committed history and lock
+checks remain strict. The actual merge also exercises the two-parent DAG validation path.

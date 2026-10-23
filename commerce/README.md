@@ -320,8 +320,75 @@ Admin API environment (Coolify, its own application; nothing here is shared with
 ```bash
 pnpm install --ignore-workspace          # in commerce/; it is not part of the site's workspace
 pnpm test                                # needs TEST_DATABASE_URL (a disposable Postgres superuser)
+pnpm run test:sabotage                    # ART-327; explicit loopback TEST_DATABASE_URL required
 MIGRATION_DATABASE_URL=… node dist/bin/migrate.js
 ```
+
+## Business-invariant sabotage (ART-327)
+
+`test/business-invariants.test.ts` runs 26 negative/replay scenarios against the
+real merchant code, migrated PostgreSQL and runtime/operator roles. Fixtures
+contain synthetic traveller data only. Refref uses a loopback HTTP server;
+Notisend uses injected responses. No live payment, email or EIS filing occurs.
+
+`pnpm run test:sabotage` copies source, migrations and tests into a temporary
+directory and applies 28 mutations one at a time: 26 merchant guards plus the
+fake's saved-response replay and one-shot transport assumptions. Each is restored
+before a green rerun. It requires a disposable PostgreSQL superuser endpoint on loopback;
+each subprocess normally creates and drops its own database. Working source and deployed
+schema are never modified. CI runs both the normal suite and sabotage step.
+Anchor drift, a surviving mutation, the wrong assertion, setup/compile errors,
+signals and timeouts fail the command. Only a named `BIxx` business assertion
+counts as a killed mutation.
+
+A subprocess killed by the 30-second timeout may not run its `after()` hook;
+its test database can remain. Use a dedicated disposable PostgreSQL instance
+and remove the entire instance after the run, including on failure. For example,
+from `commerce/` (the subshell keeps its cleanup trap local):
+
+```bash
+(
+  set -e
+  docker run --rm -d --name mikluha-sabotage-pg -e POSTGRES_PASSWORD=synthetic-only \
+    -p 127.0.0.1:55433:5432 postgres:16-alpine
+  trap 'docker rm -f mikluha-sabotage-pg >/dev/null' EXIT
+  until docker exec mikluha-sabotage-pg pg_isready -U postgres >/dev/null; do sleep 1; done
+  TEST_DATABASE_URL=postgres://postgres:synthetic-only@127.0.0.1:55433/postgres pnpm run test:sabotage
+)
+```
+
+| Invariants | Guards exercised |
+| --- | --- |
+| BI01–BI03 | Stop-sales in both lock orders; no overselling the final seat |
+| BI04–BI05 | Stable attempt/body replay, ambiguous provider response, lost fulfilment ACK, one confirmation/outbox/EIS obligation under concurrent readbacks |
+| BI06–BI09 | Live legal descriptor, accepted document, browser and resolution identity |
+| BI10–BI12 | Receipt-email allowlist, immutable contract snapshot, exact paid amount |
+| BI13–BI16 | Ambiguous Notisend response, crashed worker lease, EIS filing replay and stale reviewed packet |
+| BI17–BI21 | Frozen offer/consent integrity, payment snapshot binding, immutable accepted application, unqualified refund policy stop |
+| BI22–BI24 | Exact fulfilment ACK attempt identity, DELIVERED status and malformed bodies corrupted in transit |
+| BI25–BI26 | Persisted bad ACK remains blocked and monitored; one corrupted transit response recovers from the saved correct ACK |
+
+Commerce fulfils a paid order only after HTTP 200 confirms its exact attempt as
+`DELIVERED`. An unusable ACK leaves it `PAID`, without a confirmation email.
+Reconciliation repeats the same ACK identity: Refref replays the first saved
+response for that key/body within its 24-hour idempotency retention window.
+Repeating can recover from corruption in transit when the saved response is
+correct; it cannot repair a bad response saved by Refref. That case stays
+`PAID`, raises `paidNotFulfilled`, and needs investigation rather than a new key
+or an assumed automatic recovery. The fake stores the first response separately
+from a one-shot transit fault and tests both cases. Rejected answered ACKs log
+only `fulfilment_ack_unusable`, the order reference and HTTP status; response
+bodies and personal data are excluded. The EIS filing obligation is already due
+from the independently proven payment and remains `EIS_PENDING`.
+
+**Acceptance gaps:** no merchant refund adapter exists in this tree, so duplicate
+or lost-ACK refund execution is untested. Provider callbacks, actual payment and
+receipt deduplication belong to Refref; the fake server establishes merchant
+replay and payload behaviour only. EIS tests record manual filing evidence,
+without submitting to the external portal. ART-275/285/412 qualification and
+ART-362 checkout from immutable contracts remain separate. Keep ART-327 open
+until these remaining acceptance points have independent evidence; this suite
+is not production financial-flow admission.
 
 The booking switch (refref `ops/runbooks/stop-sales.md`), as root on the host. It runs in a
 **one-off container** from the service's own image, on its network, never by `docker exec` into the
@@ -526,3 +593,7 @@ Residual repository risk: this workflow gates pull requests only; an authorized 
 can bypass history CI (relevant especially to fresh databases). Path-scoped branch rules for
 `commerce/migrations/**`, preserving CMS writes to `content/**`, are a separate owner-controlled
 follow-up. No repository access rules are changed here.
+
+The ART-327 business sabotage harness rehashes SQL mutants only in its disposable scratch copy so
+that setup reaches the selected business assertion. It restores both SQL and scratch lock after
+each mutant. This does not change the committed lock or waive the DAG/history sabotage checks.
