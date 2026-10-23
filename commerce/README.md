@@ -401,9 +401,12 @@ new journal entry, SQL file and lock entry together; never rewrite a committed e
 and the migrator validate the complete directory before using it. The migrator also verifies
 that the database journal is a contiguous, byte-identical prefix before applying anything.
 
-CI checks every commit between the PR event's exact base and head SHAs, including edits later
-reverted. Before the first lock, the existing base SQL is the authority. A PR must contain the
-base commit (rebase after another migration lands). Run from `commerce/`:
+CI finds all merge bases of the event's exact base/head SHAs and checks every commit against
+**each parent** on both divergent branches, including intermediate edits later reverted and lock
+removal on a side branch. The latest base's migrations must also be an unchanged prefix of HEAD.
+Docs/CMS-only changes on main do not require a rebase. A missing or conflicting base migration
+fails with `MIGRATION_BASE_NOT_INCLUDED`: merge/rebase and synchronize migrations explicitly.
+Before the first lock, committed SQL bytes are the bootstrap authority. Run from `commerce/`:
 
 ```sh
 pnpm exec tsx scripts/check-migration-history.ts BASE_SHA HEAD_SHA
@@ -456,8 +459,19 @@ Deployment order:
    different legal releases. Migration, deployment, recovery qualification and sales admission are
    separate owner-authorized actions.
 
-CI builds the image with the PR head SHA, pins its Docker image ID, and runs
-`pnpm exec tsx scripts/qualify-schema-image.ts IMAGE`. A disposable internal Docker network contains
+Integration CI tests/builds the default merge-tree, labelled with its actual `github.sha`.
+The separate `commerce-image` job checks out the exact PR HEAD, verifies SHA and clean tracked
+source with `node scripts/check-image-source.mjs EXPECTED_HEAD_SHA`, builds the image with that SHA,
+pins its Docker image ID, and runs
+`pnpm exec tsx scripts/qualify-schema-image.ts IMAGE EXPECTED_HEAD_SHA`. The probe independently
+compares the image's immutable identity with the declared SHA. Merge-tree results are not proof
+for a differently labelled HEAD image. After merge, a release candidate needs separate qualification
+of the actual release SHA/tree/digest.
+
+The image probe intentionally asserts bundled schema **12**: when adding 0013, revise the baseline,
+forward fixture and compatibility qualification together; do not merely remove that assertion.
+
+ A disposable internal Docker network contains
 only PostgreSQL and that unchanged image, with no host mounts, published ports or external provider
 access. Its bundled schema stays 12 while an additive **test-only** schema 13 is applied. It proves
 readiness/identity, reservation, contract readback, order state, maintenance and negative/rollback
@@ -474,14 +488,17 @@ unavailable database refuses HTTP with 503 before route execution and skips work
 side effects. `/healthz` and `/identity` stay available for diagnosis. Known attestations from 0012
 must also exactly match the bundled lock's filename, checksum, runtime commits and evidence.
 The legal-release gate remains independent: existing obligations can still be reconciled/mailed
-when only the site's legal identity is unavailable or different.
+when only the site's legal identity is unavailable or different. Commerce `/readyz` reads schema
+once per request and then performs the independent legal check; draining remains NOT_READY. Admission
+has no READY cache. Arrival's per-attempt ceiling starts inside `attempt()`, after admission; the
+schema check can add scheduling latency but does not shorten that internal ceiling.
 
 Admission checks are not a lock against owner DDL and do not cancel work already admitted. Before
 **incompatible SQL**, including the first protocol upgrade:
 
 1. Remove traffic and disable automatic restart/deployment of all old commerce and Admin API replicas.
 2. Send SIGTERM (or SIGINT) to every instance. Shutdown refuses new admission, stops timers, waits for
-   admitted HTTP and worker operations and tracked after-response work, then closes pools and exits 0.
+   admitted HTTP and worker operations and pre-registered after-response work, then closes pools and exits 0.
    Set the supervisor's stop timeout to allow provider timeouts and the current worker batch to finish.
 3. Require successful graceful exit of every instance. Independently verify there are no old runtime
    sessions or outstanding external operations. A timeout, SIGKILL, failed exit or unknown provider
@@ -495,3 +512,17 @@ Compatible, qualified SQL may be applied while the explicitly approved old image
 new operations recheck schema admission, while already-admitted operations may finish. The negative
 integration tests check direct HTTP refusal, unchanged order/outbox state, zero outbound sends,
 per-step rechecks and drain races. These checks do not authorize production rollout.
+
+Arrival tasks are tracked when scheduled, **before** response close. SIGTERM/SIGINT stops registration
+of new work. A pre-registered ticket waits for response close and rechecks live schema even while
+ordinary admission returns RUNTIME_DRAINING, then completes its bounded attempt. Fresh proofs
+coalesced into an already registered task remain part of that drain obligation. There is no blanket
+schema bypass during shutdown. Tests deliver real SIGTERM before close, then verify exactly one
+claim and that drain waits; incompatible schema still prevents the claim. SIGKILL/crash/forced timeout
+can lose memory-only proofs. Drain guarantees the registered attempt on a compatible schema, not a
+remote ACK or durable delivery after an ambiguous transport failure.
+
+Residual repository risk: this workflow gates pull requests only; an authorized direct push to main
+can bypass history CI (relevant especially to fresh databases). Path-scoped branch rules for
+`commerce/migrations/**`, preserving CMS writes to `content/**`, are a separate owner-controlled
+follow-up. No repository access rules are changed here.

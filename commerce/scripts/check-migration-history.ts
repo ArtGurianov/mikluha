@@ -8,24 +8,41 @@ export function checkHistory(repo: string, base: string, head: string): void {
   // Resolve refs before passing them to revision expressions. CI supplies event SHAs, never main.
   base = git('rev-parse', '--verify', `${base}^{commit}`);
   head = git('rev-parse', '--verify', `${head}^{commit}`);
-  git('merge-base', '--is-ancestor', base, head);
+  const common = git('merge-base', '--all', base, head).split('\n');
   const prefix = 'commerce/migrations/';
-  // git show must preserve bytes (including the lack of a final newline).
-  function exactSnapshot(commit: string, requireLock: boolean) {
-    const names = git('ls-tree', '--name-only', `${commit}:${prefix.slice(0, -1)}`).split('\n');
-    return validateMigrations(file => execFileSync('git', ['-C', repo, 'show', `${commit}:${prefix}${file}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), names, requireLock);
+  const snapshots = new Map<string, { locked: boolean; migrations: ReturnType<typeof validateMigrations> }>();
+  // Preserve SQL bytes. Validate each snapshot once; lock inheritance is checked per DAG edge.
+  function snapshot(commit: string) {
+    let value = snapshots.get(commit);
+    if (!value) {
+      const names = git('ls-tree', '--name-only', `${commit}:${prefix.slice(0, -1)}`).split('\n');
+      value = { locked: names.includes('migration.lock'), migrations: validateMigrations(file =>
+        execFileSync('git', ['-C', repo, 'show', `${commit}:${prefix}${file}`],
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), names, false) };
+      snapshots.set(commit, value);
+    }
+    return value;
   }
-  let previous = exactSnapshot(base, false);
-  let locked = git('ls-tree', '--name-only', base, '--', `${prefix}migration.lock`) !== '';
-  for (const commit of git('rev-list', '--reverse', '--topo-order', `${base}..${head}`).split('\n').filter(Boolean)) {
+  for (const ancestor of common) snapshot(ancestor);
+  // Include both divergent branches. A topological listing is not a linear migration history:
+  // every child must preserve EVERY parent, including the second parent of a merge.
+  const commits = git('rev-list', '--reverse', '--topo-order', base, head, '--not', ...common).split('\n').filter(Boolean);
+  for (const commit of commits) {
     try {
-      const next = exactSnapshot(commit, locked);
-      assertAppendOnly(previous, next);
-      previous = next;
-      locked ||= git('ls-tree', '--name-only', commit, '--', `${prefix}migration.lock`) !== '';
+      const next = snapshot(commit);
+      const parents = git('show', '-s', '--format=%P', commit).split(' ').filter(Boolean);
+      for (const parent of parents) {
+        const previous = snapshot(parent);
+        if (previous.locked && !next.locked) throw new Error('MIGRATION_LOCK_REMOVED');
+        assertAppendOnly(previous.migrations, next.migrations);
+      }
     } catch (error) { throw new Error(`${commit}: ${String(error)}`); }
   }
-  exactSnapshot(head, true);
+  const proposed = snapshot(head);
+  if (!proposed.locked) throw new Error('MIGRATION_LOCK_REQUIRED');
+  try { assertAppendOnly(snapshot(base).migrations, proposed.migrations); }
+  catch (error) { throw new Error(`MIGRATION_BASE_NOT_INCLUDED: synchronize migrations with base ${base}: ${String(error)}`); }
+
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -16,6 +16,7 @@ import { schemaReadiness } from './dist/schema-readiness.js';
 import { createCommerceServer, readiness } from './dist/server.js';
 
 const identity = await readBuildIdentity('/app/identity/identity.json');
+assert.equal(identity.sourceCommit, process.env.QUALIFICATION_SOURCE_COMMIT, 'image must identify the declared exact HEAD');
 const migrations = readMigrations('./migrations');
 assert.equal(migrations.length, 12, 'review this qualification when the real baseline advances');
 const owner = new pg.Client({ connectionString: process.env.DATABASE_URL });

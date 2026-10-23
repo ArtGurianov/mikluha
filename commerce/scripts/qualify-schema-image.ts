@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fixtureCatalog } from '../test/helpers.js';
 
-const image = process.argv[2];
-if (!image) throw new Error('usage: qualify-schema-image.ts IMAGE');
+const [image, expectedSource] = process.argv.slice(2);
+if (!image || !/^[a-f0-9]{40}$/.test(expectedSource ?? '')) throw new Error('usage: qualify-schema-image.ts IMAGE EXPECTED_HEAD_SHA');
 const docker = (...args: string[]) => execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const digest = docker('image', 'inspect', '--format', '{{.Id}}', image);
 const suffix = randomBytes(5).toString('hex');
@@ -28,7 +28,7 @@ try {
   if (!ready) throw new Error('disposable PostgreSQL did not start');
   const result = spawnSync('docker', ['run', '--rm', '-i', '--name', runtime, '--network', network,
     '-e', `DATABASE_URL=postgres://postgres:isolated-test-only@${postgres}:5432/postgres`,
-    '-e', `QUALIFICATION_CATALOG=${serialized}`, digest, 'node', '--input-type=module'], {
+    '-e', `QUALIFICATION_CATALOG=${serialized}`, '-e', `QUALIFICATION_SOURCE_COMMIT=${expectedSource}`, digest, 'node', '--input-type=module'], {
     input: readFileSync(fileURLToPath(new URL('./schema-image-probe.mjs', import.meta.url))),
     encoding: 'utf8', timeout: 90_000, maxBuffer: 1024 * 1024,
   });

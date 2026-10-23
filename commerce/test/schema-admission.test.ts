@@ -64,7 +64,7 @@ test('NOT_READY refuses direct commerce/admin requests and workers without DB or
     () => maintain(db.pool, () => {}, new Date(now.getTime() + 31 * 60_000)),
     () => processEmailOutbox(db.pool, { send: async () => { remoteCalls++; return { kind: 'ACCEPTED', jobId: 'test-job' }; } }, () => {}, () => now),
   ], e => { throw e; });
-  const after = new AfterResponse(task => admission.run(task));
+  const after = new AfterResponse(admission);
   const attestation = (await db.owner.query('SELECT * FROM schema_migration_compatibility WHERE version = 12')).rows[0];
   try {
     // A live container previously ready at 12 must stop dispatching after history is damaged.
@@ -134,4 +134,27 @@ test('drain waits for admitted external work, refuses a pending check and stops 
   const pending = racing.run(async () => { steps++; });
   const stopped = racing.drain(); checking.resolve(); await stopped;
   assert.equal((await pending).reason, 'RUNTIME_DRAINING'); assert.equal(steps, 1);
+});
+
+test('commerce readyz reads schema once, preserves independent legal admission and refuses draining', async () => {
+  let queries = 0, legalChecks = 0, legalReady = true;
+  const pool = new Proxy(db.pool, { get(target, key) {
+    const value = Reflect.get(target, key);
+    if (key === 'query') return (...args: unknown[]) => { queries++; return value.apply(target, args); };
+    return typeof value === 'function' ? value.bind(target) : value;
+  } });
+  const admission = new SchemaAdmission(() => schemaReadiness(pool, build));
+  const server = createCommerceServer({ pool, admission, ...build, catalog: fixtureCatalog([]), startedAt: new Date(),
+    legalAdmission: { verify: async () => { legalChecks++; if (!legalReady) throw new Error('legal mismatch'); } } });
+  const port = await listen(server);
+  try {
+    assert.equal(await call(port, '/readyz'), 200);
+    assert.equal(queries, 1); assert.equal(legalChecks, 1);
+    legalReady = false;
+    assert.equal(await call(port, '/readyz'), 503);
+    assert.equal(queries, 2); assert.equal(legalChecks, 2);
+    await admission.drain();
+    assert.equal(await call(port, '/readyz'), 503);
+    assert.equal(queries, 2); assert.equal(legalChecks, 2);
+  } finally { await close(server); }
 });

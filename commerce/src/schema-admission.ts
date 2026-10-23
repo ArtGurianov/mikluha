@@ -29,6 +29,23 @@ export class SchemaAdmission {
     return pending.finally(() => { this.#pending.delete(pending); });
   }
 
+  /** Register an obligation before shutdown; wait for response close, then recheck live schema.
+   * Only registration before drain grants this ticket; ordinary run/status still refuse new work.
+   */
+  schedule(start: Promise<void>, work: () => Promise<unknown>): Promise<SchemaReadiness> {
+    if (this.#stopping) return Promise.resolve({ status: 'NOT_READY', reason: 'RUNTIME_DRAINING' });
+    const pending = (async () => {
+      await start;
+      let result: SchemaReadiness;
+      try { result = await this.check(); }
+      catch { return { status: 'NOT_READY' as const, reason: 'DATABASE_UNAVAILABLE' }; }
+      if (result.status === 'READY') await work();
+      return result;
+    })();
+    this.#pending.add(pending);
+    return pending.finally(() => { this.#pending.delete(pending); });
+  }
+
   async drain(): Promise<void> {
     this.#stopping = true;
     await Promise.allSettled([...this.#pending]);

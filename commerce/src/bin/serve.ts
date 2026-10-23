@@ -63,7 +63,7 @@ const checkout: CheckoutDeps = {
   },
 };
 const arrivals = new Arrivals({
-  after: new AfterResponse(task => admission.run(task)),
+  after: new AfterResponse(admission),
   refref: vnextApiBase === null ? null
     : new RefrefClient({ apiBase: vnextApiBase, apiKey: env('REFREF_API_KEY'), timeoutMs: ATTEMPT_CEILING_MS }),
   storefrontOrigin: commerceOrigin, log,
@@ -99,7 +99,7 @@ const stop = () => {
   stopping = true;
   clearInterval(maintenanceTimer);
   clearInterval(emailTimer);
-  maintenance.stop(); mail.stop();
+  maintenance.stop(); mail.stop(); arrivals.after.stop();
   const admitted = admission.drain(); // Synchronously refuses new HTTP/worker admission.
   const http = new Promise<void>((resolve) => { server.close(() => resolve()); });
   void Promise.all([http, admitted, maintenance.drain(), mail.drain()])

@@ -30,13 +30,14 @@
 // at most. Every state-changing request must come from the admin origin itself (Origin, and
 // Sec-Fetch-Site when sent) with a JSON body; a request for another host is refused outright.
 
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+
+import type pg from 'pg';
+
 import { MIGRATIONS_DIR } from '../config.js';
 import { readMigrations, type LockedMigration } from '../migration-integrity.js';
 import { SchemaAdmission } from '../schema-admission.js';
 import { schemaReadiness } from '../schema-readiness.js';
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-
-import type pg from 'pg';
 
 import {
   affectedOrders, changeNotices, createContentItem, createDeparture, createTour, EditorialError, publishContentItem,

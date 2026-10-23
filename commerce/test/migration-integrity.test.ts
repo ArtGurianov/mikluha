@@ -75,3 +75,68 @@ test('bootstrap locks the pre-lock SQL bytes and append-only migration succeeds'
     checkHistory(f.root, prelock, f.commit());
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
+
+function appendFixture(f: ReturnType<typeof fixture>) {
+  const journal = JSON.parse(readFileSync(join(f.dir, 'journal.json'), 'utf8'));
+  const lock = JSON.parse(readFileSync(join(f.dir, 'migration.lock'), 'utf8'));
+  const version = journal.length + 1, file = `${String(version).padStart(4, '0')}_forward.sql`;
+  const sql = 'SELECT 42;\n';
+  writeFileSync(join(f.dir, file), sql);
+  journal.push({ version, file });
+  lock.migrations.push({ version, file, checksum: createHash('sha256').update(sql).digest('hex'), compatibility: { runtimeCommits: [], evidence: 'DAG fixture' } });
+  writeFileSync(join(f.dir, 'journal.json'), JSON.stringify(journal));
+  writeFileSync(join(f.dir, 'migration.lock'), JSON.stringify(lock));
+}
+
+for (const kind of ['docs', 'cms']) {
+  test(`PR behind a ${kind} base commit passes without rebase`, () => {
+    const f = fixture();
+    try {
+      f.git('switch', '-qc', 'pr'); writeFileSync(join(f.root, 'feature.txt'), 'feature'); const head = f.commit();
+      f.git('switch', '-qc', 'upstream', f.base);
+      writeFileSync(join(f.root, kind === 'cms' ? 'catalog.yml' : 'README.md'), 'main changed');
+      const base = f.commit();
+      checkHistory(f.root, base, head);
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  });
+}
+
+test('a migration added to base requires explicit synchronization', () => {
+  const f = fixture();
+  try {
+    f.git('switch', '-qc', 'pr'); writeFileSync(join(f.root, 'feature.txt'), 'feature'); const head = f.commit();
+    f.git('switch', '-qc', 'upstream', f.base); appendFixture(f); const base = f.commit();
+    assert.throws(() => checkHistory(f.root, base, head), /MIGRATION_BASE_NOT_INCLUDED: synchronize migrations/);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('merging main with a new migration validates each parent rather than a linearized order', () => {
+  const f = fixture();
+  try {
+    f.git('switch', '-qc', 'pr'); writeFileSync(join(f.root, 'feature.txt'), 'feature'); f.commit();
+    f.git('switch', '-qc', 'upstream', f.base); appendFixture(f); const base = f.commit();
+    f.git('switch', 'pr'); f.git('merge', '--no-ff', '-m', 'merge upstream', base);
+    checkHistory(f.root, base, f.git('rev-parse', 'HEAD'));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('a lock deleted and restored on a side branch is refused even after merge', () => {
+  const f = fixture();
+  try {
+    f.git('switch', '-qc', 'side'); rmSync(join(f.dir, 'migration.lock')); f.commit();
+    f.git('checkout', f.base, '--', 'commerce/migrations/migration.lock'); const side = f.commit();
+    f.git('switch', '-qc', 'pr', f.base); writeFileSync(join(f.root, 'feature.txt'), 'feature'); f.commit();
+    f.git('merge', '--no-ff', '-m', 'merge side', side);
+    assert.throws(() => checkHistory(f.root, f.base, f.git('rev-parse', 'HEAD')), /MIGRATION_LOCK_REMOVED/);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('a merge cannot discard a migration from its second parent', () => {
+  const f = fixture();
+  try {
+    f.git('switch', '-qc', 'side'); appendFixture(f); const side = f.commit();
+    f.git('switch', '-qc', 'pr', f.base); writeFileSync(join(f.root, 'feature.txt'), 'feature'); f.commit();
+    f.git('merge', '-s', 'ours', '--no-ff', '-m', 'drop side migration', side);
+    assert.throws(() => checkHistory(f.root, f.base, f.git('rev-parse', 'HEAD')), /MIGRATION_HISTORY_REWRITTEN/);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});

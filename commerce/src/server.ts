@@ -7,7 +7,7 @@ import type pg from 'pg';
 import { MIGRATIONS_DIR } from './config.js';
 import { readMigrations, type LockedMigration } from './migration-integrity.js';
 import { SchemaAdmission } from './schema-admission.js';
-import { schemaReadiness } from './schema-readiness.js';
+import { schemaReadiness, type SchemaReadiness } from './schema-readiness.js';
 
 import type { Catalog } from './catalog.js';
 import type { LegalReleaseAdmission } from './legal-admission.js';
@@ -32,15 +32,20 @@ export async function readiness(deps: ServerDeps): Promise<{ status: 'READY' | '
     const result = await schemaReadiness(deps.pool, { schemaHead: deps.schemaHead,
       migrations: deps.migrations ?? readMigrations(MIGRATIONS_DIR), sourceCommit: deps.sourceCommit });
     if (result.status !== 'READY') return result;
-    const schema = result.schema!;
-    if (deps.legalAdmission !== undefined) {
-      try { await deps.legalAdmission.verify(); }
-      catch { return { status: 'NOT_READY', reason: 'LEGAL_RELEASE_NOT_ADMITTED', schema }; }
-    }
-    return { status: 'READY', schema };
+    return legalReadiness(deps, result);
   } catch {
     return { status: 'NOT_READY', reason: 'DATABASE_UNAVAILABLE' };
   }
+}
+
+/** Consume the schema result once; legal admission stays independent of schema admission. */
+async function legalReadiness(deps: ServerDeps, result: SchemaReadiness): Promise<SchemaReadiness> {
+  if (result.status !== 'READY') return result;
+  if (deps.legalAdmission !== undefined) {
+    try { await deps.legalAdmission.verify(); }
+    catch { return { status: 'NOT_READY', reason: 'LEGAL_RELEASE_NOT_ADMITTED', schema: result.schema! }; }
+  }
+  return result;
 }
 
 export type RouteHandler = (req: IncomingMessage, res: ServerResponse, url: URL) => Promise<boolean>;
@@ -59,7 +64,7 @@ export function createCommerceServer(deps: ServerDeps, routes?: RouteHandler): S
     const path = url.pathname;
     if (req.method === 'GET' && path === '/healthz') { send(200, { ok: true }); return; }
     if (req.method === 'GET' && path === '/readyz') {
-      admission.status().then(r => r.status === 'READY' ? readiness(deps) : r).then((r) => send(r.status === 'READY' ? 200 : 503, { service: SERVICE, ...r, sourceCommit: deps.sourceCommit }),
+      admission.status().then(r => legalReadiness(deps, r)).then((r) => send(r.status === 'READY' ? 200 : 503, { service: SERVICE, ...r, sourceCommit: deps.sourceCommit }),
         () => send(503, { service: SERVICE, status: 'NOT_READY' }));
       return;
     }
