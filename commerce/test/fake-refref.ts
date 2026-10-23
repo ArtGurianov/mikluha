@@ -15,6 +15,7 @@ export interface FakeState {
   attempt: Behaviour;
   session: Behaviour | 'READY' | 'PROCESSING' | 'FAILED';
   cancel: Behaviour | 'OK';
+  ack: Behaviour;
   /** What the attempt reads back as. */
   obligation: 'OUTSTANDING' | 'IN_PROGRESS' | 'SATISFIED' | 'LATE_PAYMENT';
   attemptStatus: 'OPEN' | 'SETTLED' | 'CANCELLED' | 'EXPIRED';
@@ -25,9 +26,11 @@ export interface FakeState {
 
 export class FakeRefref {
   readonly requests: Recorded[] = [];
+  /** Accepted fulfilment identities, including commits whose response was lost. */
+  readonly fulfillments = new Map<string, string>();
   readonly attempts = new Map<string, { id: string; key: string; body: string; snapshotHash: string;
     referralResolutionId: string; payable: number }>();
-  state: FakeState = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', obligation: 'IN_PROGRESS',
+  state: FakeState = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', ack: 'OK', obligation: 'IN_PROGRESS',
     attemptStatus: 'OPEN', paymentAmountDelta: 0, projectionMismatch: false, projectionResolutionMismatch: false };
   #server: Server | null = null;
   #gate: { arrived: () => void; released: Promise<void> } | null = null;
@@ -45,7 +48,7 @@ export class FakeRefref {
   }
   base = '';
 
-  constructor(readonly merchantId: string) {}
+  constructor(readonly merchantId: string, readonly now: () => Date = () => new Date()) {}
 
   async start(): Promise<void> {
     this.#server = createServer((req, res) => {
@@ -71,7 +74,7 @@ export class FakeRefref {
             attributionSource: this.state.discountKopecks > 0 ? 'GRANT' : 'UNATTRIBUTED', campaignId: null, termsVersionId: null,
             checkoutCodeOutcome: 'NONE', inputHash: this.inputHash(body.merchantOrderRef, body.lines), currency: 'RUB',
             lines: [{ lineRef: line.lineRef, eligible: this.state.discountKopecks > 0, referralDiscountAmountKopecks: this.state.discountKopecks }],
-            totals: {}, expiresAt: new Date(Date.now() + 30 * 60_000).toISOString() });
+            totals: {}, expiresAt: new Date(this.now().getTime() + 30 * 60_000).toISOString() });
         } else if (req.method === 'POST' && (m = /^\/integrations\/orders\/([^/]+)\/checkout-attempts$/.exec(path))) {
           const accept = (answer: boolean) => {
             const ref = m![1]!;
@@ -122,7 +125,14 @@ export class FakeRefref {
             send(200, this.projection(this.attempts.get(m![1]!)!));
           });
         } else if (req.method === 'POST' && /\/fulfillment-ack$/.test(path)) {
-          send(200, { checkoutAttemptId: 'x', status: 'DELIVERED' });
+          const accept = (answer: boolean) => {
+            const existing = this.fulfillments.get(key!);
+            if (existing !== undefined && existing !== text) { send(409, { error: { code: 'IDEMPOTENCY_KEY_CONFLICT' } }); return; }
+            this.fulfillments.set(key!, text);
+            if (answer) send(200, { checkoutAttemptId: 'x', status: 'DELIVERED' });
+          };
+          if (this.state.ack === 'ACCEPTED_TIMEOUT') accept(false);
+          else behave(this.state.ack, () => accept(true));
         } else {
           send(404, { error: { code: 'NOT_FOUND' } });
         }
@@ -141,7 +151,8 @@ export class FakeRefref {
     this.#gate = null;
     this.requests.length = 0;
     this.attempts.clear();
-    this.state = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', obligation: 'IN_PROGRESS',
+    this.fulfillments.clear();
+    this.state = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', ack: 'OK', obligation: 'IN_PROGRESS',
       attemptStatus: 'OPEN', paymentAmountDelta: 0, projectionMismatch: false, projectionResolutionMismatch: false };
   }
 

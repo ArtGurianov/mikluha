@@ -320,8 +320,43 @@ Admin API environment (Coolify, its own application; nothing here is shared with
 ```bash
 pnpm install --ignore-workspace          # in commerce/; it is not part of the site's workspace
 pnpm test                                # needs TEST_DATABASE_URL (a disposable Postgres superuser)
+pnpm run test:sabotage                    # ART-327; explicit loopback TEST_DATABASE_URL required
 MIGRATION_DATABASE_URL=… node dist/bin/migrate.js
 ```
+
+## Business-invariant sabotage (ART-327)
+
+`test/business-invariants.test.ts` runs 21 negative/replay scenarios against the
+real merchant code, migrated PostgreSQL and runtime/operator roles. Fixtures
+contain synthetic traveller data only. Refref uses a loopback HTTP server;
+Notisend uses injected responses. No live payment, email or EIS filing occurs.
+
+`pnpm run test:sabotage` copies source, migrations and tests into a temporary
+directory, disables 23 guards one at a time, and restores each before a green
+rerun. It requires a disposable PostgreSQL superuser endpoint on loopback;
+each subprocess creates and drops its own database. Working source and deployed
+schema are never modified. CI runs both the normal suite and sabotage step.
+Anchor drift, a surviving mutation, the wrong assertion, setup/compile errors,
+signals and timeouts fail the command. Only a named `BIxx` business assertion
+counts as a killed mutation.
+
+| Invariants | Guards exercised |
+| --- | --- |
+| BI01–BI03 | Stop-sales in both lock orders; no overselling the final seat |
+| BI04–BI05 | Stable attempt/body replay, ambiguous provider response, lost fulfilment ACK, one confirmation/outbox/EIS obligation under concurrent readbacks |
+| BI06–BI09 | Live legal descriptor, accepted document, browser and resolution identity |
+| BI10–BI12 | Receipt-email allowlist, immutable contract snapshot, exact paid amount |
+| BI13–BI16 | Ambiguous Notisend response, crashed worker lease, EIS filing replay and stale reviewed packet |
+| BI17–BI21 | Frozen offer/consent integrity, payment snapshot binding, immutable accepted application, unqualified refund policy stop |
+
+**Acceptance gaps:** no merchant refund adapter exists in this tree, so duplicate
+or lost-ACK refund execution is untested. Provider callbacks, actual payment and
+receipt deduplication belong to Refref; the fake server establishes merchant
+replay and payload behaviour only. EIS tests record manual filing evidence,
+without submitting to the external portal. ART-275/285/412 qualification and
+ART-362 checkout from immutable contracts remain separate. Keep ART-327 open
+until these remaining acceptance points have independent evidence; this suite
+is not production financial-flow admission.
 
 The booking switch (refref `ops/runbooks/stop-sales.md`), as root on the host. It runs in a
 **one-off container** from the service's own image, on its network, never by `docker exec` into the

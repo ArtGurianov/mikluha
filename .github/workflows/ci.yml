@@ -90,6 +90,9 @@ jobs:
 
       - run: pnpm test
 
+      - name: Business-invariant sabotage sensitivity (ART-327)
+        run: pnpm run test:sabotage
+
       - name: Image
         working-directory: .
         run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=${{ github.event.pull_request.head.sha }} -t mikluha-commerce:ci .
