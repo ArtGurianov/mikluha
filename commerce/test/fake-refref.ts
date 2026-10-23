@@ -28,6 +28,8 @@ export class FakeRefref {
   readonly requests: Recorded[] = [];
   /** Accepted fulfilment identities, including commits whose response was lost. */
   readonly fulfillments = new Map<string, string>();
+  /** Override only the ACK response to inject corrupt/foreign projections after remote commit. */
+  ackBody: unknown = undefined;
   readonly attempts = new Map<string, { id: string; key: string; body: string; snapshotHash: string;
     referralResolutionId: string; payable: number }>();
   state: FakeState = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', ack: 'OK', obligation: 'IN_PROGRESS',
@@ -124,12 +126,14 @@ export class FakeRefref {
             this.state.attemptStatus = 'CANCELLED';
             send(200, this.projection(this.attempts.get(m![1]!)!));
           });
-        } else if (req.method === 'POST' && /\/fulfillment-ack$/.test(path)) {
+        } else if (req.method === 'POST' && (m = /^\/integrations\/orders\/([^/]+)\/checkout-attempts\/([^/]+)\/fulfillment-ack$/.exec(path))) {
+          const attempt = this.attempts.get(m[1]!);
+          if (!attempt || attempt.id !== m[2]) { send(404, { error: { code: 'NOT_FOUND' } }); return; }
           const accept = (answer: boolean) => {
             const existing = this.fulfillments.get(key!);
             if (existing !== undefined && existing !== text) { send(409, { error: { code: 'IDEMPOTENCY_KEY_CONFLICT' } }); return; }
             this.fulfillments.set(key!, text);
-            if (answer) send(200, { checkoutAttemptId: 'x', status: 'DELIVERED' });
+            if (answer) send(200, this.ackBody === undefined ? { checkoutAttemptId: attempt.id, status: 'DELIVERED' } : this.ackBody);
           };
           if (this.state.ack === 'ACCEPTED_TIMEOUT') accept(false);
           else behave(this.state.ack, () => accept(true));
@@ -148,6 +152,7 @@ export class FakeRefref {
   }
 
   reset(): void {
+    this.ackBody = undefined;
     this.#gate = null;
     this.requests.length = 0;
     this.attempts.clear();

@@ -326,19 +326,35 @@ MIGRATION_DATABASE_URL=… node dist/bin/migrate.js
 
 ## Business-invariant sabotage (ART-327)
 
-`test/business-invariants.test.ts` runs 21 negative/replay scenarios against the
+`test/business-invariants.test.ts` runs 24 negative/replay scenarios against the
 real merchant code, migrated PostgreSQL and runtime/operator roles. Fixtures
 contain synthetic traveller data only. Refref uses a loopback HTTP server;
 Notisend uses injected responses. No live payment, email or EIS filing occurs.
 
 `pnpm run test:sabotage` copies source, migrations and tests into a temporary
-directory, disables 23 guards one at a time, and restores each before a green
+directory, disables 26 guards one at a time, and restores each before a green
 rerun. It requires a disposable PostgreSQL superuser endpoint on loopback;
-each subprocess creates and drops its own database. Working source and deployed
+each subprocess normally creates and drops its own database. Working source and deployed
 schema are never modified. CI runs both the normal suite and sabotage step.
 Anchor drift, a surviving mutation, the wrong assertion, setup/compile errors,
 signals and timeouts fail the command. Only a named `BIxx` business assertion
 counts as a killed mutation.
+
+A subprocess killed by the 30-second timeout may not run its `after()` hook;
+its test database can remain. Use a dedicated disposable PostgreSQL instance
+and remove the entire instance after the run, including on failure. For example,
+from `commerce/` (the subshell keeps its cleanup trap local):
+
+```bash
+(
+  set -e
+  docker run --rm -d --name mikluha-sabotage-pg -e POSTGRES_PASSWORD=synthetic-only \
+    -p 127.0.0.1:55433:5432 postgres:16-alpine
+  trap 'docker rm -f mikluha-sabotage-pg >/dev/null' EXIT
+  until docker exec mikluha-sabotage-pg pg_isready -U postgres >/dev/null; do sleep 1; done
+  TEST_DATABASE_URL=postgres://postgres:synthetic-only@127.0.0.1:55433/postgres pnpm run test:sabotage
+)
+```
 
 | Invariants | Guards exercised |
 | --- | --- |
@@ -348,6 +364,12 @@ counts as a killed mutation.
 | BI10–BI12 | Receipt-email allowlist, immutable contract snapshot, exact paid amount |
 | BI13–BI16 | Ambiguous Notisend response, crashed worker lease, EIS filing replay and stale reviewed packet |
 | BI17–BI21 | Frozen offer/consent integrity, payment snapshot binding, immutable accepted application, unqualified refund policy stop |
+| BI22–BI24 | Exact fulfilment ACK attempt identity, DELIVERED status, malformed bodies, and recovery after a correct ACK |
+
+Commerce fulfils a paid order only after HTTP 200 confirms its exact attempt as
+`DELIVERED`. An unusable ACK leaves it `PAID`, without a confirmation email, so
+reconciliation can retry the same ACK identity. The EIS filing obligation is
+already due from the independently proven payment and remains `EIS_PENDING`.
 
 **Acceptance gaps:** no merchant refund adapter exists in this tree, so duplicate
 or lost-ACK refund execution is untested. Provider callbacks, actual payment and

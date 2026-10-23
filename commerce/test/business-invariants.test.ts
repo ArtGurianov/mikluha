@@ -148,7 +148,14 @@ test('BI04 ambiguous provider creation and duplicate pay replay the identical fr
   fake.state.attempt = 'OK';
   fake.state.session = 'READY';
   const restarted = { ...deps, refref: new RefrefClient({ apiBase: fake.base, apiKey: 'synthetic-only', timeoutMs: 500 }) };
-  await Promise.all(Array.from({ length: 4 }, () => pay(restarted, order.ref, order.hash)));
+  const sessionsBefore = fake.calls(/\/payment-session$/).length;
+  assert.equal(sessionsBefore, 1, 'BI04: first ambiguous session was actually requested');
+  const outcomes = await Promise.allSettled(Array.from({ length: 4 }, () => pay(restarted, order.ref, order.hash)));
+  assert.ok(outcomes.every(r => r.status === 'fulfilled' && r.value.kind === 'REDIRECT'), 'BI04: all parallel retries return the live provider session');
+  const sessions = fake.calls(/\/payment-session$/);
+  assert.equal(sessions.length - sessionsBefore, outcomes.length, 'BI04: observe every parallel payment-session replay');
+  const attemptId = fake.attempts.get(order.ref)!.id;
+  assert.ok(sessions.every(r => r.path.includes(`/checkout-attempts/${attemptId}/`)), 'BI04: every session replay uses the same attempt');
   const attempts = fake.calls(/\/checkout-attempts$/);
   assert.ok(attempts.length >= 2, 'BI04: exercise actual replay');
   assert.equal(new Set(attempts.map(r => r.key)).size, 1, 'BI04: replay uses one idempotency identity');
@@ -349,4 +356,48 @@ test('BI21 unqualified expense refund policy cannot start new money', async () =
   assert.deepEqual(await pay({ ...deps, catalog: { ...catalog, refundPolicy: 'DOCUMENTED_EXPENSES' } }, order.ref, order.hash),
     { kind: 'STATUS', code: 'REFUND_WORKFLOW_UNQUALIFIED' }, 'BI21: unqualified refund workflow blocks money');
   assert.equal(fake.requests.length, before, 'BI21: no payment side effect');
+});
+
+async function rejectAcks(id: string, bodies: (attemptId: string) => readonly unknown[]) {
+  const order = await resolved();
+  await pay(deps, order.ref, order.hash);
+  const attemptId = fake.attempts.get(order.ref)!.id;
+  fake.state.obligation = 'SATISFIED';
+  for (const body of bodies(attemptId)) {
+    fake.ackBody = body;
+    await reconcileOrder(deps, order.ref);
+    assert.equal(await status(order.ref), 'PAID', `${id}: unusable ACK cannot fulfil locally`);
+    assert.equal((await db.owner.query('SELECT count(*) FROM email_outbox')).rows[0].count, '0', `${id}: no premature confirmation`);
+    assert.equal((await db.owner.query("SELECT count(*) FROM order_event WHERE event = 'FULFILLED'")).rows[0].count,
+      '0', `${id}: no fulfilled event`);
+    // EIS is due from the independently proven payment, even while the ACK is unusable.
+    assert.deepEqual((await db.owner.query('SELECT status FROM order_eis')).rows, [{ status: 'EIS_PENDING' }], `${id}: preserve the payment-created EIS obligation`);
+  }
+  assert.equal(fake.calls(/\/fulfillment-ack$/).length, bodies(attemptId).length, `${id}: every invalid ACK was exercised over HTTP`);
+  fake.ackBody = undefined;
+  const restarted = { ...deps, refref: new RefrefClient({ apiBase: fake.base, apiKey: 'synthetic-only' }) };
+  await reconcileOrder(restarted, order.ref);
+  await reconcileAll(restarted);
+  assert.equal(await status(order.ref), 'FULFILLED', `${id}: a later correct ACK recovers the paid order`);
+  assert.equal((await db.owner.query('SELECT count(*) FROM email_outbox')).rows[0].count, '1', `${id}: recovery confirms once`);
+  assert.equal((await db.owner.query('SELECT count(*) FROM order_eis')).rows[0].count, '1', `${id}: recovery never duplicates EIS`);
+  assert.deepEqual([...new Set(fake.calls(/\/fulfillment-ack$/).map(r => r.key))], [`mk-fulfil:${order.ref}`], `${id}: recovery keeps the ACK identity`);
+}
+
+test('BI22 foreign or malformed fulfilment ACK identity cannot confirm the order', async () => {
+  await rejectAcks('BI22', () => [
+    { checkoutAttemptId: '99999999-9999-4999-8999-999999999999', status: 'DELIVERED' },
+    { checkoutAttemptId: 'x', status: 'DELIVERED' },
+  ]);
+});
+
+test('BI23 a non-delivered fulfilment ACK cannot confirm the order', async () => {
+  await rejectAcks('BI23', attemptId => ['NOT_READY', 'READY', 'FAILED', 'ACTION_REQUIRED']
+    .map(status => ({ checkoutAttemptId: attemptId, status })));
+});
+
+test('BI24 malformed fulfilment ACK bodies cannot confirm the order', async () => {
+  await rejectAcks('BI24', attemptId => [null, {}, [], [attemptId, 'DELIVERED'], 'DELIVERED', true, 42,
+    { checkoutAttemptId: attemptId }, { status: 'DELIVERED' },
+    { checkoutAttemptId: [attemptId], status: 'DELIVERED' }, { checkoutAttemptId: attemptId, status: null }]);
 });

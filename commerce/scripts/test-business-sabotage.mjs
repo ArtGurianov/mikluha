@@ -23,7 +23,7 @@ const mutants = [
   ['BI02', 'freeze sales check', [edit(checkout, "if (open.rows[0]?.open !== true) { await client.query('ROLLBACK'); return { kind: 'STATUS', code: 'SALES_CLOSED' }; }", 'if (false) {}')]],
   ['BI03', 'departure capacity lock', [edit('src/orders.ts', "await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`departure:${departure.slug}`]);", '// departure lock removed')]],
   ['BI04', 'stable attempt identity', [edit(checkout, '`mk-attempt:${o.order_ref}`', "`mk-attempt:${o.order_ref}:${randomBytes(4).toString('hex')}`")]],
-  ['BI05', 'fulfilment ACK admission', [edit(checkout, "if (ack.kind === 'ANSWERED' && ack.status === 200)", 'if (true)')]],
+  ['BI05', 'fulfilment ACK admission', [edit(checkout, "if (ack.kind === 'ANSWERED' && ack.status === 200 && deliveredAcknowledgment(ack.body, attemptId))", 'if (true)')]],
   ['BI05', 'confirmation compare-and-set result', [edit(checkout, "if (changed.rowCount !== 1) { await client.query('ROLLBACK'); return false; }", 'if (false) {}')]],
   ['BI06', 'live legal admission', [edit(checkout, 'if (deps.legalAdmission !== undefined)', 'if (false)')]],
   ['BI07', 'accepted document hash', [edit(checkout, 'if (zayavka.sha256 !== acceptedZayavka)', 'if (false)')]],
@@ -44,6 +44,10 @@ const mutants = [
   ['BI20', 'immutable accepted document trigger', [edit('migrations/0003_tourists_and_contract.sql',
     'CREATE TRIGGER trg_order_document_frozen BEFORE UPDATE ON order_document\n  FOR EACH ROW EXECUTE FUNCTION fn_order_document_frozen();', '-- frozen document trigger removed')]],
   ['BI21', 'refund qualification gate', [edit(checkout, 'if (!refundWorkflowQualified(deps.catalog))', 'if (false)')]],
+  ['BI22', 'fulfilment ACK attempt identity', [edit(checkout, 'body.checkoutAttemptId === attemptId', 'true')]],
+  ['BI23', 'fulfilment ACK delivered status', [edit(checkout, "body.status === 'DELIVERED'", 'true')]],
+  ['BI24', 'fulfilment ACK body validation', [edit(checkout,
+    "return body !== null && typeof body === 'object' && !Array.isArray(body)\n    && 'checkoutAttemptId' in body && body.checkoutAttemptId === attemptId\n    && 'status' in body && body.status === 'DELIVERED';", 'return true;')]],
 ];
 
 const scratch = mkdtempSync(join(tmpdir(), 'mikluha-art327-'));
@@ -66,8 +70,8 @@ function green(result, label, count) {
 try {
   for (const entry of ['src', 'test', 'migrations', 'package.json']) cpSync(join(root, entry), join(scratch, entry), { recursive: true });
   symlinkSync(join(root, 'node_modules'), join(scratch, 'node_modules'), 'dir');
-  green(run(), 'baseline', 21);
-  console.log('baseline: 21 business invariants PASS');
+  green(run(), 'baseline', 24);
+  console.log('baseline: 24 business invariants PASS');
   for (const [id, label, edits] of mutants) {
     const originals = new Map();
     try {

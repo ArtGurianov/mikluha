@@ -31,3 +31,21 @@ payment/receipt deduplication cannot be qualified by a fake Refref. Those remain
 ART-263/268/275/285/412 and ART-327 acceptance gaps. ART-362's future checkout from
 immutable contracts is also independent. This PR neither installs nor admits a
 financial flow, and ART-327 must not be marked Done on this evidence alone.
+
+## PR #47 review follow-up
+
+The review confirmed a pre-existing runtime gap: HTTP 200 alone admitted local
+fulfilment. Validate the ACK body at the fulfilment decision: an object with
+`checkoutAttemptId === attemptId` and `status === 'DELIVERED'`. Keep the HTTP
+client's body `unknown` to avoid treating a TypeScript type as runtime validation.
+The fake must return the real attempt UUID and support corrupt ACK responses.
+BI22–BI24 cover foreign/malformed IDs, non-delivered statuses and malformed
+bodies, each followed by recovery on a valid ACK. Separate mutations remove the
+identity, status and body guards. BI05 retains transport/lost-ACK coverage.
+
+The rejected ACK leaves `PAID` and queues no confirmation. The EIS obligation
+belongs to the proven payment, independently of ACK, and must stay pending.
+BI04 records all concurrent pay outcomes and counts same-attempt session calls.
+Document disposable-server cleanup on timeout: forced termination cannot promise
+that the child's database teardown hook ran. No production fault hooks or schema
+changes are needed.

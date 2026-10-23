@@ -520,10 +520,17 @@ async function markFulfilledAndQueueEmail(deps: CheckoutDeps, o: OrderRow, now: 
   }
 }
 
+/** Refref's 200 must confirm this exact attempt as DELIVERED, not merely accept the HTTP call. */
+function deliveredAcknowledgment(body: unknown, attemptId: string): boolean {
+  return body !== null && typeof body === 'object' && !Array.isArray(body)
+    && 'checkoutAttemptId' in body && body.checkoutAttemptId === attemptId
+    && 'status' in body && body.status === 'DELIVERED';
+}
+
 /** The booking is confirmed: tell Refref (once, idempotently), then fulfil and enqueue locally. */
 async function fulfil(deps: CheckoutDeps, o: OrderRow, attemptId: string, now: Date): Promise<void> {
   const ack = await deps.refref.acknowledgeFulfillment(o.order_ref, attemptId, `mk-fulfil:${o.order_ref}`);
-  if (ack.kind === 'ANSWERED' && ack.status === 200) {
+  if (ack.kind === 'ANSWERED' && ack.status === 200 && deliveredAcknowledgment(ack.body, attemptId)) {
     if (await markFulfilledAndQueueEmail(deps, o, now)) deps.log('fulfilled', { orderRef: o.order_ref });
   }
 }
