@@ -32,6 +32,7 @@
 
 import { MIGRATIONS_DIR } from '../config.js';
 import { readMigrations, type LockedMigration } from '../migration-integrity.js';
+import { SchemaAdmission } from '../schema-admission.js';
 import { schemaReadiness } from '../schema-readiness.js';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
@@ -60,6 +61,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export interface AdminDeps {
   readonly pool: pg.Pool;
+  readonly admission?: SchemaAdmission;
   readonly publisherPool: pg.Pool;
   readonly totpKey: Buffer;
   readonly auditKeys: AuditKeyring;
@@ -179,12 +181,9 @@ export function createAdminServer(deps: AdminDeps): Server {
   const keys = adminKeys(deps.totpKey, deps.auditKeys);
   const loginLimit = deps.loginLimit ?? new GlobalLoginLimit();
 
-  async function readiness() {
-    try {
-      return await schemaReadiness(deps.pool, { schemaHead: deps.schemaHead,
-        migrations: deps.migrations ?? readMigrations(MIGRATIONS_DIR), sourceCommit: deps.sourceCommit });
-    } catch { return { status: 'NOT_READY', reason: 'DATABASE_UNAVAILABLE' }; }
-  }
+  const admission = deps.admission ?? new SchemaAdmission(() => schemaReadiness(deps.pool, {
+    schemaHead: deps.schemaHead, migrations: deps.migrations ?? readMigrations(MIGRATIONS_DIR), sourceCommit: deps.sourceCommit,
+  }));
 
   /** Same-origin JSON only; checked before a body is read or a session is looked at. */
   function guardWrite(req: IncomingMessage): void {
@@ -521,7 +520,7 @@ export function createAdminServer(deps: AdminDeps): Server {
     const path = url.pathname;
     if (req.method === 'GET' && path === '/healthz') { send(res, 200, { ok: true }); return; }
     if (req.method === 'GET' && path === '/readyz') {
-      void readiness().then(r => send(res, r.status === 'READY' ? 200 : 503, { service: ADMIN_SERVICE, ...r, sourceCommit: deps.sourceCommit }));
+      void admission.status().then(r => send(res, r.status === 'READY' ? 200 : 503, { service: ADMIN_SERVICE, ...r, sourceCommit: deps.sourceCommit }));
       return;
     }
     if (req.method === 'GET' && path === '/identity') {
@@ -531,7 +530,9 @@ export function createAdminServer(deps: AdminDeps): Server {
     // Only the Control Room's own host, through its proxy: never book.* or the public site.
     if (!path.startsWith('/api/')) { send(res, 404, { error: 'NOT_FOUND' }); return; }
     if (req.headers.host !== host) { send(res, 421, { error: 'MISDIRECTED_REQUEST' }); return; }
-    route(req, res, url).catch((e: unknown) => {
+    admission.run(() => route(req, res, url)).then(r => {
+      if (r.status !== 'READY') send(res, 503, { error: 'SCHEMA_NOT_ADMITTED', reason: r.reason });
+    }).catch((e: unknown) => {
       if (e instanceof HttpError) { send(res, e.status, { error: e.code }, e.headers); return; }
       deps.log('admin_request_failed', { error: e instanceof Error ? e.name : 'unknown' });
       send(res, 500, { error: 'INTERNAL' });

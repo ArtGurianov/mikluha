@@ -15,7 +15,7 @@
 
 import pg from 'pg';
 
-import { ATTEMPT_CEILING_MS, Arrivals } from '../arrival.js';
+import { ATTEMPT_CEILING_MS, AfterResponse, Arrivals } from '../arrival.js';
 import { PRODUCTION_BUILD_IDENTITY_FILE, readBuildIdentity } from '../build-identity.js';
 import { assertProductionContent, loadCatalog } from '../catalog.js';
 import { reconcileAll, type CheckoutDeps } from '../checkout.js';
@@ -26,6 +26,8 @@ import { LiveSiteReleaseAdmission } from '../legal-admission.js';
 import { jsonLogger } from '../log.js';
 import { readMigrations } from '../migration-integrity.js';
 import { maintain } from '../orders.js';
+import { SchemaAdmission, schemaWorker } from '../schema-admission.js';
+import { schemaReadiness } from '../schema-readiness.js';
 import { RefrefClient } from '../refref.js';
 import { createCommerceServer, SERVICE } from '../server.js';
 import { createWebHandler } from '../web.js';
@@ -48,6 +50,9 @@ const legalAdmission = which === 'PRODUCTION'
 if (legalAdmission !== undefined) await legalAdmission.verify();
 const migrations = readMigrations(MIGRATIONS_DIR);
 const pool = new pg.Pool({ connectionString: env('DATABASE_URL'), max: 10 });
+const admission = new SchemaAdmission(() => schemaReadiness(pool, {
+  schemaHead: migrations.length, migrations, sourceCommit: identity.sourceCommit,
+}));
 const checkout: CheckoutDeps = {
   pool, catalog, log,
   ...(legalAdmission ? { legalAdmission } : {}),
@@ -58,6 +63,7 @@ const checkout: CheckoutDeps = {
   },
 };
 const arrivals = new Arrivals({
+  after: new AfterResponse(task => admission.run(task)),
   refref: vnextApiBase === null ? null
     : new RefrefClient({ apiBase: vnextApiBase, apiKey: env('REFREF_API_KEY'), timeoutMs: ATTEMPT_CEILING_MS }),
   storefrontOrigin: commerceOrigin, log,
@@ -68,7 +74,7 @@ const email = new NotisendClient({
   ...(process.env.NOTISEND_REPLY_TO ? { replyTo: process.env.NOTISEND_REPLY_TO } : {}),
 });
 const server = createCommerceServer({
-  pool, catalog, schemaHead: migrations.length, migrations,
+  pool, catalog, admission, schemaHead: migrations.length, migrations,
   sourceCommit: identity.sourceCommit, startedAt: new Date(), ...(legalAdmission ? { legalAdmission } : {}),
   onError: (e) => log('request_failed', { error: e instanceof Error ? e.name : 'unknown' }),
 }, createWebHandler(checkout, which === 'STAGING', undefined, arrivals));
@@ -76,35 +82,31 @@ const port = Number(process.env.PORT ?? 3000);
 server.listen(port, '0.0.0.0', () => log('listening', { port, environment: which, departures: catalog.departures.size,
   arrivalExchange: vnextApiBase !== null }));
 
-let maintenanceRunning = false;
-const maintenanceTick = () => {
-  if (maintenanceRunning) return;
-  maintenanceRunning = true;
-  // Read-back may fulfil and enqueue; the independent mail worker will see it within ten seconds.
-  reconcileAll(checkout)
-    .then(() => maintain(pool, log))
-    .catch((e: unknown) => log('maintenance_failed', { error: e instanceof Error ? e.name : 'unknown' }))
-    .finally(() => { maintenanceRunning = false; });
-};
-let emailRunning = false;
-const emailTick = () => {
-  if (emailRunning) return;
-  emailRunning = true;
-  processEmailOutbox(pool, email, log)
-    .then(() => processExecutionNotices(pool, email, log))
-    .catch((e: unknown) => log('email_worker_failed', { error: e instanceof Error ? e.name : 'unknown' }))
-    .finally(() => { emailRunning = false; });
-};
-const maintenanceTimer = setInterval(maintenanceTick, 60_000);
-const emailTimer = setInterval(emailTick, 10_000);
-maintenanceTick();
-emailTick();
+const maintenance = schemaWorker(admission, [
+  () => reconcileAll(checkout), () => maintain(pool, log),
+], (e) => log('maintenance_failed', { error: e instanceof Error ? e.name : 'unknown' }));
+const mail = schemaWorker(admission, [
+  () => processEmailOutbox(pool, email, log), () => processExecutionNotices(pool, email, log),
+], (e) => log('email_worker_failed', { error: e instanceof Error ? e.name : 'unknown' }));
+const maintenanceTimer = setInterval(() => { void maintenance.tick(); }, 60_000);
+const emailTimer = setInterval(() => { void mail.tick(); }, 10_000);
+void maintenance.tick();
+void mail.tick();
 
+let stopping = false;
 const stop = () => {
+  if (stopping) return;
+  stopping = true;
   clearInterval(maintenanceTimer);
   clearInterval(emailTimer);
-  // After-response claims are part of the requests they follow: let them finish (each ≤ 500 ms).
-  server.close(() => { arrivals.after.drain().then(() => pool.end()).finally(() => process.exit(0)); });
+  maintenance.stop(); mail.stop();
+  const admitted = admission.drain(); // Synchronously refuses new HTTP/worker admission.
+  const http = new Promise<void>((resolve) => { server.close(() => resolve()); });
+  void Promise.all([http, admitted, maintenance.drain(), mail.drain()])
+    .then(() => arrivals.after.drain())
+    .then(() => pool.end())
+    .then(() => process.exit(0))
+    .catch(() => { log('shutdown_failed', {}); process.exit(1); });
 };
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);

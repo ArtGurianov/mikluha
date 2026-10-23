@@ -6,6 +6,7 @@ import type pg from 'pg';
 
 import { MIGRATIONS_DIR } from './config.js';
 import { readMigrations, type LockedMigration } from './migration-integrity.js';
+import { SchemaAdmission } from './schema-admission.js';
 import { schemaReadiness } from './schema-readiness.js';
 
 import type { Catalog } from './catalog.js';
@@ -15,6 +16,7 @@ export const SERVICE = 'mikluha-commerce';
 
 export interface ServerDeps {
   readonly pool: pg.Pool;
+  readonly admission?: SchemaAdmission;
   readonly catalog: Catalog;
   readonly schemaHead: number;
   readonly migrations?: readonly LockedMigration[];
@@ -44,6 +46,9 @@ export async function readiness(deps: ServerDeps): Promise<{ status: 'READY' | '
 export type RouteHandler = (req: IncomingMessage, res: ServerResponse, url: URL) => Promise<boolean>;
 
 export function createCommerceServer(deps: ServerDeps, routes?: RouteHandler): Server {
+  const admission = deps.admission ?? new SchemaAdmission(() => schemaReadiness(deps.pool, {
+    schemaHead: deps.schemaHead, migrations: deps.migrations ?? readMigrations(MIGRATIONS_DIR), sourceCommit: deps.sourceCommit,
+  }));
   return createServer((req, res) => {
     const send = (status: number, body: unknown) => {
       if (res.headersSent) { res.end(); return; }
@@ -54,7 +59,7 @@ export function createCommerceServer(deps: ServerDeps, routes?: RouteHandler): S
     const path = url.pathname;
     if (req.method === 'GET' && path === '/healthz') { send(200, { ok: true }); return; }
     if (req.method === 'GET' && path === '/readyz') {
-      readiness(deps).then((r) => send(r.status === 'READY' ? 200 : 503, { service: SERVICE, ...r, sourceCommit: deps.sourceCommit }),
+      admission.status().then(r => r.status === 'READY' ? readiness(deps) : r).then((r) => send(r.status === 'READY' ? 200 : 503, { service: SERVICE, ...r, sourceCommit: deps.sourceCommit }),
         () => send(503, { service: SERVICE, status: 'NOT_READY' }));
       return;
     }
@@ -65,7 +70,10 @@ export function createCommerceServer(deps: ServerDeps, routes?: RouteHandler): S
       return;
     }
     if (routes === undefined) { send(404, { error: 'NOT_FOUND' }); return; }
-    routes(req, res, url).then((handled) => { if (!handled) send(404, { error: 'NOT_FOUND' }); },
-      (e: unknown) => { deps.onError?.(e); send(500, { error: 'INTERNAL' }); });
+    admission.run(async () => {
+      if (!await routes(req, res, url)) send(404, { error: 'NOT_FOUND' });
+    }).then(r => {
+      if (r.status !== 'READY') send(503, { error: 'SCHEMA_NOT_ADMITTED', reason: r.reason });
+    }, (e: unknown) => { deps.onError?.(e); send(500, { error: 'INTERNAL' }); });
   });
 }

@@ -144,13 +144,15 @@ export interface ArrivalClaimer {
 export class AfterResponse {
   readonly #tasks = new Set<Promise<void>>();
 
+  constructor(private readonly admit?: (task: () => Promise<void>) => Promise<unknown>) {}
+
   /** Start `task` once the response has been handed over (or the client went away). */
-  schedule(res: ServerResponse, task: () => Promise<void>): void {
-    res.once('close', () => this.run(task));
+  schedule(res: ServerResponse, task: () => Promise<void>, settled?: () => void): void {
+    res.once('close', () => { void this.run(task).finally(settled); });
   }
 
   run(task: () => Promise<void>): Promise<void> {
-    const p = task().catch(() => undefined).finally(() => { this.#tasks.delete(p); });
+    const p = (this.admit ? this.admit(task).then(() => undefined) : task()).catch(() => undefined).finally(() => { this.#tasks.delete(p); });
     this.#tasks.add(p);
     return p;
   }
@@ -288,10 +290,7 @@ export class Arrivals {
     const c = this.#contexts.get(contextId);
     if (c === undefined || c.scheduled || c.inFlight !== null || !this.hasPending(contextId)) return;
     c.scheduled = true;
-    this.after.schedule(res, () => {
-      c.scheduled = false;
-      return this.attempt(contextId, ATTEMPT_CEILING_MS, false);
-    });
+    this.after.schedule(res, () => this.attempt(contextId, ATTEMPT_CEILING_MS, false), () => { c.scheduled = false; });
   }
 
   /**

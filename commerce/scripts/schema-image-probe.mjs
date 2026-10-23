@@ -11,6 +11,8 @@ import { migrate } from './dist/migrate.js';
 import { contractSnapshotIntact } from './dist/contract-snapshot.js';
 import { reserve, setSalesOpen, maintain } from './dist/orders.js';
 import { issueState, ownsOrder } from './dist/checkout.js';
+import { SchemaAdmission, schemaWorker } from './dist/schema-admission.js';
+import { schemaReadiness } from './dist/schema-readiness.js';
 import { createCommerceServer, readiness } from './dist/server.js';
 
 const identity = await readBuildIdentity('/app/identity/identity.json');
@@ -31,10 +33,17 @@ try {
   const raw = JSON.parse(process.env.QUALIFICATION_CATALOG);
   const catalog = { ...raw, departures: new Map(raw.departures) };
   const deps = { pool, catalog, migrations, schemaHead: migrations.length, sourceCommit: identity.sourceCommit, startedAt: new Date() };
-  server = createCommerceServer(deps);
+  const admission = new SchemaAdmission(() => schemaReadiness(pool, deps));
+  let routeCalls = 0, workerCalls = 0;
+  server = createCommerceServer({ ...deps, admission }, async (_req, res) => {
+    routeCalls++; res.end('operation'); return true;
+  });
+  const worker = schemaWorker(admission, [async () => { workerCalls++; }], error => { throw error; });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   assert.equal((await fetch(`${base}/readyz`)).status, 200);
+  assert.equal((await fetch(`${base}/operation`, { method: 'POST' })).status, 200);
+  await worker.tick(); assert.equal(workerCalls, 1);
   const before = (await owner.query('SELECT * FROM schema_migrations ORDER BY version')).rows;
   cpSync('./migrations', dir, { recursive: true });
   const entry = { version: 13, file: '0013_additive_probe.sql' };
@@ -51,6 +60,8 @@ try {
   // No image rebuild or new manifest is supplied to this server after the migration.
   const ready = await (await fetch(`${base}/readyz`)).json();
   assert.equal(ready.status, 'READY'); assert.equal(ready.schema, 13); assert.equal(ready.sourceCommit, identity.sourceCommit);
+  assert.equal((await fetch(`${base}/operation`, { method: 'POST' })).status, 200);
+  await worker.tick(); assert.equal(workerCalls, 2);
   const served = await (await fetch(`${base}/identity`)).json();
   assert.equal(served.schemaHead, 12); assert.equal(served.sourceCommit, identity.sourceCommit);
   await setSalesOpen(operator, true, 'isolated-test', 'synthetic fixture only');
@@ -76,8 +87,15 @@ try {
   assert.equal((await readiness(deps)).status, 'READY', 'old runtime rollback does not require reversing compatible SQL');
   await owner.query('DELETE FROM schema_migration_compatibility WHERE version = 13');
   assert.equal((await readiness(deps)).reason, 'SCHEMA_AHEAD_UNKNOWN');
+  assert.equal((await fetch(`${base}/operation`, { method: 'POST' })).status, 503);
+  await worker.tick(); assert.equal(routeCalls, 2); assert.equal(workerCalls, 2);
   await owner.query('INSERT INTO schema_migration_compatibility VALUES (13, $1, $2, $3, $4)', [entry.file, checksum, [], 'incompatible fixture']);
   assert.equal((await readiness(deps)).reason, 'SCHEMA_AHEAD_INCOMPATIBLE');
+  assert.equal((await fetch(`${base}/operation`, { method: 'POST' })).status, 503);
+  await worker.tick(); assert.equal(routeCalls, 2); assert.equal(workerCalls, 2);
+  await owner.query('DELETE FROM schema_migration_compatibility WHERE version = 12');
+  assert.equal((await readiness(deps)).reason, 'SCHEMA_ATTESTATION_MISMATCH');
+  await admission.drain(); await worker.drain();
   console.log(`SCHEMA_OLD_IMAGE=PASS source=${identity.sourceCommit} bundled=12 database=13 reserve=PASS contract=PASS state=PASS maintenance=PASS negatives=PASS`);
 } finally {
   if (server) { server.closeAllConnections(); await new Promise(r => server.close(r)); }

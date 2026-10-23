@@ -103,3 +103,26 @@ test('compatibility classification cannot change after it is applied', async () 
   writeFileSync(path, JSON.stringify(lock));
   await assert.rejects(migrate(db.owner, dir), /MIGRATION_COMPATIBILITY_CHANGED/);
 });
+
+
+for (const mutation of ['delete', 'file', 'checksum', 'runtime_commits', 'evidence'] as const) {
+  test(`known 0012 attestation ${mutation} fails in runtime and migrator at head and ahead`, async () => {
+    await forward();
+    if (mutation === 'delete') await db.owner.query('DELETE FROM schema_migration_compatibility WHERE version = 12');
+    if (mutation === 'file') await db.owner.query("UPDATE schema_migration_compatibility SET file = 'renamed.sql' WHERE version = 12");
+    if (mutation === 'checksum') await db.owner.query("UPDATE schema_migration_compatibility SET checksum = repeat('b', 64) WHERE version = 12");
+    if (mutation === 'runtime_commits') await db.owner.query('UPDATE schema_migration_compatibility SET runtime_commits = ARRAY[$1] WHERE version = 12', [SHA]);
+    if (mutation === 'evidence') await db.owner.query("UPDATE schema_migration_compatibility SET evidence = 'changed' WHERE version = 12");
+    for (const pool of [db.pool, db.admin]) {
+      assert.equal((await schemaReadiness(pool, build)).reason, 'SCHEMA_ATTESTATION_MISMATCH');
+      const newMigrations = readMigrations(dir);
+      assert.equal((await schemaReadiness(pool, { ...build, migrations: newMigrations, schemaHead: newMigrations.length })).reason, 'SCHEMA_ATTESTATION_MISMATCH');
+    }
+    await assert.rejects(migrate(db.owner, dir), /MIGRATION_COMPATIBILITY_CHANGED/);
+  });
+}
+
+test('missing 0012 attestation is refused on exact schema 12', async () => {
+  await db.owner.query('DELETE FROM schema_migration_compatibility WHERE version = 12');
+  assert.equal((await check()).reason, 'SCHEMA_ATTESTATION_MISMATCH');
+});

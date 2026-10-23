@@ -464,3 +464,34 @@ readiness/identity, reservation, contract readback, order state, maintenance and
 cases. The fixture proves this protocol for the tested operations; it does not qualify arbitrary
 future SQL, real payments, a production deployment or recovery. PostgreSQL integration tests also
 exercise the Admin role, immutable classification, failed-SQL rollback and tampering.
+
+### Operation admission and incompatible migration drain
+
+`/readyz` is a routing signal. Separately, schema admission checks **each** commerce/Admin application
+request and **each** background step (reconciliation, maintenance, email outbox, execution notices,
+Admin throttle pruning and after-response arrival claims). There is no cached READY. A mismatch or
+unavailable database refuses HTTP with 503 before route execution and skips worker callbacks without
+side effects. `/healthz` and `/identity` stay available for diagnosis. Known attestations from 0012
+must also exactly match the bundled lock's filename, checksum, runtime commits and evidence.
+The legal-release gate remains independent: existing obligations can still be reconciled/mailed
+when only the site's legal identity is unavailable or different.
+
+Admission checks are not a lock against owner DDL and do not cancel work already admitted. Before
+**incompatible SQL**, including the first protocol upgrade:
+
+1. Remove traffic and disable automatic restart/deployment of all old commerce and Admin API replicas.
+2. Send SIGTERM (or SIGINT) to every instance. Shutdown refuses new admission, stops timers, waits for
+   admitted HTTP and worker operations and tracked after-response work, then closes pools and exits 0.
+   Set the supervisor's stop timeout to allow provider timeouts and the current worker batch to finish.
+3. Require successful graceful exit of every instance. Independently verify there are no old runtime
+   sessions or outstanding external operations. A timeout, SIGKILL, failed exit or unknown provider
+   outcome is **not** a successful drain: reconcile/resolve it before applying SQL. Do not use a 503
+   response alone as evidence that runtime work has stopped.
+4. Take/verify the required recovery evidence, apply migrations as owner, and start only the admitted
+   exact-SHA runtime. Recheck identity, schema and legal readiness before restoring traffic. Rollback
+   to a schema-incompatible image requires its own coordinated recovery plan, never journal deletion.
+
+Compatible, qualified SQL may be applied while the explicitly approved old image is operating;
+new operations recheck schema admission, while already-admitted operations may finish. The negative
+integration tests check direct HTTP refusal, unchanged order/outbox state, zero outbound sends,
+per-step rechecks and drain races. These checks do not authorize production rollout.
