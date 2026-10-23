@@ -17,6 +17,8 @@ export interface RefrefConfig {
   readonly apiBase: string;
   readonly apiKey: string;
   readonly timeoutMs?: number;
+  /** Absolute wall-clock limit, including response body streaming. */
+  readonly deadlineMs?: number;
 }
 
 export interface ResolutionLineBody {
@@ -62,11 +64,13 @@ export class RefrefClient {
   readonly #base: URL;
   readonly #key: string;
   readonly #timeout: number;
+  readonly #deadline: number;
 
   constructor(config: RefrefConfig) {
     this.#base = new URL(config.apiBase);
     this.#key = config.apiKey;
     this.#timeout = config.timeoutMs ?? 15_000;
+    this.#deadline = config.deadlineMs ?? 20_000;
   }
 
   /** The handoff token is the idempotency identity: no Idempotency-Key (docs/28 §5). */
@@ -148,7 +152,7 @@ export class RefrefClient {
         });
       });
       req.on('timeout', () => req.destroy(new Error('TIMEOUT')));
-      if (deadlineMs !== undefined) deadline = setTimeout(() => req.destroy(new Error('TIMEOUT')), deadlineMs);
+      deadline = setTimeout(() => req.destroy(new Error('TIMEOUT')), Math.min(deadlineMs ?? this.#deadline, this.#deadline));
       req.on('error', (e) => resolve({ kind: 'UNKNOWN', cause: e.message === 'TIMEOUT' ? 'TIMEOUT' : 'TRANSPORT' }));
       if (payload !== undefined) req.write(payload);
       req.end();

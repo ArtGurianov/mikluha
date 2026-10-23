@@ -13,9 +13,13 @@
 import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
+import { bookingCutoff } from './booking-window.js';
+import type { ContractSnapshot } from './contract-snapshot.js';
+
 import { arrivalTarget, Arrivals, CONTEXT_COOKIE, contextCookie, validProof } from './arrival.js';
-import { bookable } from './catalog.js';
-import { handoffUrl, issueState, onReturn, ownsOrder, pay, reconcileOrder, zayavkaOf, type CheckoutDeps } from './checkout.js';
+import type { Json } from './snapshot.js';
+import { bookablePublished } from './public-content.js';
+import { orderBookingCutoff, paymentDeadline, handoffUrl, issueState, onReturn, ownsOrder, pay, reconcileOrder, zayavkaOf, type CheckoutDeps } from './checkout.js';
 import { countryName, MAX_SEATS_PER_ORDER, reserve, type BookingRequest, type TouristInput } from './orders.js';
 import { BookingRateLimiter } from './rate-limit.js';
 
@@ -90,8 +94,20 @@ function readForm(req: IncomingMessage): Promise<URLSearchParams | null> {
 
 /** Customer-facing words for the codes the flow returns. Codes never carry personal data. */
 const MESSAGES: Record<string, string> = {
+  BOOKING_CUTOFF_REACHED: 'Продажа мест на этот выезд через сайт закрыта за 24 часа до отправления. Если вы хотите присоединиться к поездке, свяжитесь с организатором: мы подскажем, остались ли места и возможно ли позднее оформление.',
+  PAYMENT_TEMPORARILY_BUSY: 'Платёжный сервис занят. Повторите попытку через несколько секунд на этой странице заказа.',
+  RESOLUTION_LEASE_EXPIRED: 'Проверка заявки прервалась. Вернитесь на страницу заказа и продолжите бронирование.',
   SALES_CLOSED: 'Онлайн-бронирование сейчас приостановлено. Попробуйте позже или свяжитесь с организатором.',
+  DEPARTURE_NOT_OPEN: 'Новые бронирования на этот выезд закрыты.',
+  ORDER_NOT_PAYABLE: 'Этот заказ сейчас нельзя оплатить. Проверяем его состояние.',
+  RESOLUTION_IN_PROGRESS: 'Заявка уже проверяется. Откройте страницу заказа через несколько секунд.',
+  PAYMENT_IN_PROGRESS: 'Проверяем начатую оплату. Повторно оплачивать не нужно.',
+  REPLACEMENT_NOT_AVAILABLE: 'Заказ уже изменился или проверяется. Вернитесь на его страницу.',
   NOT_ENOUGH_SEATS: 'Свободных мест на эту дату не осталось.',
+  QUOTE_REQUIRES_REBOOK: 'Для этого заказа нужно оформить новое бронирование. Сохранённые условия не изменены.',
+  QUOTE_EXPIRED: 'Срок действия цены истёк. Оформите новое бронирование.',
+  DEPARTURE_CANCELLED: 'Выезд отменяется. Начать оплату нельзя; ранее начатые платежи проверяются.',
+  ORDER_CONTRACT_INVALID: 'Не удалось проверить сохранённые условия договора. Оплата недоступна.',
   RESERVATION_EXPIRED: 'Время брони истекло. Начните бронирование заново.',
   TERMS_NOT_CURRENT: 'Условия бронирования обновились. Откройте форму заново.',
   PD_CONSENT_NOT_CURRENT: 'Согласие на обработку персональных данных обновилось. Откройте форму заново.',
@@ -143,9 +159,17 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
     redirect(res, arrivalTarget(deps.merchant.siteOrigin, url.searchParams.get('to')), [], 302);
   }
 
-  async function bookForm(res: ServerResponse, slug: string) {
-    const d = bookable(deps.catalog, slug, (deps.now ?? (() => new Date()))(), allowDemo);
-    if (typeof d === 'string') { page(res, 404, 'Бронирование', `<p>${esc(message(d))}</p>`); return; }
+  async function bookForm(req: IncomingMessage, res: ServerResponse, slug: string, replacement: string | null) {
+    const d=await bookablePublished(deps.pool,deps.catalog,slug,(deps.now ?? (()=>new Date()))(),allowDemo);
+    if (typeof d === 'string') {
+      if (d==='BOOKING_CUTOFF_REACHED') page(res,200,'Онлайн-бронирование завершено',
+        `<h1>Онлайн-бронирование завершено</h1><p>${esc(message(d))}</p><p><a href="${esc(deps.merchant.siteOrigin)}/#contacts">Контакты организатора</a></p>`);
+      else page(res,404,'Бронирование',`<p>${esc(message(d))}</p>`);
+      return;
+    }
+    if (replacement !== null && !(await ownsOrder(deps.pool,replacement,cookies(req).get(`${COOKIE_PREFIX}${replacement}`)))) {
+      page(res,403,'Бронирование',`<p>${esc(message('STATE_MISMATCH'))}</p>`); return;
+    }
     const t = deps.catalog.terms;
     const consent = deps.catalog.pdConsent;
     const site = deps.merchant.siteOrigin;
@@ -167,9 +191,10 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
     page(res, 200, `${d.tourTitle}: бронирование`, `<p class="eyebrow">Онлайн-бронирование</p><h1>${esc(d.tourTitle)}</h1>
       <p class="lead">${esc(d.startsOn)} — ${esc(d.endsOn)}. Заполните данные участников, затем проверьте итоговую Заявку перед оплатой.</p>
       <ol class="steps"><li class="current">1. Данные</li><li>2. Заявка</li><li>3. Оплата</li></ol>
-      <div class="summary"><strong>${rub(d.priceKopecks)} за туриста</strong><br>100% оплата онлайн · места резервируются на 30 минут</div>
+      <div class="summary"><strong>${rub(d.priceKopecks)} за туриста</strong><br>100% оплата онлайн · места резервируются не более чем на 30 минут, до закрытия онлайн-продаж ${esc(new Intl.DateTimeFormat('ru-RU',{timeZone:d.timezone,dateStyle:'short',timeStyle:'short'}).format(bookingCutoff(d.startsOn,d.contract.departure.departureTime,d.timezone)))} (${esc(d.timezone)})</div>
       <form method="post" action="/orders">
         <input type="hidden" name="departure" value="${esc(d.slug)}">
+        ${replacement ? `<input type="hidden" name="replacement" value="${esc(replacement)}">` : ''}
         <input type="hidden" name="termsRef" value="${esc(t.ref)}"><input type="hidden" name="termsHash" value="${esc(t.hash)}">
         <input type="hidden" name="pdConsentRef" value="${esc(consent.ref)}"><input type="hidden" name="pdConsentHash" value="${esc(consent.hash)}">
         <p>Заказчик — турист № 1: бронировать онлайн можно поездку, в которой вы участвуете сами.</p>
@@ -202,7 +227,12 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
       tourists.push({ fullName: f('Name'), dateOfBirth: f('Dob'), citizenship: f('Citizenship'),
         document: { type: f('DocType'), series: f('DocSeries'), number: f('DocNumber') } });
     }
+    const replacement=form.get('replacement');
+    if (replacement !== null && !(await ownsOrder(deps.pool,replacement,cookies(req).get(`${COOKIE_PREFIX}${replacement}`)))) {
+      page(res,403,'Бронирование',`<p>${esc(message('STATE_MISMATCH'))}</p>`); return;
+    }
     const request: BookingRequest = {
+      ...(replacement ? {replacementOrderRef:replacement} : {}),
       departureSlug: form.get('departure') ?? '',
       contact: { phone: form.get('contactPhone') ?? '', email: form.get('contactEmail') ?? '' },
       passengers: tourists, adultsOnlyConfirmed: form.get('adultsOnly') === 'yes',
@@ -216,7 +246,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
     const r = await reserve({ pool: deps.pool, catalog: deps.catalog, log: deps.log, allowDemo,
       ...(deps.legalAdmission ? { legalAdmission: deps.legalAdmission } : {}), ...(deps.now ? { now: deps.now } : {}) }, request);
     if (!r.ok) { page(res, ['NOT_ENOUGH_SEATS', 'SALES_CLOSED', 'LEGAL_RELEASE_NOT_ADMITTED'].includes(r.refusal) ? 409 : 400,
-      'Бронирование', `<p>${esc(message(r.refusal))}</p>`); return; }
+      'Бронирование', `<p>${esc(message(r.refusal))}</p>${r.refusal==='BOOKING_CUTOFF_REACHED'?`<p><a href="${esc(deps.merchant.siteOrigin)}/#contacts">Контакты организатора</a></p>`:''}`); return; }
     const state = await issueState(deps.pool, r.orderRef);
     if (state === null) throw new Error('STATE_NOT_ISSUED');
     redirect(res, handoffUrl(deps.merchant, r.orderRef, state), [stateCookie(r.orderRef, state)]);
@@ -228,7 +258,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
       cookieState: (ref) => jar.get(`${COOKIE_PREFIX}${ref}`) });
     if (outcome.kind === 'REDIRECT') { redirect(res, outcome.url); return; }
     if (outcome.kind === 'CONFIRM') { redirect(res, `/orders/${outcome.orderRef}`); return; }
-    page(res, outcome.code === 'STATE_MISMATCH' ? 403 : 409, 'Бронирование', `<p>${esc(message(outcome.code))}</p>`);
+    page(res, outcome.code === 'STATE_MISMATCH' ? 403 : 409, 'Бронирование', `<p>${esc(message(outcome.code))}</p>${outcome.code==='BOOKING_CUTOFF_REACHED'?`<p><a href="${esc(deps.merchant.siteOrigin)}/#contacts">Контакты организатора</a></p>`:''}`);
   }
 
   async function show(req: IncomingMessage, res: ServerResponse, ref: string, notice?: string) {
@@ -238,9 +268,9 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
     await reconcileOrder(deps, ref);
     const { rows } = await deps.pool.query<{ status: string; payable_kopecks: string | null; amount_kopecks: string;
       discount_kopecks: string | null; last_session: string | null; seats: number; legal_release_ref: string;
-      legal_release_content: string | null; pd_consent_ref: string }>(
+      legal_release_content: string | null; pd_consent_ref: string; departure_slug: string; quote_expires_at: Date | null; reserved_until:Date; resolution_expires_at:Date|null; snapshot:Record<string,Json>|null; snapshot_hash:string|null; contract_snapshot:ContractSnapshot|null; contract_snapshot_sha256:string|null }>(
       `SELECT status, payable_kopecks, amount_kopecks, discount_kopecks, last_session, seats,
-        legal_release_ref, legal_release_content, pd_consent_ref FROM orders WHERE order_ref = $1`, [ref]);
+        legal_release_ref, legal_release_content, pd_consent_ref, departure_slug, quote_expires_at, reserved_until, resolution_expires_at, snapshot, snapshot_hash, contract_snapshot, contract_snapshot_sha256 FROM orders WHERE order_ref = $1`, [ref]);
     const o = rows[0]!;
     const n = notice ? `<p class="notice">${esc(message(notice))}</p>` : '';
     const zayavka = await zayavkaOf(deps.pool, ref);
@@ -248,11 +278,22 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
     const site = deps.merchant.siteOrigin;
     const offer = o.legal_release_content === null ? '' : `<details class="contract-doc" open><summary>Публичная оферта · ${esc(o.legal_release_ref)}</summary><pre>${esc(o.legal_release_content)}</pre></details>`;
     const documents = `${offer}${zayavka?.content ? `<section class="contract-doc document-frame"><h2>Заявка на бронирование</h2>${zayavka.content}</section>` : ''}`;
-    if (o.status === 'RESERVED' && o.payable_kopecks !== null && zayavka?.content) {
+    const quoteExpired = paymentDeadline(o) <= (deps.now ?? (() => new Date()))();
+    const cutoff=orderBookingCutoff(o);
+    const cutoffReached = cutoff.getTime()>0 && cutoff <= (deps.now ?? (()=>new Date()))();
+    const holdUntil = new Intl.DateTimeFormat('ru-RU',{timeZone:o.contract_snapshot?.timezone ?? deps.catalog.timezone,dateStyle:'short',timeStyle:'short'}).format(o.reserved_until);
+    if ((o.status==='RESERVED' || o.status==='PAYMENT_PENDING') && cutoffReached) {
+      page(res,200,'Онлайн-бронирование завершено',`${n}<h1>Онлайн-бронирование завершено</h1><p>${esc(message('BOOKING_CUTOFF_REACHED'))}</p><p><a href="${esc(site)}/#contacts">Контакты организатора</a></p>${o.status==='PAYMENT_PENDING'?'<p>Начатую оплату продолжаем проверять. Не оплачивайте заказ повторно.</p>':''}${documents}`,o.status==='PAYMENT_PENDING'?'<meta http-equiv="refresh" content="5">':'');
+    } else if (o.status === 'RESERVED' && zayavka?.content && quoteExpired) {
+      page(res, 200, 'Срок котировки истёк', `${n}<h1>Оформите новое бронирование</h1>
+        <p>${esc(message(o.quote_expires_at === null ? 'QUOTE_REQUIRES_REBOOK' : 'QUOTE_EXPIRED'))}</p>
+        <p><a class="button" href="/book?departure=${encodeURIComponent(o.departure_slug)}&amp;replace=${encodeURIComponent(ref)}">Новое бронирование</a></p>${documents}`);
+    } else if (o.status === 'RESERVED' && o.payable_kopecks !== null && zayavka?.content) {
       const discount = Number(o.discount_kopecks);
       // The Заявка exactly as stored; paying accepts it and the offer (offer §4.2, Заявка §9).
       page(res, 200, 'Заявка на бронирование', `${n}<p class="eyebrow">Проверьте договор</p><h1>Итого к оплате: ${rub(Number(o.payable_kopecks))}</h1>
         <ol class="steps"><li>1. Данные</li><li class="current">2. Заявка</li><li>3. Оплата</li></ol>
+        <p>Места удерживаются до ${esc(holdUntil)} (${esc(o.contract_snapshot?.timezone ?? deps.catalog.timezone)}).</p>
         <p>Туристов: ${o.seats}. Полная стоимость ${rub(Number(o.amount_kopecks))}${discount > 0 ? `, скидка по приглашению ${rub(discount)}` : ''}.</p>
         <p>Проверьте Заявку: ФИО, даты рождения, гражданство и документы туристов передаются перевозчику, в средство размещения и в ЕИС «Электронная путёвка».</p>
         ${documents}
@@ -263,10 +304,10 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
           <button type="submit">Оплатить ${rub(Number(o.payable_kopecks))}</button></form>`);
     } else if (o.status === 'RESERVED') {
       // Not resolved yet (the handoff did not come back): go through it again, with this browser's state.
-      page(res, 200, 'Бронирование', `${n}<p>Бронирование не завершено.</p>
+      page(res, 200, 'Бронирование', `${n}<p>Бронирование не завершено. Места удерживаются до ${esc(holdUntil)} (${esc(o.contract_snapshot?.timezone ?? deps.catalog.timezone)}).</p>
         <p><a href="${esc(handoffUrl(deps.merchant, ref, state!))}">Продолжить</a></p>`);
-    } else if (o.status === 'PAYMENT_PENDING' && (o.last_session ?? '').startsWith('PAYMENT_FAILED')) {
-      page(res, 200, 'Оплата', `${n}<p>Платёж не прошёл. Деньги не списаны.</p>
+    } else if (o.status === 'PAYMENT_PENDING' && paymentDeadline(o)>(deps.now??(()=>new Date()))() && ((o.last_session ?? '').startsWith('PAYMENT_FAILED') || notice==='PAYMENT_TEMPORARILY_BUSY')) {
+      page(res, 200, 'Оплата', `${n}<p>${notice==='PAYMENT_TEMPORARILY_BUSY'?'Можно безопасно повторить запрос оплаты этого заказа.':'Платёж не прошёл. Деньги не списаны.'}</p>
         <form method="post" action="/orders/${esc(ref)}/pay">${accept}<button type="submit">Попробовать ещё раз</button></form>`);
     } else if (o.status === 'PAYMENT_PENDING') {
       page(res, 200, 'Оплата', `${n}<p>Проверяем платёж. Страница обновится сама.</p>`, '<meta http-equiv="refresh" content="5">');
@@ -318,7 +359,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
     const ctx = context(req, res, purchase);
     if (ctx !== undefined) arrivals.afterResponse(res, ctx);
     if (m && !ORDER_REF.test(m[1]!)) { page(res, 404, 'Заказ', '<p>Заказ не найден.</p>'); return true; }
-    if (req.method === 'GET' && url.pathname === '/book') { await bookForm(res, url.searchParams.get('departure') ?? ''); return true; }
+    if (req.method === 'GET' && url.pathname === '/book') { await bookForm(req,res,url.searchParams.get('departure') ?? '',url.searchParams.get('replace')); return true; }
     if (req.method === 'POST' && url.pathname === '/orders') { await createOrder(req, res); return true; }
     if (req.method === 'GET' && url.pathname === '/return') { await back(req, res, url); return true; }
     if (req.method === 'GET' && shared) { await sharedDocuments(res, shared[1]!); return true; }

@@ -11,9 +11,11 @@ import { maintain, reserve, setSalesOpen } from '../src/orders.js';
 import { SchemaAdmission, schemaWorker } from '../src/schema-admission.js';
 import { schemaReadiness } from '../src/schema-readiness.js';
 import { createCommerceServer } from '../src/server.js';
-import { fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
+import { fixtureCatalog, freshDb, seedCatalog, tourist, type TestDb } from './helpers.js';
 
-const build = { schemaHead: 12, migrations: readMigrations(MIGRATIONS_DIR), sourceCommit: 'a'.repeat(40) };
+const migrations=readMigrations(MIGRATIONS_DIR);
+const build = { schemaHead: migrations.length, migrations, sourceCommit: 'a'.repeat(40) };
+const nextHead=migrations.length+1;
 let db: TestDb;
 before(async () => { db = await freshDb(); });
 after(async () => { await db.drop(); });
@@ -39,6 +41,7 @@ async function call(port: number, path: string, method = 'GET') {
 test('NOT_READY refuses direct commerce/admin requests and workers without DB or provider side effects; admission recovers', async () => {
   const catalog = fixtureCatalog([{ slug: 'schema-gate', startsOn: '2027-06-01', endsOn: '2027-06-04', capacity: 12 }]);
   const now = new Date('2027-05-01T00:00:00Z');
+  await seedCatalog(db,catalog);
   await setSalesOpen(db.operator, true, 'test', 'isolated test');
   const booking = { departureSlug: 'schema-gate', contact: { phone: '+79039075547', email: 'proof@example.invalid' }, passengers: [tourist(1)],
     adultsOnlyConfirmed: true, termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
@@ -88,13 +91,13 @@ test('NOT_READY refuses direct commerce/admin requests and workers without DB or
     await db.owner.query('INSERT INTO schema_migration_compatibility VALUES ($1,$2,$3,$4,$5)',
       [attestation.version, attestation.file, attestation.checksum, attestation.runtime_commits, attestation.evidence]);
     // Owner-controlled test fixture: unknown then explicitly incompatible ahead history.
-    await db.owner.query("INSERT INTO schema_migrations (version, file, checksum) VALUES (13, '0013_incompatible.sql', repeat('b', 64))");
+    await db.owner.query("INSERT INTO schema_migrations (version, file, checksum) VALUES ($1, $2, repeat('b', 64))",[nextHead,`${String(nextHead).padStart(4,'0')}_incompatible.sql`]);
     await refused();
-    await db.owner.query("INSERT INTO schema_migration_compatibility VALUES (13, '0013_incompatible.sql', repeat('b',64), '{}', 'incompatible test fixture')");
+    await db.owner.query("INSERT INTO schema_migration_compatibility VALUES ($1, $2, repeat('b',64), '{}', 'incompatible test fixture')",[nextHead,`${String(nextHead).padStart(4,'0')}_incompatible.sql`]);
     await refused();
     // Restore the sabotage fixture only; production rollback never deletes migration history.
-    await db.owner.query('DELETE FROM schema_migration_compatibility WHERE version = 13');
-    await db.owner.query('DELETE FROM schema_migrations WHERE version = 13');
+    await db.owner.query('DELETE FROM schema_migration_compatibility WHERE version = $1',[nextHead]);
+    await db.owner.query('DELETE FROM schema_migrations WHERE version = $1',[nextHead]);
     assert.equal(await call(port, '/orders', 'POST'), 200);
     await worker.tick();
     assert.equal(routes, 1); assert.equal(remoteCalls, 1);

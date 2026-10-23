@@ -88,3 +88,10 @@ test('omitted or unknown offer refund policy fails closed at catalog load', () =
     assert.throws(() => loadCatalog(dir), /CATALOG_INVALID: oferta refundPolicy/);
   }
 });
+
+
+test('online sales end exactly 24 hours before the zoned departure',()=>{
+  const catalog=fixtureCatalog([{slug:'today',startsOn:'2026-10-05'}]);
+  assert.equal(typeof bookable(catalog,'today',new Date('2026-10-03T22:59:59Z'),false),'object');
+  assert.equal(bookable(catalog,'today',new Date('2026-10-03T23:00:00Z'),false),'BOOKING_CUTOFF_REACHED');
+});

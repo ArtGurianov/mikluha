@@ -17,7 +17,7 @@ import { RefrefClient, errorCode, type CheckoutAttempt } from '../src/refref.js'
 import { createCommerceServer } from '../src/server.js';
 import { createWebHandler } from '../src/web.js';
 import { FakeRefref } from './fake-refref.js';
-import { captureLog, fixtureCatalog, freshDb, type TestDb } from './helpers.js';
+import { captureLog, seedCatalog, fixtureCatalog, freshDb, type TestDb } from './helpers.js';
 
 const MERCHANT_ID = '3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90';
 const MINUTE = 60_000;
@@ -35,11 +35,12 @@ let deps: CheckoutDeps;
 before(async () => {
   db = await freshDb();
   catalog = fixtureCatalog([{ slug: 'altai-2026-11-01', startsOn: '2026-11-01', endsOn: '2026-11-04', capacity: 3 }]);
+  await seedCatalog(db, catalog);
   refref = new FakeRefref(MERCHANT_ID);
   await refref.start();
   logs = captureLog();
   deps = {
-    pool: db.pool, catalog, log: (e, f) => logs.log(e, f), now: () => clock,
+    pool: db.pool, initiationPool: db.initiation, catalog, log: (e, f) => logs.log(e, f), now: () => clock,
     refref: new RefrefClient({ apiBase: refref.base, apiKey: 'rk_test', timeoutMs: 1500 }),
     merchant: { businessId: MERCHANT_ID, businessSlug: 'mikluha', checkoutOrigin: 'https://checkout.refref.example',
       origin: 'https://book.mikluha.example', siteOrigin: 'https://mikluha.example' },
@@ -167,6 +168,20 @@ async function bookAndResolve(seats = 1): Promise<{ ref: string; cookie: string 
 
 const order = async (ref: string) => (await db.owner.query(
   'SELECT status, checkout_attempt_id, hold_reason, payable_kopecks FROM orders WHERE order_ref = $1', [ref])).rows[0];
+
+test('an expired quote shows a new-booking link instead of an unusable payment button', async () => {
+  const { ref,cookie }=await bookAndResolve();
+  const before=await http('GET',`/orders/${ref}`,{cookie});
+  assert.match(before.body,new RegExp(`/orders/${ref}/pay`));
+  clock=new Date(clock.getTime()+15*MINUTE);
+  const expired=await http('GET',`/orders/${ref}`,{cookie});
+  assert.equal(expired.status,200);
+  assert.match(expired.body,/Срок действия цены истёк/);
+  assert.match(expired.body,/href="\/book\?departure=altai-2026-11-01&amp;replace=mk-[0-9a-z]{12}"/);
+  assert.doesNotMatch(expired.body,new RegExp(`/orders/${ref}/pay`));
+  assert.doesNotMatch(expired.body,/<button[^>]*>Оплатить/);
+  assert.equal((await order(ref)).status,'RESERVED');
+});
 
 describe('the paid path', () => {
   test('a later catalog cannot change the reserved schedule in the accepted application or Refref payment line', async () => {
@@ -455,7 +470,7 @@ describe('never a second payment after ambiguity', () => {
     refref.state.attempt = 'ACCEPTED_TIMEOUT';
     assert.equal((await payOrder(ref, cookie)).location, 'https://pay.alfa.example/form?mdOrder=1');
     assert.equal(refref.calls(/\/checkout-attempts$/).length, 1);
-    assert.equal(refref.calls(/\/merchant-orders\//, 'GET').length, 1);
+    assert.equal(refref.calls(/\/merchant-orders\//, 'GET').length, 1); // lost-ACK read-back only
     assert.equal((await order(ref)).checkout_attempt_id, [...refref.attempts.values()][0]!.id);
     assert.deepEqual((await db.owner.query(`SELECT event FROM order_event WHERE order_id =
       (SELECT id FROM orders WHERE order_ref = $1) AND event = 'ATTEMPT_RECOVERED'`, [ref])).rows,
@@ -645,4 +660,73 @@ describe("the read-back's verdict", () => {
     assert.equal(verdict(attempt({ status: 'IN_PROGRESS', payment: null }), 100, 'h', true, now).kind, 'WAIT');
     assert.equal(verdict(attempt({ status: 'OUTSTANDING', payment: null }), 100, 'h', true, now).kind, 'ABANDONED');
   });
+});
+
+
+test('expired-quote replacement is authorized by the old cookie and transfers its seats atomically',async()=>{
+  const {ref,cookie}=await bookAndResolve(2);clock=new Date(clock.getTime()+17*MINUTE);
+  const link=`/book?departure=altai-2026-11-01&replace=${ref}`;
+  assert.equal((await http('GET',link)).status,403);
+  const form=await http('GET',link,{cookie});assert.equal(form.status,200);
+  assert.match(form.body,new RegExp(`name="replacement" value="${ref}"`));
+  const body={...bookingForm(2),replacement:ref};
+  assert.equal((await http('POST','/orders',{form:body})).status,403);
+  assert.equal((await order(ref)).status,'RESERVED');
+  const booked=await http('POST','/orders',{cookie,form:body});
+  assert.equal(booked.status,303);
+  const next=new URL(booked.location!).searchParams.get('merchantOrderRef')!;
+  assert.notEqual(next,ref);assert.equal((await order(ref)).status,'CANCELLED');
+  assert.equal((await order(next)).status,'RESERVED');
+});
+
+test('cancellation and non-payable notices use human messages',async()=>{
+  const slug='cancel-wording';
+  await seedCatalog(db,fixtureCatalog([{slug,startsOn:'2026-11-01',endsOn:'2026-11-04'}]));
+  const booked=await http('POST','/orders',{form:{...bookingForm(),departure:slug}});
+  const handoff=new URL(booked.location!);const ref=handoff.searchParams.get('merchantOrderRef')!;
+  const cookie=booked.setCookie[0]!.split(';')[0]!;
+  await db.operator.query("SELECT fn_request_departure_cancellation($1,'owner','test wording')",[slug]);
+  const back=await http('GET',`/return?rt=${'t'.repeat(40)}&state=${handoff.searchParams.get('state')}`,{cookie});
+  assert.equal(back.status,409);assert.match(back.body,/Выезд отменяется/);assert.doesNotMatch(back.body,/код DEPARTURE_/);
+  const notice=await http('GET',`/orders/${ref}?notice=ORDER_NOT_PAYABLE`,{cookie});
+  assert.match(notice.body,/Этот заказ сейчас нельзя оплатить/);assert.doesNotMatch(notice.body,/код ORDER_NOT_PAYABLE/);
+});
+
+test('cutoff pages link existing organizer contacts and show the shortened hold before closing',async()=>{
+  clock=new Date('2026-10-30T22:55:00Z'); // five minutes before cutoff (06:00 Krasnoyarsk)
+  refref.state.resolutionExpiresAt='2026-10-31T00:00:00Z';
+  const {ref,cookie}=await bookAndResolve();
+  const shown=await http('GET',`/orders/${ref}`,{cookie});
+  assert.match(shown.body,/Места удерживаются до 31\.10\.2026, 06:00/);
+  assert.match(shown.body,/<button type="submit">Оплатить/);
+  clock=new Date('2026-10-30T23:00:00Z');
+  for(const path of ['/book?departure=altai-2026-11-01',`/orders/${ref}`]){
+    const closed=await http('GET',path,{cookie});
+    assert.equal(closed.status,200);
+    assert.match(closed.body,/Онлайн-бронирование завершено/);
+    assert.match(closed.body,/за 24 часа/);
+    assert.match(closed.body,/href="https:\/\/mikluha\.example\/#contacts"/);
+    assert.doesNotMatch(closed.body,/<button type="submit">Оплатить/);
+    assert.doesNotMatch(closed.body,/Новое бронирование<\/a>/);
+  }
+  const posted=await http('POST','/orders',{form:bookingForm()});
+  assert.match(posted.body,/#contacts/);
+  const back=await http('GET',`/return?rt=${'t'.repeat(40)}&state=${cookie.split('=')[1]}`,{cookie});
+  // An already issued quote is immutable; the destination order page enforces cutoff.
+  assert.equal(back.location,`/orders/${ref}`);
+});
+
+test('unknown, demo, hidden and unpublished departures keep a generic 404 booking page',async()=>{
+  await seedCatalog(db,fixtureCatalog([
+    {slug:'refusal-demo',startsOn:'2026-11-01',isDemo:true},
+    {slug:'refusal-hidden',startsOn:'2026-11-01',isListed:false},
+  ]));
+  const tour=(await db.owner.query("SELECT id FROM tour WHERE slug='altai'")).rows[0].id;
+  await db.admin.query('SELECT fn_create_departure($1,$2,$3)',[tour,'refusal-draft','test']);
+  for(const slug of ['refusal-missing','refusal-demo','refusal-hidden','refusal-draft']){
+    const response=await http('GET',`/book?departure=${slug}`);
+    assert.equal(response.status,404,slug);
+    assert.match(response.body,/<title>Бронирование<\/title>/,slug);
+    assert.doesNotMatch(response.body,/Онлайн-бронирование завершено|Контакты организатора|\/#contacts/,slug);
+  }
 });

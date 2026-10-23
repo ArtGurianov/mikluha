@@ -49,12 +49,13 @@ const legalAdmission = which === 'PRODUCTION'
   ? new LiveSiteReleaseAdmission(siteOrigin, { sourceCommit: identity.sourceCommit, catalog }) : undefined;
 if (legalAdmission !== undefined) await legalAdmission.verify();
 const migrations = readMigrations(MIGRATIONS_DIR);
-const pool = new pg.Pool({ connectionString: env('DATABASE_URL'), max: 10 });
+const pool = new pg.Pool({ connectionString: env('DATABASE_URL'), max: 8 });
+const initiationPool = new pg.Pool({ connectionString: env('DATABASE_URL'), max: 2, connectionTimeoutMillis: 3000 });
 const admission = new SchemaAdmission(() => schemaReadiness(pool, {
   schemaHead: migrations.length, migrations, sourceCommit: identity.sourceCommit,
 }));
 const checkout: CheckoutDeps = {
-  pool, catalog, log,
+  pool, initiationPool, catalog, log,
   ...(legalAdmission ? { legalAdmission } : {}),
   refref: new RefrefClient({ apiBase: refrefApiBase, apiKey: env('REFREF_API_KEY') }),
   merchant: {
@@ -104,9 +105,10 @@ const stop = () => {
   const http = new Promise<void>((resolve) => { server.close(() => resolve()); });
   void Promise.all([http, admitted, maintenance.drain(), mail.drain()])
     .then(() => arrivals.after.drain())
-    .then(() => pool.end())
+    .then(() => Promise.all([pool.end(),initiationPool.end()]))
     .then(() => process.exit(0))
     .catch(() => { log('shutdown_failed', {}); process.exit(1); });
+
 };
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);

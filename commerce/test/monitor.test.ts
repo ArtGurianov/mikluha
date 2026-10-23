@@ -4,7 +4,7 @@ import { after, before, beforeEach, test } from 'node:test';
 import type { Catalog } from '../src/catalog.js';
 import { commerceMonitorSignals, monitorHasAlert } from '../src/monitor.js';
 import { reserve, setSalesOpen, type BookingRequest } from '../src/orders.js';
-import { fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
+import { seedCatalog, fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
 
 const NOW = new Date('2026-10-04T06:00:00Z');
 let db: TestDb;
@@ -13,6 +13,7 @@ let catalog: Catalog;
 before(async () => {
   db = await freshDb();
   catalog = fixtureCatalog([{ slug: 'altai-2026-11-01', startsOn: '2026-11-01', endsOn: '2026-11-04' }]);
+  await seedCatalog(db, catalog);
 });
 after(async () => { await db.drop(); });
 beforeEach(async () => {

@@ -5,7 +5,7 @@ import pg from 'pg';
 
 import type { Catalog } from '../src/catalog.js';
 import { maintain, reserve, salesOpen, setSalesOpen, type BookingRequest, type OrderDeps } from '../src/orders.js';
-import { captureLog, fixtureCatalog, forceStatus, freshDb, tourist, type TestDb } from './helpers.js';
+import { captureLog, seedCatalog, fixtureCatalog, forceStatus, freshDb, tourist, type TestDb } from './helpers.js';
 
 const NOW = new Date('2026-10-04T06:00:00Z');
 const HOUR = 3_600_000;
@@ -40,6 +40,7 @@ before(async () => {
     { slug: 'altai-no-capacity', startsOn: '2026-11-10', capacity: null },
     { slug: 'altai-today', startsOn: '2026-10-04' },
   ]);
+  await seedCatalog(db, catalog);
 });
 after(async () => { await db.drop(); });
 beforeEach(async () => {
@@ -118,7 +119,7 @@ describe('what can be sold', () => {
     };
     assert.equal(await refusal('altai-closed'), 'DEPARTURE_NOT_OPEN');
     assert.equal(await refusal('altai-no-capacity'), 'DEPARTURE_NO_CAPACITY');
-    assert.equal(await refusal('altai-today'), 'DEPARTURE_STARTED');
+    assert.equal(await refusal('altai-today'), 'BOOKING_CUTOFF_REACHED');
     assert.equal(await refusal('nowhere'), 'DEPARTURE_UNKNOWN');
     assert.equal(await refusal('altai-demo'), 'DEPARTURE_DEMO');
     assert.equal(await refusal('altai-demo', true), 'OK');
@@ -238,4 +239,16 @@ describe('personal data', () => {
     const { rows } = await db.owner.query('SELECT order_ref FROM orders WHERE pd_erased_at IS NOT NULL');
     assert.deepEqual(rows.map((r) => r.order_ref), [refs[0]]);
   });
+});
+
+
+test('malformed input is rejected before any pool checkout or legal network read',async()=>{
+  let connections=0;let legalReads=0;
+  const pool=new Proxy(db.pool,{get(target,key){
+    if(key==='connect') return ()=>{connections++;throw new Error('UNEXPECTED_DB_CHECKOUT')};
+    const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;
+  }});
+  const result=await reserve({...deps(),pool,legalAdmission:{verify:async()=>{legalReads++;}}},request({contact:{phone:'bad',email:'test@example.ru'}}));
+  assert.deepEqual(result,{ok:false,refusal:'CONTACT_PHONE_INVALID'});
+  assert.equal(connections,0);assert.equal(legalReads,0);
 });

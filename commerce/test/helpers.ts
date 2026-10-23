@@ -26,6 +26,7 @@ export interface TestDb {
   readonly owner: pg.Client;
   /** The service's login (commerce_app). */
   readonly pool: pg.Pool;
+  readonly initiation: pg.Pool;
   /** An operator's login (commerce_operator). */
   readonly operator: pg.Pool;
   /** The Admin API's login (admin_app). */
@@ -38,7 +39,7 @@ export interface TestDb {
   drop(timeoutMs?: number): Promise<void>;
 }
 
-export async function freshDb(): Promise<TestDb> {
+export async function freshDb(migrationsDir = MIGRATIONS_DIR): Promise<TestDb> {
   const name = `commerce_test_${randomBytes(4).toString('hex')}`;
   const admin = new pg.Client({ connectionString: ADMIN });
   await admin.connect();
@@ -47,7 +48,7 @@ export async function freshDb(): Promise<TestDb> {
   url.pathname = `/${name}`;
   const owner = new pg.Client({ connectionString: url.toString() });
   await owner.connect();
-  await migrate(owner, MIGRATIONS_DIR);
+  await migrate(owner, migrationsDir);
   for (const [login, role] of [[RUNTIME_ROLE, 'commerce_app'], [OPERATOR_ROLE, 'commerce_operator'], [ADMIN_ROLE, 'admin_app'],
     [ADMIN_OPERATOR_ROLE, 'admin_operator'], [PUBLISHER_ROLE, 'admin_publisher']]) {
     await owner.query(`DO $$ BEGIN
@@ -60,26 +61,27 @@ export async function freshDb(): Promise<TestDb> {
     const u = new URL(url);
     u.username = login;
     u.password = PASSWORD;
-    const pool = new pg.Pool({ connectionString: u.toString(), max });
+    const pool = new pg.Pool({ connectionString: u.toString(), max, connectionTimeoutMillis: 3000 });
     pool.on('connect', client => {
       clientClosures.push(new Promise<void>(resolve => { client.once('end', resolve); }));
     });
     return pool;
   };
   const pool = as(RUNTIME_ROLE, 12);
+  const initiation = as(RUNTIME_ROLE,2);
   const operator = as(OPERATOR_ROLE, 2);
   const adminPool = as(ADMIN_ROLE, 4);
   const publisher = as(PUBLISHER_ROLE, 4);
   const adminOperator = as(ADMIN_OPERATOR_ROLE, 2);
   let teardown: Promise<void> | undefined;
   return {
-    owner, pool, operator, admin: adminPool, adminOperator, publisher, url, name,
+    owner, pool, initiation, operator, admin: adminPool, adminOperator, publisher, url, name,
     async drop(timeoutMs = 10_000) {
       // Reuse cleanup after a bounded diagnostic failure, so a test can release its leaked
       // client and await the same operation instead of ending a pool twice.
       teardown ??= (async () => {
         try {
-          await Promise.all([pool.end(), operator.end(), adminPool.end(), adminOperator.end(), publisher.end()]);
+          await Promise.all([pool.end(), initiation.end(), operator.end(), adminPool.end(), adminOperator.end(), publisher.end()]);
           // pg-pool removes clients before their socket-end callbacks finish.
           await Promise.all(clientClosures);
           await owner.end();
@@ -90,7 +92,7 @@ export async function freshDb(): Promise<TestDb> {
       try {
         await Promise.race([teardown, new Promise<never>((_resolve, reject) => {
           timer = setTimeout(() => {
-            const counts = [["runtime", pool], ["operator", operator], ["admin", adminPool]] as const;
+            const counts = [["runtime", pool], ["initiation", initiation], ["operator", operator], ["admin", adminPool]] as const;
             const detail = counts.map(([label, p]) => `${label}: checkedOut=${p.totalCount - p.idleCount}, waiting=${p.waitingCount}`).join("; ");
             reject(new Error(`TEST_DATABASE_TEARDOWN_TIMEOUT ${name} after ${timeoutMs}ms (${detail}); release checked-out clients and await drop() again`));
           }, timeoutMs);
@@ -192,4 +194,28 @@ export async function forceStatus(owner: pg.Client, orderRef: string, status: 'P
   const frozen = `snapshot = '{}', snapshot_hash = 'refref-jcs-1:${'0'.repeat(64)}', payment_pending_since = now()`;
   const paid = status === 'FULFILLED' ? `, payment_id = gen_random_uuid(), paid_at = now(), fulfilled_at = now()` : '';
   await owner.query(`UPDATE orders SET status = $2, ${frozen}${paid}${extra} WHERE order_ref = $1`, [orderRef, status]);
+}
+
+/** Explicit test-only publication of YAML fixtures; runtime checkout never imports them into DB. */
+export async function seedCatalog(db: TestDb, catalog: Catalog): Promise<void> {
+  for (const d of catalog.departures.values()) {
+    let tour = (await db.owner.query('SELECT id FROM tour WHERE slug=$1', [d.tourSlug])).rows[0]?.id;
+    if (!tour) {
+      tour = (await db.admin.query('SELECT fn_create_tour($1,$2) AS id', [d.tourSlug, 'fixture'])).rows[0].id;
+      await db.admin.query('SELECT fn_save_tour_draft($1,0,$2,$3)',
+        [tour, { slug: d.tourSlug, title: d.tourTitle, contract: null, content: {} }, 'fixture']);
+      await db.publisher.query('SELECT fn_publish_tour($1,1,0,$2)', [tour, 'fixture']);
+      await db.owner.query('UPDATE tour SET is_listed=true WHERE id=$1', [tour]);
+    }
+    const dc = d.contract?.departure;
+    const contract = dc ? { tour: d.contract!.tour, departure: Object.fromEntries(Object.entries(dc).filter(([k]) => !['departureTime','returnTime'].includes(k))) } : null;
+    const id = (await db.admin.query('SELECT fn_create_departure($1,$2,$3) AS id', [tour,d.slug,'fixture'])).rows[0].id;
+    await db.admin.query('SELECT fn_save_departure_draft($1,1,$2,$3)', [id, {
+      slug:d.slug,startsOn:d.startsOn,endsOn:d.endsOn,departureTime:dc?.departureTime ?? '06:00',
+      returnTime:dc?.returnTime ?? '21:00',timezone:catalog.timezone,priceKopecks:d.priceKopecks,contract,content:{},
+    },'fixture']);
+    await db.publisher.query('SELECT fn_publish_departure($1,2,0,$2)', [id,'fixture']);
+    await db.owner.query('UPDATE departure SET capacity=$2,booking_status=$3,is_listed=$4,is_demo=$5 WHERE id=$1',
+      [id,d.capacity,d.bookingStatus,d.isListed,d.isDemo]);
+  }
 }

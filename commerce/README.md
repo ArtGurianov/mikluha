@@ -28,8 +28,7 @@ static; everything that sells a trip lives here, with its own Postgres.
   (slug/unitRef, tour binding, `published_at`) and no physical delete; the date lock while a
   departure has active or concluded orders; and every new order's `contract_snapshot` (see
   "Editable offers, immutable orders"). `bookingStatus`/capacity transitions (ART-366) and
-  documents rendered from the snapshot (ART-362) build on it; the checkout still sells from
-  `content/` until then.
+  checkout documents and quotes now consume it through ART-362 below.
 - migration 0009 (ADR v2.3 §2–§4, ART-358): content CRUD for tours, departures, reports, reviews,
   organizers and legal drafts through audited Admin commands (`src/editorial.ts`); the tour
   template resolved into a departure once; graph validation at publish; the fail-closed public
@@ -47,11 +46,16 @@ static; everything that sells a trip lives here, with its own Postgres.
   audited SSH reset, `admin_app`/`admin_publisher`/`admin_operator` capabilities, and the static Control Room in
   [`../control-room`](../control-room/README.md). See "Admin API" below. Undeployed.
 
+- migration 0012 (ART-362): live DB-backed reservations tied to the accepted published revision,
+  snapshot-only documents/receipt names, immutable 15-minute quotes and merchant-held seats.
+  Audited operator cancellation cannot complete over unresolved orders. See "Checkout contracts
+  and quotes" below. Undeployed.
+
 **Next:**
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
   integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migrations
-  0007–0012 need owner-only application and fresh schema-12 logical and PITR recovery evidence
+  0007–0016 need owner-only application and fresh schema-16 logical and PITR recovery evidence
   before future admission. Mikluha commerce is undeployed; monitor admission, sales and payments remain closed.
 
 ## Generic legal pack and individual application
@@ -104,7 +108,7 @@ signed-file digest/dates/reference in a separately authorized step (launch runbo
 | transactional email (3c) | one Postgres outbox row is inserted with FULFILLED in the same transaction; an async worker (every 10 s) sends through Notisend (`POST /v1/email/messages`) and stores the Notisend message `id`. Notisend has no idempotency key, so a send is repeated only when the message provably was not queued (HTTP 429 after the provider's delay, or a connection that never opened), at most 10 attempts. Any outcome where it may have been queued (timeout, reset, 408, 5xx, unreadable success) and an expired send lease become operator attention without another send; so does a refusal (4xx) or a `skipped`/bounced recipient. The stable outbox key travels as the `X-Mikluha-Outbox-Key` header so an operator can match the message in the Notisend log. Contract/order mail has no unsubscribe mechanism; marketing is a separate class |
 | booking rate limit (3c) | trust only exactly one valid `X-Forwarded-For` IP from the single Coolify/Traefik hop; missing, malformed or multiple values share one conservative untrusted-ingress bucket. The in-memory store has TTL eviction and a hard size bound. A body-size limit and order-scoped controls remain separate protections. SmartCaptcha is reserved for observed abuse, not launch |
 | ЕИС filing (3d) | the first proven paid state atomically creates `EIS_PENDING`. Only an explicit `commerce_operator` action after manual submission in the ЕИС personal account records `EIS_SUBMITTED` and its actual electronic-voucher number. One normalized number is lifetime-owned by one order, including historical numbers after corrections, and concurrent cross-order claims fail closed. Submission must name the material revision printed with the reviewed filing packet; an intervening change is refused as `EIS_PACKET_STALE`. A later contract/tourist correction or refund becomes `EIS_NEEDS_UPDATE`; commerce never claims it filed anything and has no ЕИС API integration |
-| contract | the offer (`content/legal/oferta.yml`) plus the order's **Заявка на бронирование** (`src/zayavka.ts`), built from the order, its tourists and the tour's and departure's `contract` data in the CMS. A departure without complete contract data is not sold. The authoritative offer text/ref/hash are frozen on reservation and re-hashed before payment. The Заявка is rendered when the price is resolved, shown before paying exactly as stored, and accepted by paying; `/pay` carries its hash, and a different one is refused. Both frozen documents remain available on the cookie-protected order page and through the high-entropy bearer link in the confirmation email; only the token hash remains in `orders`, and the outbox drops its plaintext token when Notisend accepts the mail. The bearer token/path must be redacted or excluded from live Traefik/Coolify access logs. After payment the database forbids changing the Заявка. Erased 3 years after the contract ended (24 hours after an unpaid order ends); its hash stays |
+| contract | the offer (`content/legal/oferta.yml`) plus the order's **Заявка на бронирование** (`src/zayavka.ts`), built only from the verified order `contract_snapshot`, its frozen facts and tourists. A departure without complete contract data is not sold. The authoritative offer text/ref/hash are frozen on reservation and re-hashed before payment. The Заявка is rendered when the price is resolved, shown before paying exactly as stored, and accepted by paying; `/pay` carries its hash, and a different one is refused. Both frozen documents remain available on the cookie-protected order page and through the high-entropy bearer link in the confirmation email; only the token hash remains in `orders`, and the outbox drops its plaintext token when Notisend accepts the mail. The bearer token/path must be redacted or excluded from live Traefik/Coolify access logs. The database forbids replacing the Заявка even before payment; retention may only erase its content, keeping the digest. Erased 3 years after the contract ended (24 hours after an unpaid order ends); its hash stays |
 | erasure | unpaid (EXPIRED, CANCELLED): everything, the Заявка included, within 24 h of ending; no contract was concluded. A paid trip (PAID, FULFILLED, REFUNDED): the contact and tourist rows 90 days after it ends; the Заявка, which is the contract, **3 years after the contract ended** (ПП РФ №748): the trip's end for FULFILLED, the refund (`closed_at`) for REFUNDED, never for a PAID order, whose contract is still open. Nothing under `legal_hold` or while money is unresolved |
 | booking switch | closed on a new database. Only an operator login (`commerce_operator`) can change it, through `fn_set_sales_open`, which records who, why and the database login. The service can read it, never change it. A sale reads it under a lock in its own transaction |
 
@@ -182,14 +186,86 @@ uses a modelled gateway and is not live acceptance.
 | `contract_snapshot` | written by `reserve()` (`src/contract-snapshot.ts`, schema `mikluha.order-contract/1`, `sha256:` of its RFC 8785 form): price, programme, route, accommodation with registry facts, carrier, included/excluded services, schedule and meeting points. The database checks its shape and that it agrees with the order's slug, dates, times, timezone and price, requires it on every new order, and refuses any later change, NULL or backfill; an order never changes `departure_id`. Orders from before 0008 keep NULL |
 | roles | `commerce_app` reads `tour`/`departure` only. `admin_app` (the isolated Admin API, ADR v2.1 §7) writes only through the editorial functions, which refuse any login that belongs to `commerce_app` (since 0009 it creates through them too, with no INSERT grant); it has no access to orders, payments, the switch or ЕИС. No role can change `booking_status`, `capacity` or `is_listed` yet (ART-366): departures stay CLOSED and unlisted |
 
-The current `reserve()` still reads `content/` and writes `departure_id = NULL`. For a linked
-PostgreSQL departure the insert trigger checks publication and schedule, not the authority of its
-price or programme. Snapshot shape, hash and agreement with the order do not prove which published
-revision the buyer accepted. Before the DB-backed reservation writer (ART-358/ART-362) is enabled,
-it must bind the accepted immutable revision/quote to the order and validate its price and contract.
-Comparing against the current mutable price would incorrectly reject a valid earlier quote.
-Schema 8 alone does not qualify that future writer. Supplier-name retention and the infrastructure
-role checker’s `admin_app` support remain owner-installation prerequisites.
+`reserve()` reads the published public PostgreSQL projection under the departure row/advisory
+locks, stores `departure_id` plus `accepted_departure_version` (an immutable revision FK) and builds
+the snapshot from that row. YAML cannot admit a missing, hidden or closed database departure.
+Supplier-name retention and the infrastructure role checker’s `admin_app` support remain
+owner-installation prerequisites.
+
+## Checkout contracts and quotes (migration 0013, ART-362)
+
+- `/book` and new reservations read published PostgreSQL offers. Legal release/PD consent and
+  refund qualification retain their existing separate gates. No content import or opening is
+  performed by this migration; an empty/unlisted DB catalogue refuses sales.
+- Resolution issues one immutable quote. Its exclusive deadline is the minimum of 15 minutes,
+  remaining hold, frozen departure minus 24 hours and Refref resolution expiry. This slice applies
+  no merchant promotions; adding one must also cap the deadline by its end. Cancellation or global
+  stop reject initiation under the same locks; ordinary CLOSED still permits an issued quote.
+- The stored application states the price guarantee and deadline. Programme, supplier, title,
+  schedule and receipt names come from the verified order snapshot only. A repeated/concurrent
+  return reuses the exact quote/document and never extends its expiry. Historical missing/invalid
+  snapshots fail closed; they are not reconstructed from today's catalogue.
+- Expiry only releases RESERVED orders with no frozen snapshot, attempt id or payment-start marker.
+  An active read-only resolution has a durable token; expiry revokes it before releasing an overdue
+  unpaid hold, so a late callback cannot apply. PAYMENT_PENDING/HELD seats remain occupied past 30
+  and 60 minutes. The latter is only a request to Refref to cancel, never permission to free seats.
+- An operator may call `fn_request_departure_cancellation(slug, actor, reason)` using the separate
+  commerce_operator login. This closes admission and marks a durable cancellation request. The
+  reconciler requests Refref cancellation immediately for open attempts, continuing read-back and
+  fulfilment. `fn_complete_departure_cancellation(slug, actor, reason)` refuses unresolved, HELD,
+  paid or fulfilled orders (and live reservations); paid obligations require the separate refund
+  workflow. Both commands are audited in `departure_cancellation_event`. A request cannot be reset
+  or reopened by ordinary editorial publication.
+- Global stop still permits reconciliation and fulfilment. Attempt bodies keep Snapshot V2 and
+  carry neither `inventoryReservation` nor `latePaymentPolicy`; no Alfa session lifetime is needed
+  to qualify this merchant-held model.
+
+Migration 0014 records attempt-dispatch evidence separately from the frozen payment snapshot.
+Only a new reservation writer supplies `NOT_STARTED`; historical orders default to `UNKNOWN`.
+Before sending any `createAttempt`, Commerce commits `STARTED`, then repeats admission under a
+bounded shared stop barrier. A proven first dispatch does not require merchant-order GET; previously
+started/unknown work does. A 404 is not proof that an earlier POST cannot still commit. Exact-key
+POST retries require current admission. A proven unstarted cancellation can end locally;
+STARTED/UNKNOWN retains its seat until safe remote confirmation or manual resolution. A crash
+between arming and sending is deliberately uncertain. HELD/CANCELLED logs retain their reasons,
+and RESOLVED events retain sanitized attribution source. Hold/cancel technical logs are emitted only after a successful committed compare-and-set; `order_event` remains authoritative.
+
+Migration 0015 separates remote operations from ordinary departure locking. Resolve, legal HTTP
+and Refref GETs retain no transaction/client during I/O. Resolution uses an order-scoped token,
+checked again under short locks when applying its result; expiry can atomically revoke this
+read-only token only on an overdue RESERVED order without payment evidence. Mutating Refref calls
+retain only the global share lock, shared departure-initiation barrier and per-order advisory key;
+reservation and editorial publication do not take that barrier. Only cancellation requires its
+exclusive side. The running service splits its original ten-connection budget into normal (8)
+and initiation (2) pools with the same login, so slow writes cannot consume all normal connections.
+The initiation pool waits at most 3000 ms for a connection, returning PAYMENT_TEMPORARILY_BUSY for a safe retry on the same order. All Refref HTTP calls have a 20-second absolute deadline including the response body (in addition to the 15-second inactivity timeout). A timeout remains UNKNOWN and uses the existing fixed-key recovery; it never frees payment seats.
+Duplicate order requests share bounded work. No payment/uncertain operation is released on a TTL.
+
+Migration 0016 adds `resolution_started_at`. Maintenance revokes a resolution token at two minutes only on RESERVED without frozen snapshot, attempt or payment evidence. Applying a response also checks the lease and operation identity. Pre-upgrade tokens without a start are revoked on the next maintenance pass. Identical handoff retries are permitted by Refref docs/28 §5 (201 first call, 200 identical replay, 409 different fingerprint); frozen lines and the same handoff token produce the same request. An invalid/expired handoff is not retried by maintenance: the customer follows the existing handoff again. The public order/form and refusal pages link `/#contacts` after cutoff; no new online pay action remains.
+
+The hold is up to 30 minutes, capped at the T−24h cutoff, even if its quote expires at minute 15. The protected rebooking
+link supplies a replacement reference only after verifying the old order's browser cookie. Reserve
+then atomically cancels that expired, unstarted order and creates the replacement, links it with an
+immutable unique `replaces_order_id`, or rolls back on any refusal. Other buyers cannot abandon
+that hold. Syntax, consent, contact and passenger normalization are checked before any DB checkout;
+age/capacity/date admission stays under short authoritative locks. `/book` and reserve share one
+published-offer adapter and use an exclusive cutoff exactly 24 elapsed hours before local departure.
+
+Historical RESERVED applications with no `quote_issued_at` are refused as `QUOTE_REQUIRES_REBOOK`.
+Their document and price are preserved; no resolution is refreshed underneath an old application.
+The protected order page shows a new-booking link for such orders and for an expired quote, retaining
+the stored documents and hiding the payment action.
+
+Historical PAYMENT_PENDING is separate: the verified frozen snapshot, original hold, resolution
+expiry and frozen service start minus 24 hours define its admitted payment window. Matching attempts can be
+recovered/retried and identical frozen dispatch can continue within that window, without inventing
+quote timestamps or re-rendering the contract. Expired legacy initiation returns RESERVATION_EXPIRED;
+read-back/fulfilment continue. A schema-11 upgrade test covers both pending cases and refused
+RESERVED repricing.
+
+Source/isolated tests do not establish provider conformance, production migration/restore/PITR,
+D8, financial activation or the owner-authorized SSR cutover. See
+[design and validation scope](../docs/plans/2026-10-23-art-362-checkout-design.md).
 
 ## Content CRUD and execution changes (migrations 0009–0010)
 
@@ -228,9 +304,8 @@ A newly saved draft has a new revision. Move/cancel resolution is not implemente
   and reject unauthenticated, expired and non-OWNER sessions even if they supply `by: 'owner'`.
   ART-365 must exercise this through the API; hiding a UI control is insufficient.
 
-Not here: Control Room screens (ART-365), the Admin API process and TOTP (ART-363), the
-`bookingStatus`/`isListed` transitions (ART-366), and the DB-backed quote/reservation writer that
-binds an order to the published revision it accepted (ART-362).
+Remaining follow-ups: Control Room editor screens (ART-365) and ordinary
+`bookingStatus`/`isListed` transitions (ART-366). The ART-362 writer is described above.
 
 ## Database roles
 
@@ -535,7 +610,7 @@ compares the image's immutable identity with the declared SHA. Merge-tree result
 for a differently labelled HEAD image. After merge, a release candidate needs separate qualification
 of the actual release SHA/tree/digest.
 
-The image probe intentionally asserts bundled schema **12**: when adding 0013, revise the baseline,
+The image probe intentionally asserts bundled schema **12**: when adding 0014, revise the baseline,
 forward fixture and compatibility qualification together; do not merely remove that assertion.
 
  A disposable internal Docker network contains
