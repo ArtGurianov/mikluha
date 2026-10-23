@@ -290,6 +290,8 @@ describe('the boundary', () => {
     assert.equal((await save(1, doc)).status, 200);
     assert.deepEqual((await pub(owner.cookie, 2, 0)).body, { outcome: 'PUBLISHED', version: 1, changeId: null, affectedOrders: 0 });
 
+    await db.owner.query("UPDATE departure SET booking_status='OPEN',is_listed=true,capacity=12 WHERE id=$1", [dep]);
+    await db.owner.query('UPDATE tour SET is_listed=true WHERE id=$1', [tour]);
     await setSalesOpen(db.operator, true, 'test', 'an order for the classification');
     const r = await reserve({ pool: db.pool, catalog, log: () => undefined, allowDemo: false, now: () => new Date() }, {
       departureSlug: 'altai-admin', contact: { phone: '+79039075547', email: 'ivan@example.ru' }, passengers: [tourist(1)],

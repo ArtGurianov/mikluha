@@ -1,4 +1,4 @@
-// An unchanged, digest-pinned image on schema 12, then an appended additive fixture on schema 13.
+// An unchanged, digest-pinned image on schema 16, then an appended additive fixture on schema 17.
 // All credentials are disposable; the internal network has no published ports or host mounts.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';

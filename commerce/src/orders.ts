@@ -15,9 +15,12 @@ import { randomBytes } from 'node:crypto';
 
 import type pg from 'pg';
 
-import { bookable, type Catalog, type NotBookable } from './catalog.js';
+import { bookingCutoff } from './booking-window.js';
+
+import { type Catalog, type NotBookable } from './catalog.js';
 import { buildContractSnapshot, contractSnapshotHash } from './contract-snapshot.js';
 import type { Logger } from './log.js';
+import { bookablePublished } from './public-content.js';
 import type { LegalReleaseAdmission } from './legal-admission.js';
 
 export const MAX_SEATS_PER_ORDER = 6;
@@ -75,6 +78,8 @@ export function normalizeDocument(citizenship: string, d: TouristInput['document
 
 export interface BookingRequest {
   readonly departureSlug: string;
+  /** Only after the HTTP handler verifies ownership of the old order. */
+  readonly replacementOrderRef?: string;
   /** The customer's phone and email. The customer is passengers[0]. */
   readonly contact: { readonly phone: string; readonly email: string };
   readonly passengers: readonly TouristInput[];
@@ -87,7 +92,7 @@ export interface BookingRequest {
 }
 
 export type BookingRefusal =
-  | NotBookable | 'SALES_CLOSED' | 'TERMS_NOT_CURRENT' | 'PD_CONSENT_NOT_CURRENT'
+  | NotBookable | 'REPLACEMENT_NOT_AVAILABLE' | 'SALES_CLOSED' | 'TERMS_NOT_CURRENT' | 'PD_CONSENT_NOT_CURRENT'
   | 'PD_CONSENT_NOT_CONFIRMED' | 'ADULTS_ONLY_NOT_CONFIRMED'
   | 'SEATS_INVALID' | 'NOT_ENOUGH_SEATS' | 'CONTACT_PHONE_INVALID'
   | 'CONTACT_EMAIL_INVALID' | 'PASSENGER_NAME_INVALID' | 'DATE_OF_BIRTH_INVALID' | 'PASSENGER_NOT_ADULT'
@@ -150,23 +155,15 @@ export async function setSalesOpen(pool: pg.Pool, open: boolean, by: string, rea
 }
 
 /**
- * Reserve seats for a new order. Everything is checked before the transaction; capacity is checked
- * inside it, under a lock on the departure, so two customers cannot both take the last seat.
+ * Reserve from the live published row, under the same row/advisory locks as editorial changes.
+ * No YAML price or contract can admit a booking; two customers cannot take the last seat.
  */
 export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<BookingResult> {
-  const now = (deps.now ?? (() => new Date()))();
   const refuse = (refusal: BookingRefusal): BookingResult => {
     deps.log('booking_refused', { departure: req.departureSlug, refusal });
     return { ok: false, refusal };
   };
 
-  if (deps.legalAdmission !== undefined) {
-    try { await deps.legalAdmission.verify(); }
-    catch { return refuse('LEGAL_RELEASE_NOT_ADMITTED'); }
-  }
-
-  const departure = bookable(deps.catalog, req.departureSlug, now, deps.allowDemo);
-  if (typeof departure === 'string') return refuse(departure);
   if (req.termsRef !== deps.catalog.terms.ref || req.termsHash !== deps.catalog.terms.hash) return refuse('TERMS_NOT_CURRENT');
   if (req.pdConsentRef !== deps.catalog.pdConsent.ref || req.pdConsentHash !== deps.catalog.pdConsent.hash) {
     return refuse('PD_CONSENT_NOT_CURRENT');
@@ -185,8 +182,7 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
   for (const p of req.passengers) {
     const n = name(p.fullName);
     if (n === null) return refuse('PASSENGER_NAME_INVALID');
-    if (!realDate(p.dateOfBirth) || p.dateOfBirth >= departure.startsOn) return refuse('DATE_OF_BIRTH_INVALID');
-    if (ageOn(p.dateOfBirth, departure.startsOn) < ADULT_AGE) return refuse('PASSENGER_NOT_ADULT');
+    if (!realDate(p.dateOfBirth)) return refuse('DATE_OF_BIRTH_INVALID');
     const citizenship = p.citizenship.trim().toUpperCase();
     if (countryName(citizenship) === null) return refuse('CITIZENSHIP_INVALID');
     const doc = normalizeDocument(citizenship, p.document);
@@ -195,41 +191,66 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
       documentType: doc.type, documentSeries: doc.series, documentNumber: doc.number });
   }
 
+  if (deps.legalAdmission !== undefined) {
+    try { await deps.legalAdmission.verify(); }
+    catch { return refuse('LEGAL_RELEASE_NOT_ADMITTED'); }
+  }
+
   const client = await deps.pool.connect();
   try {
     await client.query('BEGIN');
-    // The switch is read in the same transaction that sells: closing it stops every later sale.
     const open = await client.query<{ open: boolean }>('SELECT fn_sales_open_for_sale() AS open');
-    if (open.rows[0]?.open !== true) {
-      await client.query('ROLLBACK');
-      return refuse('SALES_CLOSED');
+    if (open.rows[0]?.open !== true) return refuse('SALES_CLOSED');
+    const departureId = (await client.query<{ id: string | null }>('SELECT fn_lock_checkout_departure($1) AS id', [req.departureSlug])).rows[0]!.id;
+    let now = (deps.now ?? (() => new Date()))();
+    const departure=await bookablePublished(client,deps.catalog,req.departureSlug,now,deps.allowDemo);
+    if (typeof departure==='string') return refuse(departure);
+    for (const p of passengers) {
+      if (p.dateOfBirth >= departure.startsOn) return refuse('DATE_OF_BIRTH_INVALID');
+      if (ageOn(p.dateOfBirth,departure.startsOn)<ADULT_AGE) return refuse('PASSENGER_NOT_ADULT');
     }
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`departure:${departure.slug}`]);
+    let replacedId:string|null=null;
+    if (req.replacementOrderRef !== undefined) {
+      const prior=(await client.query<{id:string}>(`SELECT id FROM orders WHERE order_ref=$1 AND departure_slug=$2
+        AND status='RESERVED' AND (quote_expires_at IS NULL OR quote_expires_at <= $3)
+        AND snapshot IS NULL AND checkout_attempt_id IS NULL AND payment_pending_since IS NULL
+        AND resolution_operation_id IS NULL FOR UPDATE`,[req.replacementOrderRef,req.departureSlug,now])).rows[0];
+      if (!prior) return refuse('REPLACEMENT_NOT_AVAILABLE');
+      replacedId=prior.id;
+      await client.query("UPDATE orders SET status='CANCELLED',closed_at=$2 WHERE id=$1",[prior.id,now]);
+      await client.query("INSERT INTO order_event(order_id,at,event,detail) VALUES ($1,$2,'CANCELLED','QUOTE_REPLACED')",[prior.id,now]);
+    }
+
     const taken = await client.query<{ seats: string }>(
       `SELECT coalesce(sum(seats), 0) AS seats FROM orders
-        WHERE departure_slug = $1 AND status = ANY($2) AND NOT (status = 'RESERVED' AND reserved_until <= $3)`,
+        WHERE departure_slug = $1 AND status = ANY($2) AND NOT (status = 'RESERVED' AND reserved_until <= $3 AND snapshot IS NULL AND checkout_attempt_id IS NULL AND payment_pending_since IS NULL AND resolution_operation_id IS NULL)`,
       [departure.slug, TAKEN, now]);
     if (Number(taken.rows[0]!.seats) + seats > departure.capacity) {
       await client.query('ROLLBACK');
       return refuse('NOT_ENOUGH_SEATS');
     }
+    // Recheck after the awaited capacity/replacement reads, before creating the hold.
+    now = (deps.now ?? (()=>new Date()))();
+    const cutoff=bookingCutoff(departure.startsOn,departure.contract.departure.departureTime,departure.timezone);
+    if (cutoff<=now) return refuse('BOOKING_CUTOFF_REACHED');
     const orderRef = newOrderRef();
-    const reservedUntil = new Date(now.getTime() + RESERVATION_MINUTES * 60_000);
+    const reservedUntil = new Date(Math.min(now.getTime() + RESERVATION_MINUTES * 60_000,
+      cutoff.getTime()));
     const amount = departure.priceKopecks * seats;
     // The buyer's contract, as resolved now: later edits of the departure never reach this order.
-    const contract = buildContractSnapshot(departure, deps.catalog.timezone);
+    const contract = buildContractSnapshot(departure, departure.timezone);
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO orders (order_ref, departure_slug, trip_starts_on, trip_ends_on, seats, unit_price_kopecks,
                            amount_kopecks, status, reserved_until, legal_release_ref, legal_release_hash, legal_release_content,
                            pd_consent_ref, pd_consent_hash, pd_consent_content, pd_consent_accepted_at,
                            adults_only_confirmed, created_at, trip_departure_time, trip_return_time, trip_timezone,
-                           contract_snapshot, contract_snapshot_sha256)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'RESERVED', $8, $9, $10, $11, $12, $13, $14, $15, true, $15, $16, $17, $18, $19, $20) RETURNING id`,
+                           contract_snapshot, contract_snapshot_sha256, departure_id, accepted_departure_version, attempt_creation_state, replaces_order_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'RESERVED', $8, $9, $10, $11, $12, $13, $14, $15, true, $15, $16, $17, $18, $19, $20, $21, $22, 'NOT_STARTED', $23) RETURNING id`,
       [orderRef, departure.slug, departure.startsOn, departure.endsOn, seats, departure.priceKopecks, amount,
         reservedUntil, req.termsRef, req.termsHash, deps.catalog.terms.text, deps.catalog.pdConsent.ref,
         deps.catalog.pdConsent.hash, deps.catalog.pdConsent.text, now,
-        departure.contract.departure.departureTime, departure.contract.departure.returnTime, deps.catalog.timezone,
-        contract, contractSnapshotHash(contract)]);
+        departure.contract.departure.departureTime, departure.contract.departure.returnTime, departure.timezone,
+        contract, contractSnapshotHash(contract), departureId, departure.publishedVersion, replacedId]);
     const id = inserted.rows[0]!.id;
     // The customer is tourist №1: their name is that tourist's, by construction.
     await client.query('INSERT INTO order_contact (order_id, full_name, phone, email) VALUES ($1, $2, $3, $4)',
@@ -242,12 +263,14 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
     await client.query(`INSERT INTO order_event (order_id, at, event, detail) VALUES ($1, $2, 'RESERVED', $3)`,
       [id, now, `seats:${seats}`]);
     await client.query('COMMIT');
+    if (replacedId !== null) deps.log('order_cancelled',{orderRef:req.replacementOrderRef!,reason:'QUOTE_REPLACED'});
     deps.log('booking_reserved', { orderRef, departure: departure.slug, seats, amountKopecks: amount });
     return { ok: true, orderRef, amountKopecks: amount, reservedUntil };
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw e;
   } finally {
+    await client.query('ROLLBACK').catch(() => undefined);
     client.release();
   }
 }
@@ -260,9 +283,19 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // A crashed read-only resolve can be retried with the same handoff identity (Refref docs/28 §5).
+    const stale = await client.query<{ id: string }>(`UPDATE orders SET resolution_operation_id=NULL, resolution_started_at=NULL
+      WHERE status='RESERVED' AND snapshot IS NULL AND checkout_attempt_id IS NULL AND payment_pending_since IS NULL
+        AND resolution_operation_id IS NOT NULL AND (resolution_started_at IS NULL OR resolution_started_at <= $1::timestamptz - interval '2 minutes')
+      RETURNING id`, [now]);
+    for (const r of stale.rows) await client.query("INSERT INTO order_event(order_id,at,event) VALUES ($1,$2,'RESOLUTION_LEASE_EXPIRED')", [r.id,now]);
+    // Resolution has no payment authority. Revoke its token atomically before releasing an
+    // overdue unpaid order; its callback must match that token and RESERVED before applying.
+    // Frozen/started/uncertain payments never enter this branch.
     const expired = await client.query<{ id: string }>(
-      `UPDATE orders SET status = 'EXPIRED', closed_at = $1
-        WHERE status = 'RESERVED' AND reserved_until <= $1 RETURNING id`, [now]);
+      `UPDATE orders SET status = 'EXPIRED', closed_at = $1, resolution_operation_id = NULL, resolution_started_at = NULL
+        WHERE status = 'RESERVED' AND reserved_until <= $1 AND snapshot IS NULL
+          AND checkout_attempt_id IS NULL AND payment_pending_since IS NULL RETURNING id`, [now]);
     for (const r of expired.rows) {
       await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'EXPIRED')`, [r.id, now]);
     }

@@ -18,7 +18,7 @@ import { RefrefClient } from '../src/refref.js';
 import { createCommerceServer } from '../src/server.js';
 import { createWebHandler } from '../src/web.js';
 import { FakeRefref } from './fake-refref.js';
-import { captureLog, fixtureCatalog, freshDb, type TestDb } from './helpers.js';
+import { captureLog, seedCatalog, fixtureCatalog, freshDb, type TestDb } from './helpers.js';
 
 const MERCHANT_ID = '3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90';
 const COMMERCE = 'https://book.mikluha.example';
@@ -112,6 +112,7 @@ let checkoutDeps: CheckoutDeps;
 before(async () => {
   db = await freshDb();
   catalog = fixtureCatalog([{ slug: 'altai-2026-11-01', startsOn: '2026-11-01', endsOn: '2026-11-04', capacity: 3 }]);
+  await seedCatalog(db, catalog);
   refref = new FakeRefref(MERCHANT_ID);
   await refref.start();
   vnext = new FakeVnext();

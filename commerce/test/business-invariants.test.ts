@@ -11,7 +11,7 @@ import { commerceMonitorSignals, monitorHasAlert } from '../src/monitor.js';
 import { maintain, reserve, setSalesOpen } from '../src/orders.js';
 import { RefrefClient } from '../src/refref.js';
 import { FakeRefref } from './fake-refref.js';
-import { captureLog, fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
+import { captureLog, fixtureCatalog, freshDb, seedCatalog, tourist, type TestDb } from './helpers.js';
 
 const now = new Date('2026-10-23T03:00:00Z');
 const merchant = { businessId: '3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90', businessSlug: 'mikluha',
@@ -24,6 +24,7 @@ let logs: ReturnType<typeof captureLog>;
 
 before(async () => {
   db = await freshDb();
+  await seedCatalog(db,catalog);
   fake = new FakeRefref(merchant.businessId, () => now);
   await fake.start();
 });
@@ -101,6 +102,18 @@ test('BI01 stop-sales waits for an in-flight session and then prevents new sessi
   const before = fake.requests.length;
   assert.deepEqual(await pay(deps, order.ref, order.hash), { kind: 'STATUS', code: 'SALES_CLOSED' }, 'BI01: stop refuses retry');
   assert.equal(fake.requests.length, before, 'BI01: no new external call after close commits');
+  // Stop after the short freeze check but before the separate session barrier.
+  await setSalesOpen(db.operator,true,'synthetic-operator','race setup');
+  const pool = new Proxy(db.pool,{get(target,key,receiver){
+    if(key==='query') return async(...args: Parameters<typeof target.query>)=>{
+      if(typeof args[0]==='string' && args[0].startsWith('SELECT email FROM order_contact'))
+        await setSalesOpen(db.operator,false,'synthetic-operator','between freeze and session');
+      return target.query(...args);
+    };
+    return Reflect.get(target,key,receiver);
+  }});
+  assert.deepEqual(await pay({...deps,pool},order.ref,order.hash),{kind:'STATUS',code:'SALES_CLOSED'},'BI01: session barrier rechecks a stop after freeze');
+  assert.equal(fake.requests.length,before,'BI01: no session across the final stop barrier');
 });
 
 test('BI02 close commits before pay crosses the sales lock', { timeout: 10_000 }, async () => {
@@ -151,10 +164,11 @@ test('BI04 ambiguous provider creation and duplicate pay replay the identical fr
   const restarted = { ...deps, refref: new RefrefClient({ apiBase: fake.base, apiKey: 'synthetic-only', timeoutMs: 500 }) };
   const sessionsBefore = fake.calls(/\/payment-session$/).length;
   assert.equal(sessionsBefore, 1, 'BI04: first ambiguous session was actually requested');
+  fake.state.projection = {status:404,code:'NOT_FOUND'}; // remote commit not visible yet
   const outcomes = await Promise.allSettled(Array.from({ length: 4 }, () => pay(restarted, order.ref, order.hash)));
   assert.ok(outcomes.every(r => r.status === 'fulfilled' && r.value.kind === 'REDIRECT'), 'BI04: all parallel retries return the live provider session');
   const sessions = fake.calls(/\/payment-session$/);
-  assert.equal(sessions.length - sessionsBefore, outcomes.length, 'BI04: observe every parallel payment-session replay');
+  assert.equal(sessions.length - sessionsBefore, 1, 'BI04: coalesced retries share one payment-session replay');
   const attemptId = fake.attempts.get(order.ref)!.id;
   assert.ok(sessions.every(r => r.path.includes(`/checkout-attempts/${attemptId}/`)), 'BI04: every session replay uses the same attempt');
   const attempts = fake.calls(/\/checkout-attempts$/);
@@ -185,7 +199,8 @@ test('BI05 duplicate readbacks and lost fulfilment ACK confirm exactly once afte
   const restarted = { ...deps, refref: new RefrefClient({ apiBase: fake.base, apiKey: 'synthetic-only' }) };
   await db.owner.query('BEGIN');
   await db.owner.query('SELECT id FROM orders WHERE order_ref = $1 FOR UPDATE', [order.ref]);
-  const replays = Promise.allSettled(Array.from({ length: 8 }, () => reconcileOrder(restarted, order.ref)));
+  // Distinct pool identities simulate independent workers despite per-process coalescing.
+  const replays = Promise.allSettled(Array.from({ length: 8 }, () => reconcileOrder({ ...restarted, pool: new Proxy(db.pool,{}) }, order.ref)));
   let observed: number;
   try { observed = await waitLocks('commerce_test_runtime', 8); }
   finally { await db.owner.query('COMMIT'); }

@@ -14,7 +14,7 @@ import { MIGRATIONS_DIR } from '../src/config.js';
 import { buildContractSnapshot, contractSnapshotHash, contractSnapshotIntact } from '../src/contract-snapshot.js';
 import { schemaHead } from '../src/migrate.js';
 import { reserve, setSalesOpen, type BookingRequest } from '../src/orders.js';
-import { fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
+import { seedCatalog, fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
 
 const run = promisify(execFile);
 const NOW = new Date('2026-10-04T06:00:00Z');
@@ -298,11 +298,16 @@ describe('date lock', () => {
 
   test('an order made before departures lived in the database locks its slug too', async () => {
     await setSalesOpen(db.operator, true, 'test', 'open for the test');
-    const req: BookingRequest = { departureSlug: 'altai-legacy', contact: { phone: '+79039075547', email: 'ivan@example.ru' },
-      passengers: [tourist(1)], adultsOnlyConfirmed: true, termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
-      pdConsentConfirmed: true, pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash };
-    const r = await reserve({ pool: db.pool, catalog, log: () => undefined, allowDemo: false, now: () => new Date() }, req);
-    assert.equal(r.ok, true);
+    const historic = await newDeparture();
+    const ref = await insertOrder(historic, { departureId: null });
+    await db.owner.query('ALTER TABLE orders DISABLE TRIGGER trg_order_contract_immutable');
+    await db.owner.query('ALTER TABLE orders DISABLE TRIGGER trg_frozen_trip_schedule');
+    try {
+      await db.owner.query("UPDATE orders SET departure_slug='altai-legacy', contract_snapshot=NULL, contract_snapshot_sha256=NULL WHERE order_ref=$1", [ref]);
+    } finally {
+      await db.owner.query('ALTER TABLE orders ENABLE TRIGGER trg_order_contract_immutable');
+      await db.owner.query('ALTER TABLE orders ENABLE TRIGGER trg_frozen_trip_schedule');
+    }
     const tour = await publishedTour();
     const id = (await db.admin.query('SELECT fn_create_departure($1, $2, $3) AS id', [tour.id, 'altai-legacy', 'editor'])).rows[0].id;
     await db.admin.query('SELECT fn_save_departure_draft($1, 1, $2, $3)', [id, departureDoc('altai-legacy'), 'editor']);
@@ -386,6 +391,7 @@ describe('the order contract snapshot', () => {
   test('reserve() stores the resolved contract of the departure it sold, and a later catalog does not reach it', async () => {
     await setSalesOpen(db.operator, true, 'test', 'open for the test');
     const c = fixtureCatalog([{ slug: 'altai-reserve', startsOn: '2027-08-01', endsOn: '2027-08-04', price: 26500 }]);
+    await seedCatalog(db, c);
     const req: BookingRequest = { departureSlug: 'altai-reserve', contact: { phone: '+79039075547', email: 'ivan@example.ru' },
       passengers: [tourist(1), tourist(2)], adultsOnlyConfirmed: true, termsRef: c.terms.ref, termsHash: c.terms.hash,
       pdConsentConfirmed: true, pdConsentRef: c.pdConsent.ref, pdConsentHash: c.pdConsent.hash };
@@ -450,6 +456,8 @@ test('schema restore: a logical dump restored into an empty database enforces th
 
 test('reserve() holds the schedule lock until its real order commits', async () => {
   const d = await newDeparture();
+  await db.owner.query("UPDATE departure SET booking_status='OPEN',is_listed=true,capacity=12 WHERE id=$1", [d.id]);
+  await db.owner.query('UPDATE tour SET is_listed=true WHERE id=(SELECT tour_id FROM departure WHERE id=$1)', [d.id]);
   const c = fixtureCatalog([{ slug: d.slug, startsOn: '2027-06-01', endsOn: '2027-06-04', price: 34000 }]);
   await setSalesOpen(db.operator, true, 'test', 'concurrent reservation');
   const editor = new pg.Client({ connectionString: db.url.toString() });

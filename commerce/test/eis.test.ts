@@ -5,13 +5,13 @@ import pg from 'pg';
 
 import { eisFilingPacket, eisRecords, markEisNeedsUpdate, recordEisSubmitted } from '../src/eis.js';
 import { maintain, reserve } from '../src/orders.js';
-import { fixtureCatalog, forceStatus, freshDb, tourist, type TestDb } from './helpers.js';
+import { seedCatalog, fixtureCatalog, forceStatus, freshDb, tourist, type TestDb } from './helpers.js';
 
 let db: TestDb;
 const now = new Date('2026-10-04T06:00:00Z');
 const catalog = fixtureCatalog([{ slug: 'altai-eis', startsOn: '2026-11-01', endsOn: '2026-11-04' }]);
 
-before(async () => { db = await freshDb(); });
+before(async () => { db = await freshDb(); await seedCatalog(db, catalog); });
 after(async () => { await db.drop(); });
 beforeEach(async () => {
   await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');

@@ -31,7 +31,8 @@ export interface ZayavkaInput {
   readonly formedAt: string;
   readonly timezone: string;
   readonly offerRef: string;
-  readonly departure: Departure & { readonly contract: NonNullable<Departure['contract']> };
+  readonly departure: Pick<Departure, 'slug' | 'tourSlug' | 'tourTitle' | 'startsOn' | 'endsOn'> & { readonly contract: NonNullable<Departure['contract']> };
+  readonly quoteExpiresAt?: string;
   /** The customer: tourist №1, with their phone and email. */
   readonly contact: { readonly fullName: string; readonly phone: string; readonly email: string };
   readonly tourists: readonly Tourist[];
@@ -50,6 +51,7 @@ export function renderZayavka(z: ZayavkaInput): string {
   const services = dc.services.length === 0 ? '<p>Не предусмотрены.</p>'
     : `<table><tr><th>Услуга</th><th>Поставщик</th><th>Включено в цену</th><th>Примечание</th></tr>${dc.services.map((x) =>
       `<tr><td>${esc(x.name)}</td><td>${esc(x.supplier)}</td><td>${x.included ? 'Да' : 'Нет'}</td><td>${esc(x.note ?? '')}</td></tr>`).join('')}</table>`;
+  const quoteDeadline = z.quoteExpiresAt ? new Intl.DateTimeFormat('ru-RU', { timeZone: z.timezone, dateStyle: 'short', timeStyle: 'medium' }).format(new Date(z.quoteExpiresAt)) : null;
   const program = tour.program.map((day) => `<h4>${esc(day.title)}</h4>${list(day.items)}`).join('');
   return `<article class="zayavka">
 <h2>Заявка на бронирование № ${esc(z.orderRef)}</h2>
@@ -71,6 +73,7 @@ ${services}
 ${program}
 <h3>5. Цена и оплата</h3>
 <table>${row('Общая цена туристского продукта', rub(z.amountKopecks))}${z.discountKopecks > 0 ? row('Скидка по приглашению', rub(z.discountKopecks)) : ''}${row('К оплате', rub(z.amountKopecks - z.discountKopecks))}${row('Порядок оплаты', '100% предварительная оплата')}</table>
+${z.quoteExpiresAt ? `<p>Цена к оплате гарантирована до ${esc(quoteDeadline!)} (${esc(z.timezone)}), не более 15 минут с формирования котировки и не позднее окончания брони, закрытия онлайн-продаж за 24 часа до выезда или окончания применённой акции. Изменение цены и обычное закрытие продаж не отменяют котировку. Отмена выезда или экстренная остановка оператора запрещают начало оплаты.</p>` : ''}
 <h3>6. Что включено / не включено</h3>
 <p>Включено в цену:</p>${list(tour.included)}
 <p>Не включено в цену:</p>${tour.excluded.length === 0 ? '<p>—</p>' : list(tour.excluded)}

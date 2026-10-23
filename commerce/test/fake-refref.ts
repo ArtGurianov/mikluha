@@ -12,6 +12,7 @@ type Behaviour = 'OK' | 'TIMEOUT' | 'ACCEPTED_TIMEOUT' | 'ERROR_500' | { status:
 
 export interface FakeState {
   discountKopecks: number;
+  resolutionExpiresAt: string | null;
   attempt: Behaviour;
   session: Behaviour | 'READY' | 'PROCESSING' | 'FAILED';
   cancel: Behaviour | 'OK';
@@ -20,6 +21,7 @@ export interface FakeState {
   obligation: 'OUTSTANDING' | 'IN_PROGRESS' | 'SATISFIED' | 'LATE_PAYMENT';
   attemptStatus: 'OPEN' | 'SETTLED' | 'CANCELLED' | 'EXPIRED';
   paymentAmountDelta: number;
+  projection: Behaviour;
   projectionMismatch: boolean;
   projectionResolutionMismatch: boolean;
 }
@@ -34,9 +36,10 @@ export class FakeRefref {
   ackTransitBody: { body: unknown } | undefined = undefined;
   readonly attempts = new Map<string, { id: string; key: string; body: string; snapshotHash: string;
     referralResolutionId: string; payable: number }>();
-  state: FakeState = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', ack: 'OK', obligation: 'IN_PROGRESS',
-    attemptStatus: 'OPEN', paymentAmountDelta: 0, projectionMismatch: false, projectionResolutionMismatch: false };
+  state: FakeState = { discountKopecks: 0, resolutionExpiresAt: null, attempt: 'OK', session: 'READY', cancel: 'OK', ack: 'OK', obligation: 'IN_PROGRESS',
+    attemptStatus: 'OPEN', paymentAmountDelta: 0, projection: 'OK', projectionMismatch: false, projectionResolutionMismatch: false };
   #server: Server | null = null;
+  #resolutionGate: { arrived: () => void; released: Promise<void> } | null = null;
   #gate: { arrived: () => void; released: Promise<void> } | null = null;
 
   /**
@@ -48,6 +51,13 @@ export class FakeRefref {
     let release!: () => void;
     const a = new Promise<void>((r) => { arrived = r; });
     this.#gate = { arrived, released: new Promise<void>((r) => { release = r; }) };
+    return { arrived: a, release };
+  }
+  holdResolutions(): { arrived: Promise<void>; release: () => void } {
+    let arrived!: () => void;
+    let release!: () => void;
+    const a = new Promise<void>((r) => { arrived = r; });
+    this.#resolutionGate = { arrived, released: new Promise<void>((r) => { release = r; }) };
     return { arrived: a, release };
   }
   base = '';
@@ -74,11 +84,15 @@ export class FakeRefref {
         let m: RegExpExecArray | null;
         if (req.method === 'POST' && path === '/integrations/referral-resolutions') {
           const line = body.lines[0];
-          send(201, { status: 'RESOLVED', referralResolutionId: '7a0e1c3b-5d2f-4e8a-b6c1-9f3d2e4a5b60', merchantOrderRef: body.merchantOrderRef,
+          const reply = () => send(201, { status: 'RESOLVED', referralResolutionId: '7a0e1c3b-5d2f-4e8a-b6c1-9f3d2e4a5b60', merchantOrderRef: body.merchantOrderRef,
             attributionSource: this.state.discountKopecks > 0 ? 'GRANT' : 'UNATTRIBUTED', campaignId: null, termsVersionId: null,
             checkoutCodeOutcome: 'NONE', inputHash: this.inputHash(body.merchantOrderRef, body.lines), currency: 'RUB',
             lines: [{ lineRef: line.lineRef, eligible: this.state.discountKopecks > 0, referralDiscountAmountKopecks: this.state.discountKopecks }],
-            totals: {}, expiresAt: new Date(this.now().getTime() + 30 * 60_000).toISOString() });
+            totals: {}, expiresAt: this.state.resolutionExpiresAt ?? new Date(this.now().getTime() + 30 * 60_000).toISOString() });
+          const gate = this.#resolutionGate;
+          this.#resolutionGate = null;
+          if (gate) { gate.arrived(); void gate.released.then(reply); }
+          else reply();
         } else if (req.method === 'POST' && (m = /^\/integrations\/orders\/([^/]+)\/checkout-attempts$/.exec(path))) {
           const accept = (answer: boolean) => {
             const ref = m![1]!;
@@ -104,10 +118,13 @@ export class FakeRefref {
           if (this.state.attempt === 'ACCEPTED_TIMEOUT') accept(false);
           else behave(this.state.attempt, () => accept(true));
         } else if (req.method === 'GET' && (m = /^\/integrations\/merchant-orders\/([^/]+)$/.exec(path))) {
-          const a = this.attempts.get(m[1]!);
-          if (!a) { send(404, { error: { code: 'NOT_FOUND' } }); return; }
-          send(200, { id: '10000000-0000-4000-8000-000000000001', merchantOrderId: m[1], status: 'OPEN',
-            checkoutAttempts: [this.projection(a)] });
+          // Read refusal/timeout applies even before an attempt exists (no existence oracle).
+          behave(this.state.projection,()=>{
+            const a = this.attempts.get(m![1]!);
+            if (!a) { send(404, { error: { code: 'NOT_FOUND' } }); return; }
+            send(200, { id: '10000000-0000-4000-8000-000000000001', merchantOrderId: m![1], status: 'OPEN',
+              checkoutAttempts: [this.projection(a)] });
+          });
         } else if (req.method === 'POST' && /\/payment-session$/.test(path) && this.#gate !== null) {
           const gate = this.#gate;
           this.#gate = null;
@@ -164,11 +181,12 @@ export class FakeRefref {
     this.ackBody = undefined;
     this.ackTransitBody = undefined;
     this.#gate = null;
+    this.#resolutionGate = null;
     this.requests.length = 0;
     this.attempts.clear();
     this.fulfillments.clear();
-    this.state = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', ack: 'OK', obligation: 'IN_PROGRESS',
-      attemptStatus: 'OPEN', paymentAmountDelta: 0, projectionMismatch: false, projectionResolutionMismatch: false };
+    this.state = { discountKopecks: 0, resolutionExpiresAt: null, attempt: 'OK', session: 'READY', cancel: 'OK', ack: 'OK', obligation: 'IN_PROGRESS',
+      attemptStatus: 'OPEN', paymentAmountDelta: 0, projection: 'OK', projectionMismatch: false, projectionResolutionMismatch: false };
   }
 
   calls(pattern: RegExp, method = 'POST'): Recorded[] {

@@ -64,6 +64,42 @@
         "runtimeCommits": [],
         "evidence": "Protocol bootstrap: pre-protocol runtimes remain incompatible."
       }
+    },
+    {
+      "version": 13,
+      "file": "0013_checkout_quotes_and_cancellation.sql",
+      "checksum": "e895098dced0ac0800538d4164564362fbeb72fc0053fcc70a7a6a3b987f02ba",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "ART-362 checkout schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-23-art-362-checkout-design.md."
+      }
+    },
+    {
+      "version": 14,
+      "file": "0014_attempt_dispatch_evidence.sql",
+      "checksum": "9e9b31ae94eae8bb1b47981527d5a2604e76e6fc35ba4280c3d064479f6a0779",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "ART-362 checkout schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-23-art-362-checkout-design.md."
+      }
+    },
+    {
+      "version": 15,
+      "file": "0015_checkout_operation_scope.sql",
+      "checksum": "b5b5ea77f970f0a8bff6a758be66a706674405b26e330d9cd968e4dd66aab76f",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "ART-362 checkout schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-23-art-362-checkout-design.md."
+      }
+    },
+    {
+      "version": 16,
+      "file": "0016_resolution_lease.sql",
+      "checksum": "1a38157011fa8d9f73ad624a48c2d115431dbc87846d4df534e261b01dc7ab4f",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "ART-362 checkout schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-23-art-362-checkout-design.md."
+      }
     }
   ]
 }

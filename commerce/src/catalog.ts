@@ -11,6 +11,8 @@ import { basename, join } from 'node:path';
 
 import yaml from 'js-yaml';
 
+import { bookingCutoff } from './booking-window.js';
+
 /** What every departure of a tour shares in the contract: the program and the tour's conditions. */
 export interface TourContract {
   readonly destination: string;
@@ -214,7 +216,7 @@ export function todayIn(timezone: string, now: Date): string {
 
 export type NotBookable =
   | 'DEPARTURE_UNKNOWN' | 'DEPARTURE_NOT_OPEN' | 'DEPARTURE_NOT_LISTED' | 'DEPARTURE_DEMO'
-  | 'DEPARTURE_NO_PRICE' | 'DEPARTURE_NO_CAPACITY' | 'DEPARTURE_NO_CONTRACT' | 'DEPARTURE_STARTED' | 'REFUND_WORKFLOW_UNQUALIFIED';
+  | 'BOOKING_CUTOFF_REACHED' | 'DEPARTURE_NO_PRICE' | 'DEPARTURE_NO_CAPACITY' | 'DEPARTURE_NO_CONTRACT' | 'DEPARTURE_STARTED' | 'REFUND_WORKFLOW_UNQUALIFIED';
 
 export interface Bookable extends Departure {
   readonly priceKopecks: number;
@@ -236,6 +238,6 @@ export function bookable(catalog: Catalog, slug: string, now: Date, allowDemo: b
   if (d.priceKopecks === null) return 'DEPARTURE_NO_PRICE';
   if (d.capacity === null) return 'DEPARTURE_NO_CAPACITY';
   if (d.contract === null) return 'DEPARTURE_NO_CONTRACT';
-  if (d.startsOn <= todayIn(catalog.timezone, now)) return 'DEPARTURE_STARTED';
+  if (bookingCutoff(d.startsOn, d.contract.departure.departureTime, catalog.timezone) <= now) return 'BOOKING_CUTOFF_REACHED';
   return d as Bookable;
 }

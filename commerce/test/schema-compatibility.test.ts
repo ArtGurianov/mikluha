@@ -13,6 +13,7 @@ import { fixtureCatalog, freshDb, type TestDb } from './helpers.js';
 
 const SHA = 'a'.repeat(40);
 const migrations = readMigrations(MIGRATIONS_DIR);
+const nextHead=migrations.length+1;
 const build = { schemaHead: migrations.length, migrations, sourceCommit: SHA };
 let db: TestDb;
 let dir: string;
@@ -36,18 +37,18 @@ const check = () => schemaReadiness(db.pool, build);
 
 test('exact head, compatible ahead, original runtime rollback and independent legal gate', async () => {
   assert.equal((await check()).status, 'READY');
-  assert.deepEqual(await forward(), [13]);
-  assert.deepEqual(await check(), { status: 'READY', schema: 13 });
+  assert.deepEqual(await forward(), [nextHead]);
+  assert.deepEqual(await check(), { status: 'READY', schema: nextHead });
   assert.equal((await schemaReadiness(db.admin, build)).status, 'READY');
   // Roll the application back to its unchanged bundled head, not the database backwards.
   await assert.rejects(migrate(db.owner, MIGRATIONS_DIR), /MIGRATION_CHANGED|MIGRATION_UNKNOWN/);
-  assert.deepEqual(await check(), { status: 'READY', schema: 13 });
+  assert.deepEqual(await check(), { status: 'READY', schema: nextHead });
   assert.equal((await readiness({ pool: db.pool, catalog: fixtureCatalog([]), ...build, startedAt: new Date(),
     legalAdmission: { verify: async () => { throw new Error('different site SHA'); } } })).reason, 'LEGAL_RELEASE_NOT_ADMITTED');
 });
 
 test('database behind image and a mismatched build manifest remain NOT_READY', async () => {
-  assert.equal((await schemaReadiness(db.pool, { ...build, schemaHead: 13 })).reason, 'SCHEMA_NOT_AT_HEAD');
+  assert.equal((await schemaReadiness(db.pool, { ...build, schemaHead: nextHead })).reason, 'SCHEMA_NOT_AT_HEAD');
   assert.equal((await schemaReadiness(db.pool, { ...build, migrations: migrations.slice(0, 11) })).reason, 'SCHEMA_BUILD_INVALID');
 });
 
@@ -62,10 +63,10 @@ test('every ahead version must approve this exact source SHA; missing or differe
 
 test('unknown, missing and altered attestations refuse ahead history', async () => {
   await forward();
-  await db.owner.query("UPDATE schema_migration_compatibility SET checksum = repeat('b', 64) WHERE version = 13");
+  await db.owner.query("UPDATE schema_migration_compatibility SET checksum = repeat('b', 64) WHERE version = $1",[nextHead]);
   assert.equal((await check()).reason, 'SCHEMA_AHEAD_UNKNOWN');
   await assert.rejects(migrate(db.owner, dir), /MIGRATION_COMPATIBILITY_CHANGED/);
-  await db.owner.query('DELETE FROM schema_migration_compatibility WHERE version = 13');
+  await db.owner.query('DELETE FROM schema_migration_compatibility WHERE version = $1',[nextHead]);
   assert.equal((await check()).reason, 'SCHEMA_AHEAD_UNKNOWN');
 });
 
@@ -90,8 +91,8 @@ test('runtime and admin cannot grant their own forward approvals', async () => {
 test('failed forward SQL rolls back DDL, history and approval atomically', async () => {
   await assert.rejects(forward([SHA], 'CREATE TABLE must_roll_back (id int); SELECT 1 / 0;'), /division by zero/);
   assert.equal((await db.owner.query("SELECT to_regclass('must_roll_back') AS t")).rows[0].t, null);
-  assert.equal((await db.owner.query('SELECT max(version) AS v FROM schema_migrations')).rows[0].v, 12);
-  assert.equal((await db.owner.query('SELECT max(version) AS v FROM schema_migration_compatibility')).rows[0].v, 12);
+  assert.equal((await db.owner.query('SELECT max(version) AS v FROM schema_migrations')).rows[0].v, migrations.length);
+  assert.equal((await db.owner.query('SELECT max(version) AS v FROM schema_migration_compatibility')).rows[0].v, migrations.length);
   assert.equal((await check()).status, 'READY');
 });
 
@@ -122,7 +123,7 @@ for (const mutation of ['delete', 'file', 'checksum', 'runtime_commits', 'eviden
   });
 }
 
-test('missing 0012 attestation is refused on exact schema 12', async () => {
+test('missing 0012 attestation is refused on the exact bundled schema', async () => {
   await db.owner.query('DELETE FROM schema_migration_compatibility WHERE version = 12');
   assert.equal((await check()).reason, 'SCHEMA_ATTESTATION_MISMATCH');
 });

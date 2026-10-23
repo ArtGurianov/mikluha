@@ -4,13 +4,13 @@ import { after, before, beforeEach, test } from 'node:test';
 
 import { NotisendClient, OUTBOX_KEY_HEADER, processEmailOutbox, type EmailSender } from '../src/email.js';
 import { reserve } from '../src/orders.js';
-import { captureLog, fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
+import { captureLog, seedCatalog, fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
 
 let db: TestDb;
 const catalog = fixtureCatalog([{ slug: 'altai-mail', startsOn: '2026-11-01', endsOn: '2026-11-04' }]);
 const now = new Date('2026-10-04T06:00:00Z');
 
-before(async () => { db = await freshDb(); });
+before(async () => { db = await freshDb(); await seedCatalog(db, catalog); });
 after(async () => { await db.drop(); });
 beforeEach(async () => {
   await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
