@@ -1,5 +1,6 @@
 // ART-327: remove real guards in disposable copies, never in the checkout or a running service.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -84,6 +85,22 @@ try {
         if (!originals.has(path)) originals.set(path, source);
         assert.equal(source.split(from).length - 1, 1, `${id} ${label}: mutation anchor drift in ${file}`);
         writeFileSync(path, source.replace(from, to));
+      }
+      // SQL mutants must reach the selected BUSINESS assertion, rather than failing setup
+      // at ART-317 integrity validation. Rehash only this disposable copy; Git history and
+      // committed lock remain unchanged and their own sabotage tests still reject rehashes.
+      const sqlEdits = edits.filter(({ file }) => file.startsWith('migrations/') && file.endsWith('.sql'));
+      if (sqlEdits.length > 0) {
+        const lockPath = join(scratch, 'migrations/migration.lock');
+        const source = readFileSync(lockPath, 'utf8');
+        originals.set(lockPath, source);
+        const lock = JSON.parse(source);
+        for (const { file } of sqlEdits) {
+          const entry = lock.migrations.find(m => m.file === file.slice('migrations/'.length));
+          assert.ok(entry, `Missing locked SQL mutant ${file}`);
+          entry.checksum = createHash('sha256').update(readFileSync(join(scratch, file))).digest('hex');
+        }
+        writeFileSync(lockPath, JSON.stringify(lock));
       }
       const result = run(id);
       assert.equal(result.status, 1, `${id} ${label}: mutation survived\n${result.output}`);

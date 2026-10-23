@@ -48,7 +48,7 @@ jobs:
         env:
           DEPLOY_ENV: staging
           SITE_URL: https://staging.invalid
-          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha }}
+          SOURCE_COMMIT: ${{ github.sha }}
         run: pnpm run build:production
 
   # mikluha-commerce (commerce/README.md): its own package, tests against a real Postgres, and the
@@ -72,6 +72,8 @@ jobs:
       TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:55432/postgres
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -83,6 +85,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --ignore-workspace
 
+      - name: Immutable migration history (including intermediate commits)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec tsx scripts/check-migration-history.ts "$BASE_SHA" "$HEAD_SHA"
+
       - run: pnpm run typecheck
 
       # test/editorial-contract.test.ts restores a pg_dump of the migrated schema with psql.
@@ -93,9 +101,47 @@ jobs:
       - name: Business-invariant sabotage sensitivity (ART-327)
         run: pnpm run test:sabotage
 
-      - name: Image
+      # Integration build uses the default test-merge checkout and its actual SHA.
+      - name: Merge-tree image
         working-directory: .
-        run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=${{ github.event.pull_request.head.sha }} -t mikluha-commerce:ci .
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT="$SOURCE_COMMIT" -t mikluha-commerce:merge-ci .
+
+  # Qualification is a different proof: the immutable runtime at the PR's exact HEAD,
+  # even when main advanced and the integration merge-tree contains different content/code.
+  commerce-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: commerce
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: commerce/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - name: Verify exact HEAD checkout and clean tracked source
+        run: node scripts/check-image-source.mjs "$EXPECTED_HEAD_SHA"
+
+      - name: Exact-HEAD image
+        working-directory: .
+        run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT="$EXPECTED_HEAD_SHA" -t mikluha-commerce:head-ci .
+
+      - name: Unchanged exact-HEAD image on compatible forward schema
+        run: pnpm exec tsx scripts/qualify-schema-image.ts mikluha-commerce:head-ci "$EXPECTED_HEAD_SHA"
 
   # The static Control Room (control-room/README.md, ART-363): its own package; `build` ends with the
   # no-secret check over the exported files, and the image is built as Coolify would.
@@ -127,4 +173,6 @@ jobs:
       - run: pnpm run build
 
       - name: Image
-        run: docker build --build-arg SOURCE_COMMIT=${{ github.event.pull_request.head.sha }} -t mikluha-control-room:ci .
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: docker build --build-arg SOURCE_COMMIT="$SOURCE_COMMIT" -t mikluha-control-room:ci .

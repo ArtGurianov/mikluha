@@ -51,7 +51,7 @@ static; everything that sells a trip lives here, with its own Postgres.
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
   integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migrations
-  0007–0011 need owner-only application and fresh schema-11 logical and PITR recovery evidence
+  0007–0012 need owner-only application and fresh schema-12 logical and PITR recovery evidence
   before future admission. Mikluha commerce is undeployed; monitor admission, sales and payments remain closed.
 
 ## Generic legal pack and individual application
@@ -460,3 +460,143 @@ checks snapshot shape/order consistency and digest format, not JSON-to-digest eq
 with a wrong digest, including one inserted by a direct owner writer. DB-backed document/reservation
 writers must invoke it and bind the accepted immutable revision before admission (ART-358/362).
 The current content-backed document path is not claimed to enforce this future gate.
+
+## Immutable migration history (ART-317)
+
+`migrations/migration.lock` fixes the filename, version and SHA-256 of every SQL file. Append a
+new journal entry, SQL file and lock entry together; never rewrite a committed entry. Startup
+and the migrator validate the complete directory before using it. The migrator also verifies
+that the database journal is a contiguous, byte-identical prefix before applying anything.
+
+CI finds all merge bases of the event's exact base/head SHAs and checks every commit against
+**each parent** on both divergent branches, including intermediate edits later reverted and lock
+removal on a side branch. The latest base's migrations must also be an unchanged prefix of HEAD.
+Docs/CMS-only changes on main do not require a rebase. A missing or conflicting base migration
+fails with `MIGRATION_BASE_NOT_INCLUDED`: merge/rebase and synchronize migrations explicitly.
+Before the first lock, committed SQL bytes are the bootstrap authority. Run from `commerce/`:
+
+```sh
+pnpm exec tsx scripts/check-migration-history.ts BASE_SHA HEAD_SHA
+```
+
+The schema-7 upgrade test compares all old journal fields, including timestamps, before and
+after the forward upgrade. This is isolated test evidence; it does not apply production SQL.
+
+
+## Forward-compatible schema readiness (ART-318)
+
+Migration 0012 introduces `schema_migration_compatibility`, written only by the owner migrator.
+Commerce and Admin API read the same contiguous migration history and verify their entire bundled
+prefix's filenames and checksums. Every ahead migration needs its own matching attestation and an
+explicit approval for the **full source SHA from the old image's immutable identity file**. No
+approval is inferred from a higher version, a mutable environment variable, a tag or a recent CI run.
+Database-behind, missing/unknown history, altered checksums, gaps and unapproved runtimes remain
+`NOT_READY`. A null or abbreviated identity cannot receive a forward approval.
+
+From 0012 onward every lock entry must contain a classification:
+
+```json
+"compatibility": {
+  "runtimeCommits": [],
+  "evidence": "Incompatible until the actual old image and this migration are qualified."
+}
+```
+
+An empty list means incompatible. A compatible migration lists only the exact tested old source
+commits; `evidence` records the proof location, old image digest, new migration checksum and exercised
+operations. SQL and classification become immutable together. The migrator validates prior
+attestations on rerun and inserts new SQL, journal and attestation in one transaction. Runtime roles
+have SELECT only. The database owner is the authority for applying reviewed migrations; database
+owner compromise is outside the runtime permission boundary.
+
+Deployment order:
+
+1. Land and deploy the protocol-aware baseline with schema 0012. Existing pre-protocol images still
+   require exact schema equality and **cannot** be made forward-compatible by registry entries.
+2. Qualify each proposed future migration using the actual previous image digest/source SHA. Include
+   booking, payment/reconciliation, workers and Admin operations affected by that SQL, negative
+   permissions/integrity tests, recovery and application rollback. Commit the exact approval and
+   evidence with the new migration. This PR approves **no real ahead migration**.
+3. Apply that release's migrations as owner. The previous protocol-aware image remains ready only
+   if **every** ahead version explicitly approves it. Then install the exact new image. On application
+   rollback keep compatible SQL; do not delete journal rows or run the old migrator backwards.
+   Incompatible migrations require a coordinated release; this gate provides no availability promise.
+4. Recheck `/identity`, `/readyz`, and independent legal-release admission. Commerce and the public
+   site's legal identity must still agree exactly; schema compatibility does not authorize serving
+   different legal releases. Migration, deployment, recovery qualification and sales admission are
+   separate owner-authorized actions.
+
+Integration CI tests/builds the default merge-tree, labelled with its actual `github.sha`.
+The separate `commerce-image` job checks out the exact PR HEAD, verifies SHA and clean tracked
+source with `node scripts/check-image-source.mjs EXPECTED_HEAD_SHA`, builds the image with that SHA,
+pins its Docker image ID, and runs
+`pnpm exec tsx scripts/qualify-schema-image.ts IMAGE EXPECTED_HEAD_SHA`. The probe independently
+compares the image's immutable identity with the declared SHA. Merge-tree results are not proof
+for a differently labelled HEAD image. After merge, a release candidate needs separate qualification
+of the actual release SHA/tree/digest.
+
+The image probe intentionally asserts bundled schema **12**: when adding 0013, revise the baseline,
+forward fixture and compatibility qualification together; do not merely remove that assertion.
+
+ A disposable internal Docker network contains
+only PostgreSQL and that unchanged image, with no host mounts, published ports or external provider
+access. Its bundled schema stays 12 while an additive **test-only** schema 13 is applied. It proves
+readiness/identity, reservation, contract readback, order state, maintenance and negative/rollback
+cases. The fixture proves this protocol for the tested operations; it does not qualify arbitrary
+future SQL, real payments, a production deployment or recovery. PostgreSQL integration tests also
+exercise the Admin role, immutable classification, failed-SQL rollback and tampering.
+
+### Operation admission and incompatible migration drain
+
+`/readyz` is a routing signal. Separately, schema admission checks **each** commerce/Admin application
+request and **each** background step (reconciliation, maintenance, email outbox, execution notices,
+Admin throttle pruning and after-response arrival claims). There is no cached READY. A mismatch or
+unavailable database refuses HTTP with 503 before route execution and skips worker callbacks without
+side effects. `/healthz` and `/identity` stay available for diagnosis. Known attestations from 0012
+must also exactly match the bundled lock's filename, checksum, runtime commits and evidence.
+The legal-release gate remains independent: existing obligations can still be reconciled/mailed
+when only the site's legal identity is unavailable or different. Commerce `/readyz` reads schema
+once per request and then performs the independent legal check; draining remains NOT_READY. Admission
+has no READY cache. Arrival's per-attempt ceiling starts inside `attempt()`, after admission; the
+schema check can add scheduling latency but does not shorten that internal ceiling.
+
+Admission checks are not a lock against owner DDL and do not cancel work already admitted. Before
+**incompatible SQL**, including the first protocol upgrade:
+
+1. Remove traffic and disable automatic restart/deployment of all old commerce and Admin API replicas.
+2. Send SIGTERM (or SIGINT) to every instance. Shutdown refuses new admission, stops timers, waits for
+   admitted HTTP and worker operations and pre-registered after-response work, then closes pools and exits 0.
+   Set the supervisor's stop timeout to allow provider timeouts and the current worker batch to finish.
+3. Require successful graceful exit of every instance. Independently verify there are no old runtime
+   sessions or outstanding external operations. A timeout, SIGKILL, failed exit or unknown provider
+   outcome is **not** a successful drain: reconcile/resolve it before applying SQL. Do not use a 503
+   response alone as evidence that runtime work has stopped.
+4. Take/verify the required recovery evidence, apply migrations as owner, and start only the admitted
+   exact-SHA runtime. Recheck identity, schema and legal readiness before restoring traffic. Rollback
+   to a schema-incompatible image requires its own coordinated recovery plan, never journal deletion.
+
+Compatible, qualified SQL may be applied while the explicitly approved old image is operating;
+new operations recheck schema admission, while already-admitted operations may finish. The negative
+integration tests check direct HTTP refusal, unchanged order/outbox state, zero outbound sends,
+per-step rechecks and drain races. These checks do not authorize production rollout.
+
+Arrival tasks are tracked when scheduled, **before** response close. SIGTERM/SIGINT stops registration
+of new work. A still-live HTTP request admitted before shutdown can also register its own ticket
+before its handler returns. This permission is async-context scoped and revoked on return, including
+for detached descendants; unrelated callbacks and new requests cannot borrow it. Drain waits for
+these late registrations as well. A registered ticket waits for response close and rechecks live schema even while
+ordinary admission returns RUNTIME_DRAINING, then completes its bounded attempt. Fresh proofs
+coalesced into an already registered task remain part of that drain obligation. There is no blanket
+schema bypass during shutdown. Tests deliver real SIGTERM before close, then verify exactly one
+claim and that drain waits; incompatible schema still prevents the claim. SIGKILL/crash/forced timeout
+can lose memory-only proofs. Drain guarantees the registered attempt on a compatible schema, not a
+remote ACK or durable delivery after an ambiguous transport failure.
+
+Residual repository risk: this workflow gates pull requests only; an authorized direct push to main
+can bypass history CI (relevant especially to fresh databases). Path-scoped branch rules for
+`commerce/migrations/**`, preserving CMS writes to `content/**`, are a separate owner-controlled
+follow-up. No repository access rules are changed here.
+
+The ART-327 business sabotage harness rehashes SQL mutants only in its disposable scratch copy so
+that setup reaches the selected business assertion. It restores both SQL and scratch lock after
+each mutant. This does not change the committed lock or waive the DAG/history sabotage checks.

@@ -24,6 +24,7 @@ import { randomBytes } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 import { performance } from 'node:perf_hooks';
 
+import type { SchemaAdmission } from './schema-admission.js';
 import { ExpiryQueue } from './expiry-queue.js';
 import type { Logger } from './log.js';
 import type { ArrivalClaimReceipt, RefrefResult } from './refref.js';
@@ -143,20 +144,33 @@ export interface ArrivalClaimer {
  */
 export class AfterResponse {
   readonly #tasks = new Set<Promise<void>>();
+  #stopping = false;
+  constructor(private readonly admission?: Pick<SchemaAdmission, 'run' | 'schedule' | 'canScheduleFromRequest'>) {}
 
-  /** Start `task` once the response has been handed over (or the client went away). */
-  schedule(res: ServerResponse, task: () => Promise<void>): void {
-    res.once('close', () => this.run(task));
+  /** Register before response close, including from a live admitted request during drain. */
+  schedule(res: ServerResponse, task: () => Promise<void>, settled?: () => void): void {
+    if (this.#stopping && !this.admission?.canScheduleFromRequest()) { settled?.(); return; }
+    const start = new Promise<void>(resolve => {
+      if (res.closed) resolve();
+      else res.once('close', resolve);
+    });
+    const work = this.admission ? this.admission.schedule(start, task) : start.then(task);
+    void this.#track(work).finally(settled);
   }
 
   run(task: () => Promise<void>): Promise<void> {
-    const p = task().catch(() => undefined).finally(() => { this.#tasks.delete(p); });
+    if (this.#stopping) return Promise.resolve();
+    return this.#track(this.admission ? this.admission.run(task) : Promise.resolve().then(task));
+  }
+
+  #track(work: Promise<unknown>): Promise<void> {
+    const p = work.then(() => undefined, () => undefined).finally(() => { this.#tasks.delete(p); });
     this.#tasks.add(p);
     return p;
   }
 
   get pending(): number { return this.#tasks.size; }
-
+  stop(): void { this.#stopping = true; }
   async drain(): Promise<void> {
     while (this.#tasks.size > 0) await Promise.allSettled([...this.#tasks]);
   }
@@ -286,12 +300,14 @@ export class Arrivals {
   /** After this response, try the context's pending claims (single-flight, throttled). */
   afterResponse(res: ServerResponse, contextId: string): void {
     const c = this.#contexts.get(contextId);
-    if (c === undefined || c.scheduled || c.inFlight !== null || !this.hasPending(contextId)) return;
+    if (c === undefined || c.scheduled || !this.hasPending(contextId)) return;
     c.scheduled = true;
-    this.after.schedule(res, () => {
-      c.scheduled = false;
-      return this.attempt(contextId, ATTEMPT_CEILING_MS, false);
-    });
+    this.after.schedule(res, async () => {
+      // Fresh proofs captured during a shared in-flight claim belong to this registered task.
+      // Keep them in its drain obligation instead of needing a new admission after SIGTERM.
+      do { await this.attempt(contextId, ATTEMPT_CEILING_MS, false); }
+      while (!c.closed && c.proofs.some(p => p.state === 'PENDING' && !p.tried));
+    }, () => { c.scheduled = false; });
   }
 
   /**
