@@ -393,3 +393,21 @@ checks snapshot shape/order consistency and digest format, not JSON-to-digest eq
 with a wrong digest, including one inserted by a direct owner writer. DB-backed document/reservation
 writers must invoke it and bind the accepted immutable revision before admission (ART-358/362).
 The current content-backed document path is not claimed to enforce this future gate.
+
+## Immutable migration history (ART-317)
+
+`migrations/migration.lock` fixes the filename, version and SHA-256 of every SQL file. Append a
+new journal entry, SQL file and lock entry together; never rewrite a committed entry. Startup
+and the migrator validate the complete directory before using it. The migrator also verifies
+that the database journal is a contiguous, byte-identical prefix before applying anything.
+
+CI checks every commit between the PR event's exact base and head SHAs, including edits later
+reverted. Before the first lock, the existing base SQL is the authority. A PR must contain the
+base commit (rebase after another migration lands). Run from `commerce/`:
+
+```sh
+pnpm exec tsx scripts/check-migration-history.ts BASE_SHA HEAD_SHA
+```
+
+The schema-7 upgrade test compares all old journal fields, including timestamps, before and
+after the forward upgrade. This is isolated test evidence; it does not apply production SQL.

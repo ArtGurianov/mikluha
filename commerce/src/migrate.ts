@@ -2,25 +2,14 @@
 // transaction, under an advisory lock so two deploys cannot interleave. An applied file whose content
 // changed is refused: history is never rewritten, a fix is a new migration.
 
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import type pg from 'pg';
-
-export interface JournalEntry { readonly version: number; readonly file: string }
+import { readMigrations } from './migration-integrity.js';
+export type { JournalEntry } from './migration-integrity.js';
 
 const LOCK = 7_247_011;
 
-export function readJournal(dir: string): { entry: JournalEntry; sql: string; checksum: string }[] {
-  const journal = JSON.parse(readFileSync(join(dir, 'journal.json'), 'utf8')) as JournalEntry[];
-  journal.forEach((e, i) => {
-    if (e.version !== i + 1) throw new Error(`MIGRATION_JOURNAL_GAP: entry ${i} has version ${e.version}`);
-  });
-  return journal.map((entry) => {
-    const sql = readFileSync(join(dir, entry.file), 'utf8');
-    return { entry, sql, checksum: createHash('sha256').update(sql).digest('hex') };
-  });
+export function readJournal(dir: string) {
+  return readMigrations(dir).map(({ version, file, sql, checksum }) => ({ entry: { version, file }, sql, checksum }));
 }
 
 export function schemaHead(dir: string): number {
@@ -34,7 +23,13 @@ export async function migrate(client: pg.Client, dir: string): Promise<number[]>
   try {
     await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
       version int PRIMARY KEY, file text NOT NULL, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())`);
-    const { rows } = await client.query<{ version: number; checksum: string }>('SELECT version, checksum FROM schema_migrations');
+    const { rows } = await client.query<{ version: number; file: string; checksum: string }>('SELECT version, file, checksum FROM schema_migrations ORDER BY version');
+    rows.forEach((r, i) => {
+      const expected = files[i];
+      if (r.version !== i + 1 || !expected || r.file !== expected.entry.file || r.checksum !== expected.checksum) {
+        throw new Error(`MIGRATION_CHANGED: database history at ${r.version}`);
+      }
+    });
     const applied = new Map(rows.map((r) => [r.version, r.checksum]));
     for (const v of applied.keys()) {
       if (v > files.length) throw new Error(`MIGRATION_UNKNOWN: the database has version ${v}, this build knows ${files.length}`);

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
@@ -21,7 +21,8 @@ test('migrations apply once; an applied migration that changed is refused', asyn
   const dir = mkdtempSync(join(tmpdir(), 'commerce-migrations-'));
   cpSync(MIGRATIONS_DIR, dir, { recursive: true });
   writeFileSync(join(dir, '0001_orders.sql'), '-- rewritten history\n');
-  await assert.rejects(migrate(db.owner, dir), /MIGRATION_CHANGED/);
+  try { await assert.rejects(migrate(db.owner, dir), /MIGRATION_CHANGED/); }
+  finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('0010 upgrades populated schema 9 without rewriting its history and closes organizer visibility', async () => {
@@ -35,7 +36,7 @@ test('0010 upgrades populated schema 9 without rewriting its history and closes 
     await client.connect();
     cpSync(MIGRATIONS_DIR, dir, { recursive: true });
     const journal = JSON.parse(readFileSync(join(dir, 'journal.json'), 'utf8'));
-    writeFileSync(join(dir, 'journal.json'), JSON.stringify(journal.filter((e: { version: number }) => e.version <= 9)));
+    truncateMigrations(dir, 9);
     assert.deepEqual(await migrate(client, dir), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
     const history = (await client.query('SELECT * FROM schema_migrations ORDER BY version')).rows;
     const tour = (await client.query("SELECT fn_create_tour('upgrade-tour', 'owner') AS id")).rows[0].id;
@@ -79,4 +80,31 @@ test("the site's own content/ loads, as the image ships it", () => {
   const catalog = loadCatalog(join(MIGRATIONS_DIR, '..', '..', 'content'));
   assert.ok(catalog.departures.size > 0);
   for (const d of catalog.departures.values()) assert.match(d.startsOn, /^\d{4}-\d{2}-\d{2}$/);
+});
+
+function truncateMigrations(dir: string, head: number) {
+  const journal = JSON.parse(readFileSync(join(dir, 'journal.json'), 'utf8')).slice(0, head);
+  const lock = JSON.parse(readFileSync(join(dir, 'migration.lock'), 'utf8'));
+  lock.migrations = lock.migrations.slice(0, head);
+  for (const name of readdirSync(dir)) if (name.endsWith('.sql') && !journal.some((e: { file: string }) => e.file === name)) rmSync(join(dir, name));
+  writeFileSync(join(dir, 'journal.json'), JSON.stringify(journal));
+  writeFileSync(join(dir, 'migration.lock'), JSON.stringify(lock));
+}
+
+test('schema 0001–0007 upgrades without reapplying or changing any existing journal row', async () => {
+  const name = `${db.name}_schema7`;
+  const url = new URL(db.url); url.pathname = `/${name}`;
+  const client = new pg.Client({ connectionString: url.toString() });
+  const dir = mkdtempSync(join(tmpdir(), 'commerce-schema7-'));
+  await db.owner.query(`CREATE DATABASE ${name}`);
+  try {
+    await client.connect(); cpSync(MIGRATIONS_DIR, dir, { recursive: true }); truncateMigrations(dir, 7);
+    assert.deepEqual(await migrate(client, dir), [1, 2, 3, 4, 5, 6, 7]);
+    const before = (await client.query('SELECT * FROM schema_migrations ORDER BY version')).rows;
+    assert.deepEqual(await migrate(client, MIGRATIONS_DIR), Array.from({ length: schemaHead(MIGRATIONS_DIR) - 7 }, (_, i) => i + 8));
+    assert.deepEqual((await client.query('SELECT * FROM schema_migrations WHERE version <= 7 ORDER BY version')).rows, before);
+    assert.deepEqual(await migrate(client, MIGRATIONS_DIR), []);
+  } finally {
+    await client.end(); await db.owner.query(`DROP DATABASE ${name}`); rmSync(dir, { recursive: true, force: true });
+  }
 });
