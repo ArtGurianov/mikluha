@@ -100,7 +100,8 @@ export class RefrefClient {
   }
 
   acknowledgeFulfillment(orderRef: string, attemptId: string, key: string) {
-    return this.#send<{ status: string }>('POST', `/integrations/orders/${encodeURIComponent(orderRef)}/checkout-attempts/`
+    // A 200 response is still untrusted input; the caller must validate identity and status.
+    return this.#send<unknown>('POST', `/integrations/orders/${encodeURIComponent(orderRef)}/checkout-attempts/`
       + `${encodeURIComponent(attemptId)}/fulfillment-ack`, { status: 'DELIVERED', externalFulfillmentId: orderRef }, key);
   }
 
