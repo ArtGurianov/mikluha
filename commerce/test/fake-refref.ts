@@ -27,9 +27,11 @@ export interface FakeState {
 export class FakeRefref {
   readonly requests: Recorded[] = [];
   /** Accepted fulfilment identities, including commits whose response was lost. */
-  readonly fulfillments = new Map<string, string>();
-  /** Override only the ACK response to inject corrupt/foreign projections after remote commit. */
+  readonly fulfillments = new Map<string, { request: string; responseBody: string }>();
+  /** Inject a bad response persisted by Refref; same-key replays retain the first response. */
   ackBody: unknown = undefined;
+  /** Corrupt exactly one transmitted response, leaving Refref's saved response untouched. */
+  ackTransitBody: { body: unknown } | undefined = undefined;
   readonly attempts = new Map<string, { id: string; key: string; body: string; snapshotHash: string;
     referralResolutionId: string; payable: number }>();
   state: FakeState = { discountKopecks: 0, attempt: 'OK', session: 'READY', cancel: 'OK', ack: 'OK', obligation: 'IN_PROGRESS',
@@ -130,10 +132,17 @@ export class FakeRefref {
           const attempt = this.attempts.get(m[1]!);
           if (!attempt || attempt.id !== m[2]) { send(404, { error: { code: 'NOT_FOUND' } }); return; }
           const accept = (answer: boolean) => {
+            const fingerprint = JSON.stringify([path, text]);
             const existing = this.fulfillments.get(key!);
-            if (existing !== undefined && existing !== text) { send(409, { error: { code: 'IDEMPOTENCY_KEY_CONFLICT' } }); return; }
-            this.fulfillments.set(key!, text);
-            if (answer) send(200, this.ackBody === undefined ? { checkoutAttemptId: attempt.id, status: 'DELIVERED' } : this.ackBody);
+            if (existing !== undefined && existing.request !== fingerprint) { send(409, { error: { code: 'IDEMPOTENCY_KEY_CONFLICT' } }); return; }
+            const record = existing ?? { request: fingerprint, responseBody: JSON.stringify(
+              this.ackBody === undefined ? { checkoutAttemptId: attempt.id, status: 'DELIVERED' } : this.ackBody) };
+            this.fulfillments.set(key!, record);
+            if (answer) {
+              const body = this.ackTransitBody === undefined ? JSON.parse(record.responseBody) : this.ackTransitBody.body;
+              this.ackTransitBody = undefined;
+              send(200, body);
+            }
           };
           if (this.state.ack === 'ACCEPTED_TIMEOUT') accept(false);
           else behave(this.state.ack, () => accept(true));
@@ -153,6 +162,7 @@ export class FakeRefref {
 
   reset(): void {
     this.ackBody = undefined;
+    this.ackTransitBody = undefined;
     this.#gate = null;
     this.requests.length = 0;
     this.attempts.clear();

@@ -7,6 +7,7 @@ import { issueState, onReturn, pay, reconcileAll, reconcileOrder, zayavkaOf, typ
 import { eisRecords, recordEisSubmitted } from '../src/eis.js';
 import { NotisendClient, processEmailOutbox } from '../src/email.js';
 import { LiveSiteReleaseAdmission } from '../src/legal-admission.js';
+import { commerceMonitorSignals, monitorHasAlert } from '../src/monitor.js';
 import { maintain, reserve, setSalesOpen } from '../src/orders.js';
 import { RefrefClient } from '../src/refref.js';
 import { FakeRefref } from './fake-refref.js';
@@ -364,8 +365,11 @@ async function rejectAcks(id: string, bodies: (attemptId: string) => readonly un
   const attemptId = fake.attempts.get(order.ref)!.id;
   fake.state.obligation = 'SATISFIED';
   for (const body of bodies(attemptId)) {
-    fake.ackBody = body;
+    fake.ackTransitBody = { body };
     await reconcileOrder(deps, order.ref);
+    assert.equal(fake.ackTransitBody, undefined, `${id}: transit corruption applies to one response only`);
+    assert.deepEqual(JSON.parse(fake.fulfillments.get(`mk-fulfil:${order.ref}`)!.responseBody),
+      { checkoutAttemptId: attemptId, status: 'DELIVERED' }, `${id}: corruption never changes Refref's saved response`);
     assert.equal(await status(order.ref), 'PAID', `${id}: unusable ACK cannot fulfil locally`);
     assert.equal((await db.owner.query('SELECT count(*) FROM email_outbox')).rows[0].count, '0', `${id}: no premature confirmation`);
     assert.equal((await db.owner.query("SELECT count(*) FROM order_event WHERE event = 'FULFILLED'")).rows[0].count,
@@ -374,30 +378,75 @@ async function rejectAcks(id: string, bodies: (attemptId: string) => readonly un
     assert.deepEqual((await db.owner.query('SELECT status FROM order_eis')).rows, [{ status: 'EIS_PENDING' }], `${id}: preserve the payment-created EIS obligation`);
   }
   assert.equal(fake.calls(/\/fulfillment-ack$/).length, bodies(attemptId).length, `${id}: every invalid ACK was exercised over HTTP`);
-  fake.ackBody = undefined;
   const restarted = { ...deps, refref: new RefrefClient({ apiBase: fake.base, apiKey: 'synthetic-only' }) };
   await reconcileOrder(restarted, order.ref);
   await reconcileAll(restarted);
-  assert.equal(await status(order.ref), 'FULFILLED', `${id}: a later correct ACK recovers the paid order`);
+  assert.equal(await status(order.ref), 'FULFILLED', `${id}: replay of the saved correct ACK recovers after transit corruption`);
   assert.equal((await db.owner.query('SELECT count(*) FROM email_outbox')).rows[0].count, '1', `${id}: recovery confirms once`);
   assert.equal((await db.owner.query('SELECT count(*) FROM order_eis')).rows[0].count, '1', `${id}: recovery never duplicates EIS`);
   assert.deepEqual([...new Set(fake.calls(/\/fulfillment-ack$/).map(r => r.key))], [`mk-fulfil:${order.ref}`], `${id}: recovery keeps the ACK identity`);
 }
 
-test('BI22 foreign or malformed fulfilment ACK identity cannot confirm the order', async () => {
+test('BI22 foreign or malformed fulfilment ACK identity in transit cannot confirm the order', async () => {
   await rejectAcks('BI22', () => [
     { checkoutAttemptId: '99999999-9999-4999-8999-999999999999', status: 'DELIVERED' },
     { checkoutAttemptId: 'x', status: 'DELIVERED' },
   ]);
 });
 
-test('BI23 a non-delivered fulfilment ACK cannot confirm the order', async () => {
+test('BI23 a non-delivered fulfilment ACK in transit cannot confirm the order', async () => {
   await rejectAcks('BI23', attemptId => ['NOT_READY', 'READY', 'FAILED', 'ACTION_REQUIRED']
     .map(status => ({ checkoutAttemptId: attemptId, status })));
 });
 
-test('BI24 malformed fulfilment ACK bodies cannot confirm the order', async () => {
+test('BI24 malformed fulfilment ACK bodies in transit cannot confirm the order', async () => {
   await rejectAcks('BI24', attemptId => [null, {}, [], [attemptId, 'DELIVERED'], 'DELIVERED', true, 42,
     { checkoutAttemptId: attemptId }, { status: 'DELIVERED' },
     { checkoutAttemptId: [attemptId], status: 'DELIVERED' }, { checkoutAttemptId: attemptId, status: null }]);
+});
+
+test('BI25 a persisted bad ACK is replayed after restart and raises paidNotFulfilled', async () => {
+  const order = await resolved();
+  await pay(deps, order.ref, order.hash);
+  fake.state.obligation = 'SATISFIED';
+  const badBody = { checkoutAttemptId: '99999999-9999-4999-8999-999999999999', status: 'DELIVERED',
+    detail: 'synthetic-response-must-not-enter-logs' };
+  fake.ackBody = badBody;
+  await reconcileOrder(deps, order.ref);
+  const first = fake.fulfillments.get(`mk-fulfil:${order.ref}`)!;
+  assert.deepEqual(JSON.parse(first.responseBody), badBody, 'BI25: bad response was persisted upstream');
+  // A corrected current response cannot replace an existing same-key idempotency record.
+  fake.ackBody = undefined;
+  const restarted = { ...deps, refref: new RefrefClient({ apiBase: fake.base, apiKey: 'synthetic-only' }) };
+  for (let replay = 0; replay < 3; replay++) await reconcileOrder(restarted, order.ref);
+  await reconcileAll(restarted);
+  assert.equal(await status(order.ref), 'PAID', 'BI25: persisted bad ACK remains blocked across replays');
+  assert.deepEqual(fake.fulfillments.get(`mk-fulfil:${order.ref}`), first, 'BI25: saved response cannot be replaced by a retry');
+  assert.equal((await db.owner.query('SELECT count(*) FROM email_outbox')).rows[0].count, '0', 'BI25: no false confirmation');
+  const signals = await commerceMonitorSignals(db.pool, new Date(now.getTime() + 600_000));
+  assert.equal(signals.paidNotFulfilled.count, 1, 'BI25: monitor detects the blocked paid order');
+  assert.ok(monitorHasAlert(signals), 'BI25: blocked order raises an alert');
+  const unusable = logs.lines.map(line => JSON.parse(line)).filter(line => line.event === 'fulfilment_ack_unusable');
+  assert.deepEqual(unusable, Array.from({ length: 5 }, () => ({ event: 'fulfilment_ack_unusable', orderRef: order.ref, status: 200 })),
+    'BI25: rejected ACK logs only its order and HTTP status on every replay');
+  assert.ok(!logs.lines.join('\n').includes(badBody.detail), 'BI25: response body never enters logs');
+  assert.equal(fake.calls(/\/fulfillment-ack$/).length, 5, 'BI25: initial ACK plus four replays were sent');
+  assert.deepEqual([...new Set(fake.calls(/\/fulfillment-ack$/).map(r => r.key))], [`mk-fulfil:${order.ref}`], 'BI25: retries never bypass idempotency with a new key');
+});
+
+test('BI26 one corrupted transit ACK recovers on the saved correct response after restart', async () => {
+  const order = await resolved();
+  await pay(deps, order.ref, order.hash);
+  fake.state.obligation = 'SATISFIED';
+  fake.ackTransitBody = { body: null };
+  await reconcileOrder(deps, order.ref);
+  assert.equal(await status(order.ref), 'PAID', 'BI26: corrupt transit response cannot fulfil');
+  assert.equal((await db.owner.query('SELECT count(*) FROM email_outbox')).rows[0].count, '0', 'BI26: no premature confirmation');
+  const saved = fake.fulfillments.get(`mk-fulfil:${order.ref}`)!;
+  const restarted = { ...deps, refref: new RefrefClient({ apiBase: fake.base, apiKey: 'synthetic-only' }) };
+  await reconcileOrder(restarted, order.ref);
+  assert.equal(await status(order.ref), 'FULFILLED', 'BI26: next replay recovers without changing the saved ACK or fault configuration');
+  assert.deepEqual(fake.fulfillments.get(`mk-fulfil:${order.ref}`), saved, 'BI26: recovery uses the original saved response');
+  assert.equal(fake.calls(/\/fulfillment-ack$/).length, 2, 'BI26: exactly one corrupted response followed by one replay');
+  assert.equal((await db.owner.query('SELECT count(*) FROM email_outbox')).rows[0].count, '1', 'BI26: recovered confirmation queued once');
 });

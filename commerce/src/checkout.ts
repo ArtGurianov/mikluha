@@ -532,6 +532,8 @@ async function fulfil(deps: CheckoutDeps, o: OrderRow, attemptId: string, now: D
   const ack = await deps.refref.acknowledgeFulfillment(o.order_ref, attemptId, `mk-fulfil:${o.order_ref}`);
   if (ack.kind === 'ANSWERED' && ack.status === 200 && deliveredAcknowledgment(ack.body, attemptId)) {
     if (await markFulfilledAndQueueEmail(deps, o, now)) deps.log('fulfilled', { orderRef: o.order_ref });
+  } else if (ack.kind === 'ANSWERED') {
+    deps.log('fulfilment_ack_unusable', { orderRef: o.order_ref, status: ack.status });
   }
 }
 

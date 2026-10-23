@@ -48,6 +48,9 @@ const mutants = [
   ['BI23', 'fulfilment ACK delivered status', [edit(checkout, "body.status === 'DELIVERED'", 'true')]],
   ['BI24', 'fulfilment ACK body validation', [edit(checkout,
     "return body !== null && typeof body === 'object' && !Array.isArray(body)\n    && 'checkoutAttemptId' in body && body.checkoutAttemptId === attemptId\n    && 'status' in body && body.status === 'DELIVERED';", 'return true;')]],
+  ['BI25', 'saved ACK response replay', [edit('test/fake-refref.ts', 'const record = existing ?? { request: fingerprint, responseBody: JSON.stringify(',
+    'const record = { request: fingerprint, responseBody: JSON.stringify(')]],
+  ['BI26', 'one-shot transit corruption', [edit('test/fake-refref.ts', '              this.ackTransitBody = undefined;', '              // transit fault is incorrectly retained')]],
 ];
 
 const scratch = mkdtempSync(join(tmpdir(), 'mikluha-art327-'));
@@ -70,8 +73,8 @@ function green(result, label, count) {
 try {
   for (const entry of ['src', 'test', 'migrations', 'package.json']) cpSync(join(root, entry), join(scratch, entry), { recursive: true });
   symlinkSync(join(root, 'node_modules'), join(scratch, 'node_modules'), 'dir');
-  green(run(), 'baseline', 24);
-  console.log('baseline: 24 business invariants PASS');
+  green(run(), 'baseline', 26);
+  console.log('baseline: 26 business invariants PASS');
   for (const [id, label, edits] of mutants) {
     const originals = new Map();
     try {
@@ -95,7 +98,7 @@ try {
     green(run(id), `${id} restored`, 1);
     console.log(`${id} ${label}: KILLED by business assertion; restored PASS`);
   }
-  console.log(`ART327_SABOTAGE_PASS: ${mutants.length}/${mutants.length} guards killed and restored; no live qualification`);
+  console.log(`ART327_SABOTAGE_PASS: ${mutants.length}/${mutants.length} mutations killed and restored; no live qualification`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

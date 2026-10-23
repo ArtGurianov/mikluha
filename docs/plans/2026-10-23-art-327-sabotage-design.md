@@ -40,10 +40,22 @@ fulfilment. Validate the ACK body at the fulfilment decision: an object with
 client's body `unknown` to avoid treating a TypeScript type as runtime validation.
 The fake must return the real attempt UUID and support corrupt ACK responses.
 BI22–BI24 cover foreign/malformed IDs, non-delivered statuses and malformed
-bodies, each followed by recovery on a valid ACK. Separate mutations remove the
+bodies corrupted in transit, followed by replay of the saved correct ACK. Separate mutations remove the
 identity, status and body guards. BI05 retains transport/lost-ACK coverage.
 
-The rejected ACK leaves `PAID` and queues no confirmation. The EIS obligation
+The rejected ACK leaves `PAID` and queues no confirmation. Refref stores the
+first response for an idempotency key/body (migration 000011, 24-hour retention),
+so a persisted bad response cannot be repaired by repeating the same request.
+The fake must preserve that response even when its current response configuration
+changes. BI25 proves this stays PAID across restart/reconciliation and raises
+paidNotFulfilled with no email. A separate one-shot transport override corrupts
+only an outgoing response; BI26 proves the next replay of the saved correct ACK
+recovers without changing fault configuration. Mutations of fake persistence
+and one-shot consumption make both model assumptions test-sensitive. No automatic
+key rotation or post-expiry recovery is claimed. Log rejected answered ACKs with
+only orderRef and HTTP status, never the response body.
+
+The EIS obligation
 belongs to the proven payment, independently of ACK, and must stay pending.
 BI04 records all concurrent pay outcomes and counts same-attempt session calls.
 Document disposable-server cleanup on timeout: forced termination cannot promise

@@ -326,14 +326,15 @@ MIGRATION_DATABASE_URL=… node dist/bin/migrate.js
 
 ## Business-invariant sabotage (ART-327)
 
-`test/business-invariants.test.ts` runs 24 negative/replay scenarios against the
+`test/business-invariants.test.ts` runs 26 negative/replay scenarios against the
 real merchant code, migrated PostgreSQL and runtime/operator roles. Fixtures
 contain synthetic traveller data only. Refref uses a loopback HTTP server;
 Notisend uses injected responses. No live payment, email or EIS filing occurs.
 
 `pnpm run test:sabotage` copies source, migrations and tests into a temporary
-directory, disables 26 guards one at a time, and restores each before a green
-rerun. It requires a disposable PostgreSQL superuser endpoint on loopback;
+directory and applies 28 mutations one at a time: 26 merchant guards plus the
+fake's saved-response replay and one-shot transport assumptions. Each is restored
+before a green rerun. It requires a disposable PostgreSQL superuser endpoint on loopback;
 each subprocess normally creates and drops its own database. Working source and deployed
 schema are never modified. CI runs both the normal suite and sabotage step.
 Anchor drift, a surviving mutation, the wrong assertion, setup/compile errors,
@@ -364,12 +365,21 @@ from `commerce/` (the subshell keeps its cleanup trap local):
 | BI10–BI12 | Receipt-email allowlist, immutable contract snapshot, exact paid amount |
 | BI13–BI16 | Ambiguous Notisend response, crashed worker lease, EIS filing replay and stale reviewed packet |
 | BI17–BI21 | Frozen offer/consent integrity, payment snapshot binding, immutable accepted application, unqualified refund policy stop |
-| BI22–BI24 | Exact fulfilment ACK attempt identity, DELIVERED status, malformed bodies, and recovery after a correct ACK |
+| BI22–BI24 | Exact fulfilment ACK attempt identity, DELIVERED status and malformed bodies corrupted in transit |
+| BI25–BI26 | Persisted bad ACK remains blocked and monitored; one corrupted transit response recovers from the saved correct ACK |
 
 Commerce fulfils a paid order only after HTTP 200 confirms its exact attempt as
-`DELIVERED`. An unusable ACK leaves it `PAID`, without a confirmation email, so
-reconciliation can retry the same ACK identity. The EIS filing obligation is
-already due from the independently proven payment and remains `EIS_PENDING`.
+`DELIVERED`. An unusable ACK leaves it `PAID`, without a confirmation email.
+Reconciliation repeats the same ACK identity: Refref replays the first saved
+response for that key/body within its 24-hour idempotency retention window.
+Repeating can recover from corruption in transit when the saved response is
+correct; it cannot repair a bad response saved by Refref. That case stays
+`PAID`, raises `paidNotFulfilled`, and needs investigation rather than a new key
+or an assumed automatic recovery. The fake stores the first response separately
+from a one-shot transit fault and tests both cases. Rejected answered ACKs log
+only `fulfilment_ack_unusable`, the order reference and HTTP status; response
+bodies and personal data are excluded. The EIS filing obligation is already due
+from the independently proven payment and remains `EIS_PENDING`.
 
 **Acceptance gaps:** no merchant refund adapter exists in this tree, so duplicate
 or lost-ACK refund execution is untested. Provider callbacks, actual payment and
