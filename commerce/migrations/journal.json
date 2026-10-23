@@ -9,5 +9,6 @@
   { "version": 8, "file": "0008_editorial_offers_and_contract_snapshot.sql" },
   { "version": 9, "file": "0009_content_crud_and_execution_changes.sql" },
   { "version": 10, "file": "0010_execution_change_identity_and_visibility.sql" },
-  { "version": 11, "file": "0011_admin_auth.sql" }
+  { "version": 11, "file": "0011_admin_auth.sql" },
+  { "version": 12, "file": "0012_schema_compatibility.sql" }
 ]

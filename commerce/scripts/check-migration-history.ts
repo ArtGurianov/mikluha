@@ -13,7 +13,7 @@ export function checkHistory(repo: string, base: string, head: string): void {
   // git show must preserve bytes (including the lack of a final newline).
   function exactSnapshot(commit: string, requireLock: boolean) {
     const names = git('ls-tree', '--name-only', `${commit}:${prefix.slice(0, -1)}`).split('\n');
-    return validateMigrations(file => execFileSync('git', ['-C', repo, 'show', `${commit}:${prefix}${file}`], { encoding: 'utf8' }), names, requireLock);
+    return validateMigrations(file => execFileSync('git', ['-C', repo, 'show', `${commit}:${prefix}${file}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), names, requireLock);
   }
   let previous = exactSnapshot(base, false);
   let locked = git('ls-tree', '--name-only', base, '--', `${prefix}migration.lock`) !== '';

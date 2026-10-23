@@ -30,6 +30,9 @@
 // at most. Every state-changing request must come from the admin origin itself (Origin, and
 // Sec-Fetch-Site when sent) with a JSON body; a request for another host is refused outright.
 
+import { MIGRATIONS_DIR } from '../config.js';
+import { readMigrations, type LockedMigration } from '../migration-integrity.js';
+import { schemaReadiness } from '../schema-readiness.js';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
 import type pg from 'pg';
@@ -63,6 +66,7 @@ export interface AdminDeps {
   /** The Control Room's origin, e.g. https://admin.mikluha-maklai.ru: the only one allowed to write. */
   readonly origin: string;
   readonly schemaHead: number;
+  readonly migrations?: readonly LockedMigration[];
   readonly sourceCommit: string | null;
   readonly startedAt: Date;
   readonly log: Logger;
@@ -177,9 +181,8 @@ export function createAdminServer(deps: AdminDeps): Server {
 
   async function readiness() {
     try {
-      const { rows } = await deps.pool.query<{ v: number | null }>('SELECT max(version) AS v FROM schema_migrations');
-      const schema = rows[0]?.v ?? 0;
-      return schema === deps.schemaHead ? { status: 'READY', schema } : { status: 'NOT_READY', reason: 'SCHEMA_NOT_AT_HEAD', schema };
+      return await schemaReadiness(deps.pool, { schemaHead: deps.schemaHead,
+        migrations: deps.migrations ?? readMigrations(MIGRATIONS_DIR), sourceCommit: deps.sourceCommit });
     } catch { return { status: 'NOT_READY', reason: 'DATABASE_UNAVAILABLE' }; }
   }
 

@@ -20,7 +20,7 @@ function fixture() {
   return { root, dir, git, commit, base };
 }
 
-for (const sabotage of ['sql', 'rehash', 'delete', 'rename', 'gap', 'unlisted', 'lock-delete', 'intermediate'] as const) {
+for (const sabotage of ['sql', 'rehash', 'delete', 'rename', 'gap', 'unlisted', 'lock-delete', 'intermediate', 'policy'] as const) {
   test(`immutable history refuses ${sabotage}`, () => {
     const f = fixture();
     try {
@@ -34,6 +34,10 @@ for (const sabotage of ['sql', 'rehash', 'delete', 'rename', 'gap', 'unlisted', 
         lock.migrations[0].checksum = createHash('sha256').update(readFileSync(path)).digest('hex');
         writeFileSync(lockPath, JSON.stringify(lock));
       }
+      if (sabotage === 'policy') {
+        lock.migrations.at(-1).compatibility.runtimeCommits.push('a'.repeat(40));
+        writeFileSync(lockPath, JSON.stringify(lock));
+      }
       if (sabotage === 'delete') rmSync(path);
       if (sabotage === 'rename') { writeFileSync(join(f.dir, '0001_renamed.sql'), original); rmSync(path); }
       if (sabotage === 'gap') writeFileSync(join(f.dir, 'journal.json'), JSON.stringify([{ version: 2, file: '0001_orders.sql' }]));
@@ -42,7 +46,7 @@ for (const sabotage of ['sql', 'rehash', 'delete', 'rename', 'gap', 'unlisted', 
       const bad = f.commit();
       if (sabotage === 'intermediate') { writeFileSync(path, original); f.commit(); }
       assert.throws(() => checkHistory(f.root, f.base, f.git('rev-parse', 'HEAD')));
-      if (sabotage !== 'rehash' && sabotage !== 'intermediate') assert.throws(() => readMigrations(f.dir));
+      if (sabotage !== 'rehash' && sabotage !== 'intermediate' && sabotage !== 'policy') assert.throws(() => readMigrations(f.dir));
       assert.ok(bad);
     } finally { rmSync(f.root, { recursive: true, force: true }); }
   });
@@ -51,15 +55,21 @@ for (const sabotage of ['sql', 'rehash', 'delete', 'rename', 'gap', 'unlisted', 
 test('bootstrap locks the pre-lock SQL bytes and append-only migration succeeds', () => {
   const f = fixture();
   try {
+    // The actual pre-lock baseline ends at 11; protocol metadata is introduced only afterward.
+    const originalLock = JSON.parse(readFileSync(join(f.dir, 'migration.lock'), 'utf8'));
+    originalLock.migrations = originalLock.migrations.slice(0, 11);
+    const initialJournal = JSON.parse(readFileSync(join(f.dir, 'journal.json'), 'utf8'));
+    for (const e of initialJournal.slice(11)) rmSync(join(f.dir, e.file));
+    writeFileSync(join(f.dir, 'journal.json'), JSON.stringify(initialJournal.slice(0, 11)));
     rmSync(join(f.dir, 'migration.lock')); const prelock = f.commit();
-    f.git('checkout', f.base, '--', 'commerce/migrations/migration.lock');
+    writeFileSync(join(f.dir, 'migration.lock'), JSON.stringify(originalLock));
     const boot = f.commit(); checkHistory(f.root, prelock, boot);
     const journal = JSON.parse(readFileSync(join(f.dir, 'journal.json'), 'utf8'));
     const lock = JSON.parse(readFileSync(join(f.dir, 'migration.lock'), 'utf8'));
     const entry = { version: journal.length + 1, file: `${String(journal.length + 1).padStart(4, '0')}_forward.sql` };
     const sql = 'SELECT 1;\n';
     writeFileSync(join(f.dir, entry.file), sql);
-    journal.push(entry); lock.migrations.push({ ...entry, checksum: createHash('sha256').update(sql).digest('hex') });
+    journal.push(entry); lock.migrations.push({ ...entry, checksum: createHash('sha256').update(sql).digest('hex'), compatibility: { runtimeCommits: [], evidence: 'incompatible fixture' } });
     writeFileSync(join(f.dir, 'journal.json'), JSON.stringify(journal));
     writeFileSync(join(f.dir, 'migration.lock'), JSON.stringify(lock));
     checkHistory(f.root, prelock, f.commit());

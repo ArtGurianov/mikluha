@@ -24,7 +24,7 @@ import { NotisendClient, processEmailOutbox } from '../email.js';
 import { processExecutionNotices } from '../execution-notice.js';
 import { LiveSiteReleaseAdmission } from '../legal-admission.js';
 import { jsonLogger } from '../log.js';
-import { schemaHead } from '../migrate.js';
+import { readMigrations } from '../migration-integrity.js';
 import { maintain } from '../orders.js';
 import { RefrefClient } from '../refref.js';
 import { createCommerceServer, SERVICE } from '../server.js';
@@ -46,6 +46,7 @@ const vnextApiBase = process.env.REFREF_VNEXT_API_BASE
 const legalAdmission = which === 'PRODUCTION'
   ? new LiveSiteReleaseAdmission(siteOrigin, { sourceCommit: identity.sourceCommit, catalog }) : undefined;
 if (legalAdmission !== undefined) await legalAdmission.verify();
+const migrations = readMigrations(MIGRATIONS_DIR);
 const pool = new pg.Pool({ connectionString: env('DATABASE_URL'), max: 10 });
 const checkout: CheckoutDeps = {
   pool, catalog, log,
@@ -67,7 +68,7 @@ const email = new NotisendClient({
   ...(process.env.NOTISEND_REPLY_TO ? { replyTo: process.env.NOTISEND_REPLY_TO } : {}),
 });
 const server = createCommerceServer({
-  pool, catalog, schemaHead: schemaHead(MIGRATIONS_DIR),
+  pool, catalog, schemaHead: migrations.length, migrations,
   sourceCommit: identity.sourceCommit, startedAt: new Date(), ...(legalAdmission ? { legalAdmission } : {}),
   onError: (e) => log('request_failed', { error: e instanceof Error ? e.name : 'unknown' }),
 }, createWebHandler(checkout, which === 'STAGING', undefined, arrivals));

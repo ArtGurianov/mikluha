@@ -55,6 +55,15 @@
       "version": 11,
       "file": "0011_admin_auth.sql",
       "checksum": "8e1a798ac90baf4c63600ef340d2a0fb7e84beba47c21359ef4b2a4b38e1b933"
+    },
+    {
+      "version": 12,
+      "file": "0012_schema_compatibility.sql",
+      "checksum": "59dae694c2a6cff960d79f1ff615ad0e888172fff6a2b4462ca030df2656dac6",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "Protocol bootstrap: pre-protocol runtimes remain incompatible."
+      }
     }
   ]
 }

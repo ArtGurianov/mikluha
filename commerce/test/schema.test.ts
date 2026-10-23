@@ -35,7 +35,6 @@ test('0010 upgrades populated schema 9 without rewriting its history and closes 
   try {
     await client.connect();
     cpSync(MIGRATIONS_DIR, dir, { recursive: true });
-    const journal = JSON.parse(readFileSync(join(dir, 'journal.json'), 'utf8'));
     truncateMigrations(dir, 9);
     assert.deepEqual(await migrate(client, dir), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
     const history = (await client.query('SELECT * FROM schema_migrations ORDER BY version')).rows;

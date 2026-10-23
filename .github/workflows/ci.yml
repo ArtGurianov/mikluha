@@ -102,6 +102,9 @@ jobs:
         working-directory: .
         run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=${{ github.event.pull_request.head.sha }} -t mikluha-commerce:ci .
 
+      - name: Unchanged image on compatible forward schema (isolated PostgreSQL)
+        run: pnpm exec tsx scripts/qualify-schema-image.ts mikluha-commerce:ci
+
   # The static Control Room (control-room/README.md, ART-363): its own package; `build` ends with the
   # no-secret check over the exported files, and the image is built as Coolify would.
   control-room:

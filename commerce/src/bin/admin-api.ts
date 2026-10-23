@@ -17,7 +17,7 @@ import { parseTotpKey } from '../admin/totp.js';
 import { PRODUCTION_BUILD_IDENTITY_FILE, readBuildIdentity } from '../build-identity.js';
 import { env, MIGRATIONS_DIR } from '../config.js';
 import { jsonLogger } from '../log.js';
-import { schemaHead } from '../migrate.js';
+import { readMigrations } from '../migration-integrity.js';
 
 const log = jsonLogger(ADMIN_SERVICE);
 assertAdminEnvironment(process.env);
@@ -25,11 +25,12 @@ const origin = adminOrigin(env('ADMIN_ORIGIN'));
 const totpKey = parseTotpKey(env('ADMIN_TOTP_KEY'));
 const auditKeys = parseAuditKeys(process.env);
 const identity = await readBuildIdentity(PRODUCTION_BUILD_IDENTITY_FILE);
+const migrations = readMigrations(MIGRATIONS_DIR);
 const pool = new pg.Pool({ connectionString: env('ADMIN_DATABASE_URL'), max: 5 });
 const publisherPool = new pg.Pool({ connectionString: env('ADMIN_PUBLISH_DATABASE_URL'), max: 3 });
 await assertAdminLogin(pool);
 await assertAdminLogin(publisherPool, 'admin_publisher');
-const server = createAdminServer({ pool, publisherPool, totpKey, auditKeys, origin, schemaHead: schemaHead(MIGRATIONS_DIR),
+const server = createAdminServer({ pool, publisherPool, totpKey, auditKeys, origin, schemaHead: migrations.length, migrations,
   sourceCommit: identity.sourceCommit, startedAt: new Date(), log });
 const port = Number(process.env.PORT ?? 3000);
 server.listen(port, '0.0.0.0', () => log('listening', { port }));

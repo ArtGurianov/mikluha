@@ -51,7 +51,7 @@ static; everything that sells a trip lives here, with its own Postgres.
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
   integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migrations
-  0007–0011 need owner-only application and fresh schema-11 logical and PITR recovery evidence
+  0007–0012 need owner-only application and fresh schema-12 logical and PITR recovery evidence
   before future admission. Mikluha commerce is undeployed; monitor admission, sales and payments remain closed.
 
 ## Generic legal pack and individual application
@@ -411,3 +411,56 @@ pnpm exec tsx scripts/check-migration-history.ts BASE_SHA HEAD_SHA
 
 The schema-7 upgrade test compares all old journal fields, including timestamps, before and
 after the forward upgrade. This is isolated test evidence; it does not apply production SQL.
+
+
+## Forward-compatible schema readiness (ART-318)
+
+Migration 0012 introduces `schema_migration_compatibility`, written only by the owner migrator.
+Commerce and Admin API read the same contiguous migration history and verify their entire bundled
+prefix's filenames and checksums. Every ahead migration needs its own matching attestation and an
+explicit approval for the **full source SHA from the old image's immutable identity file**. No
+approval is inferred from a higher version, a mutable environment variable, a tag or a recent CI run.
+Database-behind, missing/unknown history, altered checksums, gaps and unapproved runtimes remain
+`NOT_READY`. A null or abbreviated identity cannot receive a forward approval.
+
+From 0012 onward every lock entry must contain a classification:
+
+```json
+"compatibility": {
+  "runtimeCommits": [],
+  "evidence": "Incompatible until the actual old image and this migration are qualified."
+}
+```
+
+An empty list means incompatible. A compatible migration lists only the exact tested old source
+commits; `evidence` records the proof location, old image digest, new migration checksum and exercised
+operations. SQL and classification become immutable together. The migrator validates prior
+attestations on rerun and inserts new SQL, journal and attestation in one transaction. Runtime roles
+have SELECT only. The database owner is the authority for applying reviewed migrations; database
+owner compromise is outside the runtime permission boundary.
+
+Deployment order:
+
+1. Land and deploy the protocol-aware baseline with schema 0012. Existing pre-protocol images still
+   require exact schema equality and **cannot** be made forward-compatible by registry entries.
+2. Qualify each proposed future migration using the actual previous image digest/source SHA. Include
+   booking, payment/reconciliation, workers and Admin operations affected by that SQL, negative
+   permissions/integrity tests, recovery and application rollback. Commit the exact approval and
+   evidence with the new migration. This PR approves **no real ahead migration**.
+3. Apply that release's migrations as owner. The previous protocol-aware image remains ready only
+   if **every** ahead version explicitly approves it. Then install the exact new image. On application
+   rollback keep compatible SQL; do not delete journal rows or run the old migrator backwards.
+   Incompatible migrations require a coordinated release; this gate provides no availability promise.
+4. Recheck `/identity`, `/readyz`, and independent legal-release admission. Commerce and the public
+   site's legal identity must still agree exactly; schema compatibility does not authorize serving
+   different legal releases. Migration, deployment, recovery qualification and sales admission are
+   separate owner-authorized actions.
+
+CI builds the image with the PR head SHA, pins its Docker image ID, and runs
+`pnpm exec tsx scripts/qualify-schema-image.ts IMAGE`. A disposable internal Docker network contains
+only PostgreSQL and that unchanged image, with no host mounts, published ports or external provider
+access. Its bundled schema stays 12 while an additive **test-only** schema 13 is applied. It proves
+readiness/identity, reservation, contract readback, order state, maintenance and negative/rollback
+cases. The fixture proves this protocol for the tested operations; it does not qualify arbitrary
+future SQL, real payments, a production deployment or recovery. PostgreSQL integration tests also
+exercise the Admin role, immutable classification, failed-SQL rollback and tampering.

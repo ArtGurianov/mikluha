@@ -4,6 +4,10 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import type pg from 'pg';
 
+import { MIGRATIONS_DIR } from './config.js';
+import { readMigrations, type LockedMigration } from './migration-integrity.js';
+import { schemaReadiness } from './schema-readiness.js';
+
 import type { Catalog } from './catalog.js';
 import type { LegalReleaseAdmission } from './legal-admission.js';
 
@@ -13,18 +17,20 @@ export interface ServerDeps {
   readonly pool: pg.Pool;
   readonly catalog: Catalog;
   readonly schemaHead: number;
+  readonly migrations?: readonly LockedMigration[];
   readonly sourceCommit: string | null;
   readonly startedAt: Date;
   readonly legalAdmission?: LegalReleaseAdmission;
   readonly onError?: (e: unknown) => void;
 }
 
-/** READY when the database answers at exactly this build's schema version. */
+/** READY after immutable prefix and every exact-SHA forward approval, then legal admission. */
 export async function readiness(deps: ServerDeps): Promise<{ status: 'READY' | 'NOT_READY'; reason?: string; schema?: number }> {
   try {
-    const { rows } = await deps.pool.query<{ v: number | null }>('SELECT max(version) AS v FROM schema_migrations');
-    const schema = rows[0]?.v ?? 0;
-    if (schema !== deps.schemaHead) return { status: 'NOT_READY', reason: 'SCHEMA_NOT_AT_HEAD', schema };
+    const result = await schemaReadiness(deps.pool, { schemaHead: deps.schemaHead,
+      migrations: deps.migrations ?? readMigrations(MIGRATIONS_DIR), sourceCommit: deps.sourceCommit });
+    if (result.status !== 'READY') return result;
+    const schema = result.schema!;
     if (deps.legalAdmission !== undefined) {
       try { await deps.legalAdmission.verify(); }
       catch { return { status: 'NOT_READY', reason: 'LEGAL_RELEASE_NOT_ADMITTED', schema }; }
