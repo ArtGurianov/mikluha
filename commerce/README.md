@@ -1,5 +1,9 @@
 # mikluha-commerce
 
+Target design for a separate merchant-native Refref v10 transition, with mandatory deposits
+and later balance payments: [Mikluha Commerce vNext](../docs/refref-v10/README.md).
+It is a documentation draft; the source/runtime and historical v9 status below remain distinct.
+
 For the approved Refref v9 product rules (ADR-140 revision 7: one Commission per
 booking) and the still-unimplemented purchase-manifest contract, see [TOUR contract status](../docs/refref-v9-contract-status.md).
 The current full-only Alfa qualification below does not qualify merchant-owned
