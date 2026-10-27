@@ -285,7 +285,7 @@
   },
   "authority": {
     "refrefCore": "Existing OWNER-approved O1-O7; retain profile/legal gates.",
-    "mikluhaDesign": "Proposed implementation architecture for review; no new commercial numeric defaults.",
+    "mikluhaDesign": "Proposed implementation architecture for review; no new commercial numeric defaults. MK-C12 promo-code scope directly approved by OWNER as recorded below; other Mikluha profile decisions remain in their existing qualification scope.",
     "suppliedBrief": "Direct user-pasted requirements; unread external attachment is not a verified normative source."
   },
   "verificationScope": {
@@ -295,5 +295,26 @@
     "providerE2E": "NOT_RUN",
     "deployedSchemaInventory": "NOT_RUN",
     "publicLaunch": "NOT_AUTHORIZED_BY_THIS_PACKAGE"
-  }
+  },
+  "ownerDecisions": [
+    {
+      "id": "MK-C12",
+      "status": "OWNER_APPROVED",
+      "recordedOn": "2026-10-28",
+      "sourceKind": "DIRECT_HUMAN_OWNER_MESSAGE",
+      "originalOwnerText": "Кстати, mikluha тоже не будет никогда иметь своих собственных промокодов - только промокоды refref.",
+      "promoCodeScope": "REFREF_ONLY",
+      "mikluhaOwnPromoCodesPlanned": false,
+      "localMerchantCouponEngineOrStackingPlanned": false,
+      "preserved": [
+        "Referral-link attribution",
+        "Qualified Apply/ORDER_SUBMIT and valid AutoApply",
+        "v10 holder/72h/R14.1",
+        "OWNER-02 and D_rule/D_applied",
+        "Accepted historical prices and contracts",
+        "Normal catalogue-price editing independent of promo codes"
+      ],
+      "scopeBoundary": "No inherited Flexperiment continuation period, fullPaymentDueAt or finality-mode selection. No deposit tariff, provider account/credentials, bank authority, legal publication, implementation, deployment or public GO is assigned."
+    }
+  ]
 }
