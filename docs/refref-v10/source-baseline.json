@@ -202,6 +202,16 @@
         "path": "commerce/migrations/0016_resolution_lease.sql",
         "sha256": "1a38157011fa8d9f73ad624a48c2d115431dbc87846d4df534e261b01dc7ab4f",
         "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0016_resolution_lease.sql"
+      },
+      {
+        "path": "commerce/src/web.ts",
+        "sha256": "5cf281dc0e1165fd1239eb99c9ba533e8b4c326107328c148ab6a0f3c2d2afa6",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/web.ts"
+      },
+      {
+        "path": "commerce/test/arrival.test.ts",
+        "sha256": "c04044115cccc2b70d2e7c8e0c4f7759f92542beb31ccdbc99557f0282c10071",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/test/arrival.test.ts"
       }
     ]
   },
@@ -271,7 +281,7 @@
   "authority": {
     "refrefCore": "Existing OWNER-approved O1-O7; retain profile/legal gates.",
     "mikluhaDesign": "Proposed implementation architecture for review; no new commercial numeric defaults.",
-    "suppliedBrief": "User-pasted requirements used; external ChatGPT Library file unavailable without login."
+    "suppliedBrief": "Direct user-pasted requirements; unread external attachment is not a verified normative source."
   },
   "verificationScope": {
     "sourceInspection": "PERFORMED",
