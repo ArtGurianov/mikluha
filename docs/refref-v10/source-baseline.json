@@ -275,6 +275,11 @@
         "path": "docs/v10/sources/owner-o7-2026-10-27.md",
         "sha256": "90647cf491fb24b9cfa020374b0e06459eb0035497413aef225409cfd1af802e",
         "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/sources/owner-o7-2026-10-27.md"
+      },
+      {
+        "path": "docs/plans/2026-10-26-refref-core-supersession.md",
+        "sha256": "1033914e4596cebc103c0d0fc317715b3108e7de64a1bd61714a1bc5506368cf",
+        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/plans/2026-10-26-refref-core-supersession.md"
       }
     ]
   },
