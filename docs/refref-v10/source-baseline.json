@@ -218,68 +218,68 @@
   "refref": {
     "repository": "ArtGurianov/refref",
     "pullRequest": 130,
-    "commit": "045d1c7389931f9666bb4dad2494390649a0b607",
+    "commit": "c932b656edbda1d47cfb57de08fd4a36536712f5",
     "pullRequestStateAtInspection": "OPEN_NOT_MERGED",
     "files": [
       {
         "path": "docs/v10/README.md",
-        "sha256": "4e8b809bf5d65b9b8d8ea2a498baffdd033a5adb6718bd3eb91f0e5b52547df3",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/README.md"
+        "sha256": "56675f71c2741c1ffd59f8566d13a0247e8d0716af82cfbadb1302a32a567fa4",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/README.md"
       },
       {
         "path": "docs/v10/ADR-141-refref-core.md",
-        "sha256": "6edcc499913f41fb8bcf507249189df361597eb4cb08a96364c0f338938b270a",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/ADR-141-refref-core.md"
+        "sha256": "4b6e260d454689e0fd6dcfd783f436e4d57751c4deb281d905b715ae6a813de1",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/ADR-141-refref-core.md"
       },
       {
         "path": "docs/v10/GATES.md",
-        "sha256": "374924fb70a46b8aaa55b6e6930c213ff133831fa449aa741ae18cfa222c7653",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/GATES.md"
+        "sha256": "be0229ad67d213b0d5f7ef6ea0e8d7c7aa76dbd2381289e3b797b3d58adba498",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/GATES.md"
       },
       {
         "path": "docs/v10/contracts/01-common-contract.md",
         "sha256": "100200647af1f0b8af584163ff0b067cdac939d1297265070d832e8e6d577ef4",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/contracts/01-common-contract.md"
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/01-common-contract.md"
       },
       {
         "path": "docs/v10/contracts/02-attribution-bound.md",
         "sha256": "1972279f436da80dca4997199fad2e732a4e477a2ec98625db94dd8d61374402",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/contracts/02-attribution-bound.md"
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/02-attribution-bound.md"
       },
       {
         "path": "docs/v10/contracts/03-merchant-reporting.md",
-        "sha256": "127360d811267311edd7fb1c1a32296c5f5b4d5080d02051f8849d2ee7fc4959",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/contracts/03-merchant-reporting.md"
+        "sha256": "cd8bc810e962130ad2bd26865c0f235f5028dc7e47e6434ef79d6af41ea13057",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/03-merchant-reporting.md"
       },
       {
         "path": "docs/v10/contracts/04-money-finality-claims.md",
         "sha256": "231bf76f706bf817c78fe7fb61189867862d60bdb91e2b44609aa38413234417",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/contracts/04-money-finality-claims.md"
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/04-money-finality-claims.md"
       },
       {
         "path": "docs/v10/contracts/05-payouts-s3-conformance.md",
         "sha256": "3944f8938eb1255ac6914ebc0a619ad1e57d57bb77c084543c2c5d3deb5191be",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/contracts/05-payouts-s3-conformance.md"
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/05-payouts-s3-conformance.md"
       },
       {
         "path": "docs/v10/contracts/06-api-and-states.md",
-        "sha256": "7d45a8371ce926abc13362d9f9ca932b73319fc95b6e4d25f6ea431e1dd7516e",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/contracts/06-api-and-states.md"
+        "sha256": "cffe375491a614ce3242b098dc84ba3d3f1bd5d8abe235d01ee1fc49b223aadd",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/06-api-and-states.md"
       },
       {
         "path": "docs/v10/contracts/merchant-result.schema.json",
         "sha256": "7d6d511792281f91b4533fb7959e43fb6597d36a8a09ab70b3392ed894f6c06d",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/contracts/merchant-result.schema.json"
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/merchant-result.schema.json"
       },
       {
         "path": "docs/v10/sources/owner-o7-2026-10-27.md",
         "sha256": "90647cf491fb24b9cfa020374b0e06459eb0035497413aef225409cfd1af802e",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/v10/sources/owner-o7-2026-10-27.md"
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/sources/owner-o7-2026-10-27.md"
       },
       {
         "path": "docs/plans/2026-10-26-refref-core-supersession.md",
         "sha256": "1033914e4596cebc103c0d0fc317715b3108e7de64a1bd61714a1bc5506368cf",
-        "url": "https://github.com/ArtGurianov/refref/blob/045d1c7389931f9666bb4dad2494390649a0b607/docs/plans/2026-10-26-refref-core-supersession.md"
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/plans/2026-10-26-refref-core-supersession.md"
       }
     ]
   },
