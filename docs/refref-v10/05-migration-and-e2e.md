@@ -53,13 +53,20 @@
 | M2 — schema/data design | Forward-only новые сущности экономической покупки, принятых ревизий, allocation мест, отдельных payment/refund операций, payment ownership и integration outbox | Review ограничений, race/NULL/wrong-type тестов, retention и import map; старые SQL неизменны |
 | M3 — native source/contract | Purchase immutable profile/revisions, seat and conditional transfer-proposal allocations, independent deposits/refunds/local first FULL, synthetic and concurrency recovery | Exact-head DB/source tests, historical bank-time proof; **no BOUND, S4, Refref calls, C or Refref ACK needed** |
 | M4 — native checkout entry | Buyer native checkout with accessible disabled promo/Apply, inert /arrive, no NEW Refref calls despite configured env; preserved scoped legacy read-back | Profile and price unaffected by promo/query/restart; accepted legal/SSR/provider admission independent of future Refref transport |
-| R1 — ОТЛОЖЕН: touch, Apply и BOUND | После готовности native: новый referral lifecycle profile, server-side touch/offer и сохранённый BOUND до первой возможности оплаты; отдельный Refref контрактный admission | TOUR-70/71, REFREF-122; CAP_BOUND_V10 exact accepted receipt, recovery/replay, no retroactive binding |
-| R2 — ОТЛОЖЕН: revision/result/evidence | Для сохранённого BOUND: независимая доставка исторических принятых ревизий, FULL, receipts, позднего evidence и recovery | TOUR-86 / TOUR-71, CAP_RESULTS_EVIDENCE_V10; source и transport разные проверки |
-| R3 — ОТЛОЖЕН: S4/registry/S3 | Допустимые споры, реестры и финансовые последствия с исходным C/S5, отдельно от buyer money | TOUR-87 / TOUR-71, CAP_S4_V10 и CAP_REGISTRY_S3_V10; отдельные полномочия на денежное исполнение |
 | M5 — отдельно разрешённый provider profile | Реальный merchant-owned acquiring/refund/fiscal путь в допустимой среде; туристский/ЕИС workflow по применимости | Фактический provider read-back и доступная проверяемая evidence chain; synthetic adapter не заменяет это доказательство |
 | M6 — cutover rehearsal | Прогон копии схемы с синтетической legacy/v10 историей; restore/replay, атомарное переключение новой выдачи | Контрольные агрегаты сходятся, старые owners/readers доступны, rollback не нарушает existing rights |
 | M7 — scoped activation | После отдельного OWNER разрешения: выбранный новый профиль/круг заказов, версия buyer terms и provider/source admission | Записанный scope cutover, точный SHA/digest/schema, независимые runtime read-backs; продажи не открываются одним merge |
 | M8 — drain и retirement | Только после завершения старых операций убрать старую выдачу/лишние writers; сохранить доступ к доказательствам | No orphan attempts/claims/debts, доказана retention/восстановимость, отдельный review и deploy authority |
+
+### Отложенные реферальные этапы — отдельный поток после native admission
+
+Эти этапы не являются последовательными условиями выполнения M3–M8 и не требуют ждать полного drain M8. Реализация и Go Refref возможны только после собственных capabilities/профильных проверок. Указанный ниже поток не блокирует native public GO.
+
+| Этап | Содержание | Независимый допуск |
+|---|---|---|
+| R1 — ОТЛОЖЕН: touch, Apply и BOUND | После готовности native: новый referral lifecycle profile, server-side touch/offer и сохранённый BOUND до первой возможности оплаты; отдельный Refref контрактный admission | TOUR-70/71, REFREF-122; CAP_BOUND_V10 exact accepted receipt, recovery/replay, no retroactive binding |
+| R2 — ОТЛОЖЕН: revision/result/evidence | Для сохранённого BOUND: независимая доставка исторических принятых ревизий, FULL, receipts, позднего evidence и recovery | TOUR-86 / TOUR-71, CAP_RESULTS_EVIDENCE_V10; source и transport разные проверки |
+| R3 — ОТЛОЖЕН: S4/registry/S3 | Допустимые споры, реестры и финансовые последствия с исходным C/S5, отдельно от buyer money | TOUR-87 / TOUR-71, CAP_S4_V10 и CAP_REGISTRY_S3_V10; отдельные полномочия на денежное исполнение |
 
 SSR/Admin переход ADR v2.3 остаётся собственным необходимым треком. Этот проект не объявляет его состоявшимся и не делает работоспособность static-каталога доказательством нового Commerce. Последовательная реализация одного профиля допустима; три отдельных системы одновременно строить не требуется.
 
