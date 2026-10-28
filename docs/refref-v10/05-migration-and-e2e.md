@@ -192,3 +192,27 @@ Cutover должен атомарно назначать профиль ново
 Этот PR не меняет credentials, host/network/config, backup paths или persistent state: **CUSTODY_IMPACT: NO**. Будущий PR deployment/schema/provider provisioning, затрагивающий такие ресурсы, отдельно перечисляет custody resources и authority по [AGENTS.md](../../AGENTS.md); до чистого drift-check и свежего capture отмечает `CUSTODY_PENDING`. Реальные ключи, банковские payloads, туристские данные и приватные акты не коммитятся в публичный репозиторий Mikluha.
 
 Связанный upstream: [стратегия Refref v10](https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/migration/01-migration-strategy.md), [S6](https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/03-merchant-reporting.md), [gates](https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/GATES.md). Эти ссылки фиксируют зависимость, а не копируют в Mikluha нормативный пакет Core.
+
+## OWNER acceptance extension — 28.10.2026 (проектные E2E, NOT_RUN)
+
+Ниже дополнительные обязательные сценарии для следующей реализации. Это отдельный namespace `MK-OWNER-*`, **не** утверждение, что они уже вошли в ранее посчитанные 63 E2E или прошли. При переводе в машинный реестр обновить его count/index/coverage и задать проверяемые exact-head verdicts source, HTTP transport и qualified bank/fiscal provider.
+
+| ID | Вход/действие | Ожидаемые проверяемые результаты |
+|---|---|---|
+| MK-OWNER-01 | Депозит при цене 80k; каталог поднялся до 100k или снизился до 70k; покупатель открывает доплату | В обоих случаях исходная цена 80k и остаток 60k при депозите 20k; никаких невидимых мутаций принятой ревизии |
+| MK-OWNER-02 | Неизвестный номер/неверный email/подбор ID, просроченный или повторно использованный magic link | Одинаковый публичный ответ, никаких данных брони до подтверждения исходного email; audit/rate limits, no token leakage |
+| MK-OWNER-03 | Исходное письмо/напоминание и ссылка на туре → ограниченная сессия доплаты | Правильный выезд, цена до скидки/D_applied/итог, received/refunded/balance/due; нет аккаунта покупателя |
+| MK-OWNER-04 | Одновременно два окна доплаты; первая банковская операция STARTED/UNKNOWN; callback после restart | Нет перекрывающей повторной операции; read-back, ровно одно учитываемое поступление, поздний реальный второй debit урегулируется отдельно |
+| MK-OWNER-05 | PROPOSED transfer 80k→90k, депозит 20k; немедленный платёж обязателен | Старые места закреплены; новые только proposal-held; до consent и подтверждённого платежа нет финального переключения; после — атомарное переключение и новая ревизия, остаток по согласованному графику |
+| MK-OWNER-06 | PROPOSED transfer 80k→70k, депозит 20k; немедленный платёж не обязателен | Consent по исходному email; после него атомарное переключение; долг 50k без refund |
+| MK-OWNER-07 | FULL 80k→новая цена 70k | Модератор инициирует отдельный квалифицированный частичный refund 10k; финансовое и фискальное подтверждение независимы; FULL/C/S5 не переписаны |
+| MK-OWNER-08 | Consent не получен, proposal истёк, refund/payment UNKNOWN, поздний provider success, конкурирующая продажа места | Исходная бронь не утрачена; release hold только после проверки; no double booking, no blind retry, явный operator incident |
+| MK-OWNER-09 | Override новой цены модератором, затем отказ/согласие покупателя | Actor/reason/old/new/hash/audit; без согласия новая цена и места не вступают в силу |
+| MK-OWNER-10 | BOUND кампании A; buyer ввёл код B под 72h защитой; затем оплатил депозит | Admin показывает только подтверждённую A attribution, не ложно применённый B; промокод и фактическая D_applied согласованы с итогом |
+| MK-OWNER-11 | LINK BOUND без промокода; предоплата, доплата, перенос; кампания архивирована; Refref offline | Все операции ссылаются на тот же purchase/binding/campaign, история читается локально; нет второго BOUND/C |
+| MK-OWNER-12 | FULL отправлен, ACK потерян; затем HTTP202 с ACCEPTED_FOR_PROCESSING → APPLIED без C или с C | Admin различает outbox/receipt/processing/qualified result; filter campaignRef/promo и ID с tenant isolation; новый FULL не создан |
+| MK-OWNER-13 | Перенос на поздний выезд после FULL; новая цена ниже, часть возвращена | Первоначальный S5 serviceAnchorAtBound и исходная C не меняются; новая дата и refund в buyer history, S4 отдельно |
+| MK-OWNER-14 | Доплата до поездки при 100% получении денег; услуга ещё не оказана | Refref FULL по реальному источнику, но фискальный «полный расчёт» не порождается автоматически событием FULL; чеки/зачёт/частичный refund по квалифицированному MK-C07 |
+| MK-OWNER-15 | Перенос требует только более поздней оплаты по графику новой поездки | После consent разрешено переключение без немедленного платежа; total balance отличается от amount due now, fullPaymentDueAt меняется только принятой ревизией |
+
+Инварианты контрпримеров: нельзя выдавать ошибочно `D_rule` за `D_applied`; нельзя создавать второй BOUND или C; нельзя менять первоначальный S5 anchor; нельзя переписывать историческую договорную цену или банковский факт; нельзя называть UI/mock PASS реальным provider conformance.
