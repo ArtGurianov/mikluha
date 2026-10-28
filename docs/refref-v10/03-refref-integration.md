@@ -140,7 +140,9 @@ Mikluha напрямую исполняет месячный реестр пар
 
 Приёмка включает отдельные source/contract, transport E2E и provider/evidence E2E verdicts. Отсутствие работающего endpoint — BLOCKED для transport, а не PASS по mocks. Финальный путь «предоплата → доплата → PAID_IN_FULL → C → FINAL» обязателен в профиле Mikluha перед отдельным публичным GO Refref вместе с LMS/LAB. Остальные gates — [миграция и E2E](05-migration-and-e2e.md).
 
-## 8. OWNER_APPROVED — историческая атрибуция и Commerce Admin
+## 8. DEFERRED REFERRAL — OWNER_APPROVED требования к исторической атрибуции и Commerce Admin
+
+**Не внедрять в текущий native checkout**: Apply и новые attribution-вызовы отключены по TOUR-81. Настоящий раздел — для будущего referral admission и REFREF-123, не его prerequisite для native launch.
 
 Mikluha хранит локальный immutable referral snapshot итогового **durable BOUND**, а не только предварительную оценку промокода: businessRef, purchaseRef, bindingRef, campaignRef, participationRef/referrerRef (в объёме подтверждённого ответа), termsVersionRef/hash, touchRef, источник атрибуции LINK/PROMO/действительный AutoApply, фактически подтверждённый промокод при наличии, source command/receipt и время. Поля campaignRef и termsVersionRef должны присутствовать в утверждённом response/read-back DTO Refref; пока этого нет, это межрепозиторный contract blocker, а не разрешение угадывать campaignRef из введённого кода.
 
@@ -149,3 +151,8 @@ Mikluha хранит локальный immutable referral snapshot итогов
 Commerce Admin, в карточке брони и каждой связанной операции, отображает read-only локальные поля: применённый код или «не применён», campaignRef, bindingRef, termsVersionRef, исходный источник, согласованная стоимость до скидки, actual D_applied, итоговая договорная стоимость, суммарные подтверждённые оплаты, успешные возвраты, оставшийся долг **либо** переплата; у отдельного платежа — его собственная сумма/status/provider ID. Сумма расчётной Refref D_rule не выдаётся за фактическую скидку. Показывать историю прежних immutable ревизий и цен; безопасное копирование ID, фильтр/поиск по campaignRef и промокоду с tenant scope/ролями. Открытие исторической карточки не требует сетевого запроса в Refref.
 
 Статус отчётности Refref разложен на: локальный durable source/outbox → отправка/повтор → устойчивый HTTP202 sourceReceipt → processingStatus ACCEPTED_FOR_PROCESSING или APPLIED → мотив квалификации/commissionRef если положительная C. «Отправлено» не значит принято; APPLIED не означает автоматически положительную C или банковскую верификацию. UNKNOWN не отображается как отказ/неоплата. Исторический snapshot не меняется после закрытия кампании, переноса брони, доплаты или восстановления отчёта. Секреты, buyer tokens, личные данные туристов в Refref payload и публичные логи не отправляются.
+
+
+### Referral transfer discount (policy direction; exceptions OPEN)
+
+OWNER направленно утвердил перерасчёт исходного frozen campaign discount rule на подходящую новую цену при согласованном переносе: процент пересчитывается от нового G, fixed следует исходной fixed rule/cap; фиксируются exact G, D_rule, actual buyer D_applied, итог, terms version и proposal hash. Самостоятельная merchant coupon engine запрещена. Применимость исходной кампании к новому выезду, сценарий неподходящего выезда, источник достоверного frozen rule и право покупателя на обещанную скидку требуют отдельной совместимой квалификации и согласия; автоматическое `D_applied=0` **не утверждено**. Комиссия после первого FULL остаётся frozen C, а S5 исходным anchor. До FULL квалифицируется effective revision; не обещать новую C по одному пересчёту скидки.
