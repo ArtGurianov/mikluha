@@ -51,8 +51,8 @@
 | M0 — review проекта | Пять документов, точный pinned Refref contract, открытые параметры Mikluha и отраслевые gates | Согласована область реализации; O1–O7 не переоткрываются |
 | M1 — business/profile qualification | Утверждённые версии депозитного графика, просрочки остатка/мест, договора/изменений, действительных полномочий seller/agent, fiscal/ЕИС применимости и native provider; MK-C11: режим окончательности/точный anchor услуги | Нет выдуманных процентов, сроков, ролей или разрешения банку; документированы supported flows и UNKNOWN/read-back; ранний FULL не выбирает PAYMENT автоматически |
 | M2 — schema/data design | Forward-only новые сущности экономической покупки, принятых ревизий, allocation мест, отдельных payment/refund операций, payment ownership и integration outbox | Review ограничений, race/NULL/wrong-type тестов, retention и import map; старые SQL неизменны |
-| M3 — synthetic source/contract | Транзакции/полномочия/дедупликация, BOUND-before-opportunity, first FULL, S4 snapshots, независимые локальное принятие ревизии/реферальная квалификация и recovery на synthetic adapters | Exact-head meaningful tests и migration-history; отказ/UNKNOWN Refref не откатывает договор, сохранены депозит и истинные поздние платежи; заявлен только source/contract scope |
-| M4 — attribution/checkout и merchant transport | Переход `/arrive`/context к v10 action/holder/Apply; настоящий HTTP/DB/outbox путь Mikluha → квалифицированный Refref v10; без обязательного SDK | 72h/R14.1/campaign expiry, отсутствие ретроминта, первоначальный BOUND UNKNOWN не обходится; устойчивая доставка неподходящей/запаздавшей ревизии и FULL, CAS/read-back без отката договора и второй C |
+| M3 — NATIVE source/contract; referral assertions deferred | Транзакции/полномочия/дедупликация, local first FULL, независимые локальное принятие ревизии; **BOUND/S4 отложены**; будущая реферальная квалификация и recovery на synthetic adapters | Exact-head meaningful tests и migration-history; отказ/UNKNOWN Refref не откатывает договор, сохранены депозит и истинные поздние платежи; заявлен только source/contract scope |
+| M4 — NATIVE checkout; referral Apply/transport deferred | Нативный вход без новых Refref attribution вызовов, отключённый Apply и inert /arrive; будущий HTTP/DB/outbox путь Mikluha → квалифицированный Refref v10; без обязательного SDK | 72h/R14.1/campaign expiry, отсутствие ретроминта, первоначальный BOUND UNKNOWN не обходится; устойчивая доставка неподходящей/запаздавшей ревизии и FULL, CAS/read-back без отката договора и второй C |
 | M5 — отдельно разрешённый provider profile | Реальный merchant-owned acquiring/refund/fiscal путь в допустимой среде; туристский/ЕИС workflow по применимости | Фактический provider read-back и доступная проверяемая evidence chain; synthetic adapter не заменяет это доказательство |
 | M6 — cutover rehearsal | Прогон копии схемы с синтетической legacy/v10 историей; restore/replay, атомарное переключение новой выдачи | Контрольные агрегаты сходятся, старые owners/readers доступны, rollback не нарушает existing rights |
 | M7 — scoped activation | После отдельного OWNER разрешения: выбранный новый профиль/круг заказов, версия buyer terms и provider/source admission | Записанный scope cutover, точный SHA/digest/schema, независимые runtime read-backs; продажи не открываются одним merge |
@@ -183,7 +183,7 @@ Cutover должен атомарно назначать профиль ново
 | Tourism/legal readiness | Фактические роли/полномочия, опубликованные/акцептованные версии, применимость ЕИС/ПД и fiscal mapping | `NOT_RUN`: impact/gate подготовлен, юридическая квалификация не заменена кодом |
 | Public GO | Mikluha E2E с предоплатой/доплатой и применимыми изменениями/отменами; отдельно LMS и LAB; явное OWNER разрешение | Не выдаётся этим PR; merge/deploy/первые продажи — отдельные действия |
 
-Обязательный счастливый путь перед public GO Refref: **Mikluha booking → durable BOUND до оплаты → депозит → доплата → действительный PAID_IN_FULL → одна C → FINAL**, плюс применимые отмены и изменения бронирования. Mikluha — самостоятельный merchant-native Commerce, не тестовый mock третьего профиля и не подсистема кредитов/туристов в Core.
+Для native public GO не требуется Refref, другая LMS/LAB готовность или BOUND. Future-only обязательный счастливый путь перед public GO Refref: **Mikluha booking → durable BOUND до оплаты → депозит → доплата → действительный PAID_IN_FULL → одна C → FINAL**, плюс применимые отмены и изменения бронирования. Mikluha — самостоятельный merchant-native Commerce, не тестовый mock третьего профиля и не подсистема кредитов/туристов в Core.
 
 ## 7. Разделение полномочий и окончательный checklist перехода
 
@@ -216,3 +216,25 @@ Cutover должен атомарно назначать профиль ново
 | MK-OWNER-15 | Перенос требует только более поздней оплаты по графику новой поездки | После consent разрешено переключение без немедленного платежа; total balance отличается от amount due now, fullPaymentDueAt меняется только принятой ревизией |
 
 Инварианты контрпримеров: нельзя выдавать ошибочно `D_rule` за `D_applied`; нельзя создавать второй BOUND или C; нельзя менять первоначальный S5 anchor; нельзя переписывать историческую договорную цену или банковский факт; нельзя называть UI/mock PASS реальным provider conformance.
+
+
+## Approved SOL v5-final: native/referral scenario ownership and negative acceptance
+
+The original 63 `MKV10-E2E-*` IDs remain preserved as future full-conformance cases, all NOT_RUN. Native facets belong to TOUR-37/76/77/78/79/81/83 and are proved only in their local source/provider scope; full BOUND/C/S4/S5/transport assertions belong to deferred TOUR-71/70/86 and REFREF-123. A native facet passing never upgrades the original full-case verdict. This Markdown is not an existing machine test registry. The 15 prior `MK-OWNER-*` remain NOT_RUN and are split by scope: 01–09,15 current native; 10–13 deferred referral; 14 native fiscal facet and separately deferred Refref FULL facet. Legacy recovery remains enabled although new native attribution is suppressed.
+
+| Coverage item | Owner/phase | Assertion / no duplicated scenario ID |
+|---|---|---|
+| TRANSFER-PAY-01 (new) | TOUR-79/78, native | 20k old deposit + 70k proposal-specific payment for new 90k revision never yields FULL against old 80k obligation; SQL commit produces one effective revision and allocation |
+| TRANSFER-PAY-02 (new) | TOUR-79/78, native | Bank success followed by crash before seat switch; restart commits once, with real financial chronology and no second payment/refund |
+| TRANSFER-PAY-03 (new) | TOUR-79/83, native | Target changed or unavailable after bank success; funds remain recognized and scoped to proposal, no automatic credit to original debt, deterministic NEEDS_RESOLUTION/refund route |
+| TRANSFER-PAY-04 (new) | TOUR-79/78, native | Independent ordinary top-up while proposal OPEN invalidates stale economic hash, no silent acceptance or overlapping active payment |
+| MKV10-E2E-17 (existing) | TOUR-79, native facet | Race at target seat proposal hold creation, not only at final commit; one holder, losing buyer keeps original allocation |
+| MK-OWNER-08 + MKV10-E2E-06/08 (existing) | TOUR-78/79/83, native | Proposal-linked UNKNOWN fences holds and overlapping payments; timeout is not terminal bank evidence |
+| MKV10-E2E-59 (existing) | TOUR-78/79, native facet | True old-revision FULL at T1, change at T2, bank callback at T3: no retrospective assignment to new revision; worker knownAt separately |
+| MK-OWNER-06 (existing) | TOUR-79, native | Email prefetch scanner does not consent; authenticated explicit action commits only intended proposal |
+| REFERRAL-FULL-01 (new, deferred) | TOUR-71 | first true FULL BEFORE transfer computes C on prior effective revision, first FULL AFTER transfer on new effective revision, never second C |
+| REFERRAL-DISCOUNT-01 (new, deferred) | TOUR-71 / REFREF-123 | frozen percent and fixed discount rules, exact rounding and archived campaign, target trip outside eligibility: no silently invented discount, explicit buyer terms, separate frozen C/S5 |
+| BOUND identity same create/replay/read-back | REFREF-123, deferred | no duplicate test ID in Mikluha; campaign archive and cross-business scope checked upstream |
+| Native ingress regardless of env/restart | TOUR-81, native | no NEW Refref calls with API base present; existing legacy scoped recovery continues |
+
+Referral merchant-readable identity/read-back is deferred to REFREF-123. Native source has no BOUND, no Refref C and no S4. Independent provider/fiscal legal admission gates remain mandatory for native live money.
