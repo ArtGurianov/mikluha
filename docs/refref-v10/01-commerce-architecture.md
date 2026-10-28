@@ -4,6 +4,8 @@
 
 ## 1. Выбранная граница
 
+**Текущий этап: native-first**, profile `NATIVE_NO_REFERRAL`, no new Refref BOUND/Apply/transport calls. Shared Commerce bookkeeping and bank authority are reusable; legacy read-back/recovery remains active in its own scope. Refref flow below is DEFERRED and cannot block independent native go-live. Profile immutability after purchase creation is the current protective guard, subject to separate owner-requested scope review; no retroactive BOUND is authorized.
+
 Mikluha становится владельцем бронирования, покупательского checkout, каждого взноса, возврата, исполнения услуги и фискализации. Refref владеет атрибуцией, BOUND, признанием одной комиссии и её окончательностью, S4/B2, реестром партнёрского долга и S3. Refref не хранит график туристических взносов и не проводит покупательские платежи.
 
 Предоплата и последующая доплата — обязательный сценарий существующего бизнеса Mikluha. Их размеры, сроки и правила мест нельзя вывести из старого кода, примеров 30/70 или условий Refref. Они заполняются в версии политики Mikluha до допуска checkout. Наличие отдельного Commerce Mikluha не создаёт платный продукт Refref Commerce.
@@ -61,7 +63,7 @@ Mikluha становится владельцем бронирования, по
 
 Состояния ортогональны: **бронь**, **покупательский денежный остаток**, **исход конкретной операции**, **исполнение услуги**, **фискальный/EIS долг**, **доставка отчёта Refref**. Нельзя выразить всё одним PAID/FULFILLED. Неуспех доставки FULL не возвращает реально оплаченный заказ в неоплаченный и не создаёт вторую платёжную сессию.
 
-## 5. Обычный путь
+## 5. Реферальный путь — ОТЛОЖЕН (не native checkout)
 
 ```mermaid
 sequenceDiagram
