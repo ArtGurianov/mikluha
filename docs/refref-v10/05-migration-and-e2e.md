@@ -243,3 +243,76 @@ The original 63 `MKV10-E2E-*` IDs remain preserved as future full-conformance ca
 | Native ingress regardless of env/restart | TOUR-81, native | no NEW Refref calls with API base present; existing legacy scoped recovery continues |
 
 Referral merchant-readable identity/read-back is deferred to REFREF-123. Native source has no BOUND, no Refref C and no S4. Independent provider/fiscal legal admission gates remain mandatory for native live money.
+
+## Приложение: владение всеми 63 исходными MKV10-E2E
+
+Таблица ниже сохраняет **каждый** исходный ID и разделяет его локальную проверяемую грань от полного будущего E2E; исходные формулировки/stimulus выше не изменяются. `—` означает, что отдельной проверяемой native-грани нет или полноценный сценарий целиком native. Задачи здесь — ответственные владельцы *планируемой* приёмки, не утверждение об уже успешном тесте; статусы всех 63 полных сценариев остаются `NOT_RUN`. Отложенный общий conformance — TOUR-71; профильные BOUND — TOUR-70, reports — TOUR-86, **S4 и S3 — TOUR-87**.
+
+| ID | Текущий native: проверка и владелец | Отложенный Refref: проверка и владелец |
+|---|---|---|
+| MKV10-E2E-01 | TOUR-37/78: депозит, доплата, локальный FULL | TOUR-70/71: BOUND, C, S5 |
+| MKV10-E2E-02 | TOUR-37/78: несколько платежей ровно раз, первый FULL | TOUR-71: ровно одна C |
+| MKV10-E2E-03 | TOUR-78/80/84: 100% аванс ≠ оказание; чек/ЕИС | TOUR-71: C после FULL |
+| MKV10-E2E-04 | TOUR-75/78: срок, баланс и отсутствие ложного bank fact | TOUR-71/86: NOT_PAID, BOUND |
+| MKV10-E2E-05 | TOUR-27/37/78: возврат взноса, отмена и места | TOUR-71/86: CANCELLED без C |
+| MKV10-E2E-06 | TOUR-37/77/78/83: BANK_UNKNOWN удерживает деньги и места | TOUR-71/86: отдельный реферальный результат |
+| MKV10-E2E-07 | TOUR-37/78/83: поздний успех, без двойного debit | TOUR-71/86: FULL после CANCELLED |
+| MKV10-E2E-08 | TOUR-37/77/83: повтор, timeout, read-back, no double debit | — (полный исходный случай native) |
+| MKV10-E2E-09 | TOUR-37/78: webhook/restart, одно allocation | TOUR-71/86: одна C и source report |
+| MKV10-E2E-10 | — (в native нет Refref ingress) | TOUR-71/86: потерянный ACK FULL |
+| MKV10-E2E-11 | TOUR-76/78/79: изменение цены, версия и долг | TOUR-71/86: effective FULL terms |
+| MKV10-E2E-12 | TOUR-76/78/79: гонка ревизии и платежа | TOUR-71: правильная C по FULL |
+| MKV10-E2E-13 | TOUR-76/79/84: замена туриста и документы | TOUR-71: та же C/S5 |
+| MKV10-E2E-14 | TOUR-78/79: доплата за нового туриста | TOUR-71/87: frozen C и S4 evidence |
+| MKV10-E2E-15 | TOUR-76/79: самостоятельный новый заказ/места | TOUR-70/71: новый BOUND/C |
+| MKV10-E2E-16 | TOUR-78/79: перенос, согласие, conditional allocation | TOUR-71: одна C и исходный S5 |
+| MKV10-E2E-17 | TOUR-79: конкуренция за hold при создании предложения, no oversell | TOUR-71: preserved original BOUND |
+| MKV10-E2E-18 | TOUR-78/79/83: два реальных оборота, не двойной зачёт | TOUR-71/87: продолжение и frozen C |
+| MKV10-E2E-19 | TOUR-76/79: отмена и новая независимая покупка | TOUR-70/71: новое действие и BOUND |
+| MKV10-E2E-20 | TOUR-78/79: относимый refund и остаток | TOUR-87/71: partial S4 C→0 или нет |
+| MKV10-E2E-21 | TOUR-78: возврат дешёвой части и остаток | TOUR-87/71: S4 guard, C сохранена |
+| MKV10-E2E-22 | TOUR-78/79/83: полная отмена, bank refund, доказательства | TOUR-87/71: S4 полное прекращение |
+| MKV10-E2E-23 | TOUR-78/84: сертификат не банковский refund | TOUR-87/71: отказ S4 при продолжении |
+| MKV10-E2E-24 | — (только реферальная жалоба) | TOUR-87/86/71: claim раньше FULL |
+| MKV10-E2E-25 | TOUR-78/83: bank refund retry, independent source | TOUR-87/71: R25.5 evidence/срок |
+| MKV10-E2E-26 | TOUR-78: поздняя доплата как денежный факт | TOUR-87/71: после S4 нет auto restore C |
+| MKV10-E2E-27 | — (нет native registry партнёров) | TOUR-87/71: RESTORE_FULL и S3 |
+| MKV10-E2E-28 | TOUR-81: native не принимает и не рассчитывает promo | TOUR-70/71: D_applied без BOUND/C |
+| MKV10-E2E-29 | TOUR-76/81: native профиль, отсутствие позднего BOUND | TOUR-70/71: after-opportunity guard |
+| MKV10-E2E-30 | TOUR-81: disabled Apply не создаёт touch | TOUR-70/71: prefill ≠ PROMO_APPLY |
+| MKV10-E2E-31 | TOUR-81: promo/ORDER_SUBMIT отсутствует в native | TOUR-70/71: квалифицированный ORDER_SUBMIT |
+| MKV10-E2E-32 | — (в native нет права на C) | TOUR-70/71: OWNER-02, скидка 0 и C |
+| MKV10-E2E-33 | TOUR-80: native fiscal сумма без Refref скидки | TOUR-70/71: D_rule против D_applied, округление |
+| MKV10-E2E-34 | TOUR-37/80/83: fiscal UNKNOWN, чек не дублируется | — (полный исходный случай native) |
+| MKV10-E2E-35 | TOUR-79/80/84: договор/ЕИС и смена туриста | TOUR-71: сохранение S5 anchor при применимости |
+| MKV10-E2E-36 | TOUR-78/80: оказание ≠ новый банковский платёж | TOUR-71: отсутствие нового FULL/C, anchor |
+| MKV10-E2E-37 | TOUR-76/77/83: legacy STARTED/UNKNOWN recovery, no double writer | TOUR-71: BOUND owner retained |
+| MKV10-E2E-38 | TOUR-77/78/83: rollback не выключает старый платёж | TOUR-70/71/86: сохранённый BOUND и C |
+| MKV10-E2E-39 | TOUR-77/78/83: restore/read-back без второй операции/чека | TOUR-86/71: outbox source replay |
+| MKV10-E2E-40 | TOUR-78: сохранённые доказательства платежей | TOUR-87/71: ответ на партнёрский спор |
+| MKV10-E2E-41 | — (только партнёрский долг/реестр) | TOUR-87/71: O6 deadline |
+| MKV10-E2E-42 | TOUR-75/77/78/81: close/stop/cancel и долг, scoped recovery | TOUR-71: ref reporting при остановке |
+| MKV10-E2E-43 | TOUR-76/81: tenant isolation, PII в native API/logs | TOUR-70/86/71: foreign Business/result PII отказ |
+| MKV10-E2E-44 | TOUR-76/83: старый SQL неизменен, migration compatibility | — (полный исходный случай native) |
+| MKV10-E2E-45 | TOUR-78/79: отмена и доказанное продолжение | TOUR-87/71: S4 continuation guard |
+| MKV10-E2E-46 | TOUR-77/78/83: локальная доплата при сбое внешнего сервиса | TOUR-86/71: сохранённый BOUND, поздняя C |
+| MKV10-E2E-47 | TOUR-75/78: неподтверждённый зачёт не создаёт local FULL | TOUR-71: no C without real FULL |
+| MKV10-E2E-48 | TOUR-78/79: согласованное изменение и безопасная доплата | TOUR-86/71: неподходящая FULL ревизия без C |
+| MKV10-E2E-49 | TOUR-76/79: accepted revision не повторяется/не отменяется | TOUR-86/71: lost ACK/replay |
+| MKV10-E2E-50 | TOUR-76/78/83: evidence allocation смешанных поступлений/возвратов | TOUR-87/71: eligible G/C/S4 residual |
+| MKV10-E2E-51 | TOUR-81: никаких новых promo/touch вызовов | TOUR-70/71: 72h holder conflict |
+| MKV10-E2E-52 | TOUR-81: native не разрешает смену Refref offer | TOUR-70/71: R14.1 confirmation |
+| MKV10-E2E-53 | TOUR-81: disabled promo не зависит от TTL | TOUR-70/71: TTL кампании и touch |
+| MKV10-E2E-54 | TOUR-77/81/83: legacy recovery без новых claims | TOUR-70/71: unknown touch/BOUND не обходится |
+| MKV10-E2E-55 | TOUR-78/80: local FULL ≠ service rendered | TOUR-71: PAYMENT vs SCHEDULED_SERVICE S5 |
+| MKV10-E2E-56 | TOUR-76/78/79: новая цена 20 при депозитe 30, переплата | TOUR-71: FULL/C timing effective revision |
+| MKV10-E2E-57 | TOUR-78/79/83: BANK_UNKNOWN fence при смене цены | TOUR-86/71: Refref ACK не заменяет bank fence |
+| MKV10-E2E-58 | TOUR-78/79: изменение/доплата без ожидания внешнего ACK | TOUR-86/71: late FULL/unknown CAS |
+| MKV10-E2E-59 | TOUR-78/79/83: банк T1, revision T2, callback T3, full chronology | TOUR-71/86: C относится к T1 old revision |
+| MKV10-E2E-60 | TOUR-76/79: поздний callback не переписывает local revision | TOUR-86/71: stale Refref ACK |
+| MKV10-E2E-61 | TOUR-76/79: местный договор не откатывается от внешней ошибки | TOUR-86/71: auth/schema/CAS recovery |
+| MKV10-E2E-62 | TOUR-78: локальные документы и истинный FULL сохраняются | TOUR-86/71: sourceReceipt, поздний evidence |
+| MKV10-E2E-63 | TOUR-81: disabled Apply, no merchant coupon/fallback | TOUR-70/71: Refref-only code, holder/BOUND |
+
+**Разграничение:** для `01,02,03,04,05,07,09,11–23,25,28–31,33,35–40,42,43,45–50,54–62` частичный native PASS относится только к явно описанной грани; он не переименовывает оригинальный mixed/referral test в PASS. Доказательство исходного полного сценария требует отложенного этапа, если в третьей колонке указана Refref-проверка. Для нативных по сути `08,34,44` отдельный результат присваивается лишь после фактического source/provider-прогона. `REFERRAL-DISCOUNT-01` (отложенный) и `REFERRAL-FULL-01` (отложенный) не заменяют исходные ID.
+
