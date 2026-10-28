@@ -285,7 +285,7 @@
   },
   "authority": {
     "refrefCore": "Existing OWNER-approved O1-O7; retain profile/legal gates.",
-    "mikluhaDesign": "Proposed implementation architecture for review; no new commercial numeric defaults. MK-C12 promo-code scope directly approved by OWNER as recorded below; other Mikluha profile decisions remain in their existing qualification scope.",
+    "mikluhaDesign": "Native-first source/merchant design under approved SOL v5-final Plane plan; referral integration deferred. MK-POLICY-v1 commercial principles and MK-C12 approved by OWNER; numeric policy/provider/legal gaps remain.",
     "suppliedBrief": "Direct user-pasted requirements; unread external attachment is not a verified normative source."
   },
   "verificationScope": {
@@ -315,6 +315,30 @@
         "Normal catalogue-price editing independent of promo codes"
       ],
       "scopeBoundary": "No inherited Flexperiment continuation period, fullPaymentDueAt or finality-mode selection. No deposit tariff, provider account/credentials, bank authority, legal publication, implementation, deployment or public GO is assigned."
+    },
+    {
+      "id": "MK-POLICY-v1",
+      "status": "OWNER_APPROVED",
+      "recordedOn": "2026-10-28",
+      "recordSource": "DIRECT_OWNER_AND_PLANE_TOUR-75",
+      "appliesTo": "Current native buyer policy; deferred referral principles separate",
+      "approved": [
+        "Deposit freezes trip price regardless of future catalogue change",
+        "Target published price with audited moderator override and buyer consent",
+        "Transfer executes after buyer consent and any required immediate proposal-linked payment",
+        "Balance due based on agreed versioned new departure schedule",
+        "Single native payment operation engine with conditional transfer allocation",
+        "Mikluha native public launch independent of Refref"
+      ],
+      "notApprovedOrOpen": [
+        "Deposit fraction and specific times/zone/hold TTL/overdue outcomes",
+        "Bank proof of terminal payment-link cancellation",
+        "Retroactive change of NATIVE_NO_REFERRAL profile under investigation, current guard remains",
+        "Discount on transfer to trip outside original campaign",
+        "Finality risk acceptance for later referral profile",
+        "Provider/fiscal/legal gates and public operation authorization"
+      ],
+      "compatibility": "Original Refref source hashes/pins unchanged; no new BOUND/C/S4/S5 rule."
     }
   ]
 }
