@@ -27,8 +27,6 @@ export const PRODUCTION_ADDRESSES = {
   SITE_ORIGIN: 'https://mikluha-maklai.ru',
   REFREF_API_BASE: 'https://api.refref.ru/v1-rc',
   REFREF_CHECKOUT_ORIGIN: 'https://checkout.refref.ru',
-  /** Refref vNext (ADR-139): served only from the staged cutover; optional until then. */
-  REFREF_VNEXT_API_BASE: 'https://api.refref.ru/v1-vnext',
 } as const;
 
 export type ProductionAddressName = keyof typeof PRODUCTION_ADDRESSES;

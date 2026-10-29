@@ -1,5 +1,10 @@
 // TOUR arrival on the commerce origin (Refref ADR-139 docs/29 §2, §4, §6, §8; Linear ART-382).
 //
+// NOT WIRED under NATIVE_NO_REFERRAL (TOUR-81): web.ts serves /arrive inert and the service builds no
+// Arrivals and no vNext client. Only `arrivalTarget` is live. The rest is kept, with its tests, as the
+// prior contract for the deferred referral profile (docs/refref-v10/03 §1.1, TOUR-70); a cookie or
+// proof from it never becomes a v10 touch or BOUND.
+//
 //   GET /arrive?arrival=<opaque proof>&to=<site path>
 //
 // Refref sends a referred browser straight here (`r.refref.ru/:code → book.…/arrive?arrival=…`). The
