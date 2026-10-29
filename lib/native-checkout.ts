@@ -9,6 +9,8 @@ export type TouristField = {
 export interface BookingQuote {
   ref: string;
   hash: string;
+  /** Echo of the current client input revision; count alone cannot correlate a quote. */
+  inputRevision: string;
   participantCount: number;
   lines: Array<{ lineRef: string; label: string; amountLabel: string }>;
   totalLabel: string;
@@ -22,6 +24,8 @@ export interface BookingQuote {
 }
 
 export interface BookingPresentation {
+  /** Durable bootstrap supplied by A's session/recovery adapter, never minted on submit. */
+  session: { clientRequestId: string; recoveryRequired: boolean };
   departureId: string;
   title: string;
   dateLabel: string;
@@ -35,6 +39,7 @@ export interface BookingPresentation {
 }
 
 export interface BookingDraft {
+  clientRequestId: string;
   departureId: string;
   contact: { email: string; phone: string };
   passengers: Array<{
@@ -48,37 +53,55 @@ export interface BookingDraft {
   pdConsentConfirmed: boolean;
   terms: { ref: string; hash: string };
   pdConsent: { ref: string; hash: string };
-  quote: { ref: string; hash: string };
+  quote: { ref: string; hash: string; inputRevision: string };
   touristDataSchema: { ref: string; hash: string };
   paymentChoiceRef: string;
   captchaToken: string;
 }
 
-/** Rejected means the adapter proved no booking was created. Exceptions are UNKNOWN. */
+export interface QuoteRefreshRequest {
+  clientRequestId: string;
+  departureId: string;
+  inputRevision: string;
+  passengers: BookingDraft["passengers"];
+  touristDataSchema: { ref: string; hash: string };
+}
+
+/** All non-UNKNOWN refusals prove no booking/hold was created; generic exceptions are UNKNOWN. */
 export type BookingOutcome =
   | { kind: "review"; reference: string }
+  | { kind: "refresh_required"; code: "QUOTE_STALE" | "TERMS_CHANGED" | "PAYMENT_OPTIONS_CHANGED" }
+  | { kind: "not_dispatched" }
   | { kind: "rejected"; code: "CAPTCHA_INVALID" | "CAPTCHA_UNAVAILABLE" | "RATE_LIMITED" | "NOT_ENOUGH_SEATS" | "SALES_CLOSED" | "FORM_INVALID" }
   | { kind: "unknown" };
 
 /** Explicit whitelist; browser promo/query/autofill, totals and profile are never forwarded. */
-export function bookingDraft(form: FormData, view: BookingPresentation, participantIds: number[], captchaToken: string): BookingDraft | null {
+export function bookingPassengers(form: FormData, view: BookingPresentation, participantIds: number[]): BookingDraft["passengers"] {
+  const value = (name: string) => String(form.get(name) ?? "").trim();
+  return participantIds.map((id) => ({
+    fullName: value(`p${id}Name`), dateOfBirth: value(`p${id}Dob`), citizenship: value(`p${id}Citizenship`),
+    document: { type: value(`p${id}DocType`), series: value(`p${id}DocSeries`), number: value(`p${id}DocNumber`) },
+    additionalDetails: Object.fromEntries(view.touristDataSchema.fields.map((field) => [field.key, value(`p${id}Extra_${field.key}`)])),
+  }));
+}
+
+export function bookingDraft(form: FormData, view: BookingPresentation, participantIds: number[], captchaToken: string, inputRevision = view.quote.inputRevision): BookingDraft | null {
   const value = (name: string) => String(form.get(name) ?? "").trim();
   const paymentChoiceRef = value("paymentChoice");
-  if (!view.touristDataSchema.ready || view.quote.participantCount !== participantIds.length || participantIds.length === 0
+  if (!view.session.clientRequestId || view.session.recoveryRequired || !captchaToken || !view.touristDataSchema.ready
+    || !inputRevision || view.quote.inputRevision !== inputRevision || view.quote.participantCount !== participantIds.length || participantIds.length === 0
+    || value("adultsOnly") !== "yes" || value("pdConsent") !== "yes"
     || !view.quote.paymentOptions.some((option) => option.ref === paymentChoiceRef)) return null;
   return {
+    clientRequestId: view.session.clientRequestId,
     departureId: view.departureId,
     contact: { email: value("email"), phone: value("phone") },
-    passengers: participantIds.map((id) => ({
-      fullName: value(`p${id}Name`), dateOfBirth: value(`p${id}Dob`), citizenship: value(`p${id}Citizenship`),
-      document: { type: value(`p${id}DocType`), series: value(`p${id}DocSeries`), number: value(`p${id}DocNumber`) },
-      additionalDetails: Object.fromEntries(view.touristDataSchema.fields.map((field) => [field.key, value(`p${id}Extra_${field.key}`)])),
-    })),
+    passengers: bookingPassengers(form, view, participantIds),
     adultsOnlyConfirmed: value("adultsOnly") === "yes",
     pdConsentConfirmed: value("pdConsent") === "yes",
     terms: { ref: view.terms.ref, hash: view.terms.hash },
     pdConsent: { ref: view.pdConsent.ref, hash: view.pdConsent.hash },
-    quote: { ref: view.quote.ref, hash: view.quote.hash },
+    quote: { ref: view.quote.ref, hash: view.quote.hash, inputRevision },
     touristDataSchema: { ref: view.touristDataSchema.ref, hash: view.touristDataSchema.hash },
     paymentChoiceRef,
     captchaToken,

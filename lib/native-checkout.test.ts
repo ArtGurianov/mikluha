@@ -9,6 +9,7 @@ import { previewBookingView } from "../components/booking/checkout-preview-data"
 test("booking presentation whitelists draft fields, not promo, money, profile or autofill noise", () => {
   const view = previewBookingView();
   const form = new FormData();
+  form.set("adultsOnly", "yes"); form.set("pdConsent", "yes");
   for (const [k, v] of Object.entries({ email: " test@example.invalid ", phone: "+70000000000", p1Name: "Тестовый Турист", p1Dob: "1990-01-01", p1Citizenship: "RU", p1DocType: "RU_PASSPORT", p1DocSeries: "0000", p1DocNumber: "000000", adultsOnly: "yes", pdConsent: "yes", paymentChoice: view.quote.paymentOptions[0].ref })) form.set(k, v);
   const clean = bookingDraft(form, view, [1], "proof");
   assert.ok(clean);
@@ -37,6 +38,7 @@ test("draft binds selected server option and quote/schema identities, whitelisti
   const view = previewBookingView();
   view.touristDataSchema.fields = [{ key: "qualifiedField", label: "Synthetic qualified field", type: "text", required: true }];
   const form = new FormData();
+  form.set("adultsOnly", "yes"); form.set("pdConsent", "yes");
   form.set("paymentChoice", view.quote.paymentOptions[1].ref);
   form.set("p1Extra_qualifiedField", " allowed ");
   form.set("p1Extra_undeclaredField", "ignored");
@@ -44,7 +46,7 @@ test("draft binds selected server option and quote/schema identities, whitelisti
   const draft = bookingDraft(form, view, [1], "proof");
   assert.ok(draft);
   assert.deepEqual(draft.passengers[0].additionalDetails, { qualifiedField: "allowed" });
-  assert.deepEqual(draft.quote, { ref: view.quote.ref, hash: view.quote.hash });
+  assert.deepEqual(draft.quote, { ref: view.quote.ref, hash: view.quote.hash, inputRevision: view.quote.inputRevision });
   assert.deepEqual(draft.touristDataSchema, { ref: view.touristDataSchema.ref, hash: view.touristDataSchema.hash });
   assert.equal(draft.paymentChoiceRef, view.quote.paymentOptions[1].ref);
   assert.ok(!("amount" in draft));
@@ -53,6 +55,7 @@ test("draft binds selected server option and quote/schema identities, whitelisti
 test("stale party quote, unavailable schema and unsupported payment choice fail closed", () => {
   const view = previewBookingView();
   const form = new FormData();
+  form.set("adultsOnly", "yes"); form.set("pdConsent", "yes");
   assert.equal(bookingDraft(form, view, [1], "proof"), null);
   form.set("paymentChoice", view.quote.paymentOptions[0].ref);
   assert.equal(bookingDraft(form, view, [1, 2], "proof"), null);
@@ -67,9 +70,25 @@ test("full-only and closed presentations cannot accept a deposit command", () =>
   const early = previewBookingView();
   const fullOnly = previewBookingView(1, "full-only");
   const form = new FormData();
+  form.set("adultsOnly", "yes"); form.set("pdConsent", "yes");
   form.set("paymentChoice", early.quote.paymentOptions[0].ref);
   assert.equal(bookingDraft(form, fullOnly, [1], "proof"), null);
   form.set("paymentChoice", fullOnly.quote.paymentOptions[0].ref);
   assert.ok(bookingDraft(form, fullOnly, [1], "proof"));
   assert.equal(bookingDraft(form, previewBookingView(1, "closed"), [1], "proof"), null);
+});
+
+test("draft rejects missing consents, stale input revision and recovery bootstrap; ID comes from trusted session", () => {
+  const view = previewBookingView();
+  const form = new FormData();
+  form.set("paymentChoice", view.quote.paymentOptions[0].ref);
+  form.set("clientRequestId", "FORGED");
+  assert.equal(bookingDraft(form, view, [1], "proof"), null);
+  form.set("adultsOnly", "yes");
+  assert.equal(bookingDraft(form, view, [1], "proof"), null);
+  form.set("pdConsent", "yes");
+  assert.equal(bookingDraft(form, view, [1], "proof")?.clientRequestId, view.session.clientRequestId);
+  assert.equal(bookingDraft(form, view, [1], "proof", "NEW-INPUT"), null);
+  view.session.recoveryRequired = true;
+  assert.equal(bookingDraft(form, view, [1], "proof"), null);
 });

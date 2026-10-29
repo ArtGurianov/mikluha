@@ -3,9 +3,9 @@ import test from "node:test";
 import { JSDOM } from "jsdom";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import SmartCaptcha, { type SmartCaptchaApi } from "../components/booking/vendor/flexperiment-smartcaptcha";
+import SmartCaptcha, { SMARTCAPTCHA_LOAD_TIMEOUT_MS, type SmartCaptchaApi } from "../components/booking/vendor/flexperiment-smartcaptcha";
 import { NativeCheckout } from "../components/booking/native-checkout";
-import type { BookingOutcome, BookingPresentation } from "./native-checkout";
+import type { BookingOutcome, BookingPresentation, QuoteRefreshRequest } from "./native-checkout";
 import { previewBookingView } from "../components/booking/checkout-preview-data";
 import type { CaptchaWidgetProps } from "../components/booking/smartcaptcha";
 
@@ -100,11 +100,11 @@ test("the Flexperiment loader retries a failed script and never renders after pe
   await first.stop();
   const second = await fixture("synthetic-client-key");
   const scripts = document.querySelectorAll('script[src="https://smartcaptcha.cloud.yandex.ru/captcha.js"]');
-  assert.equal(scripts.length, 2);
+  assert.equal(scripts.length, 1);
   await second.stop();
   const fake = fakeApi();
   window.smartCaptcha = fake.api;
-  await act(async () => { scripts[1].dispatchEvent(new dom.window.Event("load")); });
+  await act(async () => { scripts[0].dispatchEvent(new dom.window.Event("load")); });
   assert.equal(fake.counts().rendered, 0);
   delete window.smartCaptcha;
 });
@@ -129,6 +129,7 @@ test("checkout retains data across rejection, requires fresh proof, prevents dup
     await act(async () => { dispatch(); });
     assert.equal(calls, 0);
     await clickProof();
+    await act(async () => { host.querySelector<HTMLInputElement>('input[name="adultsOnly"]')!.click(); host.querySelector<HTMLInputElement>('input[name="pdConsent"]')!.click(); });
     await act(async () => host.querySelector<HTMLInputElement>('input[name="paymentChoice"]')!.click());
     await act(async () => { dispatch(); dispatch(); });
     assert.equal(calls, 1);
@@ -151,10 +152,10 @@ test("checkout retains data across rejection, requires fresh proof, prevents dup
 test("party changes require a refreshed quote and choice, without losing tourist/contact inputs", async () => {
   const host = document.createElement("div"); document.body.append(host);
   const root = createRoot(host);
-  let sizeRequested = 0, calls = 0;
+  let calls = 0;
   const submit = async (): Promise<BookingOutcome> => { calls++; return { kind: "unknown" }; };
-  const onPartySizeChange = (size: number) => { sizeRequested = size; };
-  const render = async (view: BookingPresentation) => { await act(async () => root.render(createElement(NativeCheckout, { view, captcha: SyntheticWidget, submit, onPartySizeChange }))); };
+  const refreshQuote = async (request: QuoteRefreshRequest) => { const updated = previewBookingView(request.passengers.length); updated.quote.inputRevision = request.inputRevision; return updated; };
+  const render = async (view: BookingPresentation) => { await act(async () => root.render(createElement(NativeCheckout, { view, captcha: SyntheticWidget, submit, refreshQuote }))); };
   const button = (text: string) => [...host.querySelectorAll("button")].find((item) => item.textContent === text)!;
   const send = () => host.querySelector("form")!.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
   try {
@@ -163,10 +164,10 @@ test("party changes require a refreshed quote and choice, without losing tourist
     const name = host.querySelector<HTMLInputElement>('input[name="p1Name"]')!; name.value = "Synthetic Adult";
     await act(async () => { host.querySelector<HTMLInputElement>('input[name="paymentChoice"]')!.click(); button("Solve synthetic captcha").click(); });
     await act(async () => button("Добавить взрослого туриста").click());
-    assert.equal(sizeRequested, 2);
+    assert.equal(host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, true);
     assert.match(host.textContent ?? "", /Ожидаем обновлённые цены/);
     await act(async () => { send(); }); assert.equal(calls, 0);
-    await render(previewBookingView(2));
+    await act(async () => button("Обновить условия").click());
     assert.equal(email.value, "kept@example.invalid"); assert.equal(name.value, "Synthetic Adult");
     assert.match(host.textContent ?? "", /17 500 ₽/);
     assert.match(host.textContent ?? "", /10 000 ₽/);
@@ -203,4 +204,149 @@ test("payment presentation follows server options; children stay manager-assiste
     assert.match(host.textContent ?? "", /Состав данных для оформления уточняется/);
     assert.equal(host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, true);
   } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+test("a script with no browser events times out; retry creates a fresh script and ignores late load", async (t) => {
+  document.querySelectorAll('script[src*="smartcaptcha"]').forEach((script) => script.remove());
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const first = await fixture("synthetic-client-key");
+  const oldScript = document.querySelector<HTMLScriptElement>('script[src*="smartcaptcha"]')!;
+  const lateLoad = oldScript.onload!;
+  await act(async () => t.mock.timers.tick(SMARTCAPTCHA_LOAD_TIMEOUT_MS));
+  assert.match(first.host.textContent ?? "", /Не удалось загрузить проверку/);
+  assert.equal(oldScript.isConnected, false);
+  await first.stop();
+  const second = await fixture("synthetic-client-key");
+  const freshScript = document.querySelector<HTMLScriptElement>('script[src*="smartcaptcha"]')!;
+  assert.ok(freshScript && freshScript !== oldScript);
+  const fake = fakeApi(); window.smartCaptcha = fake.api;
+  try {
+    await act(async () => { lateLoad.call(oldScript, new dom.window.Event("load")); });
+    assert.equal(fake.counts().rendered, 0);
+    await act(async () => { freshScript.dispatchEvent(new dom.window.Event("load")); });
+    assert.equal(fake.counts().rendered, 1);
+    await act(async () => fake.solve("fresh-proof"));
+    assert.equal(second.tokens.at(-1), "fresh-proof");
+  } finally { await second.stop(); freshScript.remove(); t.mock.timers.reset(); }
+});
+
+function checkoutFixture() {
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  const click = async (text: string) => { await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === text)!.click()); };
+  const consent = async () => { await act(async () => {
+    for (const name of ["adultsOnly", "pdConsent"]) { const checkbox = host.querySelector<HTMLInputElement>(`input[name="${name}"]`)!; if (!checkbox.checked) checkbox.click(); }
+  }); };
+  const choose = async () => { await act(async () => host.querySelector<HTMLInputElement>('input[name="paymentChoice"]')!.click()); };
+  const send = async () => { await act(async () => { host.querySelector("form")!.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); }); };
+  return { host, root, click, consent, choose, send, stop: async () => { await act(async () => root.unmount()); host.remove(); } };
+}
+
+test("quote A → B → A never resurrects a payment choice and preserves contact fields", async () => {
+  const f = checkoutFixture(); const a = previewBookingView(), b = previewBookingView(1, "full-only");
+  const render = async (view: BookingPresentation) => { await act(async () => f.root.render(createElement(NativeCheckout, { view, captcha: SyntheticWidget }))); };
+  try {
+    await render(a); await f.choose();
+    const email = f.host.querySelector<HTMLInputElement>('input[name="email"]')!; email.value = "kept@example.invalid";
+    await render(b); await render(a);
+    assert.equal(f.host.querySelectorAll('input[name="paymentChoice"]:checked').length, 0);
+    assert.equal(email.value, "kept@example.invalid");
+  } finally { await f.stop(); }
+});
+
+for (const code of ["QUOTE_STALE", "TERMS_CHANGED", "PAYMENT_OPTIONS_CHANGED"] as const) {
+  test(`${code} requires an explicit read-only refresh, new payment choice and consents, without auto-submit`, async () => {
+    const f = checkoutFixture(); const view = previewBookingView(); let calls = 0, quoteCalls = 0;
+    const submit = async (): Promise<BookingOutcome> => { calls++; return { kind: "refresh_required", code }; };
+    const refreshQuote = async (request: QuoteRefreshRequest) => {
+      quoteCalls++; const updated = previewBookingView(); updated.quote.inputRevision = request.inputRevision;
+      updated.quote.hash = "fresh"; updated.terms.hash = "new-terms"; return updated;
+    };
+    try {
+      await act(async () => f.root.render(createElement(NativeCheckout, { view, submit, refreshQuote, captcha: SyntheticWidget })));
+      await f.consent(); await f.choose(); await f.click("Solve synthetic captcha"); await f.send();
+      assert.equal(calls, 1); assert.equal(quoteCalls, 0);
+      await f.send(); assert.equal(calls, 1);
+      await f.click("Обновить условия");
+      assert.equal(quoteCalls, 1); assert.equal(calls, 1);
+      assert.equal(f.host.querySelectorAll('input[name="paymentChoice"]:checked').length, 0);
+      assert.equal(f.host.querySelector<HTMLInputElement>('input[name="pdConsent"]')!.checked, false);
+      await f.click("Solve synthetic captcha"); await f.choose(); await f.send(); assert.equal(calls, 1);
+      await f.consent(); await f.send(); assert.equal(calls, 2);
+    } finally { await f.stop(); }
+  });
+}
+
+test("out-of-order quotes for 1 → 2 → 1 cannot restore old conditions; passenger edits invalidate the quote but keep unconsumed CAPTCHA", async () => {
+  const f = checkoutFixture();
+  const pending: Array<{ request: QuoteRefreshRequest; resolve: (view: BookingPresentation) => void }> = [];
+  const refreshQuote = (request: QuoteRefreshRequest) => new Promise<BookingPresentation>((resolve) => pending.push({ request, resolve }));
+  try {
+    await act(async () => f.root.render(createElement(NativeCheckout, { view: previewBookingView(), refreshQuote, captcha: SyntheticWidget })));
+    await f.click("Solve synthetic captcha");
+    await f.click("Добавить взрослого туриста"); await f.click("Обновить условия");
+    await f.click("Убрать туриста 2"); await f.click("Обновить условия");
+    assert.equal(pending.length, 2);
+    const fresh = previewBookingView(); fresh.quote.inputRevision = pending[1].request.inputRevision;
+    await act(async () => pending[1].resolve(fresh));
+    const old = previewBookingView(2); old.quote.inputRevision = pending[0].request.inputRevision;
+    await act(async () => pending[0].resolve(old));
+    assert.match(f.host.textContent ?? "", /Итого за заявку/);
+    assert.ok(!f.host.textContent?.includes("35 500 ₽"));
+    assert.match(f.host.textContent ?? "", /Проверка пройдена/);
+    const documentType = f.host.querySelector<HTMLSelectElement>('select[name="p1DocType"]')!;
+    await act(async () => { documentType.value = "FOREIGN_PASSPORT"; documentType.dispatchEvent(new dom.window.Event("change", { bubbles: true })); });
+    assert.match(f.host.textContent ?? "", /Ожидаем обновлённые цены/);
+    assert.match(f.host.textContent ?? "", /Проверка пройдена/);
+  } finally { await f.stop(); }
+});
+
+test("recovery bootstrap fences a remounted form and shows the durable request ID", async () => {
+  const f = checkoutFixture(); const view = previewBookingView(); view.session.recoveryRequired = true; let calls = 0;
+  try {
+    await act(async () => f.root.render(createElement(NativeCheckout, { view, captcha: SyntheticWidget, submit: async (): Promise<BookingOutcome> => { calls++; return { kind: "unknown" }; } })));
+    await f.send(); assert.equal(calls, 0);
+    assert.match(f.host.textContent ?? "", /SYNTHETIC-REQUEST-NOT-LIVE/);
+    assert.equal(f.host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, true);
+    assert.ok(!f.host.textContent?.includes("Обновить условия"));
+  } finally { await f.stop(); }
+});
+
+test("a failed or mismatched refresh keeps inputs, blocks submit and offers another read-only attempt", async () => {
+  const f = checkoutFixture(); let attempts = 0;
+  const refreshQuote = async (request: QuoteRefreshRequest) => {
+    attempts++;
+    if (attempts === 1) throw new Error("SYNTHETIC_OFFLINE");
+    const updated = previewBookingView(request.passengers.length);
+    updated.quote.inputRevision = attempts === 2 ? "WRONG-REVISION" : request.inputRevision;
+    return updated;
+  };
+  try {
+    await act(async () => f.root.render(createElement(NativeCheckout, { view: previewBookingView(), refreshQuote, captcha: SyntheticWidget })));
+    const email = f.host.querySelector<HTMLInputElement>('input[name="email"]')!; email.value = "kept@example.invalid";
+    await f.click("Добавить взрослого туриста");
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await f.click("Обновить условия");
+      assert.match(f.host.textContent ?? "", /Не удалось обновить условия/);
+      assert.equal(f.host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, true);
+      assert.equal(email.value, "kept@example.invalid");
+    }
+    await f.click("Обновить условия"); assert.equal(attempts, 3);
+    assert.match(f.host.textContent ?? "", /35 500 ₽/);
+    assert.equal(f.host.querySelectorAll('input[name="paymentChoice"]:checked').length, 0);
+  } finally { await f.stop(); }
+});
+
+test("generic TypeError remains UNKNOWN; only an explicit not-dispatched outcome permits retry", async () => {
+  for (const notDispatched of [false, true]) {
+    const f = checkoutFixture(); let calls = 0;
+    const submit = async (): Promise<BookingOutcome> => { calls++; if (notDispatched) return { kind: "not_dispatched" }; throw new TypeError("SYNTHETIC_NETWORK_ERROR"); };
+    try {
+      await act(async () => f.root.render(createElement(NativeCheckout, { view: previewBookingView(), captcha: SyntheticWidget, submit })));
+      await f.choose(); await f.consent(); await f.click("Solve synthetic captcha"); await f.send();
+      assert.equal(calls, 1);
+      if (notDispatched) { await f.click("Solve synthetic captcha"); await f.send(); assert.equal(calls, 2); }
+      else { await f.send(); assert.equal(calls, 1); assert.match(f.host.textContent ?? "", /Заявка могла быть создана/); }
+    } finally { await f.stop(); }
+  }
 });

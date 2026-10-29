@@ -20,12 +20,13 @@ export function previewBookingView(size = 1, policy: PreviewPolicy = "deposit-an
   const full = { ref: `${quoteRef}-full`, kind: "FULL" as const, amountLabel: total, remainingLabel: "0 ₽", balanceDueLabel: "Доплата не требуется." };
   const deposit = { ref: `${quoteRef}-deposit`, kind: "DEPOSIT" as const, amountLabel: capped ? "4 000 ₽" : amount.deposit, remainingLabel: capped ? "2 000 ₽" : amount.remaining, balanceDueLabel: "Доплатить до 13 ноября, 09:00." };
   return {
+    session: { clientRequestId: "SYNTHETIC-REQUEST-NOT-LIVE", recoveryRequired: false },
     departureId: "preview-synthetic-departure", title: "Выходные в горах Алтая",
     dateLabel: "14–16 ноября · пример выезда", departureLabel: "Отправление из Новосибирска",
     maxParticipants: 4,
     schedule: { timezone: "Asia/Krasnoyarsk", depositUntilLabel: "11 ноября, 09:00", publicBookingUntilLabel: "13 ноября, 09:00" },
     quote: {
-      ref: quoteRef, hash: `SYNTHETIC-HASH-${quoteRef}`, participantCount: size,
+      ref: quoteRef, hash: `SYNTHETIC-HASH-${quoteRef}`, inputRevision: "SYNTHETIC-INITIAL", participantCount: size,
       lines: capped ? [
         { lineRef: "ticket-1", label: "Турист 1 · билет", amountLabel: "4 000 ₽" },
         { lineRef: "service-1", label: "Турист 1 · дополнительная услуга", amountLabel: "2 000 ₽" },

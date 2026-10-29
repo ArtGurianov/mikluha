@@ -50,3 +50,23 @@ solve, token validation, allowed-domain configuration for Mikluha, actual provid
 native booking E2E remain unqualified. Before activating native checkout, qualify them in the
 selected renderer and consume Agent A's server verification, replay/idempotency and hold policy.
 Never infer server acceptance from the client's `onToken` callback.
+
+## Review follow-up: pair and origin isolation
+
+The 2026-10-29T17:27:14Z read-only Coolify audit confirmed source and target pair correspondence,
+source/target equality, both website references and no website server key. It compared the next
+20 characters after the key prefixes internally, following [Yandex key format](https://yandex.cloud/en/docs/smartcaptcha/concepts/keys).
+Only booleans were emitted. Infrastructure PR #18 keeps the receipt and a repeatable read-only
+audit; the copy procedure was not rerun. No provider mutation or real-token validation occurred.
+
+Shared keys are the owner's explicit choice. A must validate provider response `host` against an
+explicit server-owned Mikluha allowlist, rejecting missing/empty/foreign hosts even with status
+ok. Provider allowed domains must separately be inspected and real Mikluha/foreign-origin token
+tests must pass before activation. These remain unqualified; Coolify env equality cannot prove
+provider settings. Shared quotas/settings/rotation affect Flexperiment too. Do not revoke them.
+
+The reused loader now times out after 10 seconds and removes failed scripts/listeners before
+retry. Unconsumed proofs survive ordinary quote/passenger edits; submit consumes the proof before
+await, including UNKNOWN. Session, refresh and origin requirements are recorded in
+`docs/plans/2026-10-30-checkout-review-resolution.md` and TOUR-49; legal/PD qualification stays
+with TOUR-80/84.

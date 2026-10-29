@@ -15,6 +15,7 @@ declare global {
 }
 
 let smartCaptchaScript: Promise<SmartCaptchaApi> | null = null;
+export const SMARTCAPTCHA_LOAD_TIMEOUT_MS = 10_000;
 
 const loadSmartCaptcha = () => {
   if (window.smartCaptcha) return Promise.resolve(window.smartCaptcha);
@@ -23,12 +24,22 @@ const loadSmartCaptcha = () => {
     const script = document.createElement("script");
     script.src = "https://smartcaptcha.cloud.yandex.ru/captcha.js";
     script.async = true;
-    script.onload = () => window.smartCaptcha ? resolve(window.smartCaptcha) : reject(new Error("SMARTCAPTCHA_UNAVAILABLE"));
-    script.onerror = () => reject(new Error("SMARTCAPTCHA_UNAVAILABLE"));
+    let settled = false;
+    const finish = (api?: SmartCaptchaApi) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      script.onload = null;
+      script.onerror = null;
+      if (api) resolve(api);
+      else { script.remove(); reject(new Error("SMARTCAPTCHA_UNAVAILABLE")); }
+    };
+    const timer = setTimeout(() => finish(), SMARTCAPTCHA_LOAD_TIMEOUT_MS);
+    script.onload = () => finish(window.smartCaptcha);
+    script.onerror = () => finish();
     document.head.append(script);
-  }).catch((error: unknown) => {
+  }).finally(() => {
     smartCaptchaScript = null;
-    throw error;
   });
   return smartCaptchaScript;
 };
@@ -68,7 +79,7 @@ export default function SmartCaptcha({ onToken, resetKey }: Props) {
       });
       widgetId.current = id;
       const invalidate = () => {
-        if (disposed) return;
+        if (disposed || failed.current) return;
         setState("ready");
         onToken(null);
       };
@@ -98,7 +109,7 @@ export default function SmartCaptcha({ onToken, resetKey }: Props) {
   }, [onToken, resetKey]);
 
   return <div>
-    <div ref={container} className="min-h-[100px]" aria-label="Проверка безопасности" />
+    <div ref={container} role="group" className="min-h-[100px]" aria-label="Проверка безопасности" />
     {state === "loading" && <p className="text-xs text-muted-foreground" role="status">Загружаем проверку…</p>}
     {state === "error" && <p className="text-xs text-muted-foreground" role="status">Не удалось загрузить проверку. Попробуйте повторить проверку.</p>}
   </div>;

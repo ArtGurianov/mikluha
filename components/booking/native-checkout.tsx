@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, LockKeyhole, Plus, ShieldCheck } from "lucide-react";
-import { bookingDraft, bookingRefusals } from "@/lib/native-checkout";
-import type { BookingDraft, BookingOutcome, BookingPresentation } from "@/lib/native-checkout";
+import { bookingDraft, bookingPassengers, bookingRefusals } from "@/lib/native-checkout";
+import type { BookingDraft, BookingOutcome, BookingPresentation, QuoteRefreshRequest } from "@/lib/native-checkout";
 import { SmartCaptcha, type CaptchaWidget } from "./smartcaptcha";
 
 const input = "mt-2 w-full min-w-0 rounded-lg border border-input bg-background px-3 py-3 text-base font-normal text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary disabled:bg-muted";
@@ -13,23 +13,40 @@ const card = "min-w-0 rounded-2xl border border-border bg-card p-5 sm:p-7";
 const action = "inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-secondary px-5 py-3 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-secondary/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-secondary disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground";
 
 /** Client composition port. No fetch, native API URL, bank redirect or seat allocator lives here. */
-export function NativeCheckout({ view, captcha, submit, onPartySizeChange }: {
+export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuote }: {
   view: BookingPresentation;
   captcha?: CaptchaWidget;
   submit?: (draft: BookingDraft) => Promise<BookingOutcome>;
-  onPartySizeChange?: (size: number) => void;
+  /** Read-only quote operation: must never create a booking, hold or payment. */
+  refreshQuote?: (request: QuoteRefreshRequest) => Promise<BookingPresentation>;
 }) {
   const prefix = useId();
+  const suppliedSnapshot = JSON.stringify(suppliedView);
+  const [sourceSnapshot, setSourceSnapshot] = useState(suppliedSnapshot);
+  const [view, setView] = useState(suppliedView);
   const [participants, setParticipants] = useState([1]);
   const nextParticipant = useRef(2);
   const proof = useRef<string | null>(null);
   const [hasProof, setHasProof] = useState(false);
   const [captchaRevision, setCaptchaRevision] = useState(0);
-  const [status, setStatus] = useState<"editing" | "submitting" | "unknown" | "review">("editing");
+  const [status, setStatus] = useState<"editing" | "submitting" | "unknown" | "review" | "refresh_required">(() => view.session.recoveryRequired ? "unknown" : "editing");
+  const [inputRevision, setInputRevision] = useState(view.quote.inputRevision);
+  const currentInputRevision = useRef(inputRevision);
+  const activeRefresh = useRef<string | null>(null);
+  useEffect(() => () => { activeRefresh.current = null; }, [suppliedSnapshot]);
+  const [refreshing, setRefreshing] = useState(false);
+  // Adjust only this component's state before children render, preserving uncontrolled inputs.
+  if (sourceSnapshot !== suppliedSnapshot) {
+    setSourceSnapshot(suppliedSnapshot); setView(suppliedView); setRefreshing(false);
+  }
+  const formRef = useRef<HTMLFormElement>(null);
   const busy = useRef(false);
   const [notice, setNotice] = useState("");
   const [paymentChoice, setPaymentChoice] = useState<{ quoteRef: string; quoteHash: string; optionRef: string } | null>(null);
-  const quoteReady = view.quote.participantCount === participants.length;
+  const selectionContext = JSON.stringify([view.session.clientRequestId, view.quote, view.terms, view.pdConsent, view.touristDataSchema, inputRevision]);
+  const [previousContext, setPreviousContext] = useState(selectionContext);
+  if (previousContext !== selectionContext) { setPreviousContext(selectionContext); setPaymentChoice(null); }
+  const quoteReady = status !== "refresh_required" && view.quote.participantCount === participants.length && view.quote.inputRevision === inputRevision;
   const selectedPayment = paymentChoice?.quoteRef === view.quote.ref && paymentChoice?.quoteHash === view.quote.hash
     ? view.quote.paymentOptions.find((option) => option.ref === paymentChoice.optionRef) : undefined;
   const noticeRef = useRef<HTMLDivElement>(null);
@@ -44,10 +61,11 @@ export function NativeCheckout({ view, captcha, submit, onPartySizeChange }: {
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy.current || status !== "editing" || !submit || !proof.current) return;
-    const draft = bookingDraft(new FormData(event.currentTarget), view, participants, proof.current);
+    if (busy.current || refreshing || status !== "editing" || view.session.recoveryRequired || !quoteReady || !submit || !proof.current) return;
+    const draft = bookingDraft(new FormData(event.currentTarget), view, participants, proof.current, inputRevision);
     if (!draft || !selectedPayment || draft.paymentChoiceRef !== selectedPayment.ref) return;
     busy.current = true;
+    activeRefresh.current = null;
     // Consume the proof before awaiting the server; a retry always needs a fresh widget/token.
     reportProof(null);
     setStatus("submitting");
@@ -55,9 +73,14 @@ export function NativeCheckout({ view, captcha, submit, onPartySizeChange }: {
     let outcome: BookingOutcome;
     try { outcome = await submit(draft); }
     catch { outcome = { kind: "unknown" }; }
-    if (outcome.kind === "rejected") {
+    if (outcome.kind === "refresh_required") {
+      setPaymentChoice(null);
+      setStatus("refresh_required");
+      setNotice("Цена, способы оплаты или документы изменились. Обновите условия, заново выберите платёж и подтвердите согласия.");
+      busy.current = false;
+    } else if (outcome.kind === "rejected" || outcome.kind === "not_dispatched") {
       setStatus("editing");
-      setNotice(bookingRefusals[outcome.code]);
+      setNotice(outcome.kind === "rejected" ? bookingRefusals[outcome.code] : "Запрос не был отправлен. Данные сохранены. Пройдите проверку безопасности и повторите отправку.");
       retryCaptcha();
       busy.current = false;
     } else if (outcome.kind === "review") {
@@ -70,12 +93,43 @@ export function NativeCheckout({ view, captcha, submit, onPartySizeChange }: {
     requestAnimationFrame(() => noticeRef.current?.focus());
   }
 
-  const locked = status !== "editing";
+  const locked = !["editing", "refresh_required"].includes(status) || view.session.recoveryRequired;
+  function invalidateInputs() {
+    const revision = crypto.randomUUID();
+    currentInputRevision.current = revision;
+    setInputRevision(revision);
+    setPaymentChoice(null);
+    activeRefresh.current = null;
+    setRefreshing(false);
+    // Unconsumed CAPTCHA proof is independent of passenger data/quote; SDK expiry still clears it.
+  }
   function changeParticipants(ids: number[]) {
     setParticipants(ids);
+    invalidateInputs();
+  }
+  async function updateQuote() {
+    if (!refreshQuote || locked || refreshing || activeRefresh.current || !formRef.current) return;
+    const requestId = crypto.randomUUID();
+    const revision = currentInputRevision.current;
+    activeRefresh.current = requestId;
+    setRefreshing(true);
     setPaymentChoice(null);
-    retryCaptcha();
-    onPartySizeChange?.(ids.length);
+    try {
+      const updated = await refreshQuote({ clientRequestId: view.session.clientRequestId, departureId: view.departureId,
+        inputRevision: revision, passengers: bookingPassengers(new FormData(formRef.current), view, participants),
+        touristDataSchema: { ref: view.touristDataSchema.ref, hash: view.touristDataSchema.hash } });
+      if (activeRefresh.current !== requestId || currentInputRevision.current !== revision) return;
+      if (updated.quote.inputRevision !== revision || updated.quote.participantCount !== participants.length
+        || updated.departureId !== view.departureId || updated.session.clientRequestId !== view.session.clientRequestId
+        || updated.session.recoveryRequired) throw new Error("QUOTE_CONTEXT_MISMATCH");
+      setView(updated);
+      setStatus("editing");
+      setNotice("Условия обновлены. Проверьте их и выберите первый платёж.");
+    } catch {
+      if (activeRefresh.current === requestId) setNotice("Не удалось обновить условия. Данные сохранены. Повторите обновление или свяжитесь с организатором.");
+    } finally {
+      if (activeRefresh.current === requestId) { activeRefresh.current = null; setRefreshing(false); }
+    }
   }
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-14">
@@ -90,7 +144,7 @@ export function NativeCheckout({ view, captcha, submit, onPartySizeChange }: {
         ))}
       </ol>
       <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10">
-        <form method="post" onSubmit={send} className="grid min-w-0 gap-5" aria-label="Данные для бронирования" aria-busy={status === "submitting"}>
+        <form ref={formRef} method="post" onSubmit={send} onChange={(event) => { const name = event.target.getAttribute("name") ?? ""; if (/^p\d/.test(name)) invalidateInputs(); }} className="grid min-w-0 gap-5" aria-label="Данные для бронирования" aria-busy={status === "submitting"}>
           <fieldset disabled={locked} className={card}>
             <legend className="px-2 text-lg font-semibold">Контакты заказчика</legend>
             <p className="mb-5 text-sm text-muted-foreground">Заказчик участвует в поездке как турист № 1. На email придут документы и чек.</p>
@@ -140,18 +194,19 @@ export function NativeCheckout({ view, captcha, submit, onPartySizeChange }: {
             </div>
             <p id={`${prefix}-promo`} className="mt-4 text-sm leading-relaxed text-muted-foreground">Промокоды при онлайн-бронировании не принимаются. Цена в Заявке не зависит от промокода, и применить его после оформления или оплаты нельзя.</p>
           </fieldset>
-          <fieldset key={`${view.terms.ref}:${view.terms.hash}:${view.pdConsent.ref}:${view.pdConsent.hash}:${view.touristDataSchema.ref}:${view.touristDataSchema.hash}:${participants.join(",")}`} disabled={locked} className={`${card} space-y-4`}>
+          <fieldset key={JSON.stringify([view.session.clientRequestId, view.terms, view.pdConsent, view.touristDataSchema, inputRevision, status === "refresh_required"])} disabled={locked} className={`${card} space-y-4`}>
             <legend className="px-2 text-lg font-semibold">Перед отправкой</legend>
             <label className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="pdConsent" value="yes" required /><span>Я отдельно даю <a className="text-secondary underline underline-offset-4" href="/soglasie-pd/" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a> в опубликованной редакции.</span></label>
             <label className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="adultsOnly" value="yes" required /><span>Все туристы совершеннолетние.</span></label>
             <p className="text-xs leading-relaxed text-muted-foreground">Данные туристов нужны для оформления и исполнения договора. Состав данных и основания обработки указаны в <a href="/privacy-policy/" target="_blank" rel="noreferrer" className="text-secondary underline">Политике обработки данных</a>. Условия договора — в <a href="/oferta/" target="_blank" rel="noreferrer" className="text-secondary underline">Публичной оферте</a>.</p>
           </fieldset>
-          {!quoteReady && <p role="status" className="text-sm text-muted-foreground">Состав туристов изменился. Ожидаем обновлённые цены и условия оплаты.</p>}
-          {!view.touristDataSchema.ready && <p role="status" className="text-sm text-muted-foreground">Состав данных для оформления уточняется. Онлайн-отправка пока недоступна.</p>}
-          {status === "editing" && <SmartCaptcha key={captchaRevision} widget={captcha} onProof={reportProof} onRetry={retryCaptcha} />}
-          {notice && <div ref={noticeRef} tabIndex={-1} role="status" className="rounded-xl border border-border bg-accent p-5 text-sm leading-relaxed outline-secondary">{notice}</div>}
-          {!submit && <p role="status" className="text-sm text-muted-foreground">Онлайн-отправка пока недоступна. Вы можете связаться с организатором.</p>}
-          <button type="submit" disabled={!submit || !hasProof || locked || !quoteReady || !view.touristDataSchema.ready || !selectedPayment} className={`${action} w-full`}>
+          {!quoteReady && <p className="text-sm text-muted-foreground">Условия требуют обновления. Ожидаем обновлённые цены и условия оплаты.</p>}
+          {!quoteReady && !locked && <button type="button" className={action} disabled={!refreshQuote || refreshing} onClick={updateQuote}>{refreshing ? "Обновляем условия…" : "Обновить условия"}</button>}
+          {!view.touristDataSchema.ready && <p className="text-sm text-muted-foreground">Состав данных для оформления уточняется. Онлайн-отправка пока недоступна.</p>}
+          {status === "editing" && !locked && <SmartCaptcha key={captchaRevision} widget={captcha} onProof={reportProof} onRetry={retryCaptcha} />}
+          <div ref={noticeRef} tabIndex={-1} role="status" className={notice || status === "unknown" || view.session.recoveryRequired ? "rounded-xl border border-border bg-accent p-5 text-sm leading-relaxed outline-secondary" : "sr-only"}>{notice}{(status === "unknown" || view.session.recoveryRequired) && <p>Сначала уточните состояние заявки у организатора. Код обращения: {view.session.clientRequestId}. Перезагрузка страницы не разрешает повторную отправку.</p>}</div>
+          {!submit && <p className="text-sm text-muted-foreground">Онлайн-отправка пока недоступна. Вы можете связаться с организатором.</p>}
+          <button type="submit" disabled={!submit || !hasProof || locked || status !== "editing" || refreshing || !quoteReady || !view.touristDataSchema.ready || !selectedPayment} className={`${action} w-full`}>
             {status === "submitting" ? "Отправляем заявку…" : status === "unknown" ? "Нужно уточнить состояние заявки" : status === "review" ? "Заявка получена" : "Перейти к проверке заявки"}<ArrowRight className="size-4" aria-hidden />
           </button>
           <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><LockKeyhole className="mt-0.5 size-3.5 shrink-0" aria-hidden />Отправка формы не списывает деньги. Оплата — после проверки Заявки.</p>
@@ -159,7 +214,7 @@ export function NativeCheckout({ view, captcha, submit, onPartySizeChange }: {
         <aside aria-label="Ваша поездка" className="order-first min-w-0 lg:sticky lg:top-24 lg:order-last">
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
             <div className="bg-accent p-6"><p className="text-xs font-semibold uppercase tracking-widest text-accent-foreground">Ваша поездка</p><h2 className="mt-3 text-2xl font-semibold tracking-tight">{view.title}</h2><p className="mt-4 text-sm">{view.dateLabel}</p><p className="mt-1 text-sm text-muted-foreground">{view.departureLabel}</p></div>
-            {quoteReady ? <dl className="space-y-4 p-6">{view.quote.lines.map((line) => <div key={line.lineRef}><dt className="text-sm text-muted-foreground">{line.label}</dt><dd className="mt-1 font-semibold tabular-nums">{line.amountLabel}</dd></div>)}<div className="border-t border-border pt-5"><dt className="text-sm text-muted-foreground">Итого за заявку</dt><dd className="mt-1 text-3xl font-semibold tabular-nums">{view.quote.totalLabel}</dd></div>{selectedPayment && <div className="border-t border-border pt-5"><dt className="text-sm font-semibold">Первый платёж — {selectedPayment.amountLabel}</dt><dd className="mt-2 text-sm leading-relaxed text-muted-foreground">Остаток: {selectedPayment.remainingLabel}. {selectedPayment.balanceDueLabel}</dd></div>}</dl> : <p role="status" className="p-6 text-sm text-muted-foreground">Обновляем стоимость заявки…</p>}
+            {quoteReady ? <dl className="space-y-4 p-6">{view.quote.lines.map((line) => <div key={line.lineRef}><dt className="text-sm text-muted-foreground">{line.label}</dt><dd className="mt-1 font-semibold tabular-nums">{line.amountLabel}</dd></div>)}<div className="border-t border-border pt-5"><dt className="text-sm text-muted-foreground">Итого за заявку</dt><dd className="mt-1 text-3xl font-semibold tabular-nums">{view.quote.totalLabel}</dd></div>{selectedPayment && <div className="border-t border-border pt-5"><dt className="text-sm font-semibold">Первый платёж — {selectedPayment.amountLabel}</dt><dd className="mt-2 text-sm leading-relaxed text-muted-foreground">Остаток: {selectedPayment.remainingLabel}. {selectedPayment.balanceDueLabel}</dd></div>}</dl> : <p className="p-6 text-sm text-muted-foreground">Обновите стоимость заявки после изменения данных.</p>}
           </div>
           <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><Check className="mt-0.5 size-4 shrink-0" aria-hidden />Наличие мест и условия бронирования проверим при отправке заявки.</p>
           <Link href="/#contacts" prefetch={false} className="mt-5 inline-block text-sm font-semibold text-secondary underline underline-offset-4">Связаться с организатором</Link>
