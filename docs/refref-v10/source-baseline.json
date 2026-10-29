@@ -385,5 +385,64 @@
       "scope": "No G_protectedContinuation and no additional Core commission for ineligible continuation; no merchant-owned coupon engine; native launch remains independent",
       "authority": "Refref Core generic rules remain independent of Mikluha profile decisions"
     }
-  ]
+  ],
+  "refrefCurrentCandidate": {
+    "repository": "ArtGurianov/refref",
+    "pr": 130,
+    "commit": "793ad1a8fc571a98c9f1b9b31161b5b6532770ab",
+    "contractStatus": "EXACT_COMMIT_SOURCE_INSPECTED_PENDING_FINAL_MUTATION_RERUN_AND_APPROVAL",
+    "historicalSourceAuditCommit": "c932b656edbda1d47cfb57de08fd4a36536712f5",
+    "inspection": "GitHub fetch_file exact SHA for 12 relevant original source paths",
+    "files": [
+      {
+        "path": "docs/v10/README.md",
+        "blobSha": "416227151359b9e2bf5cbaf4a30c6ae7110570dd"
+      },
+      {
+        "path": "docs/v10/ADR-141-refref-core.md",
+        "blobSha": "a69701e6bd4c86a54e4fb2baf9a4ae9eba64b56b"
+      },
+      {
+        "path": "docs/v10/GATES.md",
+        "blobSha": "68c1e574e0b2c22b1e5b08c07bb8e3ca8279566c"
+      },
+      {
+        "path": "docs/v10/contracts/01-common-contract.md",
+        "blobSha": "036ee0131e4aa06c0f5217a6b95c245164a12ed0"
+      },
+      {
+        "path": "docs/v10/contracts/02-attribution-bound.md",
+        "blobSha": "a8824e78724ee8e1403e934e70994be7f043c92e"
+      },
+      {
+        "path": "docs/v10/contracts/03-merchant-reporting.md",
+        "blobSha": "b46e24c6afe310bafb0c7154b439929e135fbbec"
+      },
+      {
+        "path": "docs/v10/contracts/04-money-finality-claims.md",
+        "blobSha": "06c11d05edffe4128fa3a5662ddc4403a93f09a7"
+      },
+      {
+        "path": "docs/v10/contracts/05-payouts-s3-conformance.md",
+        "blobSha": "7a81eb4df4d4b2fa05ab51d104968f7a64b31911"
+      },
+      {
+        "path": "docs/v10/contracts/06-api-and-states.md",
+        "blobSha": "cee253488fefea1a5e13bff8cb6a5279eb1e5879"
+      },
+      {
+        "path": "docs/v10/contracts/merchant-result.schema.json",
+        "blobSha": "0a2bbc507ec536e3a4a1d37e4c4de2ed8d95ba0c"
+      },
+      {
+        "path": "docs/v10/sources/owner-o7-2026-10-27.md",
+        "blobSha": "06df92a7a481f425cd078135f77cfeee2bcd76c8"
+      },
+      {
+        "path": "docs/plans/2026-10-26-refref-core-supersession.md",
+        "blobSha": "88e170207bd9738ab17bb477a91567ba4a9cb105"
+      }
+    ],
+    "sourcePinPolicy": "Keep refref.commit and its original SHA256 records intact as historical inspection; current candidate is a separate compatibility reference, not deployment/CI/transport or provider proof."
+  }
 }
