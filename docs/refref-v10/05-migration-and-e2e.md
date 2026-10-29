@@ -128,7 +128,7 @@ Cutover должен атомарно назначать профиль ново
 | MKV10-E2E-11 | Депозит, изменение цены до первого FULL принято покупателем | Immutable старая ревизия сохранена; новая обязанность/остаток считаются по принятой эффективной ревизии; FULL содержит её hash, не live catalog |
 | MKV10-E2E-12 | Одновременные доплата и принятие новой ревизии | Одна сериализуемая effective revision на первый FULL; нет «FULL по одной цене, C по другой»; конфликт требует reread, не молчаливый overwrite |
 | MKV10-E2E-13 | После FULL заменить туриста без независимой покупки | Тот же purchaseRef/BOUND/партнёр/C; новый accepted change и собственные отраслевые действия; исходный якорь S5 не смещён |
-| MKV10-E2E-14 | После FULL добавить туриста с доплатой | Доплата merchant-only в истории этой покупки; C не увеличилась; при S4 снимок включает доплату, а не только выгодный мерчанту refund |
+| MKV10-E2E-14 | После FULL добавить туриста с доплатой — **future scenario**, текущему native не принадлежит | **Текущий native regression:** новый взрослый создаёт независимую покупку, старая остаётся неизменной; **future referral:** merchant-only доплата в истории одной purchase, C не увеличивается, S4 учитывает доплату |
 | MKV10-E2E-15 | Отдельный новый турист оформляет самостоятельную покупку | Самостоятельное действие/BOUND до его оплаты; отдельная purchase/C не подменяет и не дублирует первую |
 | MKV10-E2E-16 | Согласованный перенос выезда с переносом денег | Стабильная экономическая identity и первоначальная C; атомарные allocations двух выездов, сохранённые согласия/снимки; нет automatic S5 anchor move |
 | MKV10-E2E-17 | Два одновременных переноса на последнее место нового выезда | Не более одного успешного allocation; проигравший сохраняет прежнее место/договор или явный незавершённый workflow; нет oversell/скрытого release |
@@ -249,6 +249,17 @@ The original 63 `MKV10-E2E-*` IDs remain preserved as future full-conformance ca
 | BOUND identity same create/replay/read-back | REFREF-123, deferred | no duplicate test ID in Mikluha; campaign archive and cross-business scope checked upstream |
 | Native ingress regardless of env/restart | TOUR-81, native | no NEW Refref calls with API base present; existing legacy scoped recovery continues |
 
+Дополнительные контрпримеры четырёх технических исправлений PR #53 — **NOT_RUN**, отдельный namespace; число исходных 63 сценариев не меняется:
+
+| Coverage item | Owner/phase | Проверяемый результат |
+|---|---|---|
+| POLICY-53-CAP-01 | TOUR-78, native без Refref; TOUR-71, будущая скидка | Билет 4 000 ₽ − отнесённая скидка 500 ₽ + допуслуга 2 000 ₽, номинал 5 000 ₽ → депозит 3 500 ₽; без скидки 4 000 ₽. Cap в копейках не округляется вверх, допуслуги его не увеличивают. |
+| POLICY-53-QUOTE-01 | TOUR-71 / REFREF-123, deferred | `D_applied` сверх eligible базы или без допустимых строк отклоняется до акцепта ревизии и банковского вызова. Нет clamp обещанной скидки, переноса на ineligible строки или исправления лишь при выдаче чека. |
+| POLICY-53-SNAPSHOT-01 | TOUR-71 / REFREF-123, deferred | Mikluha единожды формирует цены строк, сохраняет версию allocator/hash до акцепта. Повтор и Refref-проверка не создают иной принятый снимок; изменённый candidate требует нового необходимого согласия. |
+| POLICY-53-HOLD-01 | TOUR-77/79/83, native | TTL истёк, но банковская регистрация/платёж UNKNOWN: место и документный scope остаются защищены, новый purchaseRef не обходит запрет повторной оплаты. Новая покупка разрешается только после доказанного безопасного освобождения. |
+| POLICY-53-WIRE-01 | TOUR-71 / REFREF-123, deferred | PAID_IN_FULL сохраняет обязательный `purchaseSnapshot.lines[].refrefDiscountAppliedKopecks` и общий applied total. Версия allocator хранится локально, не добавляется в закрытую wire-схему. Refref проверяет фактический снимок, не заменяя принятые line amounts своим распределением. |
+| POLICY-53-ELIGIBILITY-01 | TOUR-71 / REFREF-123, deferred | Первичный `G=4000`, `D_rule=5000`, `C>=0` не допускает BOUND при любом `D_applied`, в том числе при cap до 4000. Это не правило удаления уже сохранённого BOUND или отказа обслуживать действующий договор. |
+
 Referral merchant-readable identity/read-back is deferred to REFREF-123. Native source has no BOUND, no Refref C and no S4. Independent provider/fiscal legal admission gates remain mandatory for native live money.
 
 ## Приложение: владение всеми 63 исходными MKV10-E2E
@@ -270,7 +281,7 @@ Referral merchant-readable identity/read-back is deferred to REFREF-123. Native 
 | MKV10-E2E-11 | TOUR-76/78/79: изменение цены, версия и долг | TOUR-71/86: effective FULL terms |
 | MKV10-E2E-12 | TOUR-76/78/79: гонка ревизии и платежа | TOUR-71: правильная C по FULL |
 | MKV10-E2E-13 | TOUR-76/79/84: замена туриста и документы | TOUR-71: та же C/S5 |
-| MKV10-E2E-14 | TOUR-78/79: доплата за нового туриста | TOUR-71/87: frozen C и S4 evidence |
+| MKV10-E2E-14 | **Текущий native:** TOUR-37/78/79 — новый взрослый сам создаёт отдельную purchase с неизменностью старой, корректной вместимостью и независимой оплатой; Admin-добавление после FULL только при отдельном feasibility GO, не критерий native запуска | **Отложено:** TOUR-71/87 — добавление участника в существующую покупку, frozen C, S4 evidence |
 | MKV10-E2E-15 | TOUR-76/79: самостоятельный новый заказ/места | TOUR-70/71: новый BOUND/C |
 | MKV10-E2E-16 | TOUR-78/79: перенос, согласие, conditional allocation | TOUR-71: одна C и исходный S5 |
 | MKV10-E2E-17 | TOUR-79: конкуренция за hold при создании предложения, no oversell | TOUR-71: preserved original BOUND |
