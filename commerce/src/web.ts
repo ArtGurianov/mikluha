@@ -5,7 +5,11 @@
 //   GET  /return?rt=&state=          the handoff's return: state checked, referral resolved
 //   GET  /orders/<ref>               the order, read back from Refref first; the final price to accept
 //   POST /orders/<ref>/pay           accept the final price → the provider's payment page
-//   GET  /arrive?arrival=&to=        Refref vNext arrival: context cookie, proof kept, 302 to the site (arrival.ts)
+//   GET  /arrive?arrival=&to=        inert under NATIVE_NO_REFERRAL: proof dropped, no cookie, 302 to the site
+//
+// Native ingress takes no referral (TOUR-81). Promo code and Apply are shown disabled, the order is
+// built from an explicit whitelist of fields, and /arrive neither captures nor claims anything,
+// whatever REFREF_VNEXT_API_BASE says. Legacy Refref read-back of existing orders is unchanged.
 //
 // Ownership of an order is the state secret in a __Host- cookie (HttpOnly, Secure, SameSite=Lax):
 // another browser cannot see or pay someone's order, and a cross-site form cannot post with it.
@@ -16,7 +20,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { bookingCutoff } from './booking-window.js';
 import type { ContractSnapshot } from './contract-snapshot.js';
 
-import { arrivalTarget, Arrivals, CONTEXT_COOKIE, contextCookie, validProof } from './arrival.js';
+import { arrivalTarget } from './arrival.js';
 import type { Json } from './snapshot.js';
 import { bookablePublished } from './public-content.js';
 import { orderBookingCutoff, paymentDeadline, handoffUrl, issueState, onReturn, ownsOrder, pay, reconcileOrder, zayavkaOf, type CheckoutDeps } from './checkout.js';
@@ -50,6 +54,7 @@ a{color:var(--blue);text-underline-offset:3px}a:hover{color:var(--rust-dark)}hea
 main{max-width:56rem;margin:clamp(1.5rem,5vw,4rem) auto;padding:0 clamp(1rem,4vw,2rem) 5rem}.eyebrow{color:var(--rust-dark);font-size:.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1,h2,h3,legend{font-family:inherit;line-height:1.16;font-weight:650}h1{font-size:clamp(2rem,6vw,3.6rem);margin:.3rem 0 1rem}h2{font-size:1.5rem}.lead{font-size:1.08rem;color:var(--muted);max-width:46rem}.summary{background:var(--green);border:1px solid #c5dcc8;border-radius:1.25rem;padding:1.1rem 1.25rem;margin:1.5rem 0 2rem}.summary strong{color:#234f35}
 form{display:grid;gap:1rem}fieldset,.card,.contract-doc{border:1px solid var(--line);border-radius:1.25rem;background:var(--card);padding:clamp(1rem,3vw,1.5rem);box-shadow:0 8px 24px #59351d0a}fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:0}legend{padding:0 .5rem;font-size:1.15rem;font-weight:700}label{display:grid;gap:.4rem;font-weight:650;font-size:.92rem}label:has(input[type=checkbox]){display:grid;grid-template-columns:auto 1fr;align-items:start;font-weight:500;padding:.7rem 0}input,select{width:100%;border:1px solid #cfc1b3;border-radius:.7rem;background:#fff;padding:.75rem .8rem;color:var(--ink);font:inherit}input[type=checkbox]{width:1.15rem;height:1.15rem;margin:.2rem 0 0;accent-color:var(--rust)}input:focus,select:focus,button:focus,a:focus{outline:3px solid color-mix(in srgb,var(--focus) 45%,transparent);outline-offset:2px}
 button,.button{appearance:none;border:0;border-radius:999px;background:var(--rust);color:#fff;padding:.85rem 1.35rem;font:700 1rem inherit;cursor:pointer;text-decoration:none;justify-self:start}button:hover,.button:hover{background:var(--rust-dark);color:#fff}.notice{border-left:4px solid var(--rust);background:#fff1e9;padding:.9rem 1rem;border-radius:.25rem .8rem .8rem .25rem}.contract-doc{margin:1.25rem 0}.contract-doc summary{cursor:pointer;font-size:1.15rem;font-weight:700}.contract-doc pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.6}.document-frame{overflow:auto}.document-frame table{width:100%;border-collapse:collapse}.document-frame th,.document-frame td{border:1px solid var(--line);padding:.55rem;text-align:left;vertical-align:top}
+input:disabled,button:disabled,button:disabled:hover{background:#efe9e2;color:var(--muted);cursor:not-allowed}.promo button{align-self:end}.promo p{grid-column:1/-1;margin:0}
 .steps{display:flex;gap:.5rem;margin:0 0 1.5rem;padding:0;list-style:none}.steps li{flex:1;border-top:3px solid var(--line);padding-top:.45rem;color:var(--muted);font-size:.78rem}.steps .current{border-color:var(--rust);color:var(--ink);font-weight:700}.meta{color:var(--muted);font-size:.88rem}
 @media(max-width:640px){fieldset{grid-template-columns:1fr}.secure{display:none}main{margin-top:1.5rem}.steps li{font-size:.7rem}}
 </style>`;
@@ -60,11 +65,7 @@ function page(res: ServerResponse, status: number, title: string, body: string, 
 }
 
 function redirect(res: ServerResponse, location: string, cookies: string[] = [], status = 303): void {
-  // writeHead would replace a context cookie set earlier in this request: keep both.
-  const prior = res.getHeader('set-cookie');
-  const all = [...cookies, ...(Array.isArray(prior) ? prior : prior === undefined ? [] : [String(prior)])];
-  res.removeHeader('set-cookie');
-  res.writeHead(status, { location, ...SECURITY_HEADERS, ...(all.length ? { 'set-cookie': all } : {}) });
+  res.writeHead(status, { location, ...SECURITY_HEADERS, ...(cookies.length ? { 'set-cookie': cookies } : {}) });
   res.end();
 }
 
@@ -128,34 +129,26 @@ const MESSAGES: Record<string, string> = {
 };
 const message = (code: string) => MESSAGES[code] ?? `Не удалось продолжить бронирование (код ${esc(code)}).`;
 
-export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter = new BookingRateLimiter(),
-  arrivals = new Arrivals({ refref: null, storefrontOrigin: deps.merchant.origin, log: deps.log, ...(deps.now ? { now: deps.now } : {}) })) {
-  /**
-   * The browser's ACTIVE context for this request. Every buyer gets one on the purchase path, referral
-   * or not (docs/29 §4); a context Refref refused is replaced and never presented again.
-   */
-  function context(req: IncomingMessage, res: ServerResponse, issue: boolean): string | undefined {
-    const cookie = cookies(req).get(CONTEXT_COOKIE);
-    const c = arrivals.resolveContext(cookie);
-    if (!c.isNew) return c.id;
-    if (!issue && !c.rotated) return undefined;
-    res.setHeader('set-cookie', [contextCookie(c.id)]);
-    return c.id;
-  }
+/**
+ * NATIVE_NO_REFERRAL (TOUR-81): the promo code and Apply are visible but disabled, with the reason.
+ * The input has no name, so a browser never submits it, Apply is a plain disabled button, and the
+ * page's CSP allows no script that could enable either. The text promises no discount, partner
+ * credit or later application of a code.
+ */
+const PROMO_UNAVAILABLE = `<fieldset class="promo"><legend>Промокод</legend>
+          <label>Промокод <input type="text" disabled autocomplete="off" aria-describedby="promo-unavailable"></label>
+          <button type="button" disabled aria-describedby="promo-unavailable">Применить</button>
+          <p id="promo-unavailable" class="meta">Промокоды при онлайн-бронировании не принимаются. Цена в Заявке
+            не зависит от промокода, и применить его после оформления или оплаты нельзя.</p></fieldset>`;
 
+export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter = new BookingRateLimiter()) {
   /**
-   * Refref's referral redirect lands here. Never blocks the buyer: a missing or malformed proof is
-   * dropped and the buyer still goes to the page. The proof never reaches a log or the Location.
+   * Old Refref referral links still land here. Under NATIVE_NO_REFERRAL this route is inert: the proof
+   * is never read, kept, claimed or logged, no context cookie is set and nothing runs after the
+   * response. The buyer still goes to the clean page, so a referral link never blocks a purchase.
    */
-  function arrive(req: IncomingMessage, res: ServerResponse, url: URL) {
-    const proofs = url.searchParams.getAll('arrival');
-    const cookie = cookies(req).get(CONTEXT_COOKIE);
-    const c = arrivals.resolveContext(cookie);
-    if (proofs.length === 1 && validProof(proofs[0]!)) arrivals.capture(c.id, proofs[0]!);
-    else if (proofs.length > 0) deps.log('arrival_proof_rejected', { reason: proofs.length > 1 ? 'MULTIPLE' : 'MALFORMED' });
-    // Re-set even a known context: the 30-day window runs from the latest arrival, like Refref's.
-    res.setHeader('set-cookie', [contextCookie(c.id)]);
-    arrivals.afterResponse(res, c.id);
+  function arrive(res: ServerResponse, url: URL) {
+    if (url.searchParams.has('arrival')) deps.log('arrival_ignored', { profile: 'NATIVE_NO_REFERRAL' });
     redirect(res, arrivalTarget(deps.merchant.siteOrigin, url.searchParams.get('to')), [], 302);
   }
 
@@ -202,6 +195,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
         <fieldset><legend>Контакты Заказчика: для связи и чека</legend>
           <label>Телефон <input name="contactPhone" type="tel" required></label>
           <label>Email <input name="contactEmail" type="email" required></label></fieldset>
+        ${PROMO_UNAVAILABLE}
         <p>Данные туристов нужны для заключения и исполнения договора и передачи сведений в ЕИС «Электронная путёвка», как того требует закон.
           Подробнее — в <a href="${esc(site)}/privacy-policy">Политике обработки персональных данных</a>.</p>
         <label><input type="checkbox" name="pdConsent" value="yes" required> Я отдельно даю
@@ -227,6 +221,8 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
       tourists.push({ fullName: f('Name'), dateOfBirth: f('Dob'), citizenship: f('Citizenship'),
         document: { type: f('DocType'), series: f('DocSeries'), number: f('DocNumber') } });
     }
+    // Only the fields named here reach the order. Anything else the browser sends (a promo code, Apply,
+    // `ref`, utm or autofill values) is never read: it cannot change the price, profile or attribution.
     const replacement=form.get('replacement');
     if (replacement !== null && !(await ownsOrder(deps.pool,replacement,cookies(req).get(`${COOKIE_PREFIX}${replacement}`)))) {
       page(res,403,'Бронирование',`<p>${esc(message('STATE_MISMATCH'))}</p>`); return;
@@ -352,12 +348,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
   return async function handle(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
     const m = /^\/orders\/([^/]+)(\/pay)?$/.exec(url.pathname);
     const shared = /^\/documents\/([^/]+)$/.exec(url.pathname);
-    if (req.method === 'GET' && url.pathname === '/arrive') { arrive(req, res, url); return true; }
-    // Resolved once per request. The purchase path (the form and Buy) gives every buyer a context;
-    // every request of a context retries its unconfirmed claims after the response (docs/29 §6).
-    const purchase = (req.method === 'GET' && url.pathname === '/book') || (req.method === 'POST' && url.pathname === '/orders');
-    const ctx = context(req, res, purchase);
-    if (ctx !== undefined) arrivals.afterResponse(res, ctx);
+    if (req.method === 'GET' && url.pathname === '/arrive') { arrive(res, url); return true; }
     if (m && !ORDER_REF.test(m[1]!)) { page(res, 404, 'Заказ', '<p>Заказ не найден.</p>'); return true; }
     if (req.method === 'GET' && url.pathname === '/book') { await bookForm(req,res,url.searchParams.get('departure') ?? '',url.searchParams.get('replace')); return true; }
     if (req.method === 'POST' && url.pathname === '/orders') { await createOrder(req, res); return true; }

@@ -261,9 +261,9 @@ log records request paths, disable that access log for this traffic or install a
 mechanism before launch; application-level logging cannot repair a token already stored by the
 proxy. Keep the exact proxy configuration and synthetic-test result as launch evidence.
 
-The Refref vNext arrival proof (`/arrive?arrival=…`, ART-382) is a bearer credential for 30 minutes
-and gets the same gate before vNext is admitted for this origin. Use a synthetic proof that Refref
-never issued:
+The Refref vNext arrival proof (`/arrive?arrival=…`, ART-382) is a bearer credential for 30 minutes.
+Under NATIVE_NO_REFERRAL (TOUR-81) the service drops it unread, but old referral links still carry
+it through the proxy, so it gets the same gate. Use a synthetic proof that Refref never issued:
 
 ```bash
 SYNTHETIC_PROOF=ar1.SYNTHETICSYNTHETICSYNTHETICSYNTHETICSYNTHETI

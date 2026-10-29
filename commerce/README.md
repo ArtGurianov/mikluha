@@ -45,6 +45,9 @@ static; everything that sells a trip lives here, with its own Postgres.
 
 - ART-382: the Refref vNext arrival endpoint `/arrive` with the 30-day browser context and the
   after-response claim (see "Refref vNext arrival"). Not yet used by checkout (ART-383).
+- TOUR-81: native entry under `NATIVE_NO_REFERRAL`. `/arrive` is inert and the service builds no
+  Arrivals or vNext client, whatever `REFREF_VNEXT_API_BASE` says; the order form shows the promo
+  code and Apply disabled. Legacy RC read-back of existing orders is unchanged (see "Native entry").
 - migration 0011 and the isolated Admin API (ADR v2.3 §7, ART-363): password + TOTP at every
   login, sessions, OWNER-only publishing and classification bound to the signed-in session, the
   audited SSH reset, `admin_app`/`admin_publisher`/`admin_operator` capabilities, and the static Control Room in
@@ -140,7 +143,27 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 | personal data to Refref | the receipt email in the payment session, which PROVIDER fiscalization requires. Nothing else |
 | the switch | closed: no new payment session. Reading back, fulfilment and cancellation go on |
 
+## Native entry: NATIVE_NO_REFERRAL (TOUR-81)
+
+New buyers take no referral (`docs/refref-v10/05` M4). This is the code, not the configuration:
+
+| | |
+|---|---|
+| `/arrive` | `302` to the clean site page (`to` checked as below, `arrival` dropped). The proof is never read, kept, claimed or logged (only `arrival_ignored` without it); no context cookie, nothing after the response. Old Refref links therefore never block a purchase |
+| vNext | `src/bin/serve.ts` builds no `Arrivals` and no vNext client. `REFREF_VNEXT_API_BASE` is ignored and the `listening` event says so (`vnextApiBaseIgnored`) |
+| promo code | `/book` shows the promo code and Apply disabled, with the reason. The input has no `name`, Apply is a disabled `type="button"` and the CSP allows no script. No discount, partner credit or later application is promised |
+| order fields | `POST /orders` reads an explicit whitelist. Promo, Apply, `ref`, utm, autofill or price-like fields, in the body or the query, are never read |
+| legacy | Refref RC read-back, fulfilment and cancellation of existing orders continue in their own scope |
+
+`test/native-ingress.test.ts` proves it over HTTP and against the real entrypoint with
+`REFREF_VNEXT_API_BASE` pointing at a live claim server, across a restart, while the legacy
+read-back is counted separately. The section below is the deferred prior contract.
+
 ## Refref vNext arrival (ART-382, Refref ADR-139 `docs/29` §2, §4, §6, §8)
+
+**Not wired under NATIVE_NO_REFERRAL** (see above). `src/arrival.ts` and its tests keep this prior
+contract for the deferred referral profile (TOUR-70); its cookie or proof never becomes a v10
+touch or BOUND.
 
 TOUR conformance profile. Refref's referral link redirects once, straight to this origin; the public
 site is static and cannot capture anything server-side.
