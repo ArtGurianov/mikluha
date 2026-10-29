@@ -33,6 +33,70 @@ export interface ProbeRun {
   readonly minTtlSeconds: number;
 }
 
+export interface ProbeInput {
+  /** Direct cloud.ru base of the public variants, virtual-hosted: `https://<bucket>.s3.cloud.ru/cms/`. */
+  readonly originBase: string;
+  /** The TurboFlare custom host fronting the same bucket, same path: `https://<host>/cms/`. */
+  readonly cdnBase: string;
+  /** A public processed variant, relative to both bases. */
+  readonly variant: string;
+  /** A private original's object key in that bucket, e.g. `originals/probe.jpg`. */
+  readonly privateKey: string;
+}
+
+export interface ProbeTargets {
+  readonly originVariant: string;
+  readonly cdnVariant: string;
+  /** Signed HEAD and anonymous direct request: one URL. */
+  readonly originPrivate: string;
+  /** The same object key on the CDN host. */
+  readonly cdnPrivate: string;
+}
+
+/**
+ * Every URL the probe requests, from one bucket host, one CDN host and one key, so the anonymous
+ * refusals (T9, T10) are about the very object the authorized HEAD (T8) found. The CDN mapping
+ * supported is a host swap: both bases must have the same path, which T4 then proves byte for byte.
+ */
+export function probeTargets(input: ProbeInput): ProbeTargets {
+  const base = (name: string, value: string) => {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || !url.pathname.endsWith("/") || url.search || url.hash || url.username) {
+      throw new Error(`${name} must be an https base ending in "/"`);
+    }
+    return url;
+  };
+  const origin = base("PROBE_ORIGIN_BASE", input.originBase);
+  const cdn = base("PROBE_CDN_BASE", input.cdnBase);
+  if (origin.pathname !== cdn.pathname) {
+    throw new Error(`PROBE_CDN_BASE must map PROBE_ORIGIN_BASE by host only (${origin.pathname} vs ${cdn.pathname})`);
+  }
+  const relative = (name: string, value: string) => {
+    const v = value.replace(/^\/+/, "");
+    if (!v || /[?#\\]/.test(v) || v.split("/").some((seg) => ["", ".", ".."].includes(decodeURIComponent(seg)))) {
+      throw new Error(`${name} must be a plain relative path, got "${value}"`);
+    }
+    return v;
+  };
+  const variant = relative("PROBE_VARIANT", input.variant);
+  const key = relative("PROBE_PRIVATE_KEY", input.privateKey);
+  return {
+    originVariant: new URL(variant, origin).href,
+    cdnVariant: new URL(variant, cdn).href,
+    originPrivate: new URL(`/${key}`, origin).href,
+    cdnPrivate: new URL(`/${key}`, cdn).href,
+  };
+}
+
+/** The three private requests name one object: signed and anonymous direct are the same URL, the CDN one its path on the variant's CDN host. */
+export function samePrivateObject(run: ProbeRun): boolean {
+  const [exists, direct, viaCdn] = [run.privateExists.url, run.originPrivate.url, run.cdnPrivate.url].map((u) => new URL(u));
+  return exists!.href === direct!.href
+    && direct!.host === new URL(run.originVariant.url).host
+    && viaCdn!.host === new URL(run.cdnVariant.url).host
+    && viaCdn!.pathname === direct!.pathname && viaCdn!.search === "" && direct!.search === "";
+}
+
 export type Verdict = "PASS" | "FAIL";
 
 export interface MatrixRow {
@@ -89,9 +153,11 @@ export function evaluate(run: ProbeRun): MatrixRow[] {
   const plainLocation = plain.headers.location ?? "";
   // A refusal counts only as an HTTP answer about an object known to exist. A DNS, TLS or timeout
   // failure proves nothing about access, and S3 answers 403 for missing objects too.
-  const exists = run.privateExists.status === 200;
+  // And only about that object: a refusal of some other key proves nothing about this one.
+  const same = samePrivateObject(run);
+  const exists = same && run.privateExists.status === 200;
   const refused = (x: Observed) => exists && (x.status === 401 || x.status === 403 || x.status === 404);
-  const refusal = (x: Observed) => `${x.url} → ${said(x)}${exists ? "" : "; existence not confirmed"}`;
+  const refusal = (x: Observed) => `${x.url} → ${said(x)}${!same ? "; not the object of T8" : exists ? "" : "; existence not confirmed"}`;
 
   return [
     row("T1", "Direct cloud.ru HTTPS serves the processed variant", true, o.status === 200, `${o.url} → ${said(o)}`),
@@ -108,7 +174,7 @@ export function evaluate(run: ProbeRun): MatrixRow[] {
     row("T7", "CDN sets no cookie", true, c.status === 200 && c.headers["set-cookie"] === undefined,
       c.status === 200 ? c.headers["set-cookie"] ?? "none" : `no variant response (${said(c)})`),
     row("T8", "Private original exists (authorized HEAD)", true, exists,
-      `${run.privateExists.url} → ${said(run.privateExists)}`),
+      `${run.privateExists.url} → ${said(run.privateExists)}${same ? "" : "; T8–T10 do not name one object"}`),
     row("T9", "Private original is refused directly (401/403/404)", true, refused(run.originPrivate),
       refusal(run.originPrivate)),
     row("T10", "Private original is refused through the CDN host (401/403/404)", true, refused(run.cdnPrivate),

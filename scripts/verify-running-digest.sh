@@ -10,6 +10,10 @@
 #
 #   restrict,command="/usr/local/sbin/verify-running-digest" ssh-ed25519 AAAA… site-ssr-attest
 #
+# `preflight <app-uuid>` checks only that this command is the one answering and can read Docker; the
+# release workflow runs it before it changes anything, so a missing or broken credential stops the
+# release before the PATCH, not after the deploy.
+#
 # Two independent facts must hold: the container was created from exactly `repo@digest` (its
 # .Config.Image, as Coolify 4.4.6 runs a digest release — ART-360 PoC), and that image's
 # RepoDigests contain it. An image ID or config digest is not the registry digest.
@@ -22,6 +26,12 @@ if [ "$#" -eq 0 ] && [ -n "${SSH_ORIGINAL_COMMAND:-}" ]; then
   # shellcheck disable=SC2086
   set -- $SSH_ORIGINAL_COMMAND
   set +f
+fi
+if [ "$#" -eq 2 ] && [ "$1" = preflight ]; then
+  [[ "$2" =~ ^[a-z0-9]{24}$ ]] || { echo "BAD_UUID $2" >&2; exit 2; }
+  n="$(docker ps --quiet --filter "name=^$2" | wc -l | tr -d ' ')"
+  echo "READY verify-running-digest $2 ($n running)"
+  exit 0
 fi
 [ "$#" -eq 3 ] || { echo "BAD_ARGS expected 3, got $#" >&2; exit 2; }
 usage='usage: verify-running-digest.sh <app-uuid> <ghcr.io/artgurianov/repo> sha256:<64 hex>'

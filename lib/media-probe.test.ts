@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { cacheStatus, evaluate, expectedMime, matrixMarkdown, maxAge, technicalResult, type ProbeRun } from "./media-probe";
+import {
+  cacheStatus, evaluate, expectedMime, matrixMarkdown, maxAge, probeTargets, technicalResult, type ProbeRun,
+} from "./media-probe";
 
 const ORIGIN = "https://mikluha-maklai.s3.cloud.ru/cms/probe/v.webp";
 const CDN = "https://media.example.test/cms/probe/v.webp";
@@ -15,7 +17,7 @@ const passing = (): ProbeRun => ({
   cdnFirst: { url: `${CDN}?probe=1`, status: 200, headers: { ...webp, "x-cache": "MISS" } },
   cdnSecond: { url: `${CDN}?probe=1`, status: 200, headers: { ...webp, "x-cache": "HIT" } },
   cdnPlainHttp: { url: CDN.replace("https:", "http:"), status: 301, headers: { location: CDN } },
-  privateExists: { url: "https://s3.cloud.ru/mikluha-maklai/originals/p.jpg", status: 200, headers: {} },
+  privateExists: { url: PRIVATE, status: 200, headers: {} },
   originPrivate: { url: PRIVATE, status: 403, headers: {} },
   cdnPrivate: { url: CDN_PRIVATE, status: 404, headers: {} },
   siteOrigin: "https://mikluha-maklai.ru",
@@ -80,4 +82,32 @@ test("any other required failure fails the technical result", () => {
   const noCors = { ...passing(), cdnVariant: { ...passing().cdnVariant, headers: webp } };
   assert.equal(verdict(noCors, "T12").verdict, "FAIL");
   assert.equal(technicalResult(evaluate(noCors)), "TECHNICAL_FAIL");
+});
+
+test("every URL comes from the two bases and one key", () => {
+  const input = { originBase: "https://mikluha-maklai.s3.cloud.ru/cms/", cdnBase: "https://media.example.test/cms/",
+    variant: "probe/v.webp", privateKey: "originals/p.jpg" };
+  assert.deepEqual(probeTargets(input),
+    { originVariant: ORIGIN, cdnVariant: CDN, originPrivate: PRIVATE, cdnPrivate: CDN_PRIVATE });
+  assert.throws(() => probeTargets({ ...input, cdnBase: "https://media.example.test/" }), /by host only/);
+  assert.throws(() => probeTargets({ ...input, originBase: "http://mikluha-maklai.s3.cloud.ru/cms/" }), /https base/);
+  for (const privateKey of ["originals/../cms/p.jpg", "originals/%2E%2E/p.jpg", "originals//p.jpg", "p.jpg?x=1", ""]) {
+    assert.throws(() => probeTargets({ ...input, privateKey }), /PROBE_PRIVATE_KEY/, privateKey);
+  }
+});
+
+test("a refusal of another object proves nothing about the one that exists", () => {
+  // HEAD finds A; the anonymous requests ask for B, which does not exist: 404 is not a refusal of A.
+  const other = (url: string) => url.replace("/originals/p.jpg", "/originals/other.jpg");
+  const direct = { ...passing(), originPrivate: { url: other(PRIVATE), status: 404, headers: {} },
+    cdnPrivate: { url: other(CDN_PRIVATE), status: 404, headers: {} } };
+  assert.deepEqual(["T8", "T9", "T10"].map((id) => verdict(direct, id).verdict), ["FAIL", "FAIL", "FAIL"]);
+  assert.match(verdict(direct, "T9").evidence, /not the object of T8/);
+  assert.equal(technicalResult(evaluate(direct)), "TECHNICAL_FAIL");
+  const cdnOnly = { ...passing(), cdnPrivate: { url: other(CDN_PRIVATE), status: 404, headers: {} } };
+  assert.equal(technicalResult(evaluate(cdnOnly)), "TECHNICAL_FAIL");
+  const otherCdnHost = { ...passing(), cdnPrivate: { url: "https://elsewhere.test/originals/p.jpg", status: 404, headers: {} } };
+  assert.equal(technicalResult(evaluate(otherCdnHost)), "TECHNICAL_FAIL");
+  const pathStyleHead = { ...passing(), privateExists: { url: "https://s3.cloud.ru/mikluha-maklai/originals/p.jpg", status: 200, headers: {} } };
+  assert.equal(technicalResult(evaluate(pathStyleHead)), "TECHNICAL_FAIL");
 });

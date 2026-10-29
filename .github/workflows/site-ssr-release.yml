@@ -7,8 +7,9 @@ name: site-ssr-release
 #
 # A release succeeds only when the host read-back passes too, inside the same concurrency group: a
 # running container that is not exactly the chosen digest fails the release, even if /identity
-# matches (another image of the same commit would). Without the attestation credential the release
-# ends NOT_ATTESTED, failed, never as a success.
+# matches (another image of the same commit would). The attestation credential is proven before
+# anything changes: without it, or if its forced command does not answer, the release stops
+# NOT_ATTESTED before the PATCH, and the running site is untouched.
 #
 # Manual only. It never runs on push: Git auto-deploy stays off, and pointing a public domain at this
 # application is the owner-authorized hard cut (TOUR-67), not something this workflow decides.
@@ -171,6 +172,27 @@ jobs:
           jq -e --arg name "$APP_NAME" '.name == $name and .build_pack == "dockerimage" and .ports_exposes == "3000"' <<<"$app" >/dev/null \
             || { echo "::error::$APP_UUID is not the $APP_NAME Docker Image application exposing 3000"; exit 1; }
 
+      - name: The host read-back can run (before anything changes)
+        env:
+          ATTEST_KEY: ${{ secrets.SITE_SSR_ATTEST_SSH_KEY }}
+          ATTEST_KNOWN_HOSTS: ${{ secrets.SITE_SSR_ATTEST_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ATTEST_KEY:-}" ] || [ -z "${ATTEST_KNOWN_HOSTS:-}" ] || [ -z "${ATTEST_HOST:-}" ]; then
+            echo "::error::NOT_ATTESTED: no host attestation credential; nothing was changed"
+            exit 1
+          fi
+          [[ "$ATTEST_HOST" =~ ^[a-z_][a-z0-9_-]*@[A-Za-z0-9.-]+$ ]] || { echo "::error::SITE_SSR_ATTEST_HOST must be user@host"; exit 1; }
+          dir="$RUNNER_TEMP/attest"; mkdir -m 700 "$dir"
+          printf '%s\n' "$ATTEST_KEY" >"$dir/key"; chmod 600 "$dir/key"
+          printf '%s\n' "$ATTEST_KNOWN_HOSTS" >"$dir/known_hosts"
+          # Only the forced command prints READY: a key that opens a shell would run `preflight` as a
+          # command and fail here.
+          ssh -i "$dir/key" -o IdentitiesOnly=yes -o UserKnownHostsFile="$dir/known_hosts" -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes -o ConnectTimeout=15 "$ATTEST_HOST" "preflight $APP_UUID" | tee "$dir/preflight"
+          grep -qE "^READY verify-running-digest $APP_UUID \(" "$dir/preflight" \
+            || { echo "::error::NOT_ATTESTED: the attestation key did not reach verify-running-digest; nothing was changed"; exit 1; }
+
       - name: Record what runs now (the rollback target)
         run: |
           set -euo pipefail
@@ -226,24 +248,18 @@ jobs:
           [ "$got" = "$COMMIT" ] || { echo "::error::/identity reports '$got', not $COMMIT"; exit 1; }
 
       - name: The running container is the chosen digest (host read-back)
-        env:
-          ATTEST_KEY: ${{ secrets.SITE_SSR_ATTEST_SSH_KEY }}
-          ATTEST_KNOWN_HOSTS: ${{ secrets.SITE_SSR_ATTEST_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          if [ -z "${ATTEST_KEY:-}" ] || [ -z "${ATTEST_KNOWN_HOSTS:-}" ] || [ -z "${ATTEST_HOST:-}" ]; then
-            echo "::error::NOT_ATTESTED: no host attestation credential; deployed but not an accepted release"
-            echo "Run by hand: ssh adman-vps 'bash -s -- $APP_UUID $IMAGE $DIGEST' < scripts/verify-running-digest.sh"
-            exit 1
-          fi
-          dir="$(mktemp -d)"; trap 'rm -rf "$dir"' EXIT
-          printf '%s\n' "$ATTEST_KEY" >"$dir/key"; chmod 600 "$dir/key"
-          printf '%s\n' "$ATTEST_KNOWN_HOSTS" >"$dir/known_hosts"
+          dir="$RUNNER_TEMP/attest"
           # The forced command takes these three tokens from SSH_ORIGINAL_COMMAND; no shell runs them.
           ssh -i "$dir/key" -o IdentitiesOnly=yes -o UserKnownHostsFile="$dir/known_hosts" -o StrictHostKeyChecking=yes \
             -o BatchMode=yes -o ConnectTimeout=15 "$ATTEST_HOST" "$APP_UUID $IMAGE $DIGEST" | tee "$dir/out"
           grep -qxF "PASS running container is $IMAGE@$DIGEST" "$dir/out" \
-            || { echo "::error::host read-back did not confirm $IMAGE@$DIGEST"; exit 1; }
+            || { echo "::error::NOT_ATTESTED: host read-back did not confirm $IMAGE@$DIGEST (deployed; restore with the Before digest)"; exit 1; }
+
+      - name: Remove the attestation key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/attest"
 
       - name: Summary
         run: |

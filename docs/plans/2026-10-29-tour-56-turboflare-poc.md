@@ -33,9 +33,9 @@ Required rows decide `TECHNICAL_PASS`; the others are recorded for the decision.
 | T5 | A never-seen URL is a cache MISS, the repeat a HIT | yes |
 | T6 | Edge TTL (`s-maxage`, else `max-age`) ≥ `PROBE_MIN_TTL` (default 86 400 s) | yes |
 | T7 | The CDN sets no cookie | yes |
-| T8 | The private original exists (authorized SigV4 HEAD, `PROBE_S3_*`) | yes |
-| T9 | Anonymous direct request for it is refused (401/403/404); a network error or an unconfirmed object is FAIL | yes |
-| T10 | The same through the CDN host (`PROBE_PRIVATE_CDN_URL`, required) | yes |
+| T8 | The private original exists (authorized SigV4 HEAD of `https://<bucket host>/<PROBE_PRIVATE_KEY>`) | yes |
+| T9 | The same URL, anonymously, is refused (401/403/404); a network error or an unconfirmed object is FAIL | yes |
+| T10 | The same key through the CDN host (required) | yes |
 | T11 | Plain HTTP on the CDN host redirects to HTTPS or is refused | no |
 | T12 | CORS allows the site origin | yes |
 | T13 | `X-Content-Type-Options: nosniff` | no |
@@ -60,12 +60,14 @@ authentication is claimed for TurboFlare.
    PROBE_ORIGIN_BASE=https://mikluha-maklai.s3.cloud.ru/cms/ \
    PROBE_CDN_BASE=https://<turboflare host>/cms/ \
    PROBE_VARIANT=probe/turboflare-probe.webp \
-   PROBE_PRIVATE_URL=https://mikluha-maklai.s3.cloud.ru/<private original> \
-   PROBE_PRIVATE_CDN_URL=https://<turboflare host>/<private original> \
-   PROBE_S3_ENDPOINT=https://s3.cloud.ru PROBE_S3_BUCKET=mikluha-maklai PROBE_PRIVATE_KEY=<private original> \
+   PROBE_PRIVATE_KEY=<private original key, e.g. originals/probe.jpg> \
    PROBE_S3_ACCESS_KEY_ID=… PROBE_S3_SECRET_ACCESS_KEY=… \
    PROBE_OUT="$HOME/tour-56-evidence" pnpm exec tsx scripts/media-probe.ts
    ```
+
+   Every URL comes from the two bases and the one key, so T9 and T10 ask about the object T8
+   found. The two bases must have the same path: the probe supports a TurboFlare host that fronts
+   the bucket by host swap (T4 proves it byte for byte) and refuses any other mapping as bad input.
 
 4. **Switch and switch back** on a non-production SSR application (the TOUR-60 image; any commit):
    set `MEDIA_DELIVERY=cdn`, `MEDIA_ORIGIN_BASE=https://mikluha-maklai.s3.cloud.ru/cms/`,
