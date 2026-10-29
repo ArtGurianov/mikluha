@@ -339,6 +339,21 @@
         "Provider/fiscal/legal gates and public operation authorization"
       ],
       "compatibility": "Original Refref source hashes/pins unchanged; no new BOUND/C/S4/S5 rule."
+    },
+    {
+      "id": "MK-C11",
+      "status": "OWNER_APPROVED",
+      "recordedOn": "2026-10-29",
+      "recordSource": "DIRECT_OWNER",
+      "appliesTo": "Future Mikluha Refref referral lifecycle only, not native launch",
+      "approved": [
+        "modeS5=SCHEDULED_SERVICE; selected before and immutable at first BOUND",
+        "serviceAnchorAtAtBound=frozen end of eligible original scheduled trip with qualified time/zone/precision",
+        "baseClaimDeadline=addMoscowCalendarDates(max(actualPaidInFullAt,serviceAnchorAtAtBound),14) subject to timely accepted claims and preserved S5 conditions",
+        "Later transfer does not shift frozen anchor; OWNER accepts FINAL may occur before later transferred trip ends",
+        "Ordinary changes after FINAL do not revive S4 even if payout not yet executed"
+      ],
+      "compatibility": "Existing Refref v10 S5/FINAL rules; no bank/source/auth/deploy GO"
     }
   ]
 }
