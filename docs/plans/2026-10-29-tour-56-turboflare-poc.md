@@ -13,7 +13,7 @@
 |---|---|---|
 | Runtime switch | `lib/cms/media-delivery.ts` | `MEDIA_DELIVERY=direct\|cdn`; under `cdn`, only URLs under `MEDIA_ORIGIN_BASE` are served from `MEDIA_CDN_BASE`, same remaining path. Anything else (a private original, another bucket, `/media/demo/`) is never rewritten. Bad config fails the render instead of guessing |
 | Where it applies | `lib/cms/content.ts` | Every image/video `src` of the SSR snapshot, per request. The static export is untouched |
-| Probe | `scripts/media-probe.ts`, `lib/media-probe.ts` | One run of the matrix below; JSON + Markdown evidence with `PROBE_OUT` |
+| Probe | `scripts/media-probe.ts`, `lib/media-probe.ts`, `lib/s3-sigv4.ts` | One run of the matrix below; JSON + Markdown evidence with `PROBE_OUT`. The S3 key only signs one HEAD (read-only key; never written to the evidence) |
 | Switch evidence | `scripts/ssr-smoke.ts` with `EXPECT_MEDIA` | Asserts which host the rendered HTML points browsers at, and the `/identity` commit |
 | CI | `.github/workflows/ci.yml` job `site-ssr` | The same SSR image started `direct → cdn → direct`; every run reports the same commit, so no rebuild happened |
 
@@ -62,6 +62,8 @@ authentication is claimed for TurboFlare.
    PROBE_VARIANT=probe/turboflare-probe.webp \
    PROBE_PRIVATE_URL=https://mikluha-maklai.s3.cloud.ru/<private original> \
    PROBE_PRIVATE_CDN_URL=https://<turboflare host>/<private original> \
+   PROBE_S3_ENDPOINT=https://s3.cloud.ru PROBE_S3_BUCKET=mikluha-maklai PROBE_PRIVATE_KEY=<private original> \
+   PROBE_S3_ACCESS_KEY_ID=… PROBE_S3_SECRET_ACCESS_KEY=… \
    PROBE_OUT="$HOME/tour-56-evidence" pnpm exec tsx scripts/media-probe.ts
    ```
 
