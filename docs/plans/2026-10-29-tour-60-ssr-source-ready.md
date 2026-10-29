@@ -8,6 +8,10 @@
 - `CUSTODY_IMPACT: NO` — source only. Creating the Coolify application, its env and its tokens
   later is `YES` (VPS-15).
 
+Rebased on TOUR-81 (PR #50, merged): `commerce/src/bin/serve.ts` keeps the `/public/v1/catalog`
+route and #50's removal of the vNext/Arrivals wiring (inert `/arrive`, legacy read-back, no vNext
+client); the catalog handler claims only `/public/v1/catalog`.
+
 ## Coexistence until the hard cut
 
 The static export stays the production release: `Dockerfile`, `nginx.conf`, `publish.yml` and
@@ -93,10 +97,6 @@ settles every row marked open. Rows marked DB are not to be duplicated in the si
 
 - The no-JS outage page: Next's empty error document, no message. Acceptable for this stage
   only; not an accepted UX.
-- Integration with TOUR-81 (PR #50): both change `commerce/src/bin/serve.ts`. The merged file keeps
-  the `/public/v1/catalog` route **and** #50's removal of the vNext/Arrivals wiring (inert
-  `/arrive`, legacy read-back, no vNext call), then CI runs again on the new exact HEAD.
-
 - A real release, a second release, and a rollback to the first, each with both read-backs.
 - The site against real Commerce data published through Control Room, not the fixture.
 - Commerce's `LiveSiteReleaseAdmission` reads `https://mikluha-maklai.ru/release.json`; at the cut
