@@ -1,0 +1,2410 @@
+{
+  "capturedAt": "2026-10-29T12:10:39.590018+00:00",
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "checks": [
+    {
+      "check": "verified TLS, MISS then HIT, identical bytes",
+      "pass": true,
+      "evidence": [
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 12:10:52 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 8.262,
+          "totalMs": 8.3
+        },
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 12:10:52 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "HIT",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 3.723,
+          "totalMs": 3.743
+        }
+      ]
+    },
+    {
+      "check": "WebP, nosniff, CORS, no cookie, browser revalidation",
+      "pass": true,
+      "evidence": {
+        "access-control-allow-origin": "*",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-length": "51",
+        "content-type": "image/webp",
+        "date": "Thu, 29 Oct 2026 12:10:52 GMT",
+        "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+        "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+        "server": "nginx",
+        "x-cache-status": "HIT",
+        "x-content-type-options": "nosniff"
+      }
+    },
+    {
+      "check": "HEAD has no body",
+      "pass": true,
+      "evidence": "HEAD"
+    },
+    {
+      "check": "browser ETag conditional request",
+      "pass": true,
+      "evidence": {
+        "status": 304,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "date": "Thu, 29 Oct 2026 12:10:52 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "HIT",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "ttfbMs": 3.26,
+        "totalMs": 3.281
+      }
+    },
+    {
+      "check": "private sentinel actually exists at fixture origin",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "content-type": "image/jpeg",
+          "date": "Thu, 29 Oct 2026 12:10:52 GMT",
+          "connection": "keep-alive",
+          "keep-alive": "timeout=5",
+          "transfer-encoding": "chunked"
+        },
+        "bytes": 77,
+        "sha256": "96fd41210a9d29972b7658be642fb53ae000efeb19e497d0abfd66fd65aeadcc",
+        "ttfbMs": 1.559,
+        "totalMs": 1.587
+      }
+    },
+    {
+      "check": "deny raw target /originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/../originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/%2e%2e/originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/%252e%252e/originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp?x=1",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp?url=http://origin/originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp/..",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /https://origin/originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/%2f..%2foriginals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/%5c..%5coriginals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/unknown/hero.webp",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /PROCESSED/057388113A2F24C03AC11D06242D8687D9F70E16372E63A1DC7E4149BEAF2C00/HERO.WEBP",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "edge normalization only reaches the same public key",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "content-length": "51",
+          "content-type": "image/webp",
+          "date": "Thu, 29 Oct 2026 12:10:53 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "HIT",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 51,
+        "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+        "ttfbMs": 11.163,
+        "totalMs": 11.252
+      }
+    },
+    {
+      "check": "edge normalization only reaches the same public key",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "content-length": "51",
+          "content-type": "image/webp",
+          "date": "Thu, 29 Oct 2026 12:10:53 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "HIT",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 51,
+        "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+        "ttfbMs": 8.417,
+        "totalMs": 8.489
+      }
+    },
+    {
+      "check": "private denial never contacted origin",
+      "pass": true,
+      "evidence": {
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp": 2,
+        "/originals/exists.jpg": 1
+      }
+    },
+    {
+      "check": "reject credential-bearing request",
+      "pass": true,
+      "evidence": [
+        "Authorization"
+      ]
+    },
+    {
+      "check": "reject credential-bearing request",
+      "pass": true,
+      "evidence": [
+        "Cookie"
+      ]
+    },
+    {
+      "check": "reject mutation",
+      "pass": true,
+      "evidence": "POST"
+    },
+    {
+      "check": "host override rejected at edge",
+      "pass": true,
+      "evidence": "Host"
+    },
+    {
+      "check": "untrusted headers cannot vary origin bytes",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "content-length": "51",
+          "content-type": "image/webp",
+          "date": "Thu, 29 Oct 2026 12:10:53 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 51,
+        "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+        "ttfbMs": 8.472,
+        "totalMs": 8.53
+      }
+    },
+    {
+      "check": "concurrent MISS collapse",
+      "pass": true,
+      "evidence": {
+        "upstreamRequests": 1,
+        "statuses": [
+          "HIT",
+          "MISS",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT"
+        ]
+      }
+    },
+    {
+      "check": "expired cache revalidated with ETag",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "content-length": "51",
+          "content-type": "image/webp",
+          "date": "Thu, 29 Oct 2026 12:10:56 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "REVALIDATED",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 51,
+        "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+        "ttfbMs": 11.495,
+        "totalMs": 11.552
+      }
+    },
+    {
+      "check": "missing is not cached",
+      "pass": true,
+      "evidence": {
+        "statuses": [
+          404,
+          404
+        ],
+        "upstreamRequests": 2
+      }
+    },
+    {
+      "check": "error is not cached",
+      "pass": true,
+      "evidence": {
+        "statuses": [
+          503,
+          503
+        ],
+        "upstreamRequests": 2
+      }
+    },
+    {
+      "check": "timeout is not cached",
+      "pass": true,
+      "evidence": {
+        "statuses": [
+          504,
+          504
+        ],
+        "upstreamRequests": 2
+      }
+    },
+    {
+      "check": "cookie response never enters cache",
+      "pass": true,
+      "evidence": [
+        {
+          "status": 502,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 9.977,
+          "totalMs": 10.029
+        },
+        {
+          "status": 502,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 6.327,
+          "totalMs": 6.36
+        }
+      ]
+    },
+    {
+      "check": "private response never enters cache",
+      "pass": true,
+      "evidence": [
+        {
+          "status": 502,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 5.79,
+          "totalMs": 5.825
+        },
+        {
+          "status": 502,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 4.638,
+          "totalMs": 4.658
+        }
+      ]
+    },
+    {
+      "check": "wrong-type response never enters cache",
+      "pass": true,
+      "evidence": [
+        {
+          "status": 415,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "172",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 172,
+          "sha256": "928299c2af4335d94caf368ec76901df3380f798fb438410a5fecd52d50db660",
+          "ttfbMs": 4.152,
+          "totalMs": 4.17
+        },
+        {
+          "status": 415,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "172",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 172,
+          "sha256": "928299c2af4335d94caf368ec76901df3380f798fb438410a5fecd52d50db660",
+          "ttfbMs": 3.602,
+          "totalMs": 3.617
+        }
+      ]
+    },
+    {
+      "check": "X-Accel-Redirect cannot expose original",
+      "pass": true,
+      "evidence": "upstream internal redirect ignored"
+    },
+    {
+      "check": "wrong-type is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 415,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "172",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 172,
+        "sha256": "928299c2af4335d94caf368ec76901df3380f798fb438410a5fecd52d50db660",
+        "ttfbMs": 3.653,
+        "totalMs": 3.669
+      }
+    },
+    {
+      "check": "oversize is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 4.473,
+        "totalMs": 4.495
+      }
+    },
+    {
+      "check": "chunked is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 43.651,
+        "totalMs": 43.697
+      }
+    },
+    {
+      "check": "changed is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 4.317,
+        "totalMs": 4.335
+      }
+    },
+    {
+      "check": "http-redirect is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 3.883,
+        "totalMs": 3.896
+      }
+    },
+    {
+      "check": "untrusted-tls is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:10:58 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 9.201,
+        "totalMs": 9.222
+      }
+    },
+    {
+      "check": "origin outage never serves stale cached photo",
+      "pass": true,
+      "evidence": {
+        "status": 503,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "190",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:11:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "EXPIRED",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 190,
+        "sha256": "b429e25e7813a9e2b90dcec11d9cb5287751246128dd6c76a7349774829c5554",
+        "ttfbMs": 12.328,
+        "totalMs": 12.416
+      }
+    },
+    {
+      "check": "scoped revoke: denied key, removed cache file, sibling retained",
+      "pass": true,
+      "evidence": {
+        "revokedStatus": 404,
+        "removedFiles": 1,
+        "sibling": {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 12:11:01 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "HIT",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 7.673,
+          "totalMs": 7.71
+        }
+      }
+    },
+    {
+      "check": "cache failure is visible (no fabricated success)",
+      "pass": true,
+      "evidence": "edge upstream down"
+    },
+    {
+      "check": "direct origin remains independently available",
+      "pass": true,
+      "evidence": "direct"
+    },
+    {
+      "check": "real S3 direct byte identity",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 10,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 708.015,
+          "p75": 944.146,
+          "p95": 963.244
+        },
+        "totalMs": {
+          "p50": 1338.485,
+          "p75": 1502.45,
+          "p95": 1540.513
+        },
+        "hitCount": 0
+      }
+    },
+    {
+      "check": "real S3 cold byte identity",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 10,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 1478.755,
+          "p75": 1539.696,
+          "p95": 1582.977
+        },
+        "totalMs": {
+          "p50": 1659.23,
+          "p75": 1724.467,
+          "p95": 1763.17
+        },
+        "hitCount": 0
+      }
+    },
+    {
+      "check": "real S3 warm byte identity",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 20,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 11.959,
+          "p75": 13.229,
+          "p95": 13.927
+        },
+        "totalMs": {
+          "p50": 177.015,
+          "p75": 179.375,
+          "p95": 180.563
+        },
+        "hitCount": 20
+      }
+    },
+    {
+      "check": "real S3 cold requests are MISS",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 10,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 1478.755,
+          "p75": 1539.696,
+          "p95": 1582.977
+        },
+        "totalMs": {
+          "p50": 1659.23,
+          "p75": 1724.467,
+          "p95": 1763.17
+        },
+        "hitCount": 0
+      }
+    },
+    {
+      "check": "real S3 measured warm requests are HIT",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 20,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 11.959,
+          "p75": 13.229,
+          "p95": 13.927
+        },
+        "totalMs": {
+          "p50": 177.015,
+          "p75": 179.375,
+          "p95": 180.563
+        },
+        "hitCount": 20
+      }
+    },
+    {
+      "check": "real S3 direct byte identity",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 10,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 655.941,
+          "p75": 942.699,
+          "p95": 1901.832
+        },
+        "totalMs": {
+          "p50": 1670.359,
+          "p75": 2491.355,
+          "p95": 4249.488
+        },
+        "hitCount": 0
+      }
+    },
+    {
+      "check": "real S3 cold byte identity",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 10,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 1896.829,
+          "p75": 2287.829,
+          "p95": 3264.82
+        },
+        "totalMs": {
+          "p50": 2375.322,
+          "p75": 2758.524,
+          "p95": 3726.244
+        },
+        "hitCount": 0
+      }
+    },
+    {
+      "check": "real S3 warm byte identity",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 20,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 11.257,
+          "p75": 12.233,
+          "p95": 12.841
+        },
+        "totalMs": {
+          "p50": 437.017,
+          "p75": 441.082,
+          "p95": 443.019
+        },
+        "hitCount": 20
+      }
+    },
+    {
+      "check": "real S3 cold requests are MISS",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 10,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 1896.829,
+          "p75": 2287.829,
+          "p95": 3264.82
+        },
+        "totalMs": {
+          "p50": 2375.322,
+          "p75": 2758.524,
+          "p95": 3726.244
+        },
+        "hitCount": 0
+      }
+    },
+    {
+      "check": "real S3 measured warm requests are HIT",
+      "pass": true,
+      "evidence": {
+        "sampleCount": 20,
+        "errorCount": 0,
+        "ttfbMs": {
+          "p50": 11.257,
+          "p75": 12.233,
+          "p95": 12.841
+        },
+        "totalMs": {
+          "p50": 437.017,
+          "p75": 441.082,
+          "p95": 443.019
+        },
+        "hitCount": 20
+      }
+    }
+  ],
+  "observations": {
+    "responseSizeGate": {
+      "status": "PASS",
+      "maxBytes": 1048576,
+      "contentLengthAndChunkedOversize": "502; generic error only; never cached",
+      "njsMinimum": "1.0.2"
+    },
+    "mimeGate": {
+      "status": "PASS",
+      "wrongType": "415; generic error only; never cached"
+    },
+    "localWarmSynthetic": {
+      "ttfbMs": {
+        "p50": 2.727,
+        "p75": 2.916,
+        "p95": 4.392
+      },
+      "totalMs": {
+        "p50": 2.735,
+        "p75": 2.933,
+        "p95": 4.452
+      },
+      "hitRate": 0.3333333333333333,
+      "sampleCount": 12,
+      "warning": "local Docker TLS, tiny synthetic bytes; not S3, regional speed or LCP"
+    },
+    "upstreamRequestsByFixtureKey": {
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp": 5,
+      "/originals/exists.jpg": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/gallery.webp": 3,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/collapse.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/missing.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/error.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/timeout.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/cookie.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/private.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/wrong-type.webp": 3,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/redirect.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/oversize.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/chunked.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/changed.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/http-redirect.webp": 1
+    }
+  },
+  "productionQualification": "NO_GO",
+  "ownerDecision": "PENDING",
+  "testedFiles": {
+    "compose.yaml": "3e9671b4673f5e6ab3728d92de83da049d2946042b5bb8c62fbb669709efef1e",
+    "gate.mjs": "143c632b7351fd36dc280369a981a9d809d88f7638010d2ee8b6bbc9f0b6aacf",
+    "inventory-vps.py": "660b512703da013c217bfe1865e4b7ffe10bf2cf7c18dd43e6d6bcce87505ded",
+    "manual-probe.py": "e4c1927ce14cbe47c9c0c86bb46c27e8d668414a7e05e4d09f2701bb9ec65fae",
+    "measure-direct.py": "6ea31de4b648e46085b08ab507a3b446ca27f0c28ff0c77d6114a13f0f2927e8",
+    "nginx.conf": "810a84f57ba4da4a66219fdf75cdc97415c32ee43556dac46479dc15de28b99e",
+    "origin.mjs": "460ea88ee4e1d68ce63b4e01c2cbe53739489fbfccf42776026c2f98d62a3381",
+    "run.py": "cf85f57f5c759b54009318be4dfafe676d88d8fdd222e3a8aa9a2158c92d1faa",
+    "traefik.yaml": "2df4110ac44118c30b6eecc772af53a8886edbe9ae168d407f61d21a6f59afe9"
+  },
+  "enforcedContainerLimits": {
+    "edge": {
+      "memory": 100663296,
+      "nanoCpus": 250000000,
+      "pids": 64,
+      "readOnly": true
+    },
+    "cache": {
+      "memory": 134217728,
+      "nanoCpus": 250000000,
+      "pids": 32,
+      "readOnly": true
+    },
+    "origin": {
+      "memory": 100663296,
+      "nanoCpus": 250000000,
+      "pids": 32,
+      "readOnly": true
+    }
+  },
+  "boundedFetcherPackage": "nginx-module-njs-1.31.8.1.0.2-r1 description:\nnginx njs dynamic modules\n\nnginx-module-njs-1.31.8.1.0.2-r1 webpage:\nhttps://nginx.org/\n\nnginx-module-njs-1.31.8.1.0.2-r1 installed size:\n9754 KiB",
+  "images": [
+    {
+      "ID": "sha256:ef9a6e2b45c23a9693064eb858517632288d5da63bcb9f86c7cef4983290f41e",
+      "ContainerName": "mikluha-tour88-local-cache-1",
+      "Repository": "nginx",
+      "Tag": "",
+      "Platform": "linux/arm64/v8",
+      "Size": 62660635,
+      "Created": "2026-10-22T00:16:54.616730281Z"
+    },
+    {
+      "ID": "sha256:0d459d0765f0e55925663ba63fad229237ea06ad6ba4fa38658e7c5b5308a0b9",
+      "ContainerName": "mikluha-tour88-local-origin-1",
+      "Repository": "node",
+      "Tag": "",
+      "Platform": "linux/arm64/v8",
+      "Size": 163512732,
+      "Created": "2026-09-23T21:41:54.780711499Z"
+    },
+    {
+      "ID": "sha256:68269702cdcb1643b456923f45379722d65fca7d71cb85d4daf6bf6038fae376",
+      "ContainerName": "mikluha-tour88-local-edge-1",
+      "Repository": "traefik",
+      "Tag": "",
+      "Platform": "linux/arm64/v8",
+      "Size": 176587212,
+      "Created": "2026-07-31T21:02:54.259608821Z"
+    }
+  ],
+  "resources": "{\"BlockIO\":\"96.5MB / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"3bbe22e255f5780c5802407a42d5e36739a74e3025b8a6e4efdf9c1c9bfae850\",\"ID\":\"3bbe22e255f5\",\"MemPerc\":\"95.15%\",\"MemUsage\":\"91.35MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-edge-1\",\"NetIO\":\"204kB / 283kB\",\"PIDs\":\"7\"}\n{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"e34b446122a65100bea2e12aee9da9d9a1afe5be6e8c3836e53e81802d6236a8\",\"ID\":\"e34b446122a6\",\"MemPerc\":\"3.83%\",\"MemUsage\":\"4.906MiB / 128MiB\",\"Name\":\"mikluha-tour88-local-cache-1\",\"NetIO\":\"3.38kB / 2.8kB\",\"PIDs\":\"4\"}\n{\"BlockIO\":\"66.1MB / 0B\",\"CPUPerc\":\"0.01%\",\"Container\":\"7eec02f560e40d4a4e93c770dd683ef5b99a698bd78c37f78d749e6afddcb267\",\"ID\":\"7eec02f560e4\",\"MemPerc\":\"79.90%\",\"MemUsage\":\"76.7MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-origin-1\",\"NetIO\":\"30.2kB / 2.23MB\",\"PIDs\":\"7\"}",
+  "realS3LocalComparison": {
+    "scope": "ONE_VANTAGE_LOCAL_DOCKER_NOT_REGIONAL_OR_LCP",
+    "vantage": "operator-mac",
+    "tls": "test CA for local edge; system CA and verify=true for S3 via njs",
+    "originNames": "legacy mutable sources; local content-addressed alias verifies pinned SHA-256",
+    "objects": [
+      {
+        "url": "https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp",
+        "expected": {
+          "status": 200,
+          "ttfbMs": 878.674,
+          "totalMs": 1781.056,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+          "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+        },
+        "direct": [
+          {
+            "status": 200,
+            "ttfbMs": 963.244,
+            "totalMs": 1540.513,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 625.615,
+            "totalMs": 1219.622,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 635.717,
+            "totalMs": 1169.673,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 667.335,
+            "totalMs": 1159.397,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 842.44,
+            "totalMs": 1379.353,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 671.553,
+            "totalMs": 1395.998,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 954.127,
+            "totalMs": 1502.45,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 708.015,
+            "totalMs": 1338.485,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 944.146,
+            "totalMs": 1514.294,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 767.345,
+            "totalMs": 1301.53,
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          }
+        ],
+        "cold": [
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:11 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1539.122,
+            "totalMs": 1724.467
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:14 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1539.696,
+            "totalMs": 1713.69
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:20 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1582.977,
+            "totalMs": 1763.17
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:23 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1552.289,
+            "totalMs": 1732.479
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:28 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1382.409,
+            "totalMs": 1561.888
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:31 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1473.899,
+            "totalMs": 1652.921
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:37 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1522.399,
+            "totalMs": 1698.378
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:40 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1445.906,
+            "totalMs": 1627.373
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:46 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1465.089,
+            "totalMs": 1644.894
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:49 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 1478.755,
+            "totalMs": 1659.23
+          }
+        ],
+        "warm": [
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:13 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 11.725,
+            "totalMs": 177.391
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:13 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 11.128,
+            "totalMs": 174.642
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:17 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 10.775,
+            "totalMs": 176.28
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:17 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 11.557,
+            "totalMs": 172.652
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:21 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 11.305,
+            "totalMs": 174.205
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:21 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 12.373,
+            "totalMs": 176.45
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:25 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 11.585,
+            "totalMs": 180.563
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:26 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 12.465,
+            "totalMs": 180.117
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:30 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 13.812,
+            "totalMs": 179.375
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:30 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 8.093,
+            "totalMs": 170.824
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:34 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 11.737,
+            "totalMs": 175.411
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:34 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 11.765,
+            "totalMs": 177.921
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:39 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 12.939,
+            "totalMs": 178.339
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:39 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 13.927,
+            "totalMs": 180.516
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:43 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 15.628,
+            "totalMs": 182.102
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:43 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 13.229,
+            "totalMs": 177.015
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:48 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 13.276,
+            "totalMs": 177.234
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:48 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 13.151,
+            "totalMs": 175.671
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:52 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 13.67,
+            "totalMs": 180.531
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "181750",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:52 GMT",
+              "etag": "\"898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17\"",
+              "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 181750,
+            "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+            "ttfbMs": 11.959,
+            "totalMs": 175.637
+          }
+        ],
+        "directSummary": {
+          "sampleCount": 10,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 708.015,
+            "p75": 944.146,
+            "p95": 963.244
+          },
+          "totalMs": {
+            "p50": 1338.485,
+            "p75": 1502.45,
+            "p95": 1540.513
+          },
+          "hitCount": 0
+        },
+        "coldSummary": {
+          "sampleCount": 10,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 1478.755,
+            "p75": 1539.696,
+            "p95": 1582.977
+          },
+          "totalMs": {
+            "p50": 1659.23,
+            "p75": 1724.467,
+            "p95": 1763.17
+          },
+          "hitCount": 0
+        },
+        "warmSummary": {
+          "sampleCount": 20,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 11.959,
+            "p75": 13.229,
+            "p95": 13.927
+          },
+          "totalMs": {
+            "p50": 177.015,
+            "p75": 179.375,
+            "p95": 180.563
+          },
+          "hitCount": 20
+        }
+      },
+      {
+        "url": "https://mikluha-maklai.s3.cloud.ru/cms/organized.webp",
+        "expected": {
+          "status": 200,
+          "ttfbMs": 675.44,
+          "totalMs": 1846.019,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+          "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+        },
+        "direct": [
+          {
+            "status": 200,
+            "ttfbMs": 616.677,
+            "totalMs": 1480.363,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 594.779,
+            "totalMs": 1933.083,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 604.815,
+            "totalMs": 1452.576,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 697.084,
+            "totalMs": 1670.359,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 919.291,
+            "totalMs": 2491.355,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 1231.929,
+            "totalMs": 4249.488,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 1901.832,
+            "totalMs": 3927.482,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 942.699,
+            "totalMs": 1864.919,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 620.332,
+            "totalMs": 1394.018,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          {
+            "status": 200,
+            "ttfbMs": 655.941,
+            "totalMs": 1659.93,
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          }
+        ],
+        "cold": [
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:56 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 1896.829,
+            "totalMs": 2375.322
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:02 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 2637.48,
+            "totalMs": 3117.129
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:10 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 1587.186,
+            "totalMs": 2062.152
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:14 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 2287.829,
+            "totalMs": 2758.524
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:23 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 1601.145,
+            "totalMs": 2076.145
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:29 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 3264.82,
+            "totalMs": 3726.244
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:43 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 1882.07,
+            "totalMs": 2352.868
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:48 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 1764.569,
+            "totalMs": 2233.143
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:56 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 1949.102,
+            "totalMs": 2423.835
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:13:01 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 2199.286,
+            "totalMs": 2671.689
+          }
+        ],
+        "warm": [
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:58 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 12.841,
+            "totalMs": 439.681
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:11:59 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 9.125,
+            "totalMs": 442.202
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:06 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 11.257,
+            "totalMs": 433.816
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:06 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 7.151,
+            "totalMs": 432.2
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:11 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 12.729,
+            "totalMs": 441.741
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:12 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 12.155,
+            "totalMs": 433.304
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:18 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 12.483,
+            "totalMs": 443.929
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:19 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 10.837,
+            "totalMs": 436.136
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:25 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 10.345,
+            "totalMs": 429.54
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:26 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 10.073,
+            "totalMs": 435.541
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:36 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 11.712,
+            "totalMs": 441.082
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:36 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 12.233,
+            "totalMs": 443.019
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:45 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 11.701,
+            "totalMs": 441.057
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:46 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 11.972,
+            "totalMs": 440.379
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:52 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 12.515,
+            "totalMs": 436.339
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:52 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 10.746,
+            "totalMs": 437.017
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:58 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 9.012,
+            "totalMs": 434.26
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:12:58 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 7.263,
+            "totalMs": 440.033
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:13:04 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 14.199,
+            "totalMs": 442.59
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "470636",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:13:05 GMT",
+              "etag": "\"3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c\"",
+              "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 470636,
+            "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+            "ttfbMs": 5.381,
+            "totalMs": 428.671
+          }
+        ],
+        "directSummary": {
+          "sampleCount": 10,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 655.941,
+            "p75": 942.699,
+            "p95": 1901.832
+          },
+          "totalMs": {
+            "p50": 1670.359,
+            "p75": 2491.355,
+            "p95": 4249.488
+          },
+          "hitCount": 0
+        },
+        "coldSummary": {
+          "sampleCount": 10,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 1896.829,
+            "p75": 2287.829,
+            "p95": 3264.82
+          },
+          "totalMs": {
+            "p50": 2375.322,
+            "p75": 2758.524,
+            "p95": 3726.244
+          },
+          "hitCount": 0
+        },
+        "warmSummary": {
+          "sampleCount": 20,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 11.257,
+            "p75": 12.233,
+            "p95": 12.841
+          },
+          "totalMs": {
+            "p50": 437.017,
+            "p75": 441.082,
+            "p95": 443.019
+          },
+          "hitCount": 20
+        }
+      }
+    ]
+  },
+  "result": "SYNTHETIC_CHECKS_PASS_PRODUCTION_NOT_QUALIFIED"
+}

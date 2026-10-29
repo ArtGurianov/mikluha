@@ -1,0 +1,645 @@
+{
+  "capturedAt": "2026-10-29T11:47:19.918467+00:00",
+  "scope": "LOCAL_SYNTHETIC_ONLY",
+  "checks": [
+    {
+      "check": "verified TLS, MISS then HIT, identical bytes",
+      "pass": true,
+      "evidence": [
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 5.941,
+          "totalMs": 5.956
+        },
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "HIT",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 3.711,
+          "totalMs": 3.722
+        }
+      ]
+    },
+    {
+      "check": "WebP, nosniff, CORS, no cookie, browser revalidation",
+      "pass": true,
+      "evidence": {
+        "access-control-allow-origin": "*",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-length": "51",
+        "content-type": "image/webp",
+        "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+        "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+        "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+        "server": "nginx",
+        "x-cache-status": "HIT",
+        "x-content-type-options": "nosniff"
+      }
+    },
+    {
+      "check": "HEAD has no body",
+      "pass": true,
+      "evidence": "HEAD"
+    },
+    {
+      "check": "browser ETag conditional request",
+      "pass": true,
+      "evidence": {
+        "status": 304,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "HIT",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "ttfbMs": 3.018,
+        "totalMs": 3.034
+      }
+    },
+    {
+      "check": "private sentinel actually exists at fixture origin",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "content-type": "image/jpeg",
+          "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+          "connection": "keep-alive",
+          "keep-alive": "timeout=5",
+          "transfer-encoding": "chunked"
+        },
+        "bytes": 77,
+        "sha256": "96fd41210a9d29972b7658be642fb53ae000efeb19e497d0abfd66fd65aeadcc",
+        "ttfbMs": 1.549,
+        "totalMs": 1.589
+      }
+    },
+    {
+      "check": "deny raw target /originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/../originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/%2e%2e/originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/%252e%252e/originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp?x=1",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp?url=http://origin/originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp/..",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /https://origin/originals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/%2f..%2foriginals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/%5c..%5coriginals/exists.jpg",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /processed/unknown/hero.webp",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "deny raw target /PROCESSED/057388113A2F24C03AC11D06242D8687D9F70E16372E63A1DC7E4149BEAF2C00/HERO.WEBP",
+      "pass": true,
+      "evidence": 404
+    },
+    {
+      "check": "edge normalization only reaches the same public key",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "content-length": "51",
+          "content-type": "image/webp",
+          "date": "Thu, 29 Oct 2026 11:47:22 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "HIT",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 51,
+        "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+        "ttfbMs": 9.93,
+        "totalMs": 9.967
+      }
+    },
+    {
+      "check": "edge normalization only reaches the same public key",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "content-length": "51",
+          "content-type": "image/webp",
+          "date": "Thu, 29 Oct 2026 11:47:22 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "HIT",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 51,
+        "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+        "ttfbMs": 6.22,
+        "totalMs": 6.238
+      }
+    },
+    {
+      "check": "private denial never contacted origin",
+      "pass": true,
+      "evidence": {
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp": 2,
+        "/originals/exists.jpg": 1
+      }
+    },
+    {
+      "check": "reject credential-bearing request",
+      "pass": true,
+      "evidence": [
+        "Authorization"
+      ]
+    },
+    {
+      "check": "reject credential-bearing request",
+      "pass": true,
+      "evidence": [
+        "Cookie"
+      ]
+    },
+    {
+      "check": "reject mutation",
+      "pass": true,
+      "evidence": "POST"
+    },
+    {
+      "check": "host override rejected at edge",
+      "pass": true,
+      "evidence": "Host"
+    },
+    {
+      "check": "untrusted headers cannot vary origin bytes",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "content-length": "51",
+          "content-type": "image/webp",
+          "date": "Thu, 29 Oct 2026 11:47:22 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 51,
+        "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+        "ttfbMs": 55.415,
+        "totalMs": 55.455
+      }
+    },
+    {
+      "check": "concurrent MISS collapse",
+      "pass": true,
+      "evidence": {
+        "upstreamRequests": 1,
+        "statuses": [
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "MISS",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT"
+        ]
+      }
+    },
+    {
+      "check": "expired cache revalidated with ETag",
+      "pass": true,
+      "evidence": {
+        "status": 200,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "content-length": "51",
+          "content-type": "image/webp",
+          "date": "Thu, 29 Oct 2026 11:47:24 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "REVALIDATED",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 51,
+        "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+        "ttfbMs": 11.473,
+        "totalMs": 11.571
+      }
+    },
+    {
+      "check": "missing is not cached",
+      "pass": true,
+      "evidence": {
+        "statuses": [
+          404,
+          404
+        ],
+        "upstreamRequests": 2
+      }
+    },
+    {
+      "check": "error is not cached",
+      "pass": true,
+      "evidence": {
+        "statuses": [
+          503,
+          503
+        ],
+        "upstreamRequests": 2
+      }
+    },
+    {
+      "check": "timeout is not cached",
+      "pass": true,
+      "evidence": {
+        "statuses": [
+          504,
+          504
+        ],
+        "upstreamRequests": 2
+      }
+    },
+    {
+      "check": "cookie response never enters cache",
+      "pass": true,
+      "evidence": [
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 10.977,
+          "totalMs": 11.023
+        },
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 6.417,
+          "totalMs": 6.451
+        }
+      ]
+    },
+    {
+      "check": "private response never enters cache",
+      "pass": true,
+      "evidence": [
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 5.535,
+          "totalMs": 5.578
+        },
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 4.751,
+          "totalMs": 4.817
+        }
+      ]
+    },
+    {
+      "check": "wrong-type response never enters cache",
+      "pass": true,
+      "evidence": [
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "51",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 4.166,
+          "totalMs": 4.196
+        },
+        {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "51",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 4.054,
+          "totalMs": 4.085
+        }
+      ]
+    },
+    {
+      "check": "X-Accel-Redirect cannot expose original",
+      "pass": true,
+      "evidence": "upstream internal redirect ignored"
+    },
+    {
+      "check": "origin outage never serves stale cached photo",
+      "pass": true,
+      "evidence": {
+        "status": 503,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "date": "Thu, 29 Oct 2026 11:47:31 GMT",
+          "server": "nginx",
+          "x-cache-status": "EXPIRED",
+          "x-content-type-options": "nosniff",
+          "transfer-encoding": "chunked"
+        },
+        "bytes": 11,
+        "sha256": "ba691ba042bcedd9a61a36f5969026bc95859dccdc7e47f24e6bce35673baf2f",
+        "ttfbMs": 9.727,
+        "totalMs": 9.884
+      }
+    },
+    {
+      "check": "scoped revoke: denied key, removed cache file, sibling retained",
+      "pass": true,
+      "evidence": {
+        "revokedStatus": 404,
+        "removedFiles": 1,
+        "sibling": {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 11:47:32 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "HIT",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 7.538,
+          "totalMs": 7.608
+        }
+      }
+    },
+    {
+      "check": "cache failure is visible (no fabricated success)",
+      "pass": true,
+      "evidence": "edge upstream down"
+    },
+    {
+      "check": "direct origin remains independently available",
+      "pass": true,
+      "evidence": "direct"
+    }
+  ],
+  "observations": {
+    "responseSizeGate": {
+      "status": "FAIL_PRODUCTION_GATE",
+      "expectedMaxBytes": 1048576,
+      "receivedBytes": 2097152,
+      "reason": "proxy_max_temp_file_size is not a maximum response size; needs a verified ingest bound/hard cap"
+    },
+    "mimeGate": {
+      "status": "FAIL_PRODUCTION_GATE",
+      "reason": "wrong MIME is not cached, but is still delivered; trusted verified ingest or strict response gate required"
+    },
+    "localWarmSynthetic": {
+      "ttfbMs": {
+        "p50": 2.675,
+        "p75": 2.781,
+        "p95": 3.7
+      },
+      "totalMs": {
+        "p50": 2.694,
+        "p75": 2.793,
+        "p95": 3.737
+      },
+      "hitRate": 1.0,
+      "sampleCount": 12,
+      "warning": "local Docker TLS, tiny synthetic bytes; not S3, regional speed or LCP"
+    },
+    "upstreamRequestsByFixtureKey": {
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp": 5,
+      "/originals/exists.jpg": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/gallery.webp": 3,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/collapse.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/missing.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/error.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/timeout.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/cookie.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/private.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/wrong-type.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/redirect.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/oversize.webp": 1
+    }
+  },
+  "productionQualification": "NO_GO",
+  "ownerDecision": "PENDING",
+  "testedFiles": {
+    "compose.yaml": "44e8c9ca753ab82ded94b58dcf606b38c86ba4d516c2dce7b7d523420dc9fa6d",
+    "inventory-vps.py": "660b512703da013c217bfe1865e4b7ffe10bf2cf7c18dd43e6d6bcce87505ded",
+    "measure-direct.py": "6ea31de4b648e46085b08ab507a3b446ca27f0c28ff0c77d6114a13f0f2927e8",
+    "nginx.conf": "e9152de553e1bff5efa56c8d61df2ced5bfbc845998d6b6ad193de79fc4e3ad4",
+    "origin.mjs": "4c04479ce2a93503653ab504a1bcc6d375f8462f7a9aa866db2f1bda91bde4ab",
+    "run.py": "643b679963b09e018d8193f5bb69848fe5996a9a134fa1085066e49f5970529d",
+    "traefik.yaml": "2df4110ac44118c30b6eecc772af53a8886edbe9ae168d407f61d21a6f59afe9"
+  },
+  "enforcedContainerLimits": {
+    "edge": {
+      "memory": 100663296,
+      "nanoCpus": 250000000,
+      "pids": 64,
+      "readOnly": true
+    },
+    "cache": {
+      "memory": 134217728,
+      "nanoCpus": 250000000,
+      "pids": 32,
+      "readOnly": true
+    },
+    "origin": {
+      "memory": 100663296,
+      "nanoCpus": 250000000,
+      "pids": 32,
+      "readOnly": true
+    }
+  },
+  "images": [
+    {
+      "ID": "sha256:68269702cdcb1643b456923f45379722d65fca7d71cb85d4daf6bf6038fae376",
+      "ContainerName": "mikluha-tour88-local-edge-1",
+      "Repository": "traefik",
+      "Tag": "",
+      "Platform": "linux/arm64/v8",
+      "Size": 176587212,
+      "Created": "2026-07-31T21:02:54.259608821Z"
+    },
+    {
+      "ID": "sha256:0d459d0765f0e55925663ba63fad229237ea06ad6ba4fa38658e7c5b5308a0b9",
+      "ContainerName": "mikluha-tour88-local-origin-1",
+      "Repository": "node",
+      "Tag": "",
+      "Platform": "linux/arm64/v8",
+      "Size": 163512732,
+      "Created": "2026-09-23T21:41:54.780711499Z"
+    },
+    {
+      "ID": "sha256:7f7dcd27f920b22e980508bd5009b452e3d30b68c1041aa82e98e471d367db03",
+      "ContainerName": "mikluha-tour88-local-cache-1",
+      "Repository": "nginx",
+      "Tag": "",
+      "Platform": "linux/arm64/v8",
+      "Size": 61553593,
+      "Created": "2026-04-15T21:33:45.189575645Z"
+    }
+  ],
+  "resources": "{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"e584a6a38d00871433cb563b52645069861fca01d7c94da7a0f583fb81062e24\",\"ID\":\"e584a6a38d00\",\"MemPerc\":\"21.35%\",\"MemUsage\":\"20.49MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-edge-1\",\"NetIO\":\"2.31MB / 2.4MB\",\"PIDs\":\"7\"}\n{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"321d4986f317547e4460b8dd254fb5413183a54b3c5aab415b7497c7d6822d4c\",\"ID\":\"321d4986f317\",\"MemPerc\":\"2.51%\",\"MemUsage\":\"3.207MiB / 128MiB\",\"Name\":\"mikluha-tour88-local-cache-1\",\"NetIO\":\"5.7kB / 6.49kB\",\"PIDs\":\"4\"}\n{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.03%\",\"Container\":\"2dc80e3dc2e4e2e68c67e734ccefb285bae86bdf12e70b55004b4c6b901abf81\",\"ID\":\"2dc80e3dc2e4\",\"MemPerc\":\"14.05%\",\"MemUsage\":\"13.48MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-origin-1\",\"NetIO\":\"21.5kB / 2.13MB\",\"PIDs\":\"7\"}",
+  "result": "SYNTHETIC_CHECKS_PASS_WITH_PRODUCTION_GAPS"
+}
