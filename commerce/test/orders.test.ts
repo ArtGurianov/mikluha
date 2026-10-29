@@ -5,7 +5,7 @@ import pg from 'pg';
 
 import type { Catalog } from '../src/catalog.js';
 import { maintain, reserve, salesOpen, setSalesOpen, type BookingRequest, type OrderDeps } from '../src/orders.js';
-import { captureLog, seedCatalog, fixtureCatalog, forceStatus, freshDb, tourist, type TestDb } from './helpers.js';
+import { captureLog, seedCatalog, fixtureCatalog, forceStatus, freshDb, tourist, type TestDb, resetOrders } from './helpers.js';
 
 const NOW = new Date('2026-10-04T06:00:00Z');
 const HOUR = 3_600_000;
@@ -44,7 +44,7 @@ before(async () => {
 });
 after(async () => { await db.drop(); });
 beforeEach(async () => {
-  await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await resetOrders(db.owner);
   await setSalesOpen(db.operator, true, 'test', 'open for the test');
 });
 

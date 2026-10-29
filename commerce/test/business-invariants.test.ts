@@ -11,7 +11,7 @@ import { commerceMonitorSignals, monitorHasAlert } from '../src/monitor.js';
 import { maintain, reserve, setSalesOpen } from '../src/orders.js';
 import { RefrefClient } from '../src/refref.js';
 import { FakeRefref } from './fake-refref.js';
-import { captureLog, fixtureCatalog, freshDb, seedCatalog, tourist, type TestDb } from './helpers.js';
+import { captureLog, fixtureCatalog, freshDb, seedCatalog, tourist, type TestDb, resetOrders } from './helpers.js';
 
 const now = new Date('2026-10-23T03:00:00Z');
 const merchant = { businessId: '3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90', businessSlug: 'mikluha',
@@ -34,7 +34,7 @@ beforeEach(async () => {
   logs = captureLog();
   deps = { pool: db.pool, catalog, merchant, log: logs.log, now: () => now,
     refref: new RefrefClient({ apiBase: fake.base, apiKey: 'synthetic-only', timeoutMs: 500 }) };
-  await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await resetOrders(db.owner);
   await setSalesOpen(db.operator, true, 'synthetic-operator', 'test setup');
 });
 

@@ -25,6 +25,7 @@ import type { LegalReleaseAdmission } from './legal-admission.js';
 import { errorCode, type CheckoutAttempt, type RefrefClient, type ResolvedResolution } from './refref.js';
 import { contractHash, renderZayavka, sha256Hex } from './zayavka.js';
 import type { Tourist } from './orders.js';
+import { isPurchaseOrder } from './purchases.js';
 import { buildSnapshot, LINE_REF, OBLIGATION_REF, orderLine, resolutionInputHash, snapshotDigest, type Json, type OrderDeal } from './snapshot.js';
 
 export interface Merchant {
@@ -225,6 +226,8 @@ export async function onReturn(deps:CheckoutDeps,q:{rt:string|null;state:string|
     const token=randomUUID();
     const prepared=await withQuoteLock(deps,owned.order_ref,owned.departure_slug,async(client,current,blocked):Promise<OrderRow|ReturnOutcome>=>{
       if (!current) return {kind:'REFUSED',code:'UNKNOWN_ORDER'};
+      // A purchase is NATIVE_NO_REFERRAL: no Refref resolution or attribution, before or after any payment.
+      if (await isPurchaseOrder(client,current.id)) return {kind:'REFUSED',code:'NATIVE_PURCHASE_NO_REFERRAL',orderRef:current.order_ref};
       if (current.status!=='RESERVED' || current.quote_issued_at!==null) return {kind:'CONFIRM',orderRef:current.order_ref};
       if (!contractSnapshotIntact(current.contract_snapshot,current.contract_snapshot_sha256)) return {kind:'REFUSED',code:'ORDER_CONTRACT_INVALID',orderRef:current.order_ref};
       if (!current.trip_departure_time || !current.trip_return_time || !current.trip_timezone) return {kind:'REFUSED',code:'TRIP_SCHEDULE_MISSING',orderRef:current.order_ref};
@@ -346,6 +349,8 @@ async function payOnce(deps: CheckoutDeps, orderRef: string, acceptedZayavka: st
   const now = (deps.now ?? (() => new Date()))();
   let o = await loadOrder(deps.pool, orderRef);
   if (o === null) return { kind: 'STATUS', code: 'UNKNOWN_ORDER' };
+  // Its payment owner is MIKLUHA_NATIVE: a Refref checkout attempt or session is never started for it.
+  if (await isPurchaseOrder(deps.pool, o.id)) return { kind: 'STATUS', code: 'NATIVE_PAYMENT_NOT_AVAILABLE' };
 
   // Stops any new payment initiation, including a previously reserved/frozen order. Read-back,
   // fulfillment and cancellation remain available through their independent paths.

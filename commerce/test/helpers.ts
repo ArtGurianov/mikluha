@@ -102,6 +102,19 @@ export async function freshDb(migrationsDir = MIGRATIONS_DIR): Promise<TestDb> {
   };
 }
 
+/**
+ * Empty the order tables between tests. Purchase history refuses TRUNCATE (migration 0017) for every
+ * login; only this disposable test database's superuser may suspend triggers to reset it.
+ */
+export async function resetOrders(owner: pg.Client): Promise<void> {
+  await owner.query('BEGIN');
+  try {
+    await owner.query('SET LOCAL session_replication_role = replica');
+    await owner.query('TRUNCATE purchase_revision_participant, purchase_revision, purchase, execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+    await owner.query('COMMIT');
+  } catch (e) { await owner.query('ROLLBACK'); throw e; }
+}
+
 export interface FixtureDeparture {
   slug: string; startsOn: string; endsOn?: string; status?: string; price?: number | null; capacity?: number | null;
   isListed?: boolean; isDemo?: boolean;

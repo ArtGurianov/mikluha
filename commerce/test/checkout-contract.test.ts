@@ -8,7 +8,7 @@ import { issueState, onReturn, pay, reconcileAll, zayavkaOf, type CheckoutDeps }
 import { maintain, reserve, setSalesOpen } from '../src/orders.js';
 import { RefrefClient } from '../src/refref.js';
 import { FakeRefref } from './fake-refref.js';
-import { captureLog, fixtureCatalog, freshDb, seedCatalog, tourist, type TestDb } from './helpers.js';
+import { captureLog, fixtureCatalog, freshDb, seedCatalog, tourist, type TestDb, resetOrders } from './helpers.js';
 
 let db: TestDb;
 let fake: FakeRefref;
@@ -26,7 +26,7 @@ before(async () => {
 });
 after(async () => { await fake.stop(); await db.drop(); });
 beforeEach(async () => {
-  await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await resetOrders(db.owner);
   fake.reset(); clock = new Date(start); slug = `contract-${++sequence}`;
   const catalog = fixtureCatalog([{ slug, startsOn: '2026-11-01', endsOn: '2026-11-04', capacity: 2 }]);
   await seedCatalog(db, catalog);
@@ -670,7 +670,7 @@ function afterQuery(pool:TestDb['pool'],match:(sql:string)=>boolean,action:()=>v
 test('reservation rechecks the cutoff after capacity reads and rolls back a late insert',async()=>{
   await db.owner.query("UPDATE departure SET starts_on='2027-07-01',ends_on='2027-07-01',departure_time='06:00' WHERE slug=$1",[slug]);
   clock=new Date('2027-06-29T22:59:59Z');
-  const pool=afterQuery(db.pool,sql=>sql.includes('coalesce(sum(seats)'),()=>{clock=new Date('2027-06-29T23:00:00Z');});
+  const pool=afterQuery(db.pool,sql=>sql.includes('fn_departure_taken_seats'),()=>{clock=new Date('2027-06-29T23:00:00Z');});
   assert.deepEqual(await reserve({...deps,pool,allowDemo:false},request()),{ok:false,refusal:'BOOKING_CUTOFF_REACHED'});
   assert.equal((await db.owner.query('SELECT count(*)::int AS n FROM orders')).rows[0].n,0);
 });

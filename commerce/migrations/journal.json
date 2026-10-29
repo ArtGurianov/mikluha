@@ -62,5 +62,9 @@
   {
     "version": 16,
     "file": "0016_resolution_lease.sql"
+  },
+  {
+    "version": 17,
+    "file": "0017_purchase_identity_and_revisions.sql"
   }
 ]
