@@ -2,7 +2,7 @@
 
 Статус: проект для review от 27.10.2026. Это карта необходимых изменений и условий допуска, а не новая оферта, юридическое заключение, выбранный налоговый профиль или разрешение отправлять документы/деньги. Код, опубликованные договоры и настройки провайдеров этим документом не меняются.
 
-Основания: [Refref ADR-141 на HEAD PR #130](https://github.com/ArtGurianov/refref/blob/793ad1a8fc571a98c9f1b9b31161b5b6532770ab/docs/v10/ADR-141-refref-core.md), [границы реализации Mikluha](01-commerce-architecture.md), [предоплаты](02-booking-and-prepayments.md), [интеграция](03-refref-integration.md). Источник аудита Mikluha — `0e32a05ff74a8915cc1719fe041b5a03df4cd452`; это source evidence, не проверка действующих полномочий, кабинетов, схемы или реальных операций.
+Основания: [Refref ADR-141 на HEAD PR #130](https://github.com/ArtGurianov/refref/blob/5f966664182a12aba3de9c0721deadab910c338d/docs/v10/ADR-141-refref-core.md), [границы реализации Mikluha](01-commerce-architecture.md), [предоплаты](02-booking-and-prepayments.md), [интеграция](03-refref-integration.md). Источник аудита Mikluha — `0e32a05ff74a8915cc1719fe041b5a03df4cd452`; это source evidence, не проверка действующих полномочий, кабинетов, схемы или реальных операций.
 
 ## 1. Три независимых основания
 
