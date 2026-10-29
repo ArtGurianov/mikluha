@@ -285,7 +285,7 @@
   },
   "authority": {
     "refrefCore": "Existing OWNER-approved O1-O7; retain profile/legal gates.",
-    "mikluhaDesign": "Native-first source/merchant design under approved SOL v5-final Plane plan; referral integration deferred. MK-POLICY-v1 commercial principles and MK-C12 approved by OWNER; numeric policy/provider/legal gaps remain.",
+    "mikluhaDesign": "Native-first design under SOL v5-final Plane plan. MK-POLICY-v1 remains historical 28 October decision, MK-POLICY-v1.1 and MK-C11/C12 are OWNER approved 29 October; numeric and bank/provider/legal gates remain open.",
     "suppliedBrief": "Direct user-pasted requirements; unread external attachment is not a verified normative source."
   },
   "verificationScope": {
@@ -354,6 +354,36 @@
         "Ordinary changes after FINAL do not revive S4 even if payout not yet executed"
       ],
       "compatibility": "Existing Refref v10 S5/FINAL rules; no bank/source/auth/deploy GO"
+    },
+    {
+      "id": "MK-POLICY-v1.1",
+      "status": "OWNER_APPROVED",
+      "recordedOn": "2026-10-29",
+      "recordSource": "DIRECT_OWNER_WITH_OPUS_SOL_INDEPENDENT_REVIEW",
+      "appliesTo": "Supplemental later Refref integration policy; v1 historical decision remains unchanged",
+      "supersedesOpenItemsFromV1": [
+        "Discount on transfer to trip outside original campaign",
+        "Finality risk acceptance for later referral profile",
+        "Retroactive change of NATIVE_NO_REFERRAL profile under investigation — OWNER business choice only; implementation/bank qualification remains open"
+      ],
+      "approved": [
+        "One economic purchase retains same purchaseRef/BOUND/campaign/terms and agreed code when checkout is re-opened; new technical order identifier does not create a new binding",
+        "Merchant may safely replace unpaid checkout after verifying control and bank link terminality; email equality by itself is insufficient",
+        "Frozen original campaign alone qualifies revision lines; if no eligible lines before first FULL no positive C; no automatic campaign/code switching on transfer",
+        "Referral discount after transfer applies only to new lines eligible for the frozen original campaign; ineligible lines receive no Refref discount",
+        "Once first true FULL is recognised original C is frozen; ordinary post-FINAL change never reopens S4 even if partner payout unpaid",
+        "MK-C11 SCHEDULED_SERVICE uses original anchored eligible service end preserved at BOUND; reschedule never automatically extends S5",
+        "Real cancellation followed by economically independent new checkout requires new conscious touch/BOUND; spent touch never reanimated or removed"
+      ],
+      "stillOpen": [
+        "Provider-qualified payment-link closure including UNKNOWN",
+        "Native checkout implementation safety (TOUR-76)",
+        "True independent new purchase versus concealed refund/recharge factual qualification",
+        "Merchant cancellation/organizer initiated replacement legal pricing profile",
+        "Deferred Refref DTO frozen historical assessment and served capability receipts"
+      ],
+      "scope": "No G_protectedContinuation and no additional Core commission for ineligible continuation; no merchant-owned coupon engine; native launch remains independent",
+      "authority": "Refref Core generic rules remain independent of Mikluha profile decisions"
     }
   ]
 }
