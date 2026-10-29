@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Local fixture qualification. Requires Docker Compose + openssl; never connects to VPS/S3."""
+"""Local fixture qualification; --real-s3 adds bounded public GETs. Never connects to VPS."""
+import argparse
 import concurrent.futures
 import datetime
 import hashlib
@@ -11,16 +12,21 @@ import pathlib
 import shutil
 import ssl
 import subprocess
-import sys
 import time
+import urllib.request
 
+parser = argparse.ArgumentParser()
+parser.add_argument('output', nargs='?', default=str(pathlib.Path(__file__).with_name('result.json')))
+parser.add_argument('--vantage', choices=['operator-mac', 'adman-vps'], default='operator-mac')
+parser.add_argument('--real-s3', action='store_true', help='also make bounded anonymous GETs to two fixed public S3 WebP')
+args = parser.parse_args()
 ROOT = pathlib.Path(__file__).resolve().parent
 RUNTIME = ROOT / '.runtime'
 BODY = b'RIFF synthetic WebP fixture (not a real photograph)'
 DIGEST = hashlib.sha256(BODY).hexdigest()
 PREFIX = f'/processed/{DIGEST}/'
 NAMES = ['hero', 'gallery', 'collapse', 'missing', 'error', 'timeout', 'cookie', 'private',
-         'wrong-type', 'oversize', 'redirect']
+         'wrong-type', 'oversize', 'chunked', 'redirect', 'changed', 'http-redirect', 'untrusted-tls']
 # Refuse remote engines: this task grants read-only VPS access, not remote Docker writes.
 endpoint = os.environ.get('DOCKER_HOST') or subprocess.check_output(
     ['docker', 'context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'], text=True).strip()
@@ -50,7 +56,7 @@ def request(path, headers=None, method='GET', origin=False):
     if origin:
         conn = http.client.HTTPConnection('127.0.0.1', origin_port, timeout=5)
     else:
-        conn = http.client.HTTPSConnection('127.0.0.1', edge_port, timeout=6, context=context)
+        conn = http.client.HTTPSConnection('127.0.0.1', edge_port, timeout=12, context=context)
     try:
         conn.request(method, path, headers={'Host': 'media.localhost', **(headers or {})})
         res = conn.getresponse()
@@ -99,6 +105,12 @@ try:
     (RUNTIME / 'cache').chmod(0o777)  # Only synthetic fixture data, isolated from host credentials.
     (RUNTIME / 'certs').mkdir()
     allow(NAMES)
+    objects = {PREFIX + n + '.webp': {'url': 'http://origin:8080' + PREFIX + n + '.webp',
+               'sha256': DIGEST, 'etag': f'"{DIGEST}"',
+               'lastModified': 'Thu, 01 Jan 2026 00:00:00 GMT'} for n in NAMES}
+    objects[PREFIX + 'untrusted-tls.webp']['url'] = 'https://origin:8443' + PREFIX + 'untrusted-tls.webp'
+    (RUNTIME / 'objects.mjs').write_text('export default ' + json.dumps(objects) + ';\n')
+    (RUNTIME / 'fetch-budget.conf').write_text('js_fetch_timeout 900ms;\n')
     subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
                     '-subj', '/CN=media.localhost', '-addext',
                     'subjectAltName=DNS:media.localhost,IP:127.0.0.1',
@@ -125,6 +137,7 @@ try:
             ['docker', 'inspect', container, '--format',
              '{"memory":{{.HostConfig.Memory}},"nanoCpus":{{.HostConfig.NanoCpus}},'
              '"pids":{{.HostConfig.PidsLimit}},"readOnly":{{.HostConfig.ReadonlyRootfs}}}'], text=True))
+    REPORT['boundedFetcherPackage'] = compose('exec', '-T', 'cache', 'apk', 'info', 'nginx-module-njs')
     REPORT['images'] = json.loads(compose('images', '--format', 'json'))
     direct = request(hero, origin=True)
     first, second = request(hero), request(hero)
@@ -176,7 +189,7 @@ try:
     for name, code in [('missing', 404), ('error', 503), ('timeout', 504)]:
         path = PREFIX + name + '.webp'
         responses = [request(path), request(path)]
-        check(name + ' is not cached', all(r['status'] == code for r in responses) and count(path) == 2,
+        check(name + ' is not cached', all(r['status'] in ([502, 504] if name == 'timeout' else [code]) for r in responses) and count(path) == 2,
               {'statuses': [r['status'] for r in responses], 'upstreamRequests': count(path)})
     for name in ['cookie', 'private', 'wrong-type']:
         path = PREFIX + name + '.webp'
@@ -186,12 +199,14 @@ try:
               and all('set-cookie' not in r['headers'] for r in responses), responses)
     check('X-Accel-Redirect cannot expose original', request(PREFIX + 'redirect.webp')['sha256'] == direct['sha256'],
           'upstream internal redirect ignored')
-    oversized = request(PREFIX + 'oversize.webp')
-    REPORT['observations']['responseSizeGate'] = {'status': 'FAIL_PRODUCTION_GATE',
-        'expectedMaxBytes': 1048576, 'receivedBytes': oversized['bytes'],
-        'reason': 'proxy_max_temp_file_size is not a maximum response size; needs a verified ingest bound/hard cap'}
-    REPORT['observations']['mimeGate'] = {'status': 'FAIL_PRODUCTION_GATE',
-        'reason': 'wrong MIME is not cached, but is still delivered; trusted verified ingest or strict response gate required'}
+    for name, expected in [('wrong-type', 415), ('oversize', 502), ('chunked', 502),
+                           ('changed', 502), ('http-redirect', 502), ('untrusted-tls', 502)]:
+        blocked = request(PREFIX + name + '.webp')
+        check(name + ' is refused before delivery/cache', blocked['status'] == expected
+              and blocked['bytes'] < 1024 and blocked['sha256'] != direct['sha256'], blocked)
+    REPORT['observations']['responseSizeGate'] = {'status': 'PASS', 'maxBytes': 1048576,
+        'contentLengthAndChunkedOversize': '502; generic error only; never cached', 'njsMinimum': '1.0.2'}
+    REPORT['observations']['mimeGate'] = {'status': 'PASS', 'wrongType': '415; generic error only; never cached'}
     # Origin outage AFTER expiry: never serve stale, including a previously warmed key.
     time.sleep(2.2)
     control('down')
@@ -229,7 +244,69 @@ try:
         'sampleCount': len(samples), 'warning': 'local Docker TLS, tiny synthetic bytes; not S3, regional speed or LCP'}
     REPORT['observations']['upstreamRequestsByFixtureKey'] = stats()
     REPORT['resources'] = compose('stats', '--no-stream', '--format', 'json')
-    REPORT['result'] = 'SYNTHETIC_CHECKS_PASS_WITH_PRODUCTION_GAPS'
+    if args.real_s3:
+        # Real bytes, same operator network. No credentials or S3 writes; not regional evidence.
+        real = []
+        manifest = {}
+        urls = ['https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp',
+                'https://mikluha-maklai.s3.cloud.ru/cms/organized.webp']
+        def direct_s3(url):
+            started = time.monotonic()
+            with urllib.request.urlopen(url, timeout=8) as response:
+                first_byte = time.monotonic() - started
+                body = response.read(1048577)
+                if response.status != 200 or response.headers.get('Content-Type') != 'image/webp' or len(body) > 1048576:
+                    raise ValueError('real public WebP does not meet admission bounds')
+                return {'status': response.status, 'ttfbMs': round(first_byte * 1000, 3),
+                        'totalMs': round((time.monotonic() - started) * 1000, 3),
+                        'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest(),
+                        'etag': response.headers.get('ETag'), 'lastModified': response.headers.get('Last-Modified')}
+        for index, url in enumerate(urls):
+            original = direct_s3(url)
+            prefix = f"/processed/{original['sha256']}/source-{index}"
+            keys = [prefix + '-warm.webp'] + [prefix + f'-cold-{i}.webp' for i in range(10)]
+            for key in keys:
+                manifest[key] = {'url': url, 'sha256': original['sha256'], 'etag': original['etag'],
+                                 'lastModified': original['lastModified']}
+            real.append({'url': url, 'expected': original, 'keys': keys,
+                         'direct': [], 'cold': [], 'warm': []})
+        compose('stop', 'cache')
+        (RUNTIME / 'allowed.map').write_text(''.join('~^' + key.replace('.', '[.]') + '$ 1;\n' for key in manifest))
+        (RUNTIME / 'objects.mjs').write_text('export default ' + json.dumps(manifest) + ';\n')
+        (RUNTIME / 'fetch-budget.conf').write_text('js_fetch_timeout 8s;\n')
+        compose('start', 'cache')
+        time.sleep(.3)
+        for item in real:
+            for i in range(10):
+                # Alternate direct/cold ordering; warm is primed immediately before measuring.
+                if i % 2 == 0:
+                    item['direct'].append(direct_s3(item['url']))
+                    item['cold'].append(request(item['keys'][i + 1]))
+                else:
+                    item['cold'].append(request(item['keys'][i + 1]))
+                    item['direct'].append(direct_s3(item['url']))
+                prime = request(item['keys'][0])
+                if prime['status'] != 200:
+                    raise AssertionError('real S3 cache prime failed: ' + str(prime))
+                item['warm'].extend([request(item['keys'][0]), request(item['keys'][0])])
+            for mode in ['direct', 'cold', 'warm']:
+                samples = item[mode]
+                good = [r for r in samples if r['status'] == 200]
+                item[mode + 'Summary'] = {'sampleCount': len(samples), 'errorCount': len(samples) - len(good),
+                    'ttfbMs': percentiles([r['ttfbMs'] for r in good]),
+                    'totalMs': percentiles([r['totalMs'] for r in good]),
+                    'hitCount': sum(r.get('headers', {}).get('x-cache-status') == 'HIT' for r in samples)}
+                check('real S3 ' + mode + ' byte identity', all(r['status'] == 200
+                      and r['sha256'] == item['expected']['sha256'] for r in samples), item[mode + 'Summary'])
+            check('real S3 cold requests are MISS', all(r['headers'].get('x-cache-status') == 'MISS'
+                  for r in item['cold']), item['coldSummary'])
+            check('real S3 measured warm requests are HIT', item['warmSummary']['hitCount'] == 20, item['warmSummary'])
+            del item['keys']
+        REPORT['realS3LocalComparison'] = {'scope': 'ONE_VANTAGE_LOCAL_DOCKER_NOT_REGIONAL_OR_LCP', 'vantage': args.vantage,
+            'tls': 'test CA for local edge; system CA and verify=true for S3 via njs',
+            'originNames': 'legacy mutable sources; local content-addressed alias verifies pinned SHA-256',
+            'objects': real}
+    REPORT['result'] = 'SYNTHETIC_CHECKS_PASS_PRODUCTION_NOT_QUALIFIED'
 except BaseException as exc:
     if created:
         print(compose('logs', '--tail', '20'), flush=True)
@@ -237,7 +314,7 @@ except BaseException as exc:
     REPORT['error'] = str(exc)
     raise
 finally:
-    output = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'result.json'
+    output = pathlib.Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(REPORT, ensure_ascii=False, indent=2) + '\n')
     if created:

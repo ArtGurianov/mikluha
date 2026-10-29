@@ -4,7 +4,14 @@ Scope: local synthetic PoC plus owner-authorized read-only adman-vps and
 anonymous public-S3 baseline. No deploy, host write, credentials, private photos,
 DNS change or production load test. `ownerDecision=PENDING`.
 
-- `local-poc.json`: scoped assertions, known failed production gates, exact source
+- `local-poc-initial-ungated.json`: historical plain-NGINX first trial, with
+  explicit failed size/MIME production gates.
+- `local-poc-real-s3.json`: current bounded njs suite plus same-real-WebP direct /
+  localhost cold / localhost warm comparison, with source hashes. Not a VPS comparison.
+- `kemerovo-home-no-vpn.json`: owner manual curl run, 30/image, declared Kemerovo
+  home network / VPN off; script hash, byte identity and raw summaries verified.
+  Proxy configuration is bypassed, physical/VPN state remains owner-declared.
+- `local-poc.json`: scoped assertions and admission results, exact source
   file SHA-256 values, image IDs and resource caps. Reproduce with
   `python3 poc/regional-media-cache/run.py /tmp/tour88.json`. Timings are local
   Docker synthetic bytes; they do not establish regional image performance.

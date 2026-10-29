@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-10-29T11:47:19.918467+00:00",
+  "capturedAt": "2026-10-29T12:13:55.868563+00:00",
   "scope": "LOCAL_SYNTHETIC_ONLY",
   "checks": [
     {
@@ -13,7 +13,7 @@
             "cache-control": "public, max-age=0, must-revalidate",
             "content-length": "51",
             "content-type": "image/webp",
-            "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+            "date": "Thu, 29 Oct 2026 12:14:05 GMT",
             "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
             "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
             "server": "nginx",
@@ -22,8 +22,8 @@
           },
           "bytes": 51,
           "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-          "ttfbMs": 5.941,
-          "totalMs": 5.956
+          "ttfbMs": 7.8,
+          "totalMs": 7.839
         },
         {
           "status": 200,
@@ -32,7 +32,7 @@
             "cache-control": "public, max-age=0, must-revalidate",
             "content-length": "51",
             "content-type": "image/webp",
-            "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+            "date": "Thu, 29 Oct 2026 12:14:05 GMT",
             "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
             "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
             "server": "nginx",
@@ -41,8 +41,8 @@
           },
           "bytes": 51,
           "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-          "ttfbMs": 3.711,
-          "totalMs": 3.722
+          "ttfbMs": 3.571,
+          "totalMs": 3.594
         }
       ]
     },
@@ -54,7 +54,7 @@
         "cache-control": "public, max-age=0, must-revalidate",
         "content-length": "51",
         "content-type": "image/webp",
-        "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+        "date": "Thu, 29 Oct 2026 12:14:05 GMT",
         "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
         "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
         "server": "nginx",
@@ -75,7 +75,7 @@
         "headers": {
           "access-control-allow-origin": "*",
           "cache-control": "public, max-age=0, must-revalidate",
-          "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+          "date": "Thu, 29 Oct 2026 12:14:05 GMT",
           "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
           "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
           "server": "nginx",
@@ -84,8 +84,8 @@
         },
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "ttfbMs": 3.018,
-        "totalMs": 3.034
+        "ttfbMs": 4.467,
+        "totalMs": 4.499
       }
     },
     {
@@ -95,15 +95,15 @@
         "status": 200,
         "headers": {
           "content-type": "image/jpeg",
-          "date": "Thu, 29 Oct 2026 11:47:21 GMT",
+          "date": "Thu, 29 Oct 2026 12:14:05 GMT",
           "connection": "keep-alive",
           "keep-alive": "timeout=5",
           "transfer-encoding": "chunked"
         },
         "bytes": 77,
         "sha256": "96fd41210a9d29972b7658be642fb53ae000efeb19e497d0abfd66fd65aeadcc",
-        "ttfbMs": 1.549,
-        "totalMs": 1.589
+        "ttfbMs": 1.809,
+        "totalMs": 1.839
       }
     },
     {
@@ -176,7 +176,7 @@
           "cache-control": "public, max-age=0, must-revalidate",
           "content-length": "51",
           "content-type": "image/webp",
-          "date": "Thu, 29 Oct 2026 11:47:22 GMT",
+          "date": "Thu, 29 Oct 2026 12:14:06 GMT",
           "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
           "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
           "server": "nginx",
@@ -185,8 +185,8 @@
         },
         "bytes": 51,
         "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-        "ttfbMs": 9.93,
-        "totalMs": 9.967
+        "ttfbMs": 11.403,
+        "totalMs": 11.49
       }
     },
     {
@@ -199,7 +199,7 @@
           "cache-control": "public, max-age=0, must-revalidate",
           "content-length": "51",
           "content-type": "image/webp",
-          "date": "Thu, 29 Oct 2026 11:47:22 GMT",
+          "date": "Thu, 29 Oct 2026 12:14:06 GMT",
           "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
           "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
           "server": "nginx",
@@ -208,8 +208,8 @@
         },
         "bytes": 51,
         "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-        "ttfbMs": 6.22,
-        "totalMs": 6.238
+        "ttfbMs": 8.656,
+        "totalMs": 8.826
       }
     },
     {
@@ -254,7 +254,7 @@
           "cache-control": "public, max-age=0, must-revalidate",
           "content-length": "51",
           "content-type": "image/webp",
-          "date": "Thu, 29 Oct 2026 11:47:22 GMT",
+          "date": "Thu, 29 Oct 2026 12:14:06 GMT",
           "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
           "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
           "server": "nginx",
@@ -263,8 +263,8 @@
         },
         "bytes": 51,
         "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-        "ttfbMs": 55.415,
-        "totalMs": 55.455
+        "ttfbMs": 7.84,
+        "totalMs": 7.893
       }
     },
     {
@@ -274,13 +274,13 @@
         "upstreamRequests": 1,
         "statuses": [
           "HIT",
-          "HIT",
-          "HIT",
-          "HIT",
-          "HIT",
-          "HIT",
-          "HIT",
           "MISS",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
+          "HIT",
           "HIT",
           "HIT",
           "HIT",
@@ -298,7 +298,7 @@
           "cache-control": "public, max-age=0, must-revalidate",
           "content-length": "51",
           "content-type": "image/webp",
-          "date": "Thu, 29 Oct 2026 11:47:24 GMT",
+          "date": "Thu, 29 Oct 2026 12:14:09 GMT",
           "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
           "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
           "server": "nginx",
@@ -307,8 +307,8 @@
         },
         "bytes": 51,
         "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-        "ttfbMs": 11.473,
-        "totalMs": 11.571
+        "ttfbMs": 13.249,
+        "totalMs": 13.32
       }
     },
     {
@@ -349,42 +349,38 @@
       "pass": true,
       "evidence": [
         {
-          "status": 200,
+          "status": 502,
           "headers": {
             "access-control-allow-origin": "*",
-            "cache-control": "public, max-age=0, must-revalidate",
-            "content-length": "51",
-            "content-type": "image/webp",
-            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
-            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
-            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:14:11 GMT",
             "server": "nginx",
             "x-cache-status": "MISS",
             "x-content-type-options": "nosniff"
           },
-          "bytes": 51,
-          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-          "ttfbMs": 10.977,
-          "totalMs": 11.023
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 11.668,
+          "totalMs": 11.748
         },
         {
-          "status": 200,
+          "status": 502,
           "headers": {
             "access-control-allow-origin": "*",
-            "cache-control": "public, max-age=0, must-revalidate",
-            "content-length": "51",
-            "content-type": "image/webp",
-            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
-            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
-            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:14:11 GMT",
             "server": "nginx",
             "x-cache-status": "MISS",
             "x-content-type-options": "nosniff"
           },
-          "bytes": 51,
-          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-          "ttfbMs": 6.417,
-          "totalMs": 6.451
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 6.156,
+          "totalMs": 6.196
         }
       ]
     },
@@ -393,42 +389,38 @@
       "pass": true,
       "evidence": [
         {
-          "status": 200,
+          "status": 502,
           "headers": {
             "access-control-allow-origin": "*",
             "cache-control": "no-store",
-            "content-length": "51",
-            "content-type": "image/webp",
-            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
-            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
-            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:14:11 GMT",
             "server": "nginx",
             "x-cache-status": "MISS",
             "x-content-type-options": "nosniff"
           },
-          "bytes": 51,
-          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-          "ttfbMs": 5.535,
-          "totalMs": 5.578
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 6.165,
+          "totalMs": 6.226
         },
         {
-          "status": 200,
+          "status": 502,
           "headers": {
             "access-control-allow-origin": "*",
             "cache-control": "no-store",
-            "content-length": "51",
-            "content-type": "image/webp",
-            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
-            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
-            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:14:11 GMT",
             "server": "nginx",
             "x-cache-status": "MISS",
             "x-content-type-options": "nosniff"
           },
-          "bytes": 51,
-          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-          "ttfbMs": 4.751,
-          "totalMs": 4.817
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 5.124,
+          "totalMs": 5.158
         }
       ]
     },
@@ -437,42 +429,38 @@
       "pass": true,
       "evidence": [
         {
-          "status": 200,
+          "status": 415,
           "headers": {
             "access-control-allow-origin": "*",
             "cache-control": "no-store",
-            "content-length": "51",
+            "content-length": "172",
             "content-type": "text/html",
-            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
-            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
-            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "date": "Thu, 29 Oct 2026 12:14:11 GMT",
             "server": "nginx",
             "x-cache-status": "MISS",
             "x-content-type-options": "nosniff"
           },
-          "bytes": 51,
-          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-          "ttfbMs": 4.166,
-          "totalMs": 4.196
+          "bytes": 172,
+          "sha256": "928299c2af4335d94caf368ec76901df3380f798fb438410a5fecd52d50db660",
+          "ttfbMs": 5.35,
+          "totalMs": 5.391
         },
         {
-          "status": 200,
+          "status": 415,
           "headers": {
             "access-control-allow-origin": "*",
             "cache-control": "no-store",
-            "content-length": "51",
+            "content-length": "172",
             "content-type": "text/html",
-            "date": "Thu, 29 Oct 2026 11:47:27 GMT",
-            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
-            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "date": "Thu, 29 Oct 2026 12:14:11 GMT",
             "server": "nginx",
             "x-cache-status": "MISS",
             "x-content-type-options": "nosniff"
           },
-          "bytes": 51,
-          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-          "ttfbMs": 4.054,
-          "totalMs": 4.085
+          "bytes": 172,
+          "sha256": "928299c2af4335d94caf368ec76901df3380f798fb438410a5fecd52d50db660",
+          "ttfbMs": 4.882,
+          "totalMs": 4.911
         }
       ]
     },
@@ -482,6 +470,132 @@
       "evidence": "upstream internal redirect ignored"
     },
     {
+      "check": "wrong-type is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 415,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "172",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:14:11 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 172,
+        "sha256": "928299c2af4335d94caf368ec76901df3380f798fb438410a5fecd52d50db660",
+        "ttfbMs": 5.456,
+        "totalMs": 5.479
+      }
+    },
+    {
+      "check": "oversize is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:14:11 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 5.909,
+        "totalMs": 5.941
+      }
+    },
+    {
+      "check": "chunked is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:14:11 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 17.957,
+        "totalMs": 18.034
+      }
+    },
+    {
+      "check": "changed is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:14:11 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 5.299,
+        "totalMs": 5.353
+      }
+    },
+    {
+      "check": "http-redirect is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:14:11 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 5.148,
+        "totalMs": 5.193
+      }
+    },
+    {
+      "check": "untrusted-tls is refused before delivery/cache",
+      "pass": true,
+      "evidence": {
+        "status": 502,
+        "headers": {
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+          "content-length": "150",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:14:11 GMT",
+          "server": "nginx",
+          "x-cache-status": "MISS",
+          "x-content-type-options": "nosniff"
+        },
+        "bytes": 150,
+        "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+        "ttfbMs": 8.26,
+        "totalMs": 8.327
+      }
+    },
+    {
       "check": "origin outage never serves stale cached photo",
       "pass": true,
       "evidence": {
@@ -489,16 +603,17 @@
         "headers": {
           "access-control-allow-origin": "*",
           "cache-control": "no-store",
-          "date": "Thu, 29 Oct 2026 11:47:31 GMT",
+          "content-length": "190",
+          "content-type": "text/html",
+          "date": "Thu, 29 Oct 2026 12:14:13 GMT",
           "server": "nginx",
           "x-cache-status": "EXPIRED",
-          "x-content-type-options": "nosniff",
-          "transfer-encoding": "chunked"
+          "x-content-type-options": "nosniff"
         },
-        "bytes": 11,
-        "sha256": "ba691ba042bcedd9a61a36f5969026bc95859dccdc7e47f24e6bce35673baf2f",
-        "ttfbMs": 9.727,
-        "totalMs": 9.884
+        "bytes": 190,
+        "sha256": "b429e25e7813a9e2b90dcec11d9cb5287751246128dd6c76a7349774829c5554",
+        "ttfbMs": 13.813,
+        "totalMs": 13.916
       }
     },
     {
@@ -514,7 +629,7 @@
             "cache-control": "public, max-age=0, must-revalidate",
             "content-length": "51",
             "content-type": "image/webp",
-            "date": "Thu, 29 Oct 2026 11:47:32 GMT",
+            "date": "Thu, 29 Oct 2026 12:14:14 GMT",
             "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
             "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
             "server": "nginx",
@@ -523,8 +638,8 @@
           },
           "bytes": 51,
           "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
-          "ttfbMs": 7.538,
-          "totalMs": 7.608
+          "ttfbMs": 6.467,
+          "totalMs": 6.549
         }
       }
     },
@@ -541,25 +656,25 @@
   ],
   "observations": {
     "responseSizeGate": {
-      "status": "FAIL_PRODUCTION_GATE",
-      "expectedMaxBytes": 1048576,
-      "receivedBytes": 2097152,
-      "reason": "proxy_max_temp_file_size is not a maximum response size; needs a verified ingest bound/hard cap"
+      "status": "PASS",
+      "maxBytes": 1048576,
+      "contentLengthAndChunkedOversize": "502; generic error only; never cached",
+      "njsMinimum": "1.0.2"
     },
     "mimeGate": {
-      "status": "FAIL_PRODUCTION_GATE",
-      "reason": "wrong MIME is not cached, but is still delivered; trusted verified ingest or strict response gate required"
+      "status": "PASS",
+      "wrongType": "415; generic error only; never cached"
     },
     "localWarmSynthetic": {
       "ttfbMs": {
-        "p50": 2.675,
-        "p75": 2.781,
-        "p95": 3.7
+        "p50": 2.449,
+        "p75": 2.628,
+        "p95": 3.453
       },
       "totalMs": {
-        "p50": 2.694,
-        "p75": 2.793,
-        "p95": 3.737
+        "p50": 2.459,
+        "p75": 2.639,
+        "p95": 3.485
       },
       "hitRate": 1.0,
       "sampleCount": 12,
@@ -575,20 +690,25 @@
       "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/timeout.webp": 2,
       "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/cookie.webp": 2,
       "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/private.webp": 2,
-      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/wrong-type.webp": 2,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/wrong-type.webp": 3,
       "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/redirect.webp": 1,
-      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/oversize.webp": 1
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/oversize.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/chunked.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/changed.webp": 1,
+      "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/http-redirect.webp": 1
     }
   },
   "productionQualification": "NO_GO",
   "ownerDecision": "PENDING",
   "testedFiles": {
-    "compose.yaml": "44e8c9ca753ab82ded94b58dcf606b38c86ba4d516c2dce7b7d523420dc9fa6d",
+    "compose.yaml": "3e9671b4673f5e6ab3728d92de83da049d2946042b5bb8c62fbb669709efef1e",
+    "gate.mjs": "143c632b7351fd36dc280369a981a9d809d88f7638010d2ee8b6bbc9f0b6aacf",
     "inventory-vps.py": "660b512703da013c217bfe1865e4b7ffe10bf2cf7c18dd43e6d6bcce87505ded",
+    "manual-probe.py": "e4c1927ce14cbe47c9c0c86bb46c27e8d668414a7e05e4d09f2701bb9ec65fae",
     "measure-direct.py": "6ea31de4b648e46085b08ab507a3b446ca27f0c28ff0c77d6114a13f0f2927e8",
-    "nginx.conf": "e9152de553e1bff5efa56c8d61df2ced5bfbc845998d6b6ad193de79fc4e3ad4",
-    "origin.mjs": "4c04479ce2a93503653ab504a1bcc6d375f8462f7a9aa866db2f1bda91bde4ab",
-    "run.py": "643b679963b09e018d8193f5bb69848fe5996a9a134fa1085066e49f5970529d",
+    "nginx.conf": "810a84f57ba4da4a66219fdf75cdc97415c32ee43556dac46479dc15de28b99e",
+    "origin.mjs": "460ea88ee4e1d68ce63b4e01c2cbe53739489fbfccf42776026c2f98d62a3381",
+    "run.py": "cf85f57f5c759b54009318be4dfafe676d88d8fdd222e3a8aa9a2158c92d1faa",
     "traefik.yaml": "2df4110ac44118c30b6eecc772af53a8886edbe9ae168d407f61d21a6f59afe9"
   },
   "enforcedContainerLimits": {
@@ -611,16 +731,8 @@
       "readOnly": true
     }
   },
+  "boundedFetcherPackage": "nginx-module-njs-1.31.8.1.0.2-r1 description:\nnginx njs dynamic modules\n\nnginx-module-njs-1.31.8.1.0.2-r1 webpage:\nhttps://nginx.org/\n\nnginx-module-njs-1.31.8.1.0.2-r1 installed size:\n9754 KiB",
   "images": [
-    {
-      "ID": "sha256:68269702cdcb1643b456923f45379722d65fca7d71cb85d4daf6bf6038fae376",
-      "ContainerName": "mikluha-tour88-local-edge-1",
-      "Repository": "traefik",
-      "Tag": "",
-      "Platform": "linux/arm64/v8",
-      "Size": 176587212,
-      "Created": "2026-07-31T21:02:54.259608821Z"
-    },
     {
       "ID": "sha256:0d459d0765f0e55925663ba63fad229237ea06ad6ba4fa38658e7c5b5308a0b9",
       "ContainerName": "mikluha-tour88-local-origin-1",
@@ -631,15 +743,24 @@
       "Created": "2026-09-23T21:41:54.780711499Z"
     },
     {
-      "ID": "sha256:7f7dcd27f920b22e980508bd5009b452e3d30b68c1041aa82e98e471d367db03",
+      "ID": "sha256:68269702cdcb1643b456923f45379722d65fca7d71cb85d4daf6bf6038fae376",
+      "ContainerName": "mikluha-tour88-local-edge-1",
+      "Repository": "traefik",
+      "Tag": "",
+      "Platform": "linux/arm64/v8",
+      "Size": 176587212,
+      "Created": "2026-07-31T21:02:54.259608821Z"
+    },
+    {
+      "ID": "sha256:ef9a6e2b45c23a9693064eb858517632288d5da63bcb9f86c7cef4983290f41e",
       "ContainerName": "mikluha-tour88-local-cache-1",
       "Repository": "nginx",
       "Tag": "",
       "Platform": "linux/arm64/v8",
-      "Size": 61553593,
-      "Created": "2026-04-15T21:33:45.189575645Z"
+      "Size": 62660635,
+      "Created": "2026-10-22T00:16:54.616730281Z"
     }
   ],
-  "resources": "{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"e584a6a38d00871433cb563b52645069861fca01d7c94da7a0f583fb81062e24\",\"ID\":\"e584a6a38d00\",\"MemPerc\":\"21.35%\",\"MemUsage\":\"20.49MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-edge-1\",\"NetIO\":\"2.31MB / 2.4MB\",\"PIDs\":\"7\"}\n{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"321d4986f317547e4460b8dd254fb5413183a54b3c5aab415b7497c7d6822d4c\",\"ID\":\"321d4986f317\",\"MemPerc\":\"2.51%\",\"MemUsage\":\"3.207MiB / 128MiB\",\"Name\":\"mikluha-tour88-local-cache-1\",\"NetIO\":\"5.7kB / 6.49kB\",\"PIDs\":\"4\"}\n{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.03%\",\"Container\":\"2dc80e3dc2e4e2e68c67e734ccefb285bae86bdf12e70b55004b4c6b901abf81\",\"ID\":\"2dc80e3dc2e4\",\"MemPerc\":\"14.05%\",\"MemUsage\":\"13.48MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-origin-1\",\"NetIO\":\"21.5kB / 2.13MB\",\"PIDs\":\"7\"}",
-  "result": "SYNTHETIC_CHECKS_PASS_WITH_PRODUCTION_GAPS"
+  "resources": "{\"BlockIO\":\"3.67MB / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"38c7628fd807eaac7c6db5b1fe60f0553b9ecdf21ca42bb0d8b080d4d8b0b637\",\"ID\":\"38c7628fd807\",\"MemPerc\":\"25.18%\",\"MemUsage\":\"24.18MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-edge-1\",\"NetIO\":\"207kB / 288kB\",\"PIDs\":\"7\"}\n{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"3b24b657c8a0b0d3c02c54a38fa1167fd6a1643733dc793dbf322c15ed273b45\",\"ID\":\"3b24b657c8a0\",\"MemPerc\":\"3.67%\",\"MemUsage\":\"4.691MiB / 128MiB\",\"Name\":\"mikluha-tour88-local-cache-1\",\"NetIO\":\"5.44kB / 6.45kB\",\"PIDs\":\"4\"}\n{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.05%\",\"Container\":\"4d79167f5595f7dbdacaa9cd125aa38b722dee81fbe88080f800ae01efa75d9b\",\"ID\":\"4d79167f5595\",\"MemPerc\":\"19.95%\",\"MemUsage\":\"19.15MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-origin-1\",\"NetIO\":\"30.4kB / 2.26MB\",\"PIDs\":\"7\"}",
+  "result": "SYNTHETIC_CHECKS_PASS_PRODUCTION_NOT_QUALIFIED"
 }

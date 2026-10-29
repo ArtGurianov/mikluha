@@ -33,8 +33,7 @@ because the object is missing. This does **not** prove real S3 bucket ACLs.
 NGINX allowlists the raw target **as received from Traefik**. Traefik normalizes
 some URL aliases first; an alias can only reach the same public allowlisted
 object. Query and private-path variants remain denied. No arbitrary upstream
-URL, bucket, Host or browser header is forwarded. The origin hostname in
-`nginx.conf` is a fixture, not an S3 production setting.
+URL, bucket, Host or browser header is forwarded. The origin manifest is generated locally; it is not a production ingest authority.
 
 Scoped revocation is demonstrated by stopping all cache workers, persisting the
 denial, deleting exactly the `md5("public-v1:" + path)` file under this test's
@@ -46,13 +45,43 @@ freshness is zero, no stale serving is allowed. Do not use a year-long immutable
 browser TTL for consent-dependent images. Reinstatement of a revoked key is a
 separate owner operation; denied keys must remain durable across restore.
 
-The suite exits zero when its scoped assertions pass, **including observations
-of production deficiencies**. Inspect `productionQualification`,
-`observations.responseSizeGate` and `observations.mimeGate`: 2 MiB still passes a
-1 MiB `proxy_max_temp_file_size`, and wrong MIME bypasses caching but is delivered.
-Neither a CI check nor this configuration is production admission. Disk
-`max_size` is an asynchronous eviction target, not a filesystem quota. No
-host-level aggregate bandwidth/I/O cap or production regression is demonstrated.
+The plain-NGINX first experiment is preserved as
+`docs/evidence/tour-88/local-poc-initial-ungated.json`: 2 MiB passed a 1 MiB
+`proxy_max_temp_file_size`, and wrong MIME was delivered uncached. Current
+NGINX includes a **loopback njs admission handler in the same process** before
+cache fill. Its finite offline manifest pins public source URLs and SHA-256.
+It fetches at most 1 MiB, checks image/webp and hash before returning 200, and
+refuses upstream cookies/private/no-store, redirects and untrusted TLS. njs
+**1.0.2** is pinned for fixed chunked-size enforcement. It adds no image
+transformation, separate gateway service or browser-controlled upstream URL.
+S3 peer verification uses system CAs. The lab checks declared/chunked oversize,
+wrong MIME, changed bytes, redirection and self-signed upstream TLS rejection.
+
+The suite exits zero when scoped local assertions pass. Production qualification
+remains NO-GO: `max_size` is asynchronous eviction, not a filesystem quota;
+aggregate bandwidth/I/O, regional performance, real private originals, photo
+permissions and production rollback remain independent gates. Full-body
+admission also adds cold TTFB; warm loopback results cannot offset an unmeasured
+cold-user regression.
+
+Optional real-public-S3 run (fixed two public WebP, no credentials/writes):
+
+```sh
+python3 poc/regional-media-cache/run.py /tmp/tour-88-real-s3.json --real-s3
+```
+
+It runs the synthetic checks first, then checks identical real bytes over direct,
+local cold and local warm paths (10 direct, 10 unique cold aliases, 20 measured
+warm HITs per image). A warm key is primed immediately before measurement.
+Direct/cold ordering alternates. The Mac localhost edge and container S3 path
+are not the future VPS; this comparison cannot prove regional gain or LCP.
+Aliases are local content-addressed references to mutable public S3 originals;
+they are not an implemented immutable upload pipeline. The real run uses an
+8-second fetch timeout; the synthetic fixture uses 900 ms. No S3 keys are used.
+
+For a declared regional network baseline on a manual device, use
+[MANUAL.md](MANUAL.md); the default probe measures direct S3 until a test VPS
+endpoint exists. Operator-declared VPN/city metadata is never inferred from IP.
 
 The runner always tears down its own Compose project and disposable files on
 ordinary exit/failure. After a killed runner, inspect first, then clean up:

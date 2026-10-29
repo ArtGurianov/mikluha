@@ -35,3 +35,21 @@ synthetic bytes as a performance gain. Missing regional/mobile, real private
 original, hard resource bounds, physical-location, legal and rollback receipts
 remain explicit NO-GO gates in the ADR. Checkout is never called by the cache;
 absence of commercial regression must still be measured before production.
+
+
+## Follow-up accepted for research, 2026-10-29
+
+The owner chose continued local-cache research, not decision B. Initial plain
+NGINX could neither enforce a maximum response size nor reject wrong MIME before
+delivery. The next local experiment therefore uses njs 1.0.2 admission inside
+the same NGINX: fixed public URL and SHA-256 manifest, full body ≤1 MiB, MIME,
+TLS/redirect/cookie/private-response checks before cache fill. Chunked length,
+changed content and untrusted TLS are adversarial cases. This preserves one
+cache process and adds no separate universal gateway, but increases cold TTFB.
+The experiment must report that regression rather than qualifying on warm HIT.
+
+The owner supplied a direct-S3 run from Kemerovo home network, VPN off by
+operator declaration: 30 requests per image, all bytes match, 0/60 errors.
+This is an exploratory regional baseline, not the planned ≥100/key/mode
+comparison or independent physical/VPN verification. Future VPS experiments
+remain separately bounded and subject to the infrastructure host-write rule.
