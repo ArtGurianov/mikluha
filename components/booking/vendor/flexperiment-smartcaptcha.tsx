@@ -60,7 +60,8 @@ export default function SmartCaptcha({ onToken, resetKey }: Props) {
         sitekey: siteKey,
         hl: "ru",
         callback: (token) => {
-          if (disposed || failed.current || !token) return;
+          if (disposed || failed.current) return;
+          if (!token) { setState("ready"); onToken(null); return; }
           setState("solved");
           onToken(token);
         },

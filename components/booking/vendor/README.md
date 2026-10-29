@@ -13,7 +13,7 @@ one-use submission handling belong to the wrapper, not a parallel SDK implementa
 Small local changes from upstream:
 
 - Export the SDK interface for DOM tests.
-- Ignore callbacks after disposal and success after a fatal SDK error until explicit reset.
+- Invalidate an empty proof; ignore callbacks after disposal and success after a fatal SDK error until explicit reset.
 - Use Mikluha's existing text colour and retry wording.
 
 Keep these differences small when refreshing the upstream copy. The client consumes only

@@ -58,6 +58,9 @@ test("reused widget expires and resets proof, ignores fatal-error/stale callback
   try {
     await act(async () => fake.solve("proof-1"));
     assert.equal(f.tokens.at(-1), "proof-1");
+    await act(async () => fake.solve(""));
+    assert.equal(f.tokens.at(-1), null);
+    await act(async () => fake.solve("proof-1"));
     await act(async () => fake.events.get("token-expired")!());
     assert.equal(f.tokens.at(-1), null);
     await act(async () => fake.solve("proof-2"));
