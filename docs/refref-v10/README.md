@@ -15,7 +15,8 @@
 | Источник | Точное основание | Как использовать |
 |---|---|---|
 | Mikluha `origin/main` | [`0e32a05ff74a8915cc1719fe041b5a03df4cd452`](https://github.com/ArtGurianov/mikluha/tree/0e32a05ff74a8915cc1719fe041b5a03df4cd452) | Осмотренный source baseline; 16 миграций 0001–0016. Не снимок установленной БД |
-| Refref [PR #130](https://github.com/ArtGurianov/refref/pull/130) | [`c932b656edbda1d47cfb57de08fd4a36536712f5`](https://github.com/ArtGurianov/refref/tree/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10) | Конкретная редакция ADR-141/контрактов с утверждёнными O1–O7 и последними исправлениями Apply/OWNER-02 |
+| Refref [PR #130] · исторический source-аудит(https://github.com/ArtGurianov/refref/pull/130) | [`c932b656edbda1d47cfb57de08fd4a36536712f5`](https://github.com/ArtGurianov/refref/tree/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10) | Конкретная редакция ADR-141/контрактов с утверждёнными O1–O7 и последними исправлениями Apply/OWNER-02 |
+| Refref PR #130 · актуальный проверенный кандидат | [`793ad1a8fc571a98c9f1b9b31161b5b6532770ab`](https://github.com/ArtGurianov/refref/tree/793ad1a8fc571a98c9f1b9b31161b5b6532770ab/docs/v10) | Проверены точные blob identities 12 нормативных исходников. Пакет ждёт Python 12-mutation exact-head rerun и независимой аттестации; не runtime/transport GO. Исторические source SHA256 не переписаны. |
 | Предыдущая архитектура Mikluha | [ADR v2.3](../adr/2026-10-18-ssr-flexible-offers-immutable-contracts.md), [TOUR status](../refref-v9-contract-status.md), [Commerce README](../../commerce/README.md) | Отличать прежний принятый target, исходники и реально обслуживаемую систему |
 | Прямое задание OWNER в этой работе | Собственный Commerce; обязательные предоплаты; изменения туристов/выезда; фискализация и применимая ЕИС; draft PR с пятью документами | Не назначает процент депозита, сроки доплаты, провайдера или новый текст покупательской оферты |
 
