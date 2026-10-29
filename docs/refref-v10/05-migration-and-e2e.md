@@ -325,6 +325,6 @@ Referral merchant-readable identity/read-back is deferred to REFREF-123. Native 
 
 
 
-### MK-C11 · OWNER_APPROVED 29.10.2026 (deferred referral conformance)
+### MK-C11 · OWNER_APPROVED 29.10.2026 (отложенная проверка Refref)
 
-Refref S5 mode for Mikluha is `SCHEDULED_SERVICE` (not PAYMENT). Preserve source/zone/precision of `serviceAnchorAtAtBound`. Baseline window uses later of first genuine FULL and original service anchor plus 14 Moscow calendar days; no automatic extension when rescheduled. OWNER consciously accepts positive FINAL before rescheduled service completion. Neither changed trip nor an unpaid FINAL registry row reopens ordinary S4. Prove with future scenario variants for original end, later target end, timely S4 before FINAL and late refund after FINAL. Keep original 63 IDs and all NOT_RUN; do not modify native launch gates.
+Для будущего реферального профиля Mikluha выбран `SCHEDULED_SERVICE`, не `PAYMENT`. При первом BOUND сохраняются момент окончания исходной подходящей услуги `serviceAnchorAtAtBound`, его источник, зона и точность. Базовое окно S5: более поздний из действительного первого FULL и исходного service anchor плюс 14 календарных московских дат. При согласованном переносе исходный якорь автоматически не изменяется. OWNER осознанно принимает риск FINAL до фактического окончания более позднего перенесённого выезда. Изменение поездки или ещё не выплаченная комиссия после FINAL не открывают обычную S4. На отложенном этапе требуется проверить первоначальное окончание, новый более поздний выезд, своевременную претензию до FINAL и поздний возврат после FINAL. Исходные 63 ID и статус NOT_RUN остаются неизменными; native public GO не зависит от Refref.
