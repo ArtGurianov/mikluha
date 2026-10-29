@@ -2,7 +2,7 @@
 
 Дата: 27.10.2026. Статус: проект стратегии и приёмки для OWNER review. Код, SQL, установленная схема, реальные деньги и действующие договоры этим документом не изменены.
 
-Исходный код аудирован на Mikluha `0e32a05ff74a8915cc1719fe041b5a03df4cd452` (`origin/main` после fetch). Нормативная зависимость — Refref [PR #130](https://github.com/ArtGurianov/refref/pull/130), зафиксированный HEAD [`793ad1a8fc571a98c9f1b9b31161b5b6532770ab`](https://github.com/ArtGurianov/refref/tree/793ad1a8fc571a98c9f1b9b31161b5b6532770ab/docs/v10). PR Refref остаётся отдельным объектом review; его документы не доказывают наличие обслуживаемого API. При изменении исходного SHA контрактное соответствие проверяется повторно.
+Исходный код аудирован на Mikluha `0e32a05ff74a8915cc1719fe041b5a03df4cd452` (`origin/main` после fetch). Нормативная зависимость — Refref [PR #130](https://github.com/ArtGurianov/refref/pull/130), зафиксированный HEAD [`5f966664182a12aba3de9c0721deadab910c338d`](https://github.com/ArtGurianov/refref/tree/5f966664182a12aba3de9c0721deadab910c338d/docs/v10). PR Refref остаётся отдельным объектом review; его документы не доказывают наличие обслуживаемого API. При изменении исходного SHA контрактное соответствие проверяется повторно.
 
 Проектные детали бронирования — в [02](02-booking-and-prepayments.md), взаимодействия с Refref — в [03](03-refref-integration.md), отраслевого допуска — в [04](04-fiscal-eis-and-legal-impact.md). Ниже описана последовательность будущей реализации, а не отчёт о её выполнении.
 
@@ -203,7 +203,7 @@ Cutover должен атомарно назначать профиль ново
 
 Этот PR не меняет credentials, host/network/config, backup paths или persistent state: **CUSTODY_IMPACT: NO**. Будущий PR deployment/schema/provider provisioning, затрагивающий такие ресурсы, отдельно перечисляет custody resources и authority по [AGENTS.md](../../AGENTS.md); до чистого drift-check и свежего capture отмечает `CUSTODY_PENDING`. Реальные ключи, банковские payloads, туристские данные и приватные акты не коммитятся в публичный репозиторий Mikluha.
 
-Связанный upstream: [стратегия Refref v10](https://github.com/ArtGurianov/refref/blob/793ad1a8fc571a98c9f1b9b31161b5b6532770ab/docs/v10/migration/01-migration-strategy.md), [S6](https://github.com/ArtGurianov/refref/blob/793ad1a8fc571a98c9f1b9b31161b5b6532770ab/docs/v10/contracts/03-merchant-reporting.md), [gates](https://github.com/ArtGurianov/refref/blob/793ad1a8fc571a98c9f1b9b31161b5b6532770ab/docs/v10/GATES.md). Эти ссылки фиксируют зависимость, а не копируют в Mikluha нормативный пакет Core.
+Связанный upstream: [стратегия Refref v10](https://github.com/ArtGurianov/refref/blob/5f966664182a12aba3de9c0721deadab910c338d/docs/v10/migration/01-migration-strategy.md), [S6](https://github.com/ArtGurianov/refref/blob/5f966664182a12aba3de9c0721deadab910c338d/docs/v10/contracts/03-merchant-reporting.md), [gates](https://github.com/ArtGurianov/refref/blob/5f966664182a12aba3de9c0721deadab910c338d/docs/v10/GATES.md). Эти ссылки фиксируют зависимость, а не копируют в Mikluha нормативный пакет Core.
 
 ## OWNER acceptance extension — 28.10.2026 (проектные E2E, NOT_RUN)
 
