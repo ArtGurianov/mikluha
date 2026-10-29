@@ -1,4 +1,11 @@
-/** Build-time-only environment switch — no runtime env access, static export has no server. */
+/**
+ * How the site is built: `export` (static files behind Nginx, the current
+ * production) or `ssr` (`next start` reading Commerce, TOUR-60). Inlined at
+ * build by next.config.ts, so an image always runs the mode it was built in.
+ */
+export const isSsr = process.env.SITE_RENDERING === "ssr";
+
+/** Build-time switch: a static export has no runtime, and next.config.ts inlines it into an SSR build. */
 export const deployEnv = (process.env.DEPLOY_ENV === "staging" ? "staging" : "production") as
   | "production"
   | "staging";

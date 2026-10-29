@@ -50,6 +50,12 @@ async function legalReadiness(deps: ServerDeps, result: SchemaReadiness): Promis
 
 export type RouteHandler = (req: IncomingMessage, res: ServerResponse, url: URL) => Promise<boolean>;
 
+/** The first handler that claims the path answers it. */
+export const routes = (...handlers: readonly RouteHandler[]): RouteHandler => async (req, res, url) => {
+  for (const handle of handlers) if (await handle(req, res, url)) return true;
+  return false;
+};
+
 export function createCommerceServer(deps: ServerDeps, routes?: RouteHandler): Server {
   const admission = deps.admission ?? new SchemaAdmission(() => schemaReadiness(deps.pool, {
     schemaHead: deps.schemaHead, migrations: deps.migrations ?? readMigrations(MIGRATIONS_DIR), sourceCommit: deps.sourceCommit,

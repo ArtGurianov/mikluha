@@ -312,9 +312,12 @@ export interface SiteSettingsDTO<TImage = ImageAsset> {
   launchReady: boolean;
 }
 
+/** `git`: everything from content/. `commerce`: the SSR catalog from Commerce, settings and legal from Git. */
+export type ContentSource = "git" | "commerce";
+
 export interface ContentSnapshot<TImage = ImageAsset> {
   generatedAt: string;
-  source: "git";
+  source: ContentSource;
   siteSettings: SiteSettingsDTO<TImage>;
   tours: TourDTO<TImage>[];
   departures: DepartureDTO[];

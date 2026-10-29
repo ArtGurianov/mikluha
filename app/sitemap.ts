@@ -1,11 +1,13 @@
 import type { MetadataRoute } from "next";
 
-import { getContent } from "@/lib/cms/content";
+import { loadContent } from "@/lib/cms/content";
 import { getDocumentLastModified, getHomeLastModified, getTourLastModified } from "@/lib/last-modified";
 import { resolveCanonicalBase } from "@/lib/site";
 import { getListedTours, getTodayInTimezone } from "@/lib/tours";
 
-export const dynamic = "force-static";
+// What `output: "export"` requires of a metadata route. It does not make the SSR sitemap static:
+// loadContent() waits for the request there, so it lists what Commerce publishes now.
+export const revalidate = false;
 
 /**
  * Every indexable page, each with its own `lastmod` — see lib/last-modified.ts
@@ -13,8 +15,8 @@ export const dynamic = "force-static";
  * listing a URL the page itself asks not to index sends search engines
  * contradictory signals.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
-  const content = getContent();
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const content = await loadContent();
   const base = resolveCanonicalBase(content.siteSettings.siteUrl).replace(/\/$/, "");
   const today = getTodayInTimezone(content.siteSettings.timezone);
 

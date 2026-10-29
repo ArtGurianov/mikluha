@@ -4,11 +4,11 @@ import { OrganizerSection } from "@/components/home/organizer-section";
 import { ReportsSection } from "@/components/home/reports-section";
 import { ReviewsSection } from "@/components/home/reviews-section";
 import { ToursSection } from "@/components/home/tours-section";
-import { getContent } from "@/lib/cms/content";
+import { loadContent } from "@/lib/cms/content";
 import { getAllReviewsSorted, getListedTours, getTodayInTimezone, getUpcomingDepartures } from "@/lib/tours";
 
-export default function HomePage() {
-  const content = getContent();
+export default async function HomePage() {
+  const content = await loadContent();
   const today = getTodayInTimezone(content.siteSettings.timezone);
 
   return (

@@ -373,6 +373,20 @@ CREATE ROLE admin_operator_login LOGIN PASSWORD '<from the secret store>' IN ROL
 `/etc/mikluha-commerce/admin-operator.env` (root, 0600) holds one line:
 `ADMIN_OPERATOR_DATABASE_URL=postgres://admin_operator_login:…@<db host>/<db>`.
 
+## Public catalog (ADR v2.3 §2, TOUR-60)
+
+```
+GET  /public/v1/catalog       the public projection as one JSON document (src/public-api.ts)
+```
+
+What the SSR site renders on every request: `schema: "mikluha.public-catalog/1"` and the
+published, listed tours, departures (with their contract only when the database found it complete),
+organizers, reports and reviews of the `public_*` views, read as `commerce_app` in one READ ONLY
+REPEATABLE READ transaction so a page never mixes two publishes. `Cache-Control: no-store`, no
+cookie, no credential; drafts and history never reach it. The site calls it over the internal
+network (`COMMERCE_PUBLIC_API_URL`); the data is public either way, the same rows new quotes are
+priced from.
+
 ## Admin API (migration 0011, ART-363)
 
 ADR v2.3 §7 and the shared standard (`adman-vps-infrastructure/runbooks/application-standards.md`

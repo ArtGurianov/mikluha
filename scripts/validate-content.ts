@@ -22,13 +22,8 @@ import {
   type CmsMediaConfig,
 } from "../lib/cms/asset-source";
 import type { ContentSnapshot, ImageAsset } from "../lib/cms/types";
-import {
-  demoContractFields,
-  effectiveProduct,
-  hasQualifiedRefundPolicy,
-  hasCompleteDepartureContract,
-  hasCompleteTourContract,
-} from "../lib/contract-readiness";
+import { hasQualifiedRefundPolicy } from "../lib/contract-readiness";
+import { demoCatalogBlockers, openDepartureContractBlockers } from "../lib/launch-gate";
 import { REQUIRED_LEGAL_SLUGS, RESERVED_SLUGS, SLUG_RE } from "../lib/legal";
 import { findMarkdownPolicyViolations } from "../lib/cms/markdown-policy";
 import { isStaging } from "../lib/site";
@@ -111,7 +106,13 @@ async function main() {
     readFile(CACHE_FILE, "utf-8"),
     readFile(ADMIN_CONFIG_FILE, "utf-8"),
   ]);
-  const content = JSON.parse(raw) as ContentSnapshot;
+  const snapshot = JSON.parse(raw) as ContentSnapshot;
+  // `--baked`: the SSR build (build:ssr). Its catalog comes from Commerce at request time and is
+  // gated there (lib/launch-gate.ts); what the image bakes in — site settings and legal pages, and
+  // with them the launchReady gate — is checked here exactly as for the static export.
+  const content: ContentSnapshot = process.argv.includes("--baked")
+    ? { ...snapshot, tours: [], departures: [], reports: [], reviews: [], organizers: [] }
+    : snapshot;
   const mediaPolicy = createAssetSourcePolicy(yaml.load(adminConfigText) as CmsMediaConfig);
 
   const tourIds = new Set(content.tours.map((t) => t.id));
@@ -306,15 +307,7 @@ async function main() {
   if (content.siteSettings.company.isDemo) {
     demoBlockers.push('siteSettings.company is still marked "Демо-данные" (legal name / ИНН / ОГРН / phone)');
   }
-  for (const d of content.departures) {
-    if (d.isDemo) demoBlockers.push(`departure ${d.id} is still marked "Демо-данные"`);
-  }
-  for (const rv of content.reviews) {
-    if (rv.isDemo) demoBlockers.push(`review ${rv.id} is still marked "Демо-данные"`);
-  }
-  for (const o of content.organizers) {
-    if (o.isDemo) demoBlockers.push(`organizer ${o.id} is still marked "Демо-данные"`);
-  }
+  demoBlockers.push(...demoCatalogBlockers(content));
   if (!PHONE_RE.test(content.siteSettings.company.phone)) {
     demoBlockers.push(
       `siteSettings.company.phone "${content.siteSettings.company.phone}" is not a valid +7XXXXXXXXXX number`,
@@ -325,24 +318,7 @@ async function main() {
     if (!hasQualifiedRefundPolicy(content.legalPages.find((page) => page.slug === 'oferta')?.refundPolicy)) {
       fail('Production release blocked — REFUND_WORKFLOW_UNQUALIFIED. Documented-expense refunds require separate end-to-end qualification.');
     }
-    const tourById = new Map(content.tours.map((tour) => [tour.id, tour]));
-    for (const departure of content.departures) {
-      if (departure.bookingStatus !== "OPEN") continue;
-      const tour = tourById.get(departure.tourId);
-      const product = effectiveProduct(tour?.contract, departure.contract);
-      if (!hasCompleteTourContract(product)) {
-        fail(`Production release blocked — OPEN departure ${departure.id} has incomplete tour contract data.`);
-      }
-      if (!hasCompleteDepartureContract(departure.contract)) {
-        fail(`Production release blocked — OPEN departure ${departure.id} has incomplete departure contract data.`);
-      }
-      for (const field of demoContractFields(product, `departure ${departure.id}.product`)) {
-        fail(`Production release blocked — OPEN departure ${departure.id} uses explicit demo content in ${field}.`);
-      }
-      for (const field of demoContractFields(departure.contract, `departure ${departure.id}.contract`)) {
-        fail(`Production release blocked — OPEN departure ${departure.id} uses explicit demo content in ${field}.`);
-      }
-    }
+    for (const blocker of openDepartureContractBlockers(content)) fail(`Production release blocked — ${blocker}.`);
     for (const blocker of demoBlockers) {
       fail(`Production release blocked — ${blocker}. Replace it in the CMS and commit.`);
     }

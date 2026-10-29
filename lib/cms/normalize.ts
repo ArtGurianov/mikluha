@@ -10,6 +10,7 @@ import type {
   SiteSettingsDTO,
   TourDTO,
   ContentSnapshot,
+  ContentSource,
   ImageAsset,
   VideoAsset,
 } from "./types";
@@ -115,7 +116,10 @@ function normalizeSeo(
   return { title: optionalString(seo.title), description: optionalString(seo.description), image: maybeImage(seo.image) };
 }
 
-export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentSnapshot {
+type CatalogCollections = "tours" | "departures" | "reports" | "reviews" | "organizers";
+
+/** The collections that move to the Commerce projection under SSR (./projection.ts); the rest stays in Git. */
+export function normalizeCatalog(raw: Pick<RawContentSet, CatalogCollections>): Pick<ContentSnapshot, CatalogCollections> {
   const tours: TourDTO<ImageAsset>[] = raw.tours.map((t) => ({
     id: requireSlugConsistency(t, "Tour"),
     slug: requiredString(t.slug, `tour "${t._slug}" slug`),
@@ -188,6 +192,12 @@ export function normalizeContentSet(raw: RawContentSet, source: "git"): ContentS
     isListed: flag(o.isListed),
     isDemo: flag(o.isDemo),
   }));
+
+  return { tours, departures, reports, reviews, organizers };
+}
+
+export function normalizeContentSet(raw: RawContentSet, source: ContentSource): ContentSnapshot {
+  const { tours, departures, reports, reviews, organizers } = normalizeCatalog(raw);
 
   const legalPages: LegalPageDTO[] = raw.legalPages.map((p) => ({
     ...(p.refundPolicy === undefined ? {} : { refundPolicy: p.refundPolicy }),

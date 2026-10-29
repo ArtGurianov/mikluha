@@ -39,12 +39,12 @@ export const REQUIRED_LEGAL_SLUGS = [
   "cookies",
 ] as const;
 
-export function getLegalPageBySlug(content: ContentSnapshot, slug: string): LegalPageDTO | undefined {
+export function getLegalPageBySlug(content: Pick<ContentSnapshot, "legalPages">, slug: string): LegalPageDTO | undefined {
   return content.legalPages.find((page) => page.slug === slug);
 }
 
 /** Footer/navigation order: required pages first, then the rest alphabetically by title. */
-export function getLegalPagesSorted(content: ContentSnapshot): LegalPageDTO[] {
+export function getLegalPagesSorted(content: Pick<ContentSnapshot, "legalPages">): LegalPageDTO[] {
   const rank = (slug: string) => {
     const index = (REQUIRED_LEGAL_SLUGS as readonly string[]).indexOf(slug);
     return index === -1 ? REQUIRED_LEGAL_SLUGS.length : index;
