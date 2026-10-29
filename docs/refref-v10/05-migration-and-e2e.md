@@ -249,6 +249,15 @@ The original 63 `MKV10-E2E-*` IDs remain preserved as future full-conformance ca
 | BOUND identity same create/replay/read-back | REFREF-123, deferred | no duplicate test ID in Mikluha; campaign archive and cross-business scope checked upstream |
 | Native ingress regardless of env/restart | TOUR-81, native | no NEW Refref calls with API base present; existing legacy scoped recovery continues |
 
+Дополнительные контрпримеры четырёх технических исправлений PR #53 — **NOT_RUN**, отдельный namespace; число исходных 63 сценариев не меняется:
+
+| Coverage item | Owner/phase | Проверяемый результат |
+|---|---|---|
+| POLICY-53-CAP-01 | TOUR-78, native без Refref; TOUR-71, будущая скидка | Билет 4 000 ₽ − отнесённая скидка 500 ₽ + допуслуга 2 000 ₽, номинал 5 000 ₽ → депозит 3 500 ₽; без скидки 4 000 ₽. Cap в копейках не округляется вверх, допуслуги его не увеличивают. |
+| POLICY-53-QUOTE-01 | TOUR-71 / REFREF-123, deferred | `D_applied` сверх eligible базы или без допустимых строк отклоняется до акцепта ревизии и банковского вызова. Нет clamp обещанной скидки, переноса на ineligible строки или исправления лишь при выдаче чека. |
+| POLICY-53-SNAPSHOT-01 | TOUR-71 / REFREF-123, deferred | Mikluha единожды формирует цены строк, сохраняет версию allocator/hash до акцепта. Повтор и Refref-проверка не создают иной принятый снимок; изменённый candidate требует нового необходимого согласия. |
+| POLICY-53-HOLD-01 | TOUR-77/79/83, native | TTL истёк, но банковская регистрация/платёж UNKNOWN: место и документный scope остаются защищены, новый purchaseRef не обходит запрет повторной оплаты. Новая покупка разрешается только после доказанного безопасного освобождения. |
+
 Referral merchant-readable identity/read-back is deferred to REFREF-123. Native source has no BOUND, no Refref C and no S4. Independent provider/fiscal legal admission gates remain mandatory for native live money.
 
 ## Приложение: владение всеми 63 исходными MKV10-E2E
