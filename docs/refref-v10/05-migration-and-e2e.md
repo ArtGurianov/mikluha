@@ -257,6 +257,8 @@ The original 63 `MKV10-E2E-*` IDs remain preserved as future full-conformance ca
 | POLICY-53-QUOTE-01 | TOUR-71 / REFREF-123, deferred | `D_applied` сверх eligible базы или без допустимых строк отклоняется до акцепта ревизии и банковского вызова. Нет clamp обещанной скидки, переноса на ineligible строки или исправления лишь при выдаче чека. |
 | POLICY-53-SNAPSHOT-01 | TOUR-71 / REFREF-123, deferred | Mikluha единожды формирует цены строк, сохраняет версию allocator/hash до акцепта. Повтор и Refref-проверка не создают иной принятый снимок; изменённый candidate требует нового необходимого согласия. |
 | POLICY-53-HOLD-01 | TOUR-77/79/83, native | TTL истёк, но банковская регистрация/платёж UNKNOWN: место и документный scope остаются защищены, новый purchaseRef не обходит запрет повторной оплаты. Новая покупка разрешается только после доказанного безопасного освобождения. |
+| POLICY-53-WIRE-01 | TOUR-71 / REFREF-123, deferred | PAID_IN_FULL сохраняет обязательный `purchaseSnapshot.lines[].refrefDiscountAppliedKopecks` и общий applied total. Версия allocator хранится локально, не добавляется в закрытую wire-схему. Refref проверяет фактический снимок, не заменяя принятые line amounts своим распределением. |
+| POLICY-53-ELIGIBILITY-01 | TOUR-71 / REFREF-123, deferred | Первичный `G=4000`, `D_rule=5000`, `C>=0` не допускает BOUND при любом `D_applied`, в том числе при cap до 4000. Это не правило удаления уже сохранённого BOUND или отказа обслуживать действующий договор. |
 
 Referral merchant-readable identity/read-back is deferred to REFREF-123. Native source has no BOUND, no Refref C and no S4. Independent provider/fiscal legal admission gates remain mandatory for native live money.
 
