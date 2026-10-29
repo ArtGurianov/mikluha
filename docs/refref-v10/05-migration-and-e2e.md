@@ -321,5 +321,10 @@ Referral merchant-readable identity/read-back is deferred to REFREF-123. Native 
 | MKV10-E2E-62 | TOUR-78: локальные документы и истинный FULL сохраняются | TOUR-86/71: sourceReceipt, поздний evidence |
 | MKV10-E2E-63 | TOUR-81: disabled Apply, no merchant coupon/fallback | TOUR-70/71: Refref-only code, holder/BOUND |
 
-**Разграничение:** для `01,02,03,04,05,07,09,11–23,25,28–31,33,35–40,42,43,45–50,54–62` частичный native PASS относится только к явно описанной грани; он не переименовывает оригинальный mixed/referral test в PASS. Доказательство исходного полного сценария требует отложенного этапа, если в третьей колонке указана Refref-проверка. Для нативных по сути `08,34,44` отдельный результат присваивается лишь после фактического source/provider-прогона. `REFERRAL-DISCOUNT-01` (отложенный) и `REFERRAL-FULL-01` (отложенный) не заменяют исходные ID.
+**Разграничение:** для `01–07,09,11–23,25–26,28–31,33,35–40,42–43,45–53,54–63` частичный native PASS относится только к явно описанной грани; он не переименовывает оригинальный mixed/referral test в PASS. Доказательство исходного полного сценария требует отложенного этапа, если в третьей колонке указана Refref-проверка. Для нативных по сути `08,34,44` отдельный результат присваивается лишь после фактического source/provider-прогона. `REFERRAL-DISCOUNT-01` (отложенный) и `REFERRAL-FULL-01` (отложенный) не заменяют исходные ID.
 
+
+
+### MK-C11 · OWNER_APPROVED 29.10.2026 (deferred referral conformance)
+
+Refref S5 mode for Mikluha is `SCHEDULED_SERVICE` (not PAYMENT). Preserve source/zone/precision of `serviceAnchorAtAtBound`. Baseline window uses later of first genuine FULL and original service anchor plus 14 Moscow calendar days; no automatic extension when rescheduled. OWNER consciously accepts positive FINAL before rescheduled service completion. Neither changed trip nor an unpaid FINAL registry row reopens ordinary S4. Prove with future scenario variants for original end, later target end, timely S4 before FINAL and late refund after FINAL. Keep original 63 IDs and all NOT_RUN; do not modify native launch gates.
