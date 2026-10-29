@@ -374,6 +374,33 @@ test("party/schema changes preserve PD consent; new document versions reset it",
   } finally { await f.stop(); }
 });
 
+test("changing any DOB from adult to child clears only the adult declaration, independently of pricing flags", async () => {
+  const f = checkoutFixture(); let calls = 0;
+  const view = previewBookingView();
+  const submit = async (): Promise<BookingOutcome> => { calls++; return { kind: "unknown" }; };
+  const changeDate = async (value: string) => {
+    const dob = f.host.querySelector<HTMLInputElement>('input[name="p1Dob"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value")!.set!.call(dob, value);
+      dob.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    });
+  };
+  try {
+    await act(async () => f.root.render(createElement(NativeCheckout, { view, submit, captcha: SyntheticWidget })));
+    await changeDate("1990-01-01"); await f.choose(); await f.consent(); await f.click("Solve synthetic captcha");
+    await changeDate("1990-01-01");
+    assert.equal(f.host.querySelector<HTMLInputElement>('input[name="adultsOnly"]')!.checked, true);
+    await changeDate("2020-01-01");
+    assert.equal(f.host.querySelector<HTMLInputElement>('input[name="adultsOnly"]')!.checked, false);
+    assert.equal(f.host.querySelector<HTMLInputElement>('input[name="pdConsent"]')!.checked, true);
+    assert.equal(f.host.querySelectorAll('input[name="paymentChoice"]:checked').length, 1);
+    assert.match(f.host.querySelector("aside")!.textContent ?? "", /Итого за заявку/);
+    assert.match(f.host.textContent ?? "", /Проверка пройдена/);
+    assert.ok(!f.host.textContent?.includes("Обновить условия"));
+    await f.send(); assert.equal(calls, 0);
+  } finally { await f.stop(); }
+});
+
 test("quote A → B → A never resurrects a payment choice and preserves contact fields", async () => {
   const f = checkoutFixture(); const a = previewBookingView(), b = previewBookingView(1, "full-only");
   const render = async (view: BookingPresentation) => { await act(async () => f.root.render(createElement(NativeCheckout, { view, captcha: SyntheticWidget }))); };

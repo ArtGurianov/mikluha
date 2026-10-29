@@ -40,6 +40,7 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
     setSourceSnapshot(suppliedSnapshot); setView(suppliedView); setRefreshing(false);
   }
   const formRef = useRef<HTMLFormElement>(null);
+  const adultConfirmation = useRef<HTMLInputElement>(null);
   const committedPricing = useRef<string | null>(null);
   const pricingBaselineContext = useRef("");
   const [pricingEditing, setPricingEditing] = useState(false);
@@ -185,7 +186,7 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
               <legend className="px-2 text-lg font-semibold">Турист {index + 1}{index === 0 ? " · Вы" : ""}</legend>
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className="text-sm font-medium sm:col-span-2">Фамилия, имя и отчество<input className={input} name={`p${id}Name`} autoComplete="off" maxLength={200} required /></label>
-                <label className="text-sm font-medium">Дата рождения<input className={input} name={`p${id}Dob`} type="date" required /></label>
+                <label className="text-sm font-medium">Дата рождения<input className={input} name={`p${id}Dob`} type="date" required onChange={() => { if (adultConfirmation.current) adultConfirmation.current.checked = false; }} /></label>
                 <label className="text-sm font-medium">Гражданство (код страны)<input className={input} name={`p${id}Citizenship`} defaultValue="RU" list={`${prefix}-countries`} maxLength={2} minLength={2} pattern="[A-Za-z]{2}" autoComplete="off" required aria-describedby={`${prefix}-citizenship-${id}`} /></label>
                 <p id={`${prefix}-citizenship-${id}`} className="text-xs text-muted-foreground sm:col-span-2">Например: RU — Россия, BY — Беларусь, KZ — Казахстан.</p>
                 <label className="text-sm font-medium sm:col-span-2">Документ<select className={input} name={`p${id}DocType`}><option value="RU_PASSPORT">Паспорт гражданина РФ</option><option value="RU_INTERNATIONAL_PASSPORT">Заграничный паспорт гражданина РФ</option><option value="FOREIGN_DOCUMENT">Документ иностранного гражданина</option></select></label>
@@ -223,7 +224,7 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
           <fieldset key={JSON.stringify([view.session.clientRequestId, view.terms, view.pdConsent])} disabled={locked} className={`${card} space-y-4`}>
             <legend className="px-2 text-lg font-semibold">Перед отправкой</legend>
             <label className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="pdConsent" value="yes" required /><span>Я отдельно даю <a className="text-secondary underline underline-offset-4" href="/soglasie-pd/" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a> в опубликованной редакции.</span></label>
-            <label key={participants.join(",")} className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="adultsOnly" value="yes" required /><span>Все туристы совершеннолетние.</span></label>
+            <label key={participants.join(",")} className="flex items-start gap-3 text-sm leading-relaxed"><input ref={adultConfirmation} className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="adultsOnly" value="yes" required /><span>Все туристы совершеннолетние.</span></label>
             <p className="text-xs leading-relaxed text-muted-foreground">Данные туристов нужны для оформления и исполнения договора. Состав данных и основания обработки указаны в <a href="/privacy-policy/" target="_blank" rel="noreferrer" className="text-secondary underline">Политике обработки данных</a>. Условия договора — в <a href="/oferta/" target="_blank" rel="noreferrer" className="text-secondary underline">Публичной оферте</a>.</p>
           </fieldset>
           {!quoteReady && <p className="text-sm text-muted-foreground">Условия требуют обновления. Ожидаем обновлённые цены и условия оплаты.</p>}
