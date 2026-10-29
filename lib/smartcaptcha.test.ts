@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import SmartCaptcha, { type SmartCaptchaApi } from "../components/booking/vendor/flexperiment-smartcaptcha";
 import { NativeCheckout } from "../components/booking/native-checkout";
 import type { BookingOutcome, BookingPresentation } from "./native-checkout";
+import { previewBookingView } from "../components/booking/checkout-preview-data";
 import type { CaptchaWidgetProps } from "../components/booking/smartcaptcha";
 
 const dom = new JSDOM("<!doctype html><html><head></head><body></body></html>", { url: "https://ui.example.invalid" });
@@ -115,7 +116,7 @@ function SyntheticWidget({ onToken }: CaptchaWidgetProps) {
 test("checkout retains data across rejection, requires fresh proof, prevents duplicate submits and fences UNKNOWN", async () => {
   const host = document.createElement("div"); document.body.append(host);
   const root = createRoot(host);
-  const view: BookingPresentation = { departureId: "fixture", title: "Fixture", dateLabel: "Date", departureLabel: "Place", priceLabel: "18 000 ₽", paymentLabel: "Deposit", paymentDetail: "Details", maxParticipants: 4, terms: { ref: "t", hash: "th" }, pdConsent: { ref: "pd", hash: "pdh" } };
+  const view = previewBookingView();
   let finish!: (outcome: BookingOutcome) => void;
   let calls = 0;
   const submit = async () => { calls++; return new Promise<BookingOutcome>((resolve) => { finish = resolve; }); };
@@ -128,6 +129,7 @@ test("checkout retains data across rejection, requires fresh proof, prevents dup
     await act(async () => { dispatch(); });
     assert.equal(calls, 0);
     await clickProof();
+    await act(async () => host.querySelector<HTMLInputElement>('input[name="paymentChoice"]')!.click());
     await act(async () => { dispatch(); dispatch(); });
     assert.equal(calls, 1);
     assert.equal(host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, true);
@@ -143,5 +145,62 @@ test("checkout retains data across rejection, requires fresh proof, prevents dup
     await act(async () => { dispatch(); });
     assert.equal(calls, 2);
     assert.match(host.textContent ?? "", /Заявка могла быть создана/);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+test("party changes require a refreshed quote and choice, without losing tourist/contact inputs", async () => {
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  let sizeRequested = 0, calls = 0;
+  const submit = async (): Promise<BookingOutcome> => { calls++; return { kind: "unknown" }; };
+  const onPartySizeChange = (size: number) => { sizeRequested = size; };
+  const render = async (view: BookingPresentation) => { await act(async () => root.render(createElement(NativeCheckout, { view, captcha: SyntheticWidget, submit, onPartySizeChange }))); };
+  const button = (text: string) => [...host.querySelectorAll("button")].find((item) => item.textContent === text)!;
+  const send = () => host.querySelector("form")!.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
+  try {
+    await render(previewBookingView());
+    const email = host.querySelector<HTMLInputElement>('input[name="email"]')!; email.value = "kept@example.invalid";
+    const name = host.querySelector<HTMLInputElement>('input[name="p1Name"]')!; name.value = "Synthetic Adult";
+    await act(async () => { host.querySelector<HTMLInputElement>('input[name="paymentChoice"]')!.click(); button("Solve synthetic captcha").click(); });
+    await act(async () => button("Добавить взрослого туриста").click());
+    assert.equal(sizeRequested, 2);
+    assert.match(host.textContent ?? "", /Ожидаем обновлённые цены/);
+    await act(async () => { send(); }); assert.equal(calls, 0);
+    await render(previewBookingView(2));
+    assert.equal(email.value, "kept@example.invalid"); assert.equal(name.value, "Synthetic Adult");
+    assert.match(host.textContent ?? "", /17 500 ₽/);
+    assert.match(host.textContent ?? "", /10 000 ₽/);
+    assert.equal(host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, true);
+    await act(async () => { host.querySelector<HTMLInputElement>('input[name="paymentChoice"]')!.click(); button("Solve synthetic captcha").click(); });
+    assert.equal(host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, false);
+    const revised = previewBookingView(2); revised.quote.hash = "changed-hash";
+    await render(revised);
+    assert.equal(host.querySelector<HTMLInputElement>('input[name="paymentChoice"]')!.checked, false);
+    await act(async () => { send(); }); assert.equal(calls, 0);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+test("payment presentation follows server options; children stay manager-assisted and additional fields follow one schema", async () => {
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  const render = async (view: BookingPresentation) => { await act(async () => root.render(createElement(NativeCheckout, { view, captcha: SyntheticWidget }))); };
+  try {
+    await render(previewBookingView(1, "capped"));
+    assert.match(host.querySelector('input[name="paymentChoice"]')!.parentElement!.textContent ?? "", /Предоплата — 4 000 ₽/);
+    assert.match(host.textContent ?? "", /дополнительная услуга/);
+    assert.match(host.textContent ?? "", /Для поездки с ребёнком нужна единая заявка/);
+    assert.ok(!host.textContent?.includes("ЕИС «Электронная путёвка»"));
+    const fullOnly = previewBookingView(1, "full-only");
+    fullOnly.touristDataSchema.fields = [{ key: "syntheticRequired", label: "Поле из синтетической схемы", type: "select", required: true, options: [{ value: "fixture", label: "Тест" }] }];
+    await render(fullOnly);
+    assert.equal(host.querySelectorAll('input[name="paymentChoice"]').length, 1);
+    assert.match(host.querySelector('input[name="paymentChoice"]')!.parentElement!.textContent ?? "", /Полная оплата/);
+    assert.equal(host.querySelector<HTMLSelectElement>('select[name="p1Extra_syntheticRequired"]')!.required, true);
+    await render(previewBookingView(1, "closed"));
+    assert.equal(host.querySelectorAll('input[name="paymentChoice"]').length, 0);
+    assert.match(host.textContent ?? "", /Онлайн-оформление закрыто/);
+    await render(previewBookingView(1, "schema-pending"));
+    assert.match(host.textContent ?? "", /Состав данных для оформления уточняется/);
+    assert.equal(host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, true);
   } finally { await act(async () => root.unmount()); host.remove(); }
 });

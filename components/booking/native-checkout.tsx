@@ -13,10 +13,11 @@ const card = "min-w-0 rounded-2xl border border-border bg-card p-5 sm:p-7";
 const action = "inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-secondary px-5 py-3 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-secondary/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-secondary disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground";
 
 /** Client composition port. No fetch, native API URL, bank redirect or seat allocator lives here. */
-export function NativeCheckout({ view, captcha, submit }: {
+export function NativeCheckout({ view, captcha, submit, onPartySizeChange }: {
   view: BookingPresentation;
   captcha?: CaptchaWidget;
   submit?: (draft: BookingDraft) => Promise<BookingOutcome>;
+  onPartySizeChange?: (size: number) => void;
 }) {
   const prefix = useId();
   const [participants, setParticipants] = useState([1]);
@@ -27,6 +28,10 @@ export function NativeCheckout({ view, captcha, submit }: {
   const [status, setStatus] = useState<"editing" | "submitting" | "unknown" | "review">("editing");
   const busy = useRef(false);
   const [notice, setNotice] = useState("");
+  const [paymentChoice, setPaymentChoice] = useState<{ quoteRef: string; quoteHash: string; optionRef: string } | null>(null);
+  const quoteReady = view.quote.participantCount === participants.length;
+  const selectedPayment = paymentChoice?.quoteRef === view.quote.ref && paymentChoice?.quoteHash === view.quote.hash
+    ? view.quote.paymentOptions.find((option) => option.ref === paymentChoice.optionRef) : undefined;
   const noticeRef = useRef<HTMLDivElement>(null);
   const reportProof = useCallback((token: string | null) => {
     proof.current = token;
@@ -40,8 +45,9 @@ export function NativeCheckout({ view, captcha, submit }: {
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy.current || status !== "editing" || !submit || !proof.current) return;
-    busy.current = true;
     const draft = bookingDraft(new FormData(event.currentTarget), view, participants, proof.current);
+    if (!draft || !selectedPayment || draft.paymentChoiceRef !== selectedPayment.ref) return;
+    busy.current = true;
     // Consume the proof before awaiting the server; a retry always needs a fresh widget/token.
     reportProof(null);
     setStatus("submitting");
@@ -65,6 +71,12 @@ export function NativeCheckout({ view, captcha, submit }: {
   }
 
   const locked = status !== "editing";
+  function changeParticipants(ids: number[]) {
+    setParticipants(ids);
+    setPaymentChoice(null);
+    retryCaptcha();
+    onPartySizeChange?.(ids.length);
+  }
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-14">
       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-secondary"><ShieldCheck className="size-4" aria-hidden />Онлайн-бронирование</p>
@@ -87,6 +99,7 @@ export function NativeCheckout({ view, captcha, submit }: {
               <label className="text-sm font-medium">Email<input className={input} name="email" type="email" autoComplete="email" required maxLength={254} /></label>
             </div>
           </fieldset>
+          <p className="text-sm leading-relaxed text-muted-foreground">В первой заявке можно оформить нескольких взрослых. Для поездки с ребёнком нужна единая заявка с родителем или законным опекуном через <Link href="/#contacts" prefetch={false} className="text-secondary underline underline-offset-4">менеджера</Link>.</p>
           {participants.map((id, index) => (
             <fieldset key={id} disabled={locked} className={card}>
               <legend className="px-2 text-lg font-semibold">Турист {index + 1}{index === 0 ? " · Вы" : ""}</legend>
@@ -98,12 +111,27 @@ export function NativeCheckout({ view, captcha, submit }: {
                 <label className="text-sm font-medium sm:col-span-2">Документ<select className={input} name={`p${id}DocType`}><option value="RU_PASSPORT">Паспорт гражданина РФ</option><option value="RU_INTERNATIONAL_PASSPORT">Заграничный паспорт гражданина РФ</option><option value="FOREIGN_DOCUMENT">Документ иностранного гражданина</option></select></label>
                 <label className="text-sm font-medium">Серия<input className={input} name={`p${id}DocSeries`} autoComplete="off" maxLength={10} /></label>
                 <label className="text-sm font-medium">Номер<input className={input} name={`p${id}DocNumber`} autoComplete="off" required maxLength={20} /></label>
+                {view.touristDataSchema.ready && view.touristDataSchema.fields.map((field) => <label key={field.key} className="text-sm font-medium sm:col-span-2">{field.label}
+                  {field.type === "select" ? <select className={input} name={`p${id}Extra_${field.key}`} required={field.required} defaultValue=""><option value="" disabled>Выберите значение</option>{field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+                    : <input className={input} name={`p${id}Extra_${field.key}`} type={field.type} required={field.required} maxLength={field.maxLength} autoComplete="off" />}
+                  {field.help && <span className="mt-1 text-xs font-normal text-muted-foreground">{field.help}</span>}
+                </label>)}
               </div>
-              {index > 0 && <button type="button" className="mt-5 rounded text-sm font-semibold text-secondary underline underline-offset-4" onClick={() => setParticipants((ids) => ids.filter((item) => item !== id))}>Убрать туриста {index + 1}</button>}
+              {index > 0 && <button type="button" className="mt-5 rounded text-sm font-semibold text-secondary underline underline-offset-4" onClick={() => changeParticipants(participants.filter((item) => item !== id))}>Убрать туриста {index + 1}</button>}
             </fieldset>
           ))}
           <datalist id={`${prefix}-countries`}><option value="RU">Россия</option><option value="BY">Беларусь</option><option value="KZ">Казахстан</option><option value="KG">Кыргызстан</option><option value="AM">Армения</option><option value="AZ">Азербайджан</option><option value="UZ">Узбекистан</option><option value="TJ">Таджикистан</option><option value="TM">Туркменистан</option><option value="MD">Молдова</option><option value="GE">Грузия</option><option value="MN">Монголия</option><option value="CN">Китай</option></datalist>
-          {participants.length < view.maxParticipants && <button type="button" disabled={locked} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-dashed border-secondary px-5 py-3 text-sm font-semibold text-secondary disabled:opacity-50" onClick={() => { const id = nextParticipant.current++; setParticipants((ids) => [...ids, id]); }}><Plus className="size-4" aria-hidden />Добавить туриста</button>}
+          {participants.length < view.maxParticipants && <button type="button" disabled={locked} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-dashed border-secondary px-5 py-3 text-sm font-semibold text-secondary disabled:opacity-50" onClick={() => { const id = nextParticipant.current++; changeParticipants([...participants, id]); }}><Plus className="size-4" aria-hidden />Добавить взрослого туриста</button>}
+          <fieldset disabled={locked || !quoteReady} className={`${card} space-y-3`}>
+            <legend className="px-2 text-lg font-semibold">Первый платёж</legend>
+            {view.quote.paymentOptions.map((option) => <label key={option.ref} className="flex items-start gap-3 rounded-xl border border-border p-4 text-sm">
+              <input type="radio" name="paymentChoice" value={option.ref} required className="mt-1 size-4 shrink-0 accent-secondary" checked={selectedPayment?.ref === option.ref} onChange={() => setPaymentChoice({ quoteRef: view.quote.ref, quoteHash: view.quote.hash, optionRef: option.ref })} />
+              <span><span className="block font-semibold">{option.kind === "DEPOSIT" ? "Предоплата" : "Полная оплата"} — {option.amountLabel}</span><span className="mt-1 block text-muted-foreground">Остаток: {option.remainingLabel}. {option.balanceDueLabel}</span></span>
+            </label>)}
+            <p className="text-xs leading-relaxed text-muted-foreground">Предоплата для новой заявки доступна до {view.schedule.depositUntilLabel}. Онлайн-оформление — до {view.schedule.publicBookingUntilLabel}. Часовой пояс: {view.schedule.timezone}.</p>
+            {view.quote.paymentOptions.length > 0 && view.quote.paymentOptions.every((option) => option.kind === "FULL") && <p className="text-sm text-muted-foreground">Для этой заявки доступна только полная оплата.</p>}
+            {view.quote.paymentOptions.length === 0 && <p role="status" className="text-sm">Онлайн-оформление закрыто. Свяжитесь с менеджером.</p>}
+          </fieldset>
           <fieldset className={card}>
             <legend className="px-2 text-lg font-semibold">Промокод</legend>
             <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end">
@@ -112,16 +140,18 @@ export function NativeCheckout({ view, captcha, submit }: {
             </div>
             <p id={`${prefix}-promo`} className="mt-4 text-sm leading-relaxed text-muted-foreground">Промокоды при онлайн-бронировании не принимаются. Цена в Заявке не зависит от промокода, и применить его после оформления или оплаты нельзя.</p>
           </fieldset>
-          <fieldset disabled={locked} className={`${card} space-y-4`}>
+          <fieldset key={`${view.terms.ref}:${view.terms.hash}:${view.pdConsent.ref}:${view.pdConsent.hash}:${view.touristDataSchema.ref}:${view.touristDataSchema.hash}:${participants.join(",")}`} disabled={locked} className={`${card} space-y-4`}>
             <legend className="px-2 text-lg font-semibold">Перед отправкой</legend>
             <label className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="pdConsent" value="yes" required /><span>Я отдельно даю <a className="text-secondary underline underline-offset-4" href="/soglasie-pd/" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a> в опубликованной редакции.</span></label>
             <label className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="adultsOnly" value="yes" required /><span>Все туристы совершеннолетние.</span></label>
-            <p className="text-xs leading-relaxed text-muted-foreground">Данные туристов нужны для договора и ЕИС «Электронная путёвка». <a href="/privacy-policy/" target="_blank" rel="noreferrer" className="text-secondary underline">Политика обработки данных</a>. Условия договора — в <a href="/oferta/" target="_blank" rel="noreferrer" className="text-secondary underline">Публичной оферте</a>.</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">Данные туристов нужны для оформления и исполнения договора. Состав данных и основания обработки указаны в <a href="/privacy-policy/" target="_blank" rel="noreferrer" className="text-secondary underline">Политике обработки данных</a>. Условия договора — в <a href="/oferta/" target="_blank" rel="noreferrer" className="text-secondary underline">Публичной оферте</a>.</p>
           </fieldset>
+          {!quoteReady && <p role="status" className="text-sm text-muted-foreground">Состав туристов изменился. Ожидаем обновлённые цены и условия оплаты.</p>}
+          {!view.touristDataSchema.ready && <p role="status" className="text-sm text-muted-foreground">Состав данных для оформления уточняется. Онлайн-отправка пока недоступна.</p>}
           {status === "editing" && <SmartCaptcha key={captchaRevision} widget={captcha} onProof={reportProof} onRetry={retryCaptcha} />}
           {notice && <div ref={noticeRef} tabIndex={-1} role="status" className="rounded-xl border border-border bg-accent p-5 text-sm leading-relaxed outline-secondary">{notice}</div>}
           {!submit && <p role="status" className="text-sm text-muted-foreground">Онлайн-отправка пока недоступна. Вы можете связаться с организатором.</p>}
-          <button type="submit" disabled={!submit || !hasProof || locked} className={`${action} w-full`}>
+          <button type="submit" disabled={!submit || !hasProof || locked || !quoteReady || !view.touristDataSchema.ready || !selectedPayment} className={`${action} w-full`}>
             {status === "submitting" ? "Отправляем заявку…" : status === "unknown" ? "Нужно уточнить состояние заявки" : status === "review" ? "Заявка получена" : "Перейти к проверке заявки"}<ArrowRight className="size-4" aria-hidden />
           </button>
           <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><LockKeyhole className="mt-0.5 size-3.5 shrink-0" aria-hidden />Отправка формы не списывает деньги. Оплата — после проверки Заявки.</p>
@@ -129,7 +159,7 @@ export function NativeCheckout({ view, captcha, submit }: {
         <aside aria-label="Ваша поездка" className="order-first min-w-0 lg:sticky lg:top-24 lg:order-last">
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
             <div className="bg-accent p-6"><p className="text-xs font-semibold uppercase tracking-widest text-accent-foreground">Ваша поездка</p><h2 className="mt-3 text-2xl font-semibold tracking-tight">{view.title}</h2><p className="mt-4 text-sm">{view.dateLabel}</p><p className="mt-1 text-sm text-muted-foreground">{view.departureLabel}</p></div>
-            <dl className="space-y-5 p-6"><div><dt className="text-xs text-muted-foreground">За одного туриста</dt><dd className="mt-1 text-3xl font-semibold tabular-nums">{view.priceLabel}</dd></div><div className="border-t border-border pt-5"><dt className="text-sm font-semibold">{view.paymentLabel}</dt><dd className="mt-2 text-sm leading-relaxed text-muted-foreground">{view.paymentDetail}</dd></div></dl>
+            {quoteReady ? <dl className="space-y-4 p-6">{view.quote.lines.map((line) => <div key={line.lineRef}><dt className="text-sm text-muted-foreground">{line.label}</dt><dd className="mt-1 font-semibold tabular-nums">{line.amountLabel}</dd></div>)}<div className="border-t border-border pt-5"><dt className="text-sm text-muted-foreground">Итого за заявку</dt><dd className="mt-1 text-3xl font-semibold tabular-nums">{view.quote.totalLabel}</dd></div>{selectedPayment && <div className="border-t border-border pt-5"><dt className="text-sm font-semibold">Первый платёж — {selectedPayment.amountLabel}</dt><dd className="mt-2 text-sm leading-relaxed text-muted-foreground">Остаток: {selectedPayment.remainingLabel}. {selectedPayment.balanceDueLabel}</dd></div>}</dl> : <p role="status" className="p-6 text-sm text-muted-foreground">Обновляем стоимость заявки…</p>}
           </div>
           <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><Check className="mt-0.5 size-4 shrink-0" aria-hidden />Наличие мест и условия бронирования проверим при отправке заявки.</p>
           <Link href="/#contacts" prefetch={false} className="mt-5 inline-block text-sm font-semibold text-secondary underline underline-offset-4">Связаться с организатором</Link>

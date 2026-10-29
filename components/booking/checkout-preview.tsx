@@ -1,18 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { BookingOutcome, BookingPresentation } from "@/lib/native-checkout";
+import type { BookingOutcome } from "@/lib/native-checkout";
 import type { CaptchaWidgetProps } from "./smartcaptcha";
 import { NativeCheckout } from "./native-checkout";
-
-const view: BookingPresentation = {
-  departureId: "preview-synthetic-departure", title: "Выходные в горах Алтая",
-  dateLabel: "14–16 ноября · пример выезда", departureLabel: "Отправление из Новосибирска",
-  priceLabel: "18 000 ₽", paymentLabel: "Первый взнос — 6 000 ₽",
-  paymentDetail: "Остаток — по условиям Заявки. Точные суммы и сроки вы увидите перед оплатой.",
-  maxParticipants: 4,
-  terms: { ref: "PREVIEW-ONLY", hash: "PREVIEW-ONLY" }, pdConsent: { ref: "PREVIEW-ONLY", hash: "PREVIEW-ONLY" },
-};
+import { previewBookingView, type PreviewPolicy } from "./checkout-preview-data";
 
 function SyntheticCaptcha({ onToken }: CaptchaWidgetProps) {
   const [state, setState] = useState("loading");
@@ -34,6 +26,9 @@ export function CheckoutPreview() {
   const [connected, setConnected] = useState(true);
   const [realCaptcha, setRealCaptcha] = useState(false);
   const [requests, setRequests] = useState(0);
+  const [partySize, setPartySize] = useState(1);
+  const [policy, setPolicy] = useState<PreviewPolicy>("deposit-and-full");
+  const view = previewBookingView(partySize, policy);
 
   async function submit(): Promise<BookingOutcome> {
     setRequests((count) => count + 1);
@@ -54,13 +49,14 @@ export function CheckoutPreview() {
           </select></label>
           <button type="button" disabled={realCaptcha} className="rounded-lg border border-border bg-card p-2" onClick={() => window.dispatchEvent(new Event("preview-captcha-invalid"))}>Истечение CAPTCHA</button>
           <button type="button" disabled={realCaptcha} className="rounded-lg border border-border bg-card p-2" onClick={() => window.dispatchEvent(new Event("preview-captcha-invalid"))}>Ошибка CAPTCHA</button>
-          <button type="button" className="rounded-lg border border-border bg-card p-2" onClick={() => { setSession((n) => n + 1); setRequests(0); }}>Новая сессия</button>
-          <label className="flex items-center gap-2 p-2"><input type="checkbox" checked={connected} onChange={(event) => { setConnected(event.target.checked); setSession((n) => n + 1); }} />Тестовый адаптер подключён</label>
-          <label className="flex items-center gap-2 p-2"><input type="checkbox" checked={realCaptcha} onChange={(event) => { setRealCaptcha(event.target.checked); setSession((n) => n + 1); }} />Реальная CAPTCHA Flexperiment</label>
+          <label className="grid gap-1">Ответ с условиями оплаты<select className="max-w-full rounded-lg border border-border bg-card p-2" value={policy} onChange={(event) => { setPolicy(event.target.value as PreviewPolicy); setPartySize(1); setSession((n) => n + 1); }}><option value="deposit-and-full">Предоплата или полная оплата</option><option value="full-only">После T−72: только полная</option><option value="closed">После T−24: закрыто</option><option value="capped">Билет 4 000 ₽ + услуга 2 000 ₽</option><option value="schema-pending">Состав данных ещё не готов</option></select></label>
+          <button type="button" className="rounded-lg border border-border bg-card p-2" onClick={() => { setSession((n) => n + 1); setRequests(0); setPartySize(1); }}>Новая сессия</button>
+          <label className="flex items-center gap-2 p-2"><input type="checkbox" checked={connected} onChange={(event) => { setConnected(event.target.checked); setPartySize(1); setSession((n) => n + 1); }} />Тестовый адаптер подключён</label>
+          <label className="flex items-center gap-2 p-2"><input type="checkbox" checked={realCaptcha} onChange={(event) => { setRealCaptcha(event.target.checked); setPartySize(1); setSession((n) => n + 1); }} />Реальная CAPTCHA Flexperiment</label>
         </div>
         <p role="status" className="mt-3 text-xs text-muted-foreground">Тестовых отправок: {requests}. Сетевых запросов к Commerce, банку и Refref: 0.</p>
       </div>
     </section>
-    <NativeCheckout key={session} view={view} captcha={realCaptcha ? undefined : SyntheticCaptcha} submit={connected ? submit : undefined} />
+    <NativeCheckout key={session} view={view} captcha={realCaptcha ? undefined : SyntheticCaptcha} submit={connected ? submit : undefined} onPartySizeChange={setPartySize} />
   </>;
 }

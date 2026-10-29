@@ -25,12 +25,14 @@ green, rounded panels and responsive grid. A compact trip/first-installment summ
 the form on desktop and before it on mobile.
 
 - `NativeCheckout`: contact details, tourist rows, legal consent, disabled promo, server notices.
-- `BookingPresentation`: display strings and admitted document identities supplied by a future
+- `BookingPresentation`: versioned quote/schema identities, allowed first-payment choices,
+  individual line amounts, cutoff labels and admitted document identities supplied by a future
   integration. No total, discount, balance, hold expiry or eligibility is calculated in the browser.
   `maxParticipants` is the form's party-size bound supplied by that integration, not seat availability.
 - `submit(BookingDraft)`: client composition port, **not** a frozen HTTP contract. The whitelist
-  includes tourist/contact/consent data and an opaque CAPTCHA proof. No price, profile, partner,
-  promo, query/autofill extras, arrival or payment-owner field is sent.
+  includes tourist/contact/consent data and an opaque CAPTCHA proof. Quote/schema identities and an allowed option reference bind the draft; only declared extra
+  tourist fields are included. No price, profile, partner, promo, query/autofill extras, arrival
+  or payment-owner field is sent.
 - `SmartCaptcha` wraps the reused Flexperiment React component (`components/booking/vendor/`).
   Its `onToken` / `resetKey` interface and SDK lifecycle replace the former custom mount/loader.
   The development lab injects a synthetic widget and in-memory submit callback; real CAPTCHA is
@@ -94,3 +96,12 @@ Agent D owns concurrency/flood/replay/TTL negative E2E. Qualify actual SmartCapt
 privacy disclosure and no tourist-data leakage in the selected renderer. Do not relax the current
 Commerce CSP merely to mount this component. TOUR-28, TOUR-49 and TOUR-81 remain In Progress
 until their full integration and independently gated acceptance is complete.
+
+## Merged PR #53 consumer alignment
+
+[The exact-commit impact review and UI decisions](2026-10-29-pr53-checkout-ui-alignment.md)
+update this skeleton for MK-POLICY-v2.4: server-supplied independent line prices, explicit
+deposit/full selection, deadlines/timezone and versioned additional tourist fields. Initial
+multi-adult bookings remain supported. Child self-service and unqualified additional PD fields
+are not enabled. Quote refresh is required after party changes; no client financial/seat policy
+is introduced. This does not qualify TOUR-80/84 legal inputs or TOUR-91 bank guarantees.
