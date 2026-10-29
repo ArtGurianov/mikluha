@@ -1,14 +1,29 @@
 #!/usr/bin/env bash
 # The second release read-back (ADR v2.3 §8): the container Coolify runs for an application was
-# created from the registry manifest the release chose. Read-only; run on the VPS:
+# created from the registry manifest the release chose. Read-only. By hand on the VPS:
 #
 #   ssh adman-vps 'bash -s -- <app-uuid> ghcr.io/artgurianov/mikluha-site-ssr sha256:<hex>' \
 #     < scripts/verify-running-digest.sh
 #
-# An image ID or config digest is not the registry digest, so the proof is the image's RepoDigests.
-# poc/coolify-digest/verify-running-digest.sh is the same check, fixed to the PoC repository.
+# or as the forced command of the release workflow's attestation key (site-ssr-release.yml), where
+# the three arguments arrive in SSH_ORIGINAL_COMMAND and nothing else can run:
+#
+#   restrict,command="/usr/local/sbin/verify-running-digest" ssh-ed25519 AAAA… site-ssr-attest
+#
+# Two independent facts must hold: the container was created from exactly `repo@digest` (its
+# .Config.Image, as Coolify 4.4.6 runs a digest release — ART-360 PoC), and that image's
+# RepoDigests contain it. An image ID or config digest is not the registry digest.
+# poc/coolify-digest/verify-running-digest.sh is the PoC's older check, fixed to its repository.
 set -euo pipefail
 
+if [ "$#" -eq 0 ] && [ -n "${SSH_ORIGINAL_COMMAND:-}" ]; then
+  # Word-split on purpose, never globbed: three plain tokens, each validated below before any use.
+  set -f
+  # shellcheck disable=SC2086
+  set -- $SSH_ORIGINAL_COMMAND
+  set +f
+fi
+[ "$#" -eq 3 ] || { echo "BAD_ARGS expected 3, got $#" >&2; exit 2; }
 usage='usage: verify-running-digest.sh <app-uuid> <ghcr.io/artgurianov/repo> sha256:<64 hex>'
 uuid="${1:?$usage}"
 repo="${2:?$usage}"
@@ -26,10 +41,12 @@ done
 [ "${#containers[@]}" -eq 1 ] || { echo "FAIL expected one running container for $uuid, found ${#containers[@]}"; exit 1; }
 c="${containers[0]}"
 image_id="$(docker inspect --format '{{.Image}}' "$c")"
+reference="$(docker inspect --format '{{.Config.Image}}' "$c")"
 echo "container  $(docker inspect --format '{{.Name}} started {{.State.StartedAt}}' "$c")"
-echo "reference  $(docker inspect --format '{{.Config.Image}}' "$c")"
+echo "reference  $reference"
 echo "image id   $image_id"
 echo "repo digests $(docker image inspect --format '{{json .RepoDigests}}' "$image_id")"
+[ "$reference" = "$repo@$digest" ] || { echo "FAIL container was created from '$reference', not $repo@$digest"; exit 1; }
 if docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image_id" | grep -qxF "$repo@$digest"; then
   echo "PASS running container is $repo@$digest"
 else

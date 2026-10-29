@@ -1,16 +1,20 @@
 #!/usr/bin/env tsx
 /**
  * TurboFlare × cloud.ru Evolution S3 probe (TOUR-56). Requests one public
- * processed variant directly and through the CDN custom host, and one private
- * original both ways, then prints the pass/fail matrix (lib/media-probe.ts).
- * Non-production objects only; it reads, never writes. Run protocol:
+ * processed variant directly and through the CDN custom host, proves with one
+ * authorized HEAD that a private original exists, requests it anonymously both
+ * ways, then prints the pass/fail matrix (lib/media-probe.ts). Non-production
+ * objects only; it reads, never writes. Run protocol:
  * docs/plans/2026-10-29-tour-56-turboflare-poc.md.
  *
  *   PROBE_ORIGIN_BASE=https://mikluha-maklai.s3.cloud.ru/cms/   direct public variant base
  *   PROBE_CDN_BASE=https://<turboflare custom host>/cms/         the same objects via TurboFlare
  *   PROBE_VARIANT=probe/turboflare-probe.webp                     relative to both bases
- *   PROBE_PRIVATE_URL=https://…/originals/probe.jpg               a private original, direct
- *   PROBE_PRIVATE_CDN_URL=https://<host>/originals/probe.jpg      optional: the CDN path to it
+ *   PROBE_PRIVATE_URL=https://…/originals/probe.jpg               a private original, anonymous direct URL
+ *   PROBE_PRIVATE_CDN_URL=https://<host>/originals/probe.jpg      the CDN path that would map to it
+ *   PROBE_S3_ENDPOINT=https://s3.cloud.ru, PROBE_S3_REGION=ru-central-1,
+ *   PROBE_S3_BUCKET, PROBE_PRIVATE_KEY (object key), PROBE_S3_ACCESS_KEY_ID,
+ *   PROBE_S3_SECRET_ACCESS_KEY                                    a read-only key for the authorized HEAD
  *   PROBE_SITE_ORIGIN=https://mikluha-maklai.ru                   Origin sent for CORS
  *   PROBE_MIN_TTL=86400                                           minimum edge TTL, seconds
  *   PROBE_OUT=<dir>                                               optional: write probe-<time>.{json,md}
@@ -22,6 +26,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { evaluate, matrixMarkdown, technicalResult, type Observed, type ProbeRun } from "../lib/media-probe";
+import { signS3Request } from "../lib/s3-sigv4";
 
 const MAX_BYTES = 16 * 1024 * 1024;
 
@@ -34,21 +39,23 @@ function env(name: string): string {
   return value;
 }
 
-function httpsBase(name: string): URL {
+function httpsBase(name: string, trailingSlash = true): URL {
   const url = new URL(env(name));
-  if (url.protocol !== "https:" || !url.pathname.endsWith("/") || url.search || url.username) {
-    console.error(`[media-probe] ${name} must be an https base ending in "/"`);
+  if (url.protocol !== "https:" || (trailingSlash && !url.pathname.endsWith("/")) || url.search || url.username) {
+    console.error(`[media-probe] ${name} must be an https ${trailingSlash ? 'base ending in "/"' : "origin"}`);
     process.exit(2);
   }
   return url;
 }
 
-async function observe(url: string, init: { origin?: string; body?: boolean } = {}): Promise<Observed> {
+async function observe(url: string,
+  init: { origin?: string; body?: boolean; method?: string; headers?: Record<string, string> } = {}): Promise<Observed> {
   try {
     const res = await fetch(url, {
+      method: init.method ?? "GET",
       redirect: "manual",
       cache: "no-store",
-      headers: init.origin ? { origin: init.origin } : {},
+      headers: { ...(init.origin ? { origin: init.origin } : {}), ...init.headers },
       signal: AbortSignal.timeout(15_000),
     });
     const headers = Object.fromEntries([...res.headers].map(([k, v]) => [k.toLowerCase(), v]));
@@ -76,14 +83,22 @@ async function main() {
   // A query the edge has never seen: the first request has to go to the origin.
   const fresh = `${cdnUrl}?probe=${randomBytes(8).toString("hex")}`;
 
+  const s3 = httpsBase("PROBE_S3_ENDPOINT", false);
+  const existsUrl = new URL(`/${env("PROBE_S3_BUCKET")}/${env("PROBE_PRIVATE_KEY").replace(/^\/+/, "")}`, s3);
+  const signed = signS3Request("HEAD", existsUrl, {
+    accessKeyId: env("PROBE_S3_ACCESS_KEY_ID"), secretAccessKey: env("PROBE_S3_SECRET_ACCESS_KEY"),
+    region: process.env.PROBE_S3_REGION?.trim() || "ru-central-1",
+  }, new Date());
+
   const run: ProbeRun = {
     originVariant: await observe(originUrl, { body: true }),
     cdnVariant: await observe(cdnUrl, { body: true, origin: siteOrigin }),
     cdnFirst: await observe(fresh),
     cdnSecond: await observe(fresh),
     cdnPlainHttp: await observe(cdnUrl.replace(/^https:/, "http:")),
+    privateExists: await observe(existsUrl.href, { method: "HEAD", headers: signed }),
     originPrivate: await observe(env("PROBE_PRIVATE_URL")),
-    ...(process.env.PROBE_PRIVATE_CDN_URL ? { cdnPrivate: await observe(process.env.PROBE_PRIVATE_CDN_URL) } : {}),
+    cdnPrivate: await observe(env("PROBE_PRIVATE_CDN_URL")),
     siteOrigin,
     minTtlSeconds,
   };

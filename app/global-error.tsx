@@ -3,11 +3,9 @@
 import "./globals.css";
 
 /**
- * Under SSR every page starts with one Commerce read in the root layout
- * (lib/cms/content.ts). When it fails, Next answers 500 with its bare error
- * document and this paints the message in the browser: no dates, prices or
- * booking buttons, never a stale copy (ADR v2.3 §9 item 8). The static export
- * never reaches it.
+ * The last resort when the root layout itself fails. The layout never reads
+ * Commerce (a catalog outage is app/error.tsx), so this is a broken release,
+ * not an outage: no dates, prices or booking buttons, never a stale copy.
  */
 export default function GlobalError() {
   return (

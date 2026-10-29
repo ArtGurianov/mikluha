@@ -33,12 +33,13 @@ Required rows decide `TECHNICAL_PASS`; the others are recorded for the decision.
 | T5 | A never-seen URL is a cache MISS, the repeat a HIT | yes |
 | T6 | Edge TTL (`s-maxage`, else `max-age`) ≥ `PROBE_MIN_TTL` (default 86 400 s) | yes |
 | T7 | The CDN sets no cookie | yes |
-| T8 | A private original is not readable directly (401/403/404/refused) | yes |
-| T9 | A private original is not readable through the CDN host | yes, when `PROBE_PRIVATE_CDN_URL` is given |
-| T10 | Plain HTTP on the CDN host redirects to HTTPS or is refused | no |
-| T11 | CORS allows the site origin (images in `<img>` do not need it) | no |
-| T12 | `X-Content-Type-Options: nosniff` | no |
-| T13 | `Strict-Transport-Security` | no |
+| T8 | The private original exists (authorized SigV4 HEAD, `PROBE_S3_*`) | yes |
+| T9 | Anonymous direct request for it is refused (401/403/404); a network error or an unconfirmed object is FAIL | yes |
+| T10 | The same through the CDN host (`PROBE_PRIVATE_CDN_URL`, required) | yes |
+| T11 | Plain HTTP on the CDN host redirects to HTTPS or is refused | no |
+| T12 | CORS allows the site origin | yes |
+| T13 | `X-Content-Type-Options: nosniff` | no |
+| T14 | `Strict-Transport-Security` | no |
 
 Rules that hold whatever the matrix says: only processed public variants are ever public; originals
 stay private (TOUR-63); no CNAME straight to the bucket and no always-on gateway are assumed — T2

@@ -78,11 +78,23 @@ async function main() {
   }
 
   if (FIXTURE && tourSlug) {
-    const catalog = await (await fetch(`${FIXTURE}/public/v1/catalog`)).json() as { tours: { slug: string; title: string }[] };
+    const catalog = await (await fetch(`${FIXTURE}/public/v1/catalog`)).json() as {
+      tours: { slug: string; title: string }[];
+      departures: { slug: string; tourSlug: string; priceKopecks: number | null }[];
+    };
     const marker = `Проверка SSR ${Date.now()}`;
-    await fixture("/__fixture/catalog", { ...catalog, tours: catalog.tours.map((t) => t.slug === tourSlug ? { ...t, title: marker } : t) });
+    await fixture("/__fixture/catalog", {
+      ...catalog,
+      tours: catalog.tours.map((t) => t.slug === tourSlug ? { ...t, title: marker } : t),
+      // One future, closed departure of that tour with kopecks in its price: the page shows it next.
+      departures: [...catalog.departures, { ...catalog.departures.find((d) => d.tourSlug === tourSlug)!,
+        slug: "ssr-smoke-kopecks", startsOn: "2099-06-01", endsOn: "2099-06-04", bookingStatus: "CLOSED",
+        priceKopecks: 3_450_050 }],
+    });
     try {
-      check((await page(`/tours/${tourSlug}/`)).html.includes(marker), "a projection change shows on the next request");
+      const changed = await page(`/tours/${tourSlug}/`);
+      check(changed.html.includes(marker), "a projection change shows on the next request");
+      check(/34\s500,50\s₽/u.test(changed.html), "a price with kopecks is shown as Commerce has it (34 500,50 ₽)");
     } finally {
       await fixture("/__fixture/catalog", catalog);
     }
@@ -91,10 +103,12 @@ async function main() {
     try {
       const outage = await page("/");
       check(outage.res.status >= 500, `Commerce outage: GET / is an error (${outage.res.status})`);
-      // Next answers a failed root layout with its error document; app/global-error.tsx paints the
-      // message in the browser. What matters here: no price and no departure reaches the HTML.
-      check(outage.html.includes('id="__next_error__"') && !outage.html.includes("₽") && !outage.html.includes("/tours/"),
-        "Commerce outage: error document, no prices or tours");
+      // Next answers with its error document; the browser renders the layout (which never reads
+      // Commerce) and app/error.tsx from the payload. What matters here: no price, tour or booking
+      // link reaches the response, and the legal pages keep working.
+      check(!outage.html.includes("₽") && !outage.html.includes('href="/tours/') && !outage.html.includes("/book"),
+        "Commerce outage: no prices, tours or booking links");
+      check((await page("/oferta/")).res.status === 200, "Commerce outage: GET /oferta/ is still 200");
     } finally {
       await fixture("/__fixture/up");
     }

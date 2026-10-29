@@ -24,8 +24,11 @@ export interface ProbeRun {
   readonly cdnSecond: Observed;
   /** The same variant through the CDN host over plain HTTP. */
   readonly cdnPlainHttp: Observed;
+  /** An authorized (SigV4) HEAD of the private original: it must exist for a refusal to mean anything. */
+  readonly privateExists: Observed;
+  /** The same original, anonymously: directly, and through the CDN host. */
   readonly originPrivate: Observed;
-  readonly cdnPrivate?: Observed;
+  readonly cdnPrivate: Observed;
   readonly siteOrigin: string;
   readonly minTtlSeconds: number;
 }
@@ -84,7 +87,11 @@ export function evaluate(run: ProbeRun): MatrixRow[] {
   const acao = c.headers["access-control-allow-origin"];
   const plain = run.cdnPlainHttp;
   const plainLocation = plain.headers.location ?? "";
-  const refused = (x: Observed) => x.status === null || x.status === 401 || x.status === 403 || x.status === 404;
+  // A refusal counts only as an HTTP answer about an object known to exist. A DNS, TLS or timeout
+  // failure proves nothing about access, and S3 answers 403 for missing objects too.
+  const exists = run.privateExists.status === 200;
+  const refused = (x: Observed) => exists && (x.status === 401 || x.status === 403 || x.status === 404);
+  const refusal = (x: Observed) => `${x.url} → ${said(x)}${exists ? "" : "; existence not confirmed"}`;
 
   return [
     row("T1", "Direct cloud.ru HTTPS serves the processed variant", true, o.status === 200, `${o.url} → ${said(o)}`),
@@ -100,20 +107,20 @@ export function evaluate(run: ProbeRun): MatrixRow[] {
       `cache-control: ${c.headers["cache-control"] ?? "—"}`),
     row("T7", "CDN sets no cookie", true, c.status === 200 && c.headers["set-cookie"] === undefined,
       c.status === 200 ? c.headers["set-cookie"] ?? "none" : `no variant response (${said(c)})`),
-    row("T8", "Private original is not readable directly", true, refused(run.originPrivate),
-      `${run.originPrivate.url} → ${said(run.originPrivate)}`),
-    ...(run.cdnPrivate === undefined ? [] : [
-      row("T9", "Private original is not readable through the CDN", true, refused(run.cdnPrivate),
-        `${run.cdnPrivate.url} → ${said(run.cdnPrivate)}`),
-    ]),
-    row("T10", "Plain HTTP on the CDN host redirects to HTTPS or is refused", false,
+    row("T8", "Private original exists (authorized HEAD)", true, exists,
+      `${run.privateExists.url} → ${said(run.privateExists)}`),
+    row("T9", "Private original is refused directly (401/403/404)", true, refused(run.originPrivate),
+      refusal(run.originPrivate)),
+    row("T10", "Private original is refused through the CDN host (401/403/404)", true, refused(run.cdnPrivate),
+      refusal(run.cdnPrivate)),
+    row("T11", "Plain HTTP on the CDN host redirects to HTTPS or is refused", false,
       plain.status === null || ([301, 302, 307, 308].includes(plain.status) && plainLocation.startsWith("https://")),
       `${plain.url} → ${said(plain)} ${plainLocation}`.trim()),
-    row("T11", "CORS allows the site origin", false, acao === "*" || acao === run.siteOrigin,
+    row("T12", "CORS allows the site origin", true, acao === "*" || acao === run.siteOrigin,
       `access-control-allow-origin: ${acao ?? "—"} (requested from ${run.siteOrigin})`),
-    row("T12", "CDN sends X-Content-Type-Options: nosniff", false,
+    row("T13", "CDN sends X-Content-Type-Options: nosniff", false,
       (c.headers["x-content-type-options"] ?? "").toLowerCase() === "nosniff", c.headers["x-content-type-options"] ?? "—"),
-    row("T13", "CDN sends Strict-Transport-Security", false, c.headers["strict-transport-security"] !== undefined,
+    row("T14", "CDN sends Strict-Transport-Security", false, c.headers["strict-transport-security"] !== undefined,
       c.headers["strict-transport-security"] ?? "—"),
   ];
 }

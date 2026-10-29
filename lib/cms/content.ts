@@ -4,6 +4,7 @@ import path from "node:path";
 import { connection } from "next/server";
 import { cache } from "react";
 
+import { assertCatalogLaunchReady } from "../launch-gate";
 import { isSsr } from "../site";
 import { mediaDeliveryFromEnv, withMediaDelivery } from "./media-delivery";
 import { normalizeCatalog } from "./normalize";
@@ -37,18 +38,36 @@ export function getBakedContent(): ContentSnapshot {
   return cached;
 }
 
+export type SiteContent = Pick<ContentSnapshot, "siteSettings" | "legalPages">;
+
 /**
- * What a page renders. Static export: the baked snapshot. SSR (TOUR-60): one
- * Commerce projection read per request, shared by the layout, metadata and the
- * page, with media URLs resolved for the current delivery mode. Never
- * prerendered: a build never reads production data.
+ * Site settings and legal pages only, never Commerce: the root layout and the
+ * legal pages render through a Commerce outage. Under SSR it still waits for
+ * the request, so the media delivery switch applies without a rebuild.
+ */
+export const loadSiteContent = cache(async (): Promise<SiteContent> => {
+  const { siteSettings, legalPages } = getBakedContent();
+  if (!isSsr) return { siteSettings, legalPages };
+  await connection();
+  return withMediaDelivery({ siteSettings, legalPages }, mediaDeliveryFromEnv());
+});
+
+/**
+ * What a catalog page renders. Static export: the baked snapshot. SSR
+ * (TOUR-60): one Commerce projection read per request, shared by metadata and
+ * the page, with media URLs resolved for the current delivery mode. Never
+ * prerendered: a build never reads production data. Once the site is
+ * launch-ready, a catalog the static build would have refused is refused here
+ * (lib/launch-gate.ts), so publishing cannot bypass the release gate.
  */
 export const loadContent = cache(async (): Promise<ContentSnapshot> => {
   if (!isSsr) return getBakedContent();
   await connection();
+  const baked = getBakedContent();
   const catalog = normalizeCatalog(projectionToRaw(await fetchPublicCatalog()));
+  if (baked.siteSettings.launchReady) assertCatalogLaunchReady(catalog);
   return withMediaDelivery(
-    { ...getBakedContent(), ...catalog, source: "commerce", generatedAt: new Date().toISOString() },
+    { ...baked, ...catalog, source: "commerce", generatedAt: new Date().toISOString() },
     mediaDeliveryFromEnv(),
   );
 });

@@ -5,6 +5,11 @@ name: site-ssr-release
 # Docker Image application, deploy, follow to a terminal state and read /identity back. The running
 # container's RepoDigests are the second read-back, on the VPS (scripts/verify-running-digest.sh).
 #
+# A release succeeds only when the host read-back passes too, inside the same concurrency group: a
+# running container that is not exactly the chosen digest fails the release, even if /identity
+# matches (another image of the same commit would). Without the attestation credential the release
+# ends NOT_ATTESTED, failed, never as a success.
+#
 # Manual only. It never runs on push: Git auto-deploy stays off, and pointing a public domain at this
 # application is the owner-authorized hard cut (TOUR-67), not something this workflow decides.
 #
@@ -14,7 +19,10 @@ name: site-ssr-release
 # Environment `site-ssr` (main only): vars SITE_SSR_APP_UUID, SITE_SSR_IDENTITY_URL
 # (https://<host>/identity), SITE_SSR_DEPLOY_ENV (staging|production), SITE_SSR_SITE_URL; secrets
 # COOLIFY_BASE_URL, COOLIFY_SITE_SSR_WRITE_TOKEN (read+write: PATCH and read-backs) and
-# COOLIFY_SITE_SSR_DEPLOY_TOKEN (deploy only). Not the static site's or the PoC's tokens.
+# COOLIFY_SITE_SSR_DEPLOY_TOKEN (deploy only), SITE_SSR_ATTEST_SSH_KEY + SITE_SSR_ATTEST_KNOWN_HOSTS +
+# var SITE_SSR_ATTEST_HOST (user@host): a key whose authorized_keys line is `restrict` with the forced
+# command scripts/verify-running-digest.sh, so it can run that read-only check and nothing else.
+# Not the static site's or the PoC's tokens.
 
 on:
   workflow_dispatch:
@@ -142,6 +150,7 @@ jobs:
       DEPLOY_TOKEN: ${{ secrets.COOLIFY_SITE_SSR_DEPLOY_TOKEN }}
       APP_UUID: ${{ vars.SITE_SSR_APP_UUID }}
       IDENTITY_URL: ${{ vars.SITE_SSR_IDENTITY_URL }}
+      ATTEST_HOST: ${{ vars.SITE_SSR_ATTEST_HOST }}
       DIGEST: ${{ needs.candidate.outputs.digest }}
       COMMIT: ${{ needs.candidate.outputs.commit }}
     steps:
@@ -215,11 +224,33 @@ jobs:
             sleep 10
           done
           [ "$got" = "$COMMIT" ] || { echo "::error::/identity reports '$got', not $COMMIT"; exit 1; }
+
+      - name: The running container is the chosen digest (host read-back)
+        env:
+          ATTEST_KEY: ${{ secrets.SITE_SSR_ATTEST_SSH_KEY }}
+          ATTEST_KNOWN_HOSTS: ${{ secrets.SITE_SSR_ATTEST_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ATTEST_KEY:-}" ] || [ -z "${ATTEST_KNOWN_HOSTS:-}" ] || [ -z "${ATTEST_HOST:-}" ]; then
+            echo "::error::NOT_ATTESTED: no host attestation credential; deployed but not an accepted release"
+            echo "Run by hand: ssh adman-vps 'bash -s -- $APP_UUID $IMAGE $DIGEST' < scripts/verify-running-digest.sh"
+            exit 1
+          fi
+          dir="$(mktemp -d)"; trap 'rm -rf "$dir"' EXIT
+          printf '%s\n' "$ATTEST_KEY" >"$dir/key"; chmod 600 "$dir/key"
+          printf '%s\n' "$ATTEST_KNOWN_HOSTS" >"$dir/known_hosts"
+          # The forced command takes these three tokens from SSH_ORIGINAL_COMMAND; no shell runs them.
+          ssh -i "$dir/key" -o IdentitiesOnly=yes -o UserKnownHostsFile="$dir/known_hosts" -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes -o ConnectTimeout=15 "$ATTEST_HOST" "$APP_UUID $IMAGE $DIGEST" | tee "$dir/out"
+          grep -qxF "PASS running container is $IMAGE@$DIGEST" "$dir/out" \
+            || { echo "::error::host read-back did not confirm $IMAGE@$DIGEST"; exit 1; }
+
+      - name: Summary
+        run: |
           {
             echo "### Released"
             echo "- image: \`$IMAGE@$DIGEST\`"
             echo "- commit: \`$COMMIT\`, deployment \`$DEPLOYMENT\`: finished, /identity matches"
+            echo "- running container: \`$IMAGE@$DIGEST\` (Config.Image and RepoDigests, on the host)"
             echo "- rollback: dispatch with this digest and commit"
-            echo "- second read-back on the VPS:"
-            echo "  \`ssh adman-vps 'bash -s -- $APP_UUID $IMAGE $DIGEST' < scripts/verify-running-digest.sh\`"
           } >>"$GITHUB_STEP_SUMMARY"

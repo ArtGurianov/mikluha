@@ -31,8 +31,9 @@ const nextConfig: NextConfig = ssr
       },
       // The release read-back (ADR v2.3 §8): the build-baked descriptor, never a runtime env
       // (Coolify sets SOURCE_COMMIT=HEAD in the container).
+      // beforeFiles: ahead of the root-level legal route, which would otherwise claim the path.
       async rewrites() {
-        return [{ source: "/identity", destination: "/release.json" }];
+        return { beforeFiles: [{ source: "/identity", destination: "/release.json" }], afterFiles: [], fallback: [] };
       },
       async headers() {
         return [{ source: "/:path*", headers: securityHeaders }];
