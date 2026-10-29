@@ -1,0 +1,54 @@
+# Local non-production fixture only. No Docker socket, host network, S3 keys or VPS routes.
+services:
+  origin:
+    image: node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+    command: [node, /fixture/origin.mjs]
+    volumes:
+      - ./origin.mjs:/fixture/origin.mjs:ro
+    ports: ["127.0.0.1:18088:8080"]
+    networks: [lab]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 32
+  cache:
+    image: nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
+    entrypoint: [nginx, -g, "daemon off;"]
+    user: "${POC_UID:-101}:${POC_GID:-101}"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./.runtime/allowed.map:/etc/nginx/allowed.map:ro
+      - ./.runtime/cache:/cache
+    tmpfs: ["/tmp:size=8m,mode=1777"]
+    networks: [lab]
+    depends_on: [origin]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 32
+  edge:
+    image: traefik:v3.6@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
+    command:
+      - --entrypoints.websecure.address=:8443
+      - --providers.file.filename=/lab/traefik.yaml
+      - --log.level=FATAL
+      - --api=false
+    volumes:
+      - ./traefik.yaml:/lab/traefik.yaml:ro
+      - ./.runtime/certs:/certs:ro
+    ports: ["127.0.0.1:18488:8443"]
+    networks: [lab]
+    depends_on: [cache]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 64
+networks:
+  lab:
+    internal: false

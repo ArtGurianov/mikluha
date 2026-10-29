@@ -46,3 +46,18 @@ test("withMediaDelivery resolves every asset src and nothing else", () => {
   assert.equal(resolved.siteSettings.siteUrl, ORIGIN);
   assert.equal(snapshot.tours[0]!.coverImage.src, `${ORIGIN}a.webp`, "the baked snapshot is never mutated");
 });
+
+test("regional photo cache uses the existing switch; videos, originals and purchase fields stay outside it", () => {
+  const origin = "https://mikluha-maklai.s3.cloud.ru/processed/";
+  const photo = `${origin}${"a".repeat(64)}/hero.webp`;
+  const snapshot = { photo: { src: photo }, video: { src: `${ORIGIN}hero.webm` },
+    original: { src: "https://private.example/originals/hero.jpg" }, purchaseRef: "purchase-synthetic" };
+  const local = mediaDeliveryFromEnv({ MEDIA_DELIVERY: "cdn", MEDIA_ORIGIN_BASE: origin,
+    MEDIA_CDN_BASE: "https://media.localhost/processed/" });
+  const resolved = withMediaDelivery(snapshot, local);
+  assert.equal(resolved.photo.src, `https://media.localhost/processed/${"a".repeat(64)}/hero.webp`);
+  assert.equal(resolved.video.src, snapshot.video.src);
+  assert.equal(resolved.original.src, snapshot.original.src);
+  assert.equal(resolved.purchaseRef, snapshot.purchaseRef);
+  assert.deepEqual(withMediaDelivery(snapshot, mediaDeliveryFromEnv({ MEDIA_DELIVERY: "direct" })), snapshot);
+});

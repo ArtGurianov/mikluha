@@ -1,0 +1,340 @@
+{
+  "capturedAt": "2026-10-29T11:37:38.314598+00:00",
+  "vantage": "adman-vps",
+  "scope": "DIRECT_S3_READ_ONLY_BASELINE_NOT_REGIONAL_COMPARISON",
+  "notes": [
+    "operator-mac location/network not independently verified",
+    "new TLS connection per sample; cold browser, no cookies; no provider billing measurement",
+    "legacy mutable object names: inventory only, not eligible immutable cache keys"
+  ],
+  "objects": [
+    {
+      "url": "https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp",
+      "headers": {
+        "content-type": "image/webp",
+        "content-length": "181750",
+        "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+        "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+      },
+      "samples": [
+        {
+          "status": 200,
+          "ttfbMs": 290.152,
+          "totalMs": 426.917,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 596.453,
+          "totalMs": 742.24,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 187.092,
+          "totalMs": 329.043,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 162.677,
+          "totalMs": 302.636,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 166.764,
+          "totalMs": 305.347,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 204.217,
+          "totalMs": 348.115,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 196.911,
+          "totalMs": 338.603,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 213.525,
+          "totalMs": 354.611,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 172.732,
+          "totalMs": 320.769,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 237.506,
+          "totalMs": 381.978,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 223.737,
+          "totalMs": 374.44,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 225.586,
+          "totalMs": 436.136,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 380.859,
+          "totalMs": 536.591,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 155.434,
+          "totalMs": 292.589,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 197.734,
+          "totalMs": 339.43,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 172.949,
+          "totalMs": 313.877,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 167.125,
+          "totalMs": 310.598,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 168.552,
+          "totalMs": 337.328,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 180.236,
+          "totalMs": 317.301,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 155.157,
+          "totalMs": 296.56,
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17"
+        }
+      ],
+      "ttfbMs": {
+        "p50": 187.092,
+        "p75": 223.737,
+        "p95": 380.859
+      },
+      "totalMs": {
+        "p50": 337.328,
+        "p75": 374.44,
+        "p95": 536.591
+      },
+      "errorCount": 0,
+      "requests": 20,
+      "downloadedBytes": 3635000
+    },
+    {
+      "url": "https://mikluha-maklai.s3.cloud.ru/cms/organized.webp",
+      "headers": {
+        "content-type": "image/webp",
+        "content-length": "470636",
+        "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+        "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+      },
+      "samples": [
+        {
+          "status": 200,
+          "ttfbMs": 219.733,
+          "totalMs": 460.453,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 615.067,
+          "totalMs": 857.701,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 180.307,
+          "totalMs": 407.105,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 307.42,
+          "totalMs": 544.089,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 193.601,
+          "totalMs": 422.167,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 207.905,
+          "totalMs": 468.532,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 182.31,
+          "totalMs": 385.691,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 190.648,
+          "totalMs": 422.891,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 214.544,
+          "totalMs": 657.748,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 166.762,
+          "totalMs": 372.83,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 227.244,
+          "totalMs": 457.67,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 182.31,
+          "totalMs": 392.547,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 198.87,
+          "totalMs": 399.504,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 374.816,
+          "totalMs": 720.471,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 191.468,
+          "totalMs": 416.423,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 282.088,
+          "totalMs": 512.828,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 186.923,
+          "totalMs": 413.677,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 256.153,
+          "totalMs": 679.244,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 162.83,
+          "totalMs": 396.073,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        },
+        {
+          "status": 200,
+          "ttfbMs": 213.378,
+          "totalMs": 522.131,
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c"
+        }
+      ],
+      "ttfbMs": {
+        "p50": 198.87,
+        "p75": 227.244,
+        "p95": 374.816
+      },
+      "totalMs": {
+        "p50": 422.891,
+        "p75": 522.131,
+        "p95": 720.471
+      },
+      "errorCount": 0,
+      "requests": 20,
+      "downloadedBytes": 9412720
+    }
+  ]
+}

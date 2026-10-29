@@ -94,6 +94,20 @@ jobs:
       - if: failure()
         run: docker logs ssr || true
 
+  # TOUR-88: local TLS/cache fixture only; no S3 keys, VPS access or deployment.
+  regional-media-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Traefik / NGINX security and cache behavior
+        run: python3 poc/regional-media-cache/run.py /tmp/tour-88-local-poc.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tour-88-local-poc
+          path: /tmp/tour-88-local-poc.json
+
   # mikluha-commerce (commerce/README.md): its own package, tests against a real Postgres, and the
   # image built from the repository root, as Coolify builds it.
   commerce:

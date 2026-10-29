@@ -1,0 +1,58 @@
+{
+  "observedDate": "2026-10-29",
+  "rdap": {
+    "url": "https://rdap.db.ripe.net/ip/185.175.159.228",
+    "name": "Adman",
+    "country": "RU",
+    "startAddress": "185.175.159.0",
+    "endAddress": "185.175.159.255"
+  },
+  "providerFacilitySource": "https://adman.com/pages/dc/",
+  "cloudPlatformSource": "https://cloud.ru/docs/evolution/overview/index",
+  "vpsOrderPhysicalLocation": "NOT_CONFIRMED",
+  "bucketPhysicalLocation": "NOT_CONFIRMED",
+  "routeCommand": "ssh adman-vps tracepath -n -m 8 176.109.98.30",
+  "routeObservedHops": [
+    {
+      "hop": 1,
+      "ip": "46.8.97.1",
+      "rttMs": 1.638
+    },
+    {
+      "hop": 2,
+      "ip": "185.133.41.60",
+      "rttMs": 1.524
+    },
+    {
+      "hop": 3,
+      "ip": "195.218.202.113",
+      "rttMs": 0.82
+    },
+    {
+      "hop": 4,
+      "ip": "79.104.235.205",
+      "rttMs": 53.502
+    },
+    {
+      "hop": 5,
+      "reply": false
+    },
+    {
+      "hop": 6,
+      "ip": "100.105.106.54",
+      "rttMs": 46.464
+    },
+    {
+      "hop": 7,
+      "ip": "10.40.74.38",
+      "rttMs": 45.108
+    },
+    {
+      "hop": 8,
+      "ip": "172.29.65.254",
+      "rttMs": 46.977
+    }
+  ],
+  "routeReachedDestination": false,
+  "conclusion": "Partial route and provider facility description do not prove exact VPS/bucket physical location or user-network performance"
+}
