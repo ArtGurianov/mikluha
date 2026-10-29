@@ -45,9 +45,10 @@ static; everything that sells a trip lives here, with its own Postgres.
 
 - ART-382: the Refref vNext arrival endpoint `/arrive` with the 30-day browser context and the
   after-response claim (see "Refref vNext arrival"). Not yet used by checkout (ART-383).
-- TOUR-81: native entry under `NATIVE_NO_REFERRAL`. `/arrive` is inert and the service builds no
-  Arrivals or vNext client, whatever `REFREF_VNEXT_API_BASE` says; the order form shows the promo
-  code and Apply disabled. Legacy RC read-back of existing orders is unchanged (see "Native entry").
+- TOUR-81 (interim): new referral ingress and promo codes are off. `/arrive` is inert and the
+  service builds no Arrivals or vNext client, whatever `REFREF_VNEXT_API_BASE` says; the order form
+  shows the promo code and Apply disabled. Checkout itself is still the legacy Refref RC handoff
+  until TOUR-76/77/78 (see "Native entry").
 - migration 0011 and the isolated Admin API (ADR v2.3 §7, ART-363): password + TOTP at every
   login, sessions, OWNER-only publishing and classification bound to the signed-in session, the
   audited SSH reset, `admin_app`/`admin_publisher`/`admin_operator` capabilities, and the static Control Room in
@@ -143,9 +144,15 @@ POST /orders/<ref>/pay        freeze the snapshot → the one attempt → paymen
 | personal data to Refref | the receipt email in the payment session, which PROVIDER fiscalization requires. Nothing else |
 | the switch | closed: no new payment session. Reading back, fulfilment and cancellation go on |
 
-## Native entry: NATIVE_NO_REFERRAL (TOUR-81)
+## Native entry: NATIVE_NO_REFERRAL (TOUR-81, interim)
 
-New buyers take no referral (`docs/refref-v10/05` M4). This is the code, not the configuration:
+TOUR-81 turns off new referral ingress and promo codes (`docs/refref-v10/05` M4). It does **not**
+make checkout native: until TOUR-76/77/78 switch it, `POST /orders` still hands every new order to
+the legacy Refref RC attribution handoff, and Refref may still resolve a referral discount there
+(`/return`, the order page). The full `NATIVE_NO_REFERRAL` requirement for new purchases is not yet
+accepted. Do not deploy this state on its own: it drops arrivals while checkout is still Refref's.
+
+What is off now is the code, not the configuration:
 
 | | |
 |---|---|
@@ -157,7 +164,8 @@ New buyers take no referral (`docs/refref-v10/05` M4). This is the code, not the
 
 `test/native-ingress.test.ts` proves it over HTTP and against the real entrypoint with
 `REFREF_VNEXT_API_BASE` pointing at a live claim server, across a restart, while the legacy
-read-back is counted separately. The section below is the deferred prior contract.
+read-back is counted separately. It does not cover a native purchase, which does not exist yet.
+The section below is the deferred prior contract.
 
 ## Refref vNext arrival (ART-382, Refref ADR-139 `docs/29` §2, §4, §6, §8)
 

@@ -7,9 +7,10 @@
 //   POST /orders/<ref>/pay           accept the final price → the provider's payment page
 //   GET  /arrive?arrival=&to=        inert under NATIVE_NO_REFERRAL: proof dropped, no cookie, 302 to the site
 //
-// Native ingress takes no referral (TOUR-81). Promo code and Apply are shown disabled, the order is
-// built from an explicit whitelist of fields, and /arrive neither captures nor claims anything,
-// whatever REFREF_VNEXT_API_BASE says. Legacy Refref read-back of existing orders is unchanged.
+// TOUR-81 (interim): no new referral ingress or promo code. Promo code and Apply are shown disabled,
+// the order is built from an explicit whitelist of fields, and /arrive neither captures nor claims
+// anything, whatever REFREF_VNEXT_API_BASE says. Checkout itself is still the legacy RC handoff above
+// until TOUR-76/77/78; legacy Refref read-back of existing orders is unchanged.
 //
 // Ownership of an order is the state secret in a __Host- cookie (HttpOnly, Secure, SameSite=Lax):
 // another browser cannot see or pay someone's order, and a cross-site form cannot post with it.
