@@ -1,0 +1,448 @@
+{
+  "schemaVersion": 1,
+  "observedOn": "2026-10-27",
+  "purpose": "Pinned source audit for Mikluha Commerce vNext design; no installed schema, runtime, customer data or provider state inspected.",
+  "mikluha": {
+    "repository": "ArtGurianov/mikluha",
+    "ref": "origin/main",
+    "commit": "0e32a05ff74a8915cc1719fe041b5a03df4cd452",
+    "migrationCount": 16,
+    "files": [
+      {
+        "path": "README.md",
+        "sha256": "549bc08a17834c697a70eef48a242edc31af36eb29796da645152d73544fcd11",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/README.md"
+      },
+      {
+        "path": "AGENTS.md",
+        "sha256": "79d96c19657cf2d2e48599f251b4abf1c7a608d91bfced1ede3bb33567c161c3",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/AGENTS.md"
+      },
+      {
+        "path": "commerce/README.md",
+        "sha256": "2daa7c896469063e474f3959d9e7db4985b9c5596f94e5ecb2326fe41570e1fd",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/README.md"
+      },
+      {
+        "path": "docs/DECISIONS.md",
+        "sha256": "82e13b92441780ac775d176a8404383d9955222961225813d324a83953c05e31",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/docs/DECISIONS.md"
+      },
+      {
+        "path": "docs/adr/2026-10-18-ssr-flexible-offers-immutable-contracts.md",
+        "sha256": "d4e2e4612a06e85c5502008e316e17428dc11f4661d0a7c26b96a3b29a02d61d",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/docs/adr/2026-10-18-ssr-flexible-offers-immutable-contracts.md"
+      },
+      {
+        "path": "docs/refref-v9-contract-status.md",
+        "sha256": "afe1321f45ff46dde95dc62f3ece45f73c2514b64dd721cd98c8fa20268404da",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/docs/refref-v9-contract-status.md"
+      },
+      {
+        "path": "content/legal/oferta.yml",
+        "sha256": "be6fe2225c05988371ce1e693790d2a208f14d787eb3c1debc274ce6b876f459",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/content/legal/oferta.yml"
+      },
+      {
+        "path": "commerce/src/orders.ts",
+        "sha256": "ebe66018bd9d51ff0c4b49465cc44245036df4cf91b828bfbdddb9a558e73dad",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/orders.ts"
+      },
+      {
+        "path": "commerce/src/checkout.ts",
+        "sha256": "0d9971daf3efdf152bced081acde4964476774d8a473a7d37d56fba2d2331f5d",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/checkout.ts"
+      },
+      {
+        "path": "commerce/src/refref.ts",
+        "sha256": "1c1bc26dde8bf93a69a9e9987d6a5ce9101d47e2eaec5bcb2e96204fc5c22db0",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/refref.ts"
+      },
+      {
+        "path": "commerce/src/snapshot.ts",
+        "sha256": "0bb4353c697f7c0fd3486a0b312e181404e729a3959d92ad24431251536ef4d2",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/snapshot.ts"
+      },
+      {
+        "path": "commerce/src/eis.ts",
+        "sha256": "596669a0c9e45031f5d7b75201e6dd16b1183b94e552f0eb60b8857d90f976d3",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/eis.ts"
+      },
+      {
+        "path": "commerce/src/catalog.ts",
+        "sha256": "b4934699f1c2cd905722b70edeb3b5b0246dade470f3a9e05b7c09bca0d93b7f",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/catalog.ts"
+      },
+      {
+        "path": "commerce/src/arrival.ts",
+        "sha256": "cbecf4e7bb710491d952a5c5e464dbc12dbc52ace2cb929e179bdabdead74351",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/arrival.ts"
+      },
+      {
+        "path": "commerce/src/contract-snapshot.ts",
+        "sha256": "f26a9c7810f0bf3a79e2fbcb394c4c94180c32379939ed139499ebeabeebb000",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/contract-snapshot.ts"
+      },
+      {
+        "path": "commerce/src/legal-admission.ts",
+        "sha256": "39e0fced56a1cc5ee814845ed826f65e8f724947120462663b85f2be8bd96e07",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/legal-admission.ts"
+      },
+      {
+        "path": "commerce/src/migrate.ts",
+        "sha256": "7a43a0e0fa40bf312ba79662b920fba54c7517a59bbdac12214669c9b1ab2a5d",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/migrate.ts"
+      },
+      {
+        "path": "commerce/runbooks/production-launch.md",
+        "sha256": "354bfc003e766444223f3535f7464c09b537d974120c1ee800efdc470cac1607",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/runbooks/production-launch.md"
+      },
+      {
+        "path": "commerce/runbooks/fiscal-incidents.md",
+        "sha256": "08a81dde1230267bf972ec6f9106f1e94fcdcd482ccff7b89aa6504b3612a8c8",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/runbooks/fiscal-incidents.md"
+      },
+      {
+        "path": "commerce/runbooks/eis-manual-filing.md",
+        "sha256": "fce0113a57b7ce11bafdc3d423cca9410a7c0d68b03f9deb4c8b2f7fb33b1ca5",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/runbooks/eis-manual-filing.md"
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "sha256": "5ca107cf7e742265e382e8beaaeaca87458ecff4bfd44f2dba4393c8349bca8a",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/.github/workflows/ci.yml"
+      },
+      {
+        "path": "commerce/migrations/journal.json",
+        "sha256": "09aa2b811775ff5bc7c01a4d90027f3d9a524a041c0fc332207e9896b6d6e7ac",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/journal.json"
+      },
+      {
+        "path": "commerce/migrations/migration.lock",
+        "sha256": "bfb37527eb2b8e9a9a18e580b9e70882006b2b8aef9f737866a805ffbb1cf4ca",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/migration.lock"
+      },
+      {
+        "path": "commerce/migrations/0001_orders.sql",
+        "sha256": "0c1d6911cd96f569d816d221b3f8327e6bfdaf38647e5220804a439549979bd3",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0001_orders.sql"
+      },
+      {
+        "path": "commerce/migrations/0002_checkout.sql",
+        "sha256": "e0294b42d18e75c0f5d33173fcf90ddb5520561cdeafb98af291e6aaa5f7d1b8",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0002_checkout.sql"
+      },
+      {
+        "path": "commerce/migrations/0003_tourists_and_contract.sql",
+        "sha256": "0fe4fd622f160ee27370c49eb1a501f51ea63156c339ba97c05280c4fac905a0",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0003_tourists_and_contract.sql"
+      },
+      {
+        "path": "commerce/migrations/0004_pd_consent.sql",
+        "sha256": "f5beb75b4afe0fa20a8bf5236edf0cc1dee76358586bc16954fe101a00197e31",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0004_pd_consent.sql"
+      },
+      {
+        "path": "commerce/migrations/0005_confirmation_outbox.sql",
+        "sha256": "2398b9bbd77037905b49a12eea434a69e7d6c5ed4eea410940966b4d7fa7a660",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0005_confirmation_outbox.sql"
+      },
+      {
+        "path": "commerce/migrations/0006_eis_filing.sql",
+        "sha256": "18d5a2b079e9f8b82604719803168bacf65b77fa9b2d8eb6c2e5ce04da8e69b8",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0006_eis_filing.sql"
+      },
+      {
+        "path": "commerce/migrations/0007_processing_instruction.sql",
+        "sha256": "3fe3a2bd0729227d34bd08a1ef1a4b839139304ed99463cc4d2b97e85c642c18",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0007_processing_instruction.sql"
+      },
+      {
+        "path": "commerce/migrations/0008_editorial_offers_and_contract_snapshot.sql",
+        "sha256": "ec9cd9b3aa5f6f48cff741259eff1993eafcae63721676bab76a170fcce52cd4",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0008_editorial_offers_and_contract_snapshot.sql"
+      },
+      {
+        "path": "commerce/migrations/0009_content_crud_and_execution_changes.sql",
+        "sha256": "34f59f2db910957037c980dd0ad381248f926c4b50ffcef162b588c90ff47a61",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0009_content_crud_and_execution_changes.sql"
+      },
+      {
+        "path": "commerce/migrations/0010_execution_change_identity_and_visibility.sql",
+        "sha256": "962b2f012e4f26412fde844a45649498dbb0fd1aa6eadc134e02788a8c3858fc",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0010_execution_change_identity_and_visibility.sql"
+      },
+      {
+        "path": "commerce/migrations/0011_admin_auth.sql",
+        "sha256": "8e1a798ac90baf4c63600ef340d2a0fb7e84beba47c21359ef4b2a4b38e1b933",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0011_admin_auth.sql"
+      },
+      {
+        "path": "commerce/migrations/0012_schema_compatibility.sql",
+        "sha256": "59dae694c2a6cff960d79f1ff615ad0e888172fff6a2b4462ca030df2656dac6",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0012_schema_compatibility.sql"
+      },
+      {
+        "path": "commerce/migrations/0013_checkout_quotes_and_cancellation.sql",
+        "sha256": "e895098dced0ac0800538d4164564362fbeb72fc0053fcc70a7a6a3b987f02ba",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0013_checkout_quotes_and_cancellation.sql"
+      },
+      {
+        "path": "commerce/migrations/0014_attempt_dispatch_evidence.sql",
+        "sha256": "9e9b31ae94eae8bb1b47981527d5a2604e76e6fc35ba4280c3d064479f6a0779",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0014_attempt_dispatch_evidence.sql"
+      },
+      {
+        "path": "commerce/migrations/0015_checkout_operation_scope.sql",
+        "sha256": "b5b5ea77f970f0a8bff6a758be66a706674405b26e330d9cd968e4dd66aab76f",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0015_checkout_operation_scope.sql"
+      },
+      {
+        "path": "commerce/migrations/0016_resolution_lease.sql",
+        "sha256": "1a38157011fa8d9f73ad624a48c2d115431dbc87846d4df534e261b01dc7ab4f",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/migrations/0016_resolution_lease.sql"
+      },
+      {
+        "path": "commerce/src/web.ts",
+        "sha256": "5cf281dc0e1165fd1239eb99c9ba533e8b4c326107328c148ab6a0f3c2d2afa6",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/src/web.ts"
+      },
+      {
+        "path": "commerce/test/arrival.test.ts",
+        "sha256": "c04044115cccc2b70d2e7c8e0c4f7759f92542beb31ccdbc99557f0282c10071",
+        "url": "https://github.com/ArtGurianov/mikluha/blob/0e32a05ff74a8915cc1719fe041b5a03df4cd452/commerce/test/arrival.test.ts"
+      }
+    ]
+  },
+  "refref": {
+    "repository": "ArtGurianov/refref",
+    "pullRequest": 130,
+    "commit": "c932b656edbda1d47cfb57de08fd4a36536712f5",
+    "pullRequestStateAtInspection": "OPEN_NOT_MERGED",
+    "files": [
+      {
+        "path": "docs/v10/README.md",
+        "sha256": "56675f71c2741c1ffd59f8566d13a0247e8d0716af82cfbadb1302a32a567fa4",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/README.md"
+      },
+      {
+        "path": "docs/v10/ADR-141-refref-core.md",
+        "sha256": "4b6e260d454689e0fd6dcfd783f436e4d57751c4deb281d905b715ae6a813de1",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/ADR-141-refref-core.md"
+      },
+      {
+        "path": "docs/v10/GATES.md",
+        "sha256": "be0229ad67d213b0d5f7ef6ea0e8d7c7aa76dbd2381289e3b797b3d58adba498",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/GATES.md"
+      },
+      {
+        "path": "docs/v10/contracts/01-common-contract.md",
+        "sha256": "100200647af1f0b8af584163ff0b067cdac939d1297265070d832e8e6d577ef4",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/01-common-contract.md"
+      },
+      {
+        "path": "docs/v10/contracts/02-attribution-bound.md",
+        "sha256": "1972279f436da80dca4997199fad2e732a4e477a2ec98625db94dd8d61374402",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/02-attribution-bound.md"
+      },
+      {
+        "path": "docs/v10/contracts/03-merchant-reporting.md",
+        "sha256": "cd8bc810e962130ad2bd26865c0f235f5028dc7e47e6434ef79d6af41ea13057",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/03-merchant-reporting.md"
+      },
+      {
+        "path": "docs/v10/contracts/04-money-finality-claims.md",
+        "sha256": "231bf76f706bf817c78fe7fb61189867862d60bdb91e2b44609aa38413234417",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/04-money-finality-claims.md"
+      },
+      {
+        "path": "docs/v10/contracts/05-payouts-s3-conformance.md",
+        "sha256": "3944f8938eb1255ac6914ebc0a619ad1e57d57bb77c084543c2c5d3deb5191be",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/05-payouts-s3-conformance.md"
+      },
+      {
+        "path": "docs/v10/contracts/06-api-and-states.md",
+        "sha256": "cffe375491a614ce3242b098dc84ba3d3f1bd5d8abe235d01ee1fc49b223aadd",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/06-api-and-states.md"
+      },
+      {
+        "path": "docs/v10/contracts/merchant-result.schema.json",
+        "sha256": "7d6d511792281f91b4533fb7959e43fb6597d36a8a09ab70b3392ed894f6c06d",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/contracts/merchant-result.schema.json"
+      },
+      {
+        "path": "docs/v10/sources/owner-o7-2026-10-27.md",
+        "sha256": "90647cf491fb24b9cfa020374b0e06459eb0035497413aef225409cfd1af802e",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/v10/sources/owner-o7-2026-10-27.md"
+      },
+      {
+        "path": "docs/plans/2026-10-26-refref-core-supersession.md",
+        "sha256": "1033914e4596cebc103c0d0fc317715b3108e7de64a1bd61714a1bc5506368cf",
+        "url": "https://github.com/ArtGurianov/refref/blob/c932b656edbda1d47cfb57de08fd4a36536712f5/docs/plans/2026-10-26-refref-core-supersession.md"
+      }
+    ]
+  },
+  "authority": {
+    "refrefCore": "Existing OWNER-approved O1-O7; retain profile/legal gates.",
+    "mikluhaDesign": "Native-first design under SOL v5-final Plane plan. MK-POLICY-v1 remains historical 28 October decision, MK-POLICY-v1.1 and MK-C11/C12 are OWNER approved 29 October; numeric and bank/provider/legal gates remain open.",
+    "suppliedBrief": "Direct user-pasted requirements; unread external attachment is not a verified normative source."
+  },
+  "verificationScope": {
+    "sourceInspection": "PERFORMED",
+    "implementationContractTests": "NOT_RUN",
+    "servedTransportE2E": "NOT_RUN",
+    "providerE2E": "NOT_RUN",
+    "deployedSchemaInventory": "NOT_RUN",
+    "publicLaunch": "NOT_AUTHORIZED_BY_THIS_PACKAGE"
+  },
+  "ownerDecisions": [
+    {
+      "id": "MK-C12",
+      "status": "OWNER_APPROVED",
+      "recordedOn": "2026-10-28",
+      "sourceKind": "DIRECT_HUMAN_OWNER_MESSAGE",
+      "originalOwnerText": "Кстати, mikluha тоже не будет никогда иметь своих собственных промокодов - только промокоды refref.",
+      "promoCodeScope": "REFREF_ONLY",
+      "mikluhaOwnPromoCodesPlanned": false,
+      "localMerchantCouponEngineOrStackingPlanned": false,
+      "preserved": [
+        "Referral-link attribution",
+        "Qualified Apply/ORDER_SUBMIT and valid AutoApply",
+        "v10 holder/72h/R14.1",
+        "OWNER-02 and D_rule/D_applied",
+        "Accepted historical prices and contracts",
+        "Normal catalogue-price editing independent of promo codes"
+      ],
+      "scopeBoundary": "No inherited Flexperiment continuation period, fullPaymentDueAt or finality-mode selection. No deposit tariff, provider account/credentials, bank authority, legal publication, implementation, deployment or public GO is assigned."
+    },
+    {
+      "id": "MK-POLICY-v1",
+      "status": "OWNER_APPROVED",
+      "recordedOn": "2026-10-28",
+      "recordSource": "DIRECT_OWNER_AND_PLANE_TOUR-75",
+      "appliesTo": "Current native buyer policy; deferred referral principles separate",
+      "approved": [
+        "Deposit freezes trip price regardless of future catalogue change",
+        "Target published price with audited moderator override and buyer consent",
+        "Transfer executes after buyer consent and any required immediate proposal-linked payment",
+        "Balance due based on agreed versioned new departure schedule",
+        "Single native payment operation engine with conditional transfer allocation",
+        "Mikluha native public launch independent of Refref"
+      ],
+      "notApprovedOrOpen": [
+        "Deposit fraction and specific times/zone/hold TTL/overdue outcomes",
+        "Bank proof of terminal payment-link cancellation",
+        "Retroactive change of NATIVE_NO_REFERRAL profile under investigation, current guard remains",
+        "Discount on transfer to trip outside original campaign",
+        "Finality risk acceptance for later referral profile",
+        "Provider/fiscal/legal gates and public operation authorization"
+      ],
+      "compatibility": "Original Refref source hashes/pins unchanged; no new BOUND/C/S4/S5 rule."
+    },
+    {
+      "id": "MK-C11",
+      "status": "OWNER_APPROVED",
+      "recordedOn": "2026-10-29",
+      "recordSource": "DIRECT_OWNER",
+      "appliesTo": "Future Mikluha Refref referral lifecycle only, not native launch",
+      "approved": [
+        "modeS5=SCHEDULED_SERVICE; selected before and immutable at first BOUND",
+        "serviceAnchorAtAtBound=frozen end of eligible original scheduled trip with qualified time/zone/precision",
+        "baseClaimDeadline=addMoscowCalendarDates(max(actualPaidInFullAt,serviceAnchorAtAtBound),14) subject to timely accepted claims and preserved S5 conditions",
+        "Later transfer does not shift frozen anchor; OWNER accepts FINAL may occur before later transferred trip ends",
+        "Ordinary changes after FINAL do not revive S4 even if payout not yet executed"
+      ],
+      "compatibility": "Existing Refref v10 S5/FINAL rules; no bank/source/auth/deploy GO"
+    },
+    {
+      "id": "MK-POLICY-v1.1",
+      "status": "OWNER_APPROVED",
+      "recordedOn": "2026-10-29",
+      "recordSource": "DIRECT_OWNER_WITH_OPUS_SOL_INDEPENDENT_REVIEW",
+      "appliesTo": "Supplemental later Refref integration policy; v1 historical decision remains unchanged",
+      "supersedesOpenItemsFromV1": [
+        "Discount on transfer to trip outside original campaign",
+        "Finality risk acceptance for later referral profile",
+        "Retroactive change of NATIVE_NO_REFERRAL profile under investigation — OWNER business choice only; implementation/bank qualification remains open"
+      ],
+      "approved": [
+        "One economic purchase retains same purchaseRef/BOUND/campaign/terms and agreed code when checkout is re-opened; new technical order identifier does not create a new binding",
+        "Merchant may safely replace unpaid checkout after verifying control and bank link terminality; email equality by itself is insufficient",
+        "Frozen original campaign alone qualifies revision lines; if no eligible lines before first FULL no positive C; no automatic campaign/code switching on transfer",
+        "Referral discount after transfer applies only to new lines eligible for the frozen original campaign; ineligible lines receive no Refref discount",
+        "Once first true FULL is recognised original C is frozen; ordinary post-FINAL change never reopens S4 even if partner payout unpaid",
+        "MK-C11 SCHEDULED_SERVICE uses original anchored eligible service end preserved at BOUND; reschedule never automatically extends S5",
+        "Real cancellation followed by economically independent new checkout requires new conscious touch/BOUND; spent touch never reanimated or removed"
+      ],
+      "stillOpen": [
+        "Provider-qualified payment-link closure including UNKNOWN",
+        "Native checkout implementation safety (TOUR-76)",
+        "True independent new purchase versus concealed refund/recharge factual qualification",
+        "Merchant cancellation/organizer initiated replacement legal pricing profile",
+        "Deferred Refref DTO frozen historical assessment and served capability receipts"
+      ],
+      "scope": "No G_protectedContinuation and no additional Core commission for ineligible continuation; no merchant-owned coupon engine; native launch remains independent",
+      "authority": "Refref Core generic rules remain independent of Mikluha profile decisions"
+    }
+  ],
+  "refrefCurrentCandidate": {
+    "repository": "ArtGurianov/refref",
+    "pr": 130,
+    "commit": "5f966664182a12aba3de9c0721deadab910c338d",
+    "contractStatus": "EXACT_COMMIT_SOURCE_INSPECTED_PENDING_FINAL_MUTATION_RERUN_AND_APPROVAL",
+    "historicalSourceAuditCommit": "c932b656edbda1d47cfb57de08fd4a36536712f5",
+    "inspection": "GitHub fetch_file exact SHA for 12 relevant original source paths",
+    "files": [
+      {
+        "path": "docs/v10/README.md",
+        "blobSha": "416227151359b9e2bf5cbaf4a30c6ae7110570dd"
+      },
+      {
+        "path": "docs/v10/ADR-141-refref-core.md",
+        "blobSha": "a69701e6bd4c86a54e4fb2baf9a4ae9eba64b56b"
+      },
+      {
+        "path": "docs/v10/GATES.md",
+        "blobSha": "68c1e574e0b2c22b1e5b08c07bb8e3ca8279566c"
+      },
+      {
+        "path": "docs/v10/contracts/01-common-contract.md",
+        "blobSha": "036ee0131e4aa06c0f5217a6b95c245164a12ed0"
+      },
+      {
+        "path": "docs/v10/contracts/02-attribution-bound.md",
+        "blobSha": "a8824e78724ee8e1403e934e70994be7f043c92e"
+      },
+      {
+        "path": "docs/v10/contracts/03-merchant-reporting.md",
+        "blobSha": "b46e24c6afe310bafb0c7154b439929e135fbbec"
+      },
+      {
+        "path": "docs/v10/contracts/04-money-finality-claims.md",
+        "blobSha": "06c11d05edffe4128fa3a5662ddc4403a93f09a7"
+      },
+      {
+        "path": "docs/v10/contracts/05-payouts-s3-conformance.md",
+        "blobSha": "7a81eb4df4d4b2fa05ab51d104968f7a64b31911"
+      },
+      {
+        "path": "docs/v10/contracts/06-api-and-states.md",
+        "blobSha": "cee253488fefea1a5e13bff8cb6a5279eb1e5879"
+      },
+      {
+        "path": "docs/v10/contracts/merchant-result.schema.json",
+        "blobSha": "0a2bbc507ec536e3a4a1d37e4c4de2ed8d95ba0c"
+      },
+      {
+        "path": "docs/v10/sources/owner-o7-2026-10-27.md",
+        "blobSha": "06df92a7a481f425cd078135f77cfeee2bcd76c8"
+      },
+      {
+        "path": "docs/plans/2026-10-26-refref-core-supersession.md",
+        "blobSha": "88e170207bd9738ab17bb477a91567ba4a9cb105"
+      }
+    ],
+    "sourcePinPolicy": "Keep refref.commit and its original SHA256 records intact as historical inspection; current candidate is a separate compatibility reference, not deployment/CI/transport or provider proof."
+  }
+}

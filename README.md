@@ -17,6 +17,10 @@ PostgreSQL описан в [ADR v2.3](docs/adr/2026-10-18-ssr-flexible-offers-im
 платёжного контракта и целевого Refref v9 — в
 [статусе TOUR-интеграции](docs/refref-v9-contract-status.md).
 
+Проект самостоятельного перехода Mikluha на merchant-native Refref v10, включая
+обязательные предоплаты и доплаты, — [Commerce vNext](docs/refref-v10/README.md).
+Это документационный draft: действующий код, договоры и допуск продаж не меняются.
+
 Сайт туристического агентства «Миклуха Маклай» — каталог направлений/выездов, фотоотчёты, отзывы и информационный Booking Modal (QR + бронь + телефон организатора, без сбора пользовательских данных). Архитектурные инварианты и причины, по которым они такие — `docs/DECISIONS.md`.
 
 Next.js App Router + TypeScript, pure static export (`output: 'export'`), shadcn/ui поверх Tailwind CSS v4. Контент — YAML-файлы в `content/` (этот репозиторий), редактируются через `/admin` (Sveltia CMS, коммитит прямо в GitHub по fine-grained PAT) или руками. И сайт, и `/admin` входят в один статический `/out`; своего application/serverless runtime нет. Медиа отдаются браузеру напрямую из Object Storage без build-time или runtime обработки.
