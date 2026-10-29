@@ -23,7 +23,7 @@ import { createCommerceServer } from '../src/server.js';
 import { createWebHandler } from '../src/web.js';
 import { FakeRefref } from './fake-refref.js';
 import { FakeVnext } from './fake-vnext.js';
-import { captureLog, fixtureCatalog, freshDb, seedCatalog, type TestDb } from './helpers.js';
+import { captureLog, fixtureCatalog, freshDb, seedCatalog, type TestDb, resetOrders } from './helpers.js';
 
 const MERCHANT_ID = '3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90';
 const COMMERCE = 'https://book.mikluha.example';
@@ -75,7 +75,7 @@ beforeEach(async () => {
   vnext.reset();
   refref.reset();
   logs.lines.length = 0;
-  await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await resetOrders(db.owner);
   await setSalesOpen(db.operator, true, 'test', 'open');
 });
 

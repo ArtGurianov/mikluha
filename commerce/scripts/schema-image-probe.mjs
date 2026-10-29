@@ -11,6 +11,7 @@ import { migrate } from './dist/migrate.js';
 import { contractSnapshotIntact } from './dist/contract-snapshot.js';
 import { reserve, setSalesOpen, maintain } from './dist/orders.js';
 import { issueState, ownsOrder } from './dist/checkout.js';
+import { reserveNativePurchase } from './dist/purchases.js';
 import { SchemaAdmission, schemaWorker } from './dist/schema-admission.js';
 import { schemaReadiness } from './dist/schema-readiness.js';
 import { createCommerceServer, readiness } from './dist/server.js';
@@ -18,7 +19,7 @@ import { createCommerceServer, readiness } from './dist/server.js';
 const identity = await readBuildIdentity('/app/identity/identity.json');
 assert.equal(identity.sourceCommit, process.env.QUALIFICATION_SOURCE_COMMIT, 'image must identify the declared exact HEAD');
 const migrations = readMigrations('./migrations');
-const bundledHead=16, forwardHead=17;
+const bundledHead=17, forwardHead=18;
 assert.equal(migrations.length, bundledHead, 'review this qualification when the real baseline advances');
 const owner = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await owner.connect();
@@ -62,7 +63,7 @@ try {
   await worker.tick(); assert.equal(workerCalls, 1);
   const before = (await owner.query('SELECT * FROM schema_migrations ORDER BY version')).rows;
   cpSync('./migrations', dir, { recursive: true });
-  const entry = { version: forwardHead, file: '0017_additive_probe.sql' };
+  const entry = { version: forwardHead, file: '0018_additive_probe.sql' };
   const sql = 'ALTER TABLE orders ADD COLUMN forward_probe text DEFAULT NULL;';
   const checksum = createHash('sha256').update(sql).digest('hex');
   const journal = JSON.parse(readFileSync(join(dir, 'journal.json'))); journal.push(entry);
@@ -82,19 +83,24 @@ try {
   assert.equal(served.schemaHead, bundledHead); assert.equal(served.sourceCommit, identity.sourceCommit);
   await setSalesOpen(operator, true, 'isolated-test', 'synthetic fixture only');
   const now = new Date('2027-05-01T00:00:00Z');
-  const result = await reserve({ pool, catalog, log: () => {}, now: () => now }, {
+  const booking = {
     departureSlug: 'proof-departure', contact: { phone: '+79039075547', email: 'proof@example.invalid' },
     passengers: [{ fullName: 'Иван Петров', dateOfBirth: '1990-05-17', citizenship: 'RU', document: { type: 'RU_PASSPORT', series: '3210', number: '654321' } }],
     adultsOnlyConfirmed: true, termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
     pdConsentConfirmed: true, pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash,
-  });
+  };
+  const result = await reserve({ pool, catalog, log: () => {}, now: () => now }, booking);
   assert.equal(result.ok, true);
+  // The bundled purchase path also runs unchanged on the forward schema.
+  const purchase = await reserveNativePurchase({ pool, catalog, log: () => {}, now: () => now }, booking);
+  assert.equal(purchase.ok, true); assert.match(purchase.purchaseRef, /^mp-[0-9a-f]{20}$/);
+  assert.equal((await pool.query('SELECT lifecycle_profile FROM purchase_current WHERE purchase_ref = $1', [purchase.purchaseRef])).rows[0].lifecycle_profile, 'NATIVE_NO_REFERRAL');
   const contract = (await pool.query('SELECT contract_snapshot, contract_snapshot_sha256 FROM orders WHERE order_ref = $1', [result.orderRef])).rows[0];
   assert.equal(contractSnapshotIntact(contract.contract_snapshot, contract.contract_snapshot_sha256), true);
   const state = await issueState(pool, result.orderRef); assert.ok(state);
   assert.equal(await ownsOrder(pool, result.orderRef, state), true);
   const maintenance = await maintain(pool, () => {}, new Date(now.getTime() + 31 * 60_000));
-  assert.equal(maintenance.expired, 1);
+  assert.equal(maintenance.expired, 2);
   assert.equal((await readiness({ ...deps, sourceCommit: 'b'.repeat(40) })).reason, 'SCHEMA_AHEAD_INCOMPATIBLE');
   assert.equal((await readiness({ ...deps, sourceCommit: null })).reason, 'SCHEMA_AHEAD_INCOMPATIBLE');
   assert.equal((await readiness({ ...deps, schemaHead: forwardHead+1 })).reason, 'SCHEMA_NOT_AT_HEAD');
@@ -112,7 +118,7 @@ try {
   await owner.query('DELETE FROM schema_migration_compatibility WHERE version = 12');
   assert.equal((await readiness(deps)).reason, 'SCHEMA_ATTESTATION_MISMATCH');
   await admission.drain(); await worker.drain();
-  console.log(`SCHEMA_OLD_IMAGE=PASS source=${identity.sourceCommit} bundled=${bundledHead} database=${forwardHead} reserve=PASS contract=PASS state=PASS maintenance=PASS negatives=PASS`);
+  console.log(`SCHEMA_OLD_IMAGE=PASS source=${identity.sourceCommit} bundled=${bundledHead} database=${forwardHead} reserve=PASS purchase=PASS contract=PASS state=PASS maintenance=PASS negatives=PASS`);
 } finally {
   if (server) { server.closeAllConnections(); await new Promise(r => server.close(r)); }
   await pool?.end(); await operator?.end(); await owner.end(); rmSync(dir, { recursive: true, force: true });

@@ -102,6 +102,12 @@ export type BookingResult =
   | { readonly ok: true; readonly orderRef: string; readonly amountKopecks: number; readonly reservedUntil: Date }
   | { readonly ok: false; readonly refusal: BookingRefusal };
 
+/** purchaseRef is null for an order outside any purchase (its profile provenance is unresolved). */
+export type NativeBookingResult =
+  | { readonly ok: true; readonly orderRef: string; readonly amountKopecks: number; readonly reservedUntil: Date;
+      readonly purchaseRef: string | null; readonly revision: number | null }
+  | { readonly ok: false; readonly refusal: BookingRefusal };
+
 const NAME = /^[\p{L}][\p{L}\p{M} .'’-]{1,199}$/u;
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,63}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -159,7 +165,13 @@ export async function setSalesOpen(pool: pg.Pool, open: boolean, by: string, rea
  * No YAML price or contract can admit a booking; two customers cannot take the last seat.
  */
 export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<BookingResult> {
-  const refuse = (refusal: BookingRefusal): BookingResult => {
+  const r = await reserveOrder(deps, req, false);
+  return r.ok ? { ok: true, orderRef: r.orderRef, amountKopecks: r.amountKopecks, reservedUntil: r.reservedUntil } : r;
+}
+
+/** `native` opens the order as a purchase in the same transaction (purchases.ts); callers decide it, never the request. */
+export async function reserveOrder(deps: OrderDeps, req: BookingRequest, native: boolean): Promise<NativeBookingResult> {
+  const refuse = (refusal: BookingRefusal): NativeBookingResult => {
     deps.log('booking_refused', { departure: req.departureSlug, refusal });
     return { ok: false, refusal };
   };
@@ -211,20 +223,22 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
     }
     let replacedId:string|null=null;
     if (req.replacementOrderRef !== undefined) {
+      // A replacement never changes profile: a purchase continues only as a purchase, an order
+      // outside one only outside one.
       const prior=(await client.query<{id:string}>(`SELECT id FROM orders WHERE order_ref=$1 AND departure_slug=$2
         AND status='RESERVED' AND (quote_expires_at IS NULL OR quote_expires_at <= $3)
         AND snapshot IS NULL AND checkout_attempt_id IS NULL AND payment_pending_since IS NULL
-        AND resolution_operation_id IS NULL FOR UPDATE`,[req.replacementOrderRef,req.departureSlug,now])).rows[0];
+        AND resolution_operation_id IS NULL
+        AND ${native ? '' : 'NOT '}EXISTS (SELECT 1 FROM purchase_revision r JOIN purchase p ON p.id = r.purchase_id
+          WHERE r.document_order_id = orders.id AND r.revision = p.current_revision) FOR UPDATE OF orders`,
+        [req.replacementOrderRef,req.departureSlug,now])).rows[0];
       if (!prior) return refuse('REPLACEMENT_NOT_AVAILABLE');
       replacedId=prior.id;
       await client.query("UPDATE orders SET status='CANCELLED',closed_at=$2 WHERE id=$1",[prior.id,now]);
       await client.query("INSERT INTO order_event(order_id,at,event,detail) VALUES ($1,$2,'CANCELLED','QUOTE_REPLACED')",[prior.id,now]);
     }
 
-    const taken = await client.query<{ seats: string }>(
-      `SELECT coalesce(sum(seats), 0) AS seats FROM orders
-        WHERE departure_slug = $1 AND status = ANY($2) AND NOT (status = 'RESERVED' AND reserved_until <= $3 AND snapshot IS NULL AND checkout_attempt_id IS NULL AND payment_pending_since IS NULL AND resolution_operation_id IS NULL)`,
-      [departure.slug, TAKEN, now]);
+    const taken = await client.query<{ seats: string }>('SELECT fn_departure_taken_seats($1, $2) AS seats', [departure.slug, now]);
     if (Number(taken.rows[0]!.seats) + seats > departure.capacity) {
       await client.query('ROLLBACK');
       return refuse('NOT_ENOUGH_SEATS');
@@ -262,10 +276,14 @@ export async function reserve(deps: OrderDeps, req: BookingRequest): Promise<Boo
     }
     await client.query(`INSERT INTO order_event (order_id, at, event, detail) VALUES ($1, $2, 'RESERVED', $3)`,
       [id, now, `seats:${seats}`]);
+    const purchase = native ? (await client.query<{ purchase_ref: string; revision: number }>(
+      'SELECT purchase_ref, revision FROM fn_open_native_purchase($1)', [id])).rows[0]! : null;
     await client.query('COMMIT');
     if (replacedId !== null) deps.log('order_cancelled',{orderRef:req.replacementOrderRef!,reason:'QUOTE_REPLACED'});
-    deps.log('booking_reserved', { orderRef, departure: departure.slug, seats, amountKopecks: amount });
-    return { ok: true, orderRef, amountKopecks: amount, reservedUntil };
+    deps.log('booking_reserved', { orderRef, departure: departure.slug, seats, amountKopecks: amount,
+      ...(purchase ? { purchaseRef: purchase.purchase_ref, revision: purchase.revision } : {}) });
+    return { ok: true, orderRef, amountKopecks: amount, reservedUntil,
+      purchaseRef: purchase?.purchase_ref ?? null, revision: purchase?.revision ?? null };
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw e;
@@ -302,10 +320,10 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
     // Unpaid and over: 24 hours; no contract was concluded, so the Заявка goes too. A trip: the
     // operational personal data 90 days after it ends, once its money is settled (paid, fulfilled or
     // refunded; never pending or held); the Заявка, which is then the contract, stays (below).
-    // A legal hold stops all of it.
+    // A legal hold stops all of it. A purchase order also waits for the database clock (migration 0017).
     const erasable = await client.query<{ id: string; unpaid: boolean }>(
       `SELECT id, status IN ('EXPIRED','CANCELLED') AS unpaid FROM orders
-        WHERE pd_erased_at IS NULL AND NOT legal_hold AND (
+        WHERE pd_erased_at IS NULL AND NOT legal_hold AND fn_purchase_pd_retention_due(id) AND (
               (status IN ('EXPIRED','CANCELLED') AND closed_at <= $1::timestamptz - make_interval(hours => $2))
            OR (status IN ('PAID','FULFILLED','REFUNDED')
                AND trip_ends_on + $3::int < ($1::timestamptz AT TIME ZONE 'UTC')::date))

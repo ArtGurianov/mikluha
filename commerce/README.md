@@ -63,7 +63,7 @@ static; everything that sells a trip lives here, with its own Postgres.
 - qualify the selected documented-expense refund workflow separately; obtain real commercial
   facts, signed processing instruction and remaining legal/provider evidence. Refref host
   integration #48/#49 is merged; schema-6 restore proofs and timers have passed, but migrations
-  0007–0016 need owner-only application and fresh schema-16 logical and PITR recovery evidence
+  0007–0017 need owner-only application and fresh schema-17 logical and PITR recovery evidence
   before future admission. Mikluha commerce is undeployed; monitor admission, sales and payments remain closed.
 
 ## Generic legal pack and individual application
@@ -301,6 +301,66 @@ RESERVED repricing.
 Source/isolated tests do not establish provider conformance, production migration/restore/PITR,
 D8, financial activation or the owner-authorized SSR cutover. See
 [design and validation scope](../docs/plans/2026-10-23-art-362-checkout-design.md).
+
+## Purchases, revisions and the native profile (migration 0017, TOUR-76)
+
+A purchase is one economic purchase with a stable `purchase_ref` (`mp-` + 20 hex). Its
+`lifecycle_profile` and `payment_owner` are assigned by the database when it is created —
+`NATIVE_NO_REFERRAL` and `MIKLUHA_NATIVE`, constants inside `fn_open_native_purchase`, not
+arguments — and cannot be changed afterwards. There is no BOUND, partner, campaign or attribution
+column. Accepted terms are append-only `purchase_revision` rows: document order, departure revision,
+seats, price, accepted offer/consent/contract digests, `accepted_at`/`effective_at`, participant
+refs and a hash over all of them chained to the predecessor. The accepted bytes stay in the document
+order (`orders`/`order_document`); `purchase_revision_participant` links a participant to its
+`order_passenger` row without personal data, and retention can erase that row while the link stays.
+
+- `fn_open_native_purchase(order_id)` (commerce_app) accepts only an order created in the same
+  transaction — `orders.created_xact_id`/`created_xact_at`, stamped by a trigger on INSERT and
+  immutable, not a row version that any UPDATE renews — with no state, resolution, quote,
+  attribution, document, frozen snapshot, attempt or payment. Orders from before 0017 have no
+  provenance, so an existing order can't be adopted by the service, a worker retry or a migration.
+- `trg_purchase_order_guard` refuses, unconditionally, Refref resolution and attribution columns
+  (`NATIVE_PURCHASE_NO_REFERRAL`), Refref checkout/payment columns (`NATIVE_PURCHASE_PAYMENT_OWNER`)
+  and changes of the accepted terms — identity, departure, seats, price, documents and their stored
+  bytes (`legal_release_content`, `pd_consent_content`), consent, and `closed_at`/`pd_erased_at`
+  once recorded (`NATIVE_PURCHASE_TERMS_IMMUTABLE`) — on a purchase document order. `onReturn` and
+  `pay` refuse such an order before any Refref call. Browser ownership (`state_hash`) and expiry are
+  unaffected.
+- Its tourist rows cannot be added, edited or moved (a changed tourist is a new revision). They can
+  only be deleted by qualified retention, as `maintain()` does it: `pd_erased_at` marked first and
+  `fn_purchase_pd_retention_due` true — no legal hold, and 24 h since the database itself recorded the
+  unpaid closure (`closed_recorded_at`, stamped once; a backdated `closed_at` does not count) or 90 days
+  after a settled trip. Otherwise `NATIVE_PURCHASE_PD_RETENTION_ONLY`, also for `TRUNCATE order_passenger`.
+  `maintain()` selects through the same function, so an early order is skipped, not a failed batch.
+- At commit every purchase is whole (`PURCHASE_INCOMPLETE` otherwise): revision 1 exists, revisions
+  are contiguous, `current_revision` is the last one and every revision has all participant links.
+- `participant_ref` identifies a participant within the purchase. A later revision carries it only
+  when exactly one tourist of the predecessor and exactly one of the new document order have the
+  same identity document and date of birth; a replaced, added or returning tourist gets a new ref.
+  The position in the list proves nothing, and the insert trigger refuses forged continuity
+  (`PURCHASE_PARTICIPANT_CONTINUITY`).
+- A protected replacement of the purchase's current document order appends a `QUOTE_REPLACEMENT`
+  revision under the same `purchase_ref`. Replacement never crosses profiles: a deferred constraint
+  trigger refuses a legacy order that replaces a purchase order (`NATIVE_PURCHASE_CONTINUATION_REQUIRED`).
+- An order without a purchase has `provenance = 'UNRESOLVED'` and NULL profile in
+  `order_purchase_profile`; it is never read as `NATIVE_NO_REFERRAL`. Nothing is backfilled.
+- `fn_departure_taken_seats(slug, now)` is the shared capacity count (reserve now; the ART-366 /
+  TOUR-65 capacity editor and TOUR-79 transfers consume it). Call it under the departure transaction
+  lock (`fn_lock_checkout_departure`, or editorial row then advisory lock) and reread after locking.
+  A purchase document order counts its accepted revision's seats.
+- `purchase_current` is the current projection (no personal data); `src/purchases.ts` reads it.
+
+**Trust boundary.** UPDATE, DELETE and TRUNCATE of purchase history and these guards are refused
+for every login's DML, the owner's included. DDL that drops or disables triggers, or a superuser's
+`session_replication_role`, is outside that guarantee: such changes reach production only as
+reviewed, append-only, attested migrations ("Immutable migration history" below) run by the
+trusted owner. Tests reset order tables with `resetOrders` in a disposable database only.
+
+`reserveNativePurchase` is not wired to the public form. Switching new sales to the native profile
+is the separately authorized cutover after native payment operations (TOUR-77) exist; until then
+the public form keeps creating orders outside any purchase. Payment operations, money allocation,
+amendments and transfers are TOUR-77/78/79. See
+[design](../docs/plans/2026-10-29-tour-76-purchase-identity-design.md).
 
 ## Content CRUD and execution changes (migrations 0009–0010)
 

@@ -4,7 +4,7 @@ import { after, before, beforeEach, test } from 'node:test';
 import type { Catalog } from '../src/catalog.js';
 import { commerceMonitorSignals, monitorHasAlert } from '../src/monitor.js';
 import { reserve, setSalesOpen, type BookingRequest } from '../src/orders.js';
-import { seedCatalog, fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';
+import { seedCatalog, fixtureCatalog, freshDb, tourist, type TestDb, resetOrders } from './helpers.js';
 
 const NOW = new Date('2026-10-04T06:00:00Z');
 let db: TestDb;
@@ -17,7 +17,7 @@ before(async () => {
 });
 after(async () => { await db.drop(); });
 beforeEach(async () => {
-  await db.owner.query('TRUNCATE execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+  await resetOrders(db.owner);
   await setSalesOpen(db.operator, true, 'test', 'open for the test');
 });
 
