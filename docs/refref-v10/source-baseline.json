@@ -389,7 +389,7 @@
   "refrefCurrentCandidate": {
     "repository": "ArtGurianov/refref",
     "pr": 130,
-    "commit": "793ad1a8fc571a98c9f1b9b31161b5b6532770ab",
+    "commit": "5f966664182a12aba3de9c0721deadab910c338d",
     "contractStatus": "EXACT_COMMIT_SOURCE_INSPECTED_PENDING_FINAL_MUTATION_RERUN_AND_APPROVAL",
     "historicalSourceAuditCommit": "c932b656edbda1d47cfb57de08fd4a36536712f5",
     "inspection": "GitHub fetch_file exact SHA for 12 relevant original source paths",
