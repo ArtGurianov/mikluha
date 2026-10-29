@@ -92,7 +92,7 @@ test("initial checkout markup fails closed and offers no promo command or GET fo
     terms: { ref: "terms-1", hash: "terms-hash" }, pdConsent: { ref: "pd-1", hash: "pd-hash" },
   };
   const html = renderToStaticMarkup(createElement(NativeCheckout, { view }));
-  assert.match(html, /<form method="post"/);
+  assert.match(html, /<form\b[^>]*\bmethod="post"/);
   assert.match(html, /<button type="submit" disabled=""/);
   assert.match(html, /<button type="button" disabled=""[^>]*>Применить<\/button>/);
   const promo = html.match(/<input disabled="" autoComplete="off"[^>]*>/)?.[0];
