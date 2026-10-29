@@ -1,0 +1,225 @@
+name: site-ssr-release
+
+# The SSR site's code release (ADR v2.3 §8, TOUR-60), the ART-360 digest PoC made real: build the
+# image for the exact `main` commit, prove the candidate, then PATCH its digest into the one Coolify
+# Docker Image application, deploy, follow to a terminal state and read /identity back. The running
+# container's RepoDigests are the second read-back, on the VPS (scripts/verify-running-digest.sh).
+#
+# Manual only. It never runs on push: Git auto-deploy stays off, and pointing a public domain at this
+# application is the owner-authorized hard cut (TOUR-67), not something this workflow decides.
+#
+# Rollback / restore: dispatch with `digest` and `commit` of an earlier release (its summary lists
+# both). Nothing is built; the candidate job proves the image's baked identity is that commit first.
+#
+# Environment `site-ssr` (main only): vars SITE_SSR_APP_UUID, SITE_SSR_IDENTITY_URL
+# (https://<host>/identity), SITE_SSR_DEPLOY_ENV (staging|production), SITE_SSR_SITE_URL; secrets
+# COOLIFY_BASE_URL, COOLIFY_SITE_SSR_WRITE_TOKEN (read+write: PATCH and read-backs) and
+# COOLIFY_SITE_SSR_DEPLOY_TOKEN (deploy only). Not the static site's or the PoC's tokens.
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: 'Rollback: an already pushed sha256:<64 hex>. Empty builds this ref.'
+        required: false
+        default: ''
+      commit:
+        description: 'Rollback: the 40-hex commit that digest was built from.'
+        required: false
+        default: ''
+
+permissions: {}
+
+# Choose digest → PATCH → deploy → read-back as one sequence: two releases never interleave.
+concurrency:
+  group: site-ssr-release
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/artgurianov/mikluha-site-ssr
+  APP_NAME: mikluha-site-ssr
+
+jobs:
+  build:
+    if: inputs.digest == '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: site-ssr
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # One linux/amd64 manifest, no attestation index: the digest released is the image's own.
+      - id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.ssr
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          build-args: |
+            SOURCE_COMMIT=${{ github.sha }}
+            DEPLOY_ENV=${{ vars.SITE_SSR_DEPLOY_ENV }}
+            SITE_URL=${{ vars.SITE_SSR_SITE_URL }}
+
+  candidate:
+    needs: build
+    if: >-
+      always() && github.ref == 'refs/heads/main' &&
+      (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.digest != ''))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      digest: ${{ steps.inputs.outputs.digest }}
+      commit: ${{ steps.inputs.outputs.commit }}
+    env:
+      DIGEST: ${{ inputs.digest != '' && inputs.digest || needs.build.outputs.digest }}
+      COMMIT: ${{ inputs.digest != '' && inputs.commit || github.sha }}
+    steps:
+      - id: inputs
+        name: Inputs
+        run: |
+          set -euo pipefail
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::digest must be sha256:<64 hex>, got '$DIGEST'"; exit 1; }
+          [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::commit must be 40 hex, got '$COMMIT'"; exit 1; }
+          echo "digest=$DIGEST" >>"$GITHUB_OUTPUT"
+          echo "commit=$COMMIT" >>"$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: The image's baked identity is the chosen commit
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE@$DIGEST"
+          baked="$(docker run --rm --entrypoint cat "$IMAGE@$DIGEST" /app/public/release.json | jq -r .sourceCommit)"
+          [ "$baked" = "$COMMIT" ] || { echo "::error::$IMAGE@$DIGEST was built from $baked, not $COMMIT"; exit 1; }
+      - name: Candidate smoke against the projection fixture
+        run: |
+          set -euo pipefail
+          PORT=4010 pnpm exec tsx scripts/projection-fixture.ts &
+          docker run -d --name candidate --network host -e PORT=3000 \
+            -e COMMERCE_PUBLIC_API_URL=http://127.0.0.1:4010 "$IMAGE@$DIGEST"
+          for _ in $(seq 1 30); do curl -fs -o /dev/null http://127.0.0.1:3000/release.json && break; sleep 1; done
+          SMOKE_BASE_URL=http://127.0.0.1:3000 FIXTURE_URL=http://127.0.0.1:4010 EXPECT_COMMIT="$COMMIT" EXPECT_MEDIA=direct \
+            MEDIA_ORIGIN_BASE=https://mikluha-maklai.s3.cloud.ru/cms/ pnpm exec tsx scripts/ssr-smoke.ts
+      - if: failure()
+        run: docker logs candidate || true
+
+  release:
+    needs: candidate
+    if: always() && needs.candidate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: site-ssr
+    permissions: {}
+    env:
+      COOLIFY_BASE_URL: ${{ secrets.COOLIFY_BASE_URL }}
+      WRITE_TOKEN: ${{ secrets.COOLIFY_SITE_SSR_WRITE_TOKEN }}
+      DEPLOY_TOKEN: ${{ secrets.COOLIFY_SITE_SSR_DEPLOY_TOKEN }}
+      APP_UUID: ${{ vars.SITE_SSR_APP_UUID }}
+      IDENTITY_URL: ${{ vars.SITE_SSR_IDENTITY_URL }}
+      DIGEST: ${{ needs.candidate.outputs.digest }}
+      COMMIT: ${{ needs.candidate.outputs.commit }}
+    steps:
+      - name: Inputs
+        run: |
+          set -euo pipefail
+          : "${COOLIFY_BASE_URL:?}" "${WRITE_TOKEN:?}" "${DEPLOY_TOKEN:?}" "${APP_UUID:?}" "${IDENTITY_URL:?}"
+          [[ "${COOLIFY_BASE_URL%/}" =~ ^https://[^/]+$ ]] || { echo "::error::COOLIFY_BASE_URL must be an https origin"; exit 1; }
+          [[ "$APP_UUID" =~ ^[a-z0-9]{24}$ ]] || { echo "::error::bad SITE_SSR_APP_UUID"; exit 1; }
+          [[ "$IDENTITY_URL" =~ ^https://[^/]+/identity$ ]] || { echo "::error::SITE_SSR_IDENTITY_URL must be https://<host>/identity"; exit 1; }
+          echo "release $IMAGE@$DIGEST (commit $COMMIT) to $APP_UUID"
+
+      - name: The target is the SSR Docker Image application, and only it
+        run: |
+          set -euo pipefail
+          app="$(curl -fsS "${COOLIFY_BASE_URL%/}/api/v1/applications/$APP_UUID" -H "Authorization: Bearer $WRITE_TOKEN")"
+          jq '{name, build_pack, docker_registry_image_name, docker_registry_image_tag, fqdn, ports_exposes}' <<<"$app"
+          jq -e --arg name "$APP_NAME" '.name == $name and .build_pack == "dockerimage" and .ports_exposes == "3000"' <<<"$app" >/dev/null \
+            || { echo "::error::$APP_UUID is not the $APP_NAME Docker Image application exposing 3000"; exit 1; }
+
+      - name: Record what runs now (the rollback target)
+        run: |
+          set -euo pipefail
+          prev="$(curl -fsS "${COOLIFY_BASE_URL%/}/api/v1/applications/$APP_UUID" -H "Authorization: Bearer $WRITE_TOKEN" \
+            | jq -r '.docker_registry_image_tag')"
+          was="$(curl -fsS --max-time 5 "$IDENTITY_URL" | jq -r '.sourceCommit' || echo unknown)"
+          echo "previous: tag $prev, /identity $was"
+          {
+            echo "### Before"
+            echo "- stored tag: \`$prev\` (rollback digest: \`sha256:${prev#sha256-}\`)"
+            echo "- /identity: \`$was\`"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: PATCH the digest, then read Coolify's stored value back
+        run: |
+          set -euo pipefail
+          tag="sha256-${DIGEST#sha256:}"
+          jq -n --arg name "$IMAGE" --arg tag "$tag" '{docker_registry_image_name: $name, docker_registry_image_tag: $tag}' \
+            | curl -fsS -X PATCH "${COOLIFY_BASE_URL%/}/api/v1/applications/$APP_UUID" \
+                -H "Authorization: Bearer $WRITE_TOKEN" -H 'Content-Type: application/json' --data-binary @- >/dev/null
+          stored="$(curl -fsS "${COOLIFY_BASE_URL%/}/api/v1/applications/$APP_UUID" -H "Authorization: Bearer $WRITE_TOKEN" \
+            | jq -r '.docker_registry_image_name + " " + .docker_registry_image_tag')"
+          echo "stored: $stored"
+          [ "$stored" = "$IMAGE $tag" ] || { echo "::error::Coolify stored '$stored', not '$IMAGE $tag'"; exit 1; }
+
+      - name: Deploy and follow to a terminal state
+        run: |
+          set -euo pipefail
+          dep="$(curl -fsS -X POST "${COOLIFY_BASE_URL%/}/api/v1/deploy?uuid=$APP_UUID&force=false" \
+            -H "Authorization: Bearer $DEPLOY_TOKEN" | jq -r '.deployments[0].deployment_uuid // empty')"
+          [ -n "$dep" ] || { echo "::error::Coolify queued no deployment"; exit 1; }
+          echo "deployment $dep"
+          echo "DEPLOYMENT=$dep" >>"$GITHUB_ENV"
+          for _ in $(seq 1 90); do
+            # Just after queueing, the deployment can answer 404 for a few seconds.
+            status="$(curl -fsS "${COOLIFY_BASE_URL%/}/api/v1/deployments/$dep" -H "Authorization: Bearer $WRITE_TOKEN" | jq -r '.status' || echo unknown)"
+            case "$status" in
+              finished) echo "terminal: $status"; exit 0 ;;
+              failed|cancelled-by-user|error) echo "::error::deployment $dep ended $status"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::deployment $dep not terminal after 15 minutes (last: $status)"; exit 1
+
+      - name: /identity reports the chosen commit
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 18); do
+            got="$(curl -fsSL --max-time 5 "$IDENTITY_URL" | jq -r '.sourceCommit' || true)"
+            [ "$got" = "$COMMIT" ] && { echo "identity: $got"; break; }
+            sleep 10
+          done
+          [ "$got" = "$COMMIT" ] || { echo "::error::/identity reports '$got', not $COMMIT"; exit 1; }
+          {
+            echo "### Released"
+            echo "- image: \`$IMAGE@$DIGEST\`"
+            echo "- commit: \`$COMMIT\`, deployment \`$DEPLOYMENT\`: finished, /identity matches"
+            echo "- rollback: dispatch with this digest and commit"
+            echo "- second read-back on the VPS:"
+            echo "  \`ssh adman-vps 'bash -s -- $APP_UUID $IMAGE $DIGEST' < scripts/verify-running-digest.sh\`"
+          } >>"$GITHUB_STEP_SUMMARY"

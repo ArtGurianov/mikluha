@@ -9,9 +9,9 @@ import { Breadcrumbs } from "@/components/site/breadcrumbs";
 import { MarkdownContent } from "@/components/site/markdown-content";
 import { DepartureBookingCard } from "@/components/tours/departure-booking-card";
 import { MobileBookingDock } from "@/components/tours/mobile-booking-dock";
-import { getContent } from "@/lib/cms/content";
+import { getBakedContent, loadContent } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
-import { resolveCanonicalBase } from "@/lib/site";
+import { isSsr, resolveCanonicalBase } from "@/lib/site";
 import { buildBreadcrumbJsonLd, buildTouristTripJsonLd, getTourBreadcrumbs } from "@/lib/structured-data";
 import {
   getListedTours,
@@ -22,14 +22,20 @@ import {
   getTourBySlug,
 } from "@/lib/tours";
 
-export function generateStaticParams() {
-  const content = getContent();
-  return getListedTours(content).map((tour) => ({ slug: tour.slug }));
-}
+/**
+ * Static export: every page. SSR: no export at all — with one, Next treats the
+ * route as prerendered and refuses the per-request Commerce read.
+ */
+export const generateStaticParams = isSsr
+  ? undefined
+  : () => {
+      const content = getBakedContent();
+      return getListedTours(content).map((tour) => ({ slug: tour.slug }));
+    };
 
 export async function generateMetadata(props: PageProps<"/tours/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
-  const content = getContent();
+  const content = await loadContent();
   const tour = getTourBySlug(content, slug);
   if (!tour) return {};
 
@@ -47,7 +53,7 @@ export async function generateMetadata(props: PageProps<"/tours/[slug]">): Promi
 
 export default async function TourPage(props: PageProps<"/tours/[slug]">) {
   const { slug } = await props.params;
-  const content = getContent();
+  const content = await loadContent();
   const tour = getTourBySlug(content, slug);
   if (!tour) notFound();
 

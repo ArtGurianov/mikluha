@@ -11,6 +11,7 @@
 //                         nothing and no vNext client is built even when it is set.
 //   REFREF_BUSINESS_ID, REFREF_BUSINESS_SLUG, REFREF_API_KEY   Mikluha's Refref Business and its key
 //   NOTISEND_API_KEY, NOTISEND_FROM_EMAIL, NOTISEND_FROM_NAME   Notisend transactional email (optional NOTISEND_REPLY_TO)
+// The SSR site reads GET /public/v1/catalog (public-api.ts) over the internal network.
 
 import pg from 'pg';
 
@@ -27,7 +28,8 @@ import { maintain } from '../orders.js';
 import { SchemaAdmission, schemaWorker } from '../schema-admission.js';
 import { schemaReadiness } from '../schema-readiness.js';
 import { RefrefClient } from '../refref.js';
-import { createCommerceServer, SERVICE } from '../server.js';
+import { createPublicApiHandler } from '../public-api.js';
+import { createCommerceServer, routes, SERVICE } from '../server.js';
 import { createWebHandler } from '../web.js';
 
 const log = jsonLogger(SERVICE);
@@ -68,7 +70,7 @@ const server = createCommerceServer({
   pool, catalog, admission, schemaHead: migrations.length, migrations,
   sourceCommit: identity.sourceCommit, startedAt: new Date(), ...(legalAdmission ? { legalAdmission } : {}),
   onError: (e) => log('request_failed', { error: e instanceof Error ? e.name : 'unknown' }),
-}, createWebHandler(checkout, which === 'STAGING'));
+}, routes(createPublicApiHandler(pool), createWebHandler(checkout, which === 'STAGING')));
 const port = Number(process.env.PORT ?? 3000);
 server.listen(port, '0.0.0.0', () => log('listening', { port, environment: which, departures: catalog.departures.size,
   ingress: 'NATIVE_NO_REFERRAL', vnextApiBaseIgnored: Boolean(process.env.REFREF_VNEXT_API_BASE) }));

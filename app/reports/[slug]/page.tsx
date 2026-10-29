@@ -6,9 +6,9 @@ import { Gallery } from "@/components/gallery/gallery";
 import { HeroMedia } from "@/components/home/hero-media";
 import { CmsImage } from "@/components/media/cms-image";
 import { Breadcrumbs } from "@/components/site/breadcrumbs";
-import { getContent } from "@/lib/cms/content";
+import { getBakedContent, loadContent } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
-import { isStaging, resolveCanonicalBase } from "@/lib/site";
+import { isSsr, isStaging, resolveCanonicalBase } from "@/lib/site";
 import { buildBreadcrumbJsonLd, getReportBreadcrumbs } from "@/lib/structured-data";
 import {
   formatDepartureDateRange,
@@ -19,14 +19,20 @@ import {
   getTourById,
 } from "@/lib/tours";
 
-export function generateStaticParams() {
-  const content = getContent();
-  return content.reports.map((report) => ({ slug: report.slug }));
-}
+/**
+ * Static export: every page. SSR: no export at all — with one, Next treats the
+ * route as prerendered and refuses the per-request Commerce read.
+ */
+export const generateStaticParams = isSsr
+  ? undefined
+  : () => {
+      const content = getBakedContent();
+      return content.reports.map((report) => ({ slug: report.slug }));
+    };
 
 export async function generateMetadata(props: PageProps<"/reports/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
-  const content = getContent();
+  const content = await loadContent();
   const report = getReportBySlug(content, slug);
   if (!report) return {};
 
@@ -48,7 +54,7 @@ export async function generateMetadata(props: PageProps<"/reports/[slug]">): Pro
 
 export default async function ReportPage(props: PageProps<"/reports/[slug]">) {
   const { slug } = await props.params;
-  const content = getContent();
+  const content = await loadContent();
   const report = getReportBySlug(content, slug);
   if (!report) notFound();
 

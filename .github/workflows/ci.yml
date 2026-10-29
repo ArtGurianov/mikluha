@@ -51,6 +51,49 @@ jobs:
           SOURCE_COMMIT: ${{ github.sha }}
         run: pnpm run build:production
 
+  # The SSR site (Dockerfile.ssr, TOUR-60) as the release would run it, against the projection fixture:
+  # no-store, no cookie, /identity = the build's commit, render on request, the Commerce outage state,
+  # and the media switch direct → cdn → direct on the same image (TOUR-56), with no rebuild.
+  site-ssr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      EXPECT_COMMIT: ${{ github.sha }}
+      MEDIA_ORIGIN_BASE: https://mikluha-maklai.s3.cloud.ru/cms/
+      MEDIA_CDN_BASE: https://media.cdn.invalid/cms/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Image
+        run: >-
+          docker build -f Dockerfile.ssr --build-arg SOURCE_COMMIT="$EXPECT_COMMIT"
+          --build-arg DEPLOY_ENV=staging --build-arg SITE_URL=https://staging.invalid -t mikluha-site-ssr:ci .
+
+      - name: Smoke, then switch media and back without a rebuild
+        run: |
+          set -euo pipefail
+          PORT=4010 pnpm exec tsx scripts/projection-fixture.ts &
+          run() {
+            docker rm -f ssr >/dev/null 2>&1 || true
+            docker run -d --name ssr --network host -e PORT=3000 -e COMMERCE_PUBLIC_API_URL=http://127.0.0.1:4010 \
+              -e MEDIA_DELIVERY="$1" -e MEDIA_ORIGIN_BASE -e MEDIA_CDN_BASE mikluha-site-ssr:ci >/dev/null
+            for _ in $(seq 1 30); do curl -fs -o /dev/null http://127.0.0.1:3000/release.json && break; sleep 1; done
+            SMOKE_BASE_URL=http://127.0.0.1:3000 FIXTURE_URL=http://127.0.0.1:4010 EXPECT_MEDIA="$1" pnpm exec tsx scripts/ssr-smoke.ts
+          }
+          run direct
+          run cdn
+          run direct
+
+      - if: failure()
+        run: docker logs ssr || true
+
   # mikluha-commerce (commerce/README.md): its own package, tests against a real Postgres, and the
   # image built from the repository root, as Coolify builds it.
   commerce:

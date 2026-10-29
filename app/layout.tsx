@@ -3,7 +3,7 @@ import { Manrope } from "next/font/google";
 
 import { Footer } from "@/components/site/footer";
 import { Header } from "@/components/site/header";
-import { getContent } from "@/lib/cms/content";
+import { loadContent } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
 import { getLegalPagesSorted } from "@/lib/legal";
 import { deployEnv, isStaging, resolveCanonicalBase } from "@/lib/site";
@@ -17,7 +17,7 @@ const manrope = Manrope({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { siteSettings, tours } = getContent();
+  const { siteSettings, tours } = await loadContent();
   const canonicalCoverImage = siteSettings.seo.ogImage?.src ?? tours[0]?.coverImage.src;
 
   return {
@@ -50,8 +50,8 @@ function mediaOrigin(src: string): string | undefined {
   }
 }
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
-  const content = getContent();
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const content = await loadContent();
   const { siteSettings } = content;
   // The Hero poster (the LCP image) and, after the load event, the WebM both
   // come from Object Storage, so get the TLS handshake to it out of the way

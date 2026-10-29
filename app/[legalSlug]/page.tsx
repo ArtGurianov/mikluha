@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { LegalPageView } from "@/components/site/legal-page-view";
-import { getContent } from "@/lib/cms/content";
+import { getBakedContent } from "@/lib/cms/content";
 import { getLegalPageBySlug } from "@/lib/legal";
 
 /**
@@ -20,19 +20,19 @@ import { getLegalPageBySlug } from "@/lib/legal";
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return getContent().legalPages.map((page) => ({ legalSlug: page.slug }));
+  return getBakedContent().legalPages.map((page) => ({ legalSlug: page.slug }));
 }
 
 export async function generateMetadata(props: PageProps<"/[legalSlug]">): Promise<Metadata> {
   const { legalSlug } = await props.params;
-  const page = getLegalPageBySlug(getContent(), legalSlug);
+  const page = getLegalPageBySlug(getBakedContent(), legalSlug);
   if (!page) return {};
   return { title: page.title, alternates: { canonical: `/${page.slug}/` } };
 }
 
 export default async function LegalPage(props: PageProps<"/[legalSlug]">) {
   const { legalSlug } = await props.params;
-  const page = getLegalPageBySlug(getContent(), legalSlug);
+  const page = getLegalPageBySlug(getBakedContent(), legalSlug);
   if (!page) notFound();
   return <LegalPageView page={page} />;
 }

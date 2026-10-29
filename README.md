@@ -13,7 +13,10 @@ workspace `art-workspace`, проект `TOUR`.
 
 Текущий публичный сайт — статический экспорт. Принятый переход на SSR и единый
 PostgreSQL описан в [ADR v2.3](docs/adr/2026-10-18-ssr-flexible-offers-immutable-contracts.md);
-исходники Admin/Commerce не означают выполненный cutover. Граница действующего
+исходники Admin/Commerce не означают выполненный cutover. SSR-сборка
+(`pnpm run build:ssr`, `Dockerfile.ssr`, релиз по digest) существует рядом со
+статической и описана в [TOUR-60](docs/plans/2026-10-29-tour-60-ssr-source-ready.md);
+переключатель медиа и PoC TurboFlare — в [TOUR-56](docs/plans/2026-10-29-tour-56-turboflare-poc.md). Граница действующего
 платёжного контракта и целевого Refref v9 — в
 [статусе TOUR-интеграции](docs/refref-v9-contract-status.md).
 
