@@ -6,8 +6,7 @@ import Link from "next/link";
 import { ArrowRight, Check, LockKeyhole, Plus, ShieldCheck } from "lucide-react";
 import { bookingDraft, bookingRefusals } from "@/lib/native-checkout";
 import type { BookingDraft, BookingOutcome, BookingPresentation } from "@/lib/native-checkout";
-import type { CaptchaMount } from "@/lib/smartcaptcha-widget";
-import { SmartCaptcha } from "./smartcaptcha";
+import { SmartCaptcha, type CaptchaWidget } from "./smartcaptcha";
 
 const input = "mt-2 w-full min-w-0 rounded-lg border border-input bg-background px-3 py-3 text-base font-normal text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary disabled:bg-muted";
 const card = "min-w-0 rounded-2xl border border-border bg-card p-5 sm:p-7";
@@ -16,7 +15,7 @@ const action = "inline-flex min-h-12 items-center justify-center gap-3 rounded-x
 /** Client composition port. No fetch, native API URL, bank redirect or seat allocator lives here. */
 export function NativeCheckout({ view, captcha, submit }: {
   view: BookingPresentation;
-  captcha?: CaptchaMount;
+  captcha?: CaptchaWidget;
   submit?: (draft: BookingDraft) => Promise<BookingOutcome>;
 }) {
   const prefix = useId();
@@ -119,7 +118,7 @@ export function NativeCheckout({ view, captcha, submit }: {
             <label className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="adultsOnly" value="yes" required /><span>Все туристы совершеннолетние.</span></label>
             <p className="text-xs leading-relaxed text-muted-foreground">Данные туристов нужны для договора и ЕИС «Электронная путёвка». <a href="/privacy-policy/" target="_blank" rel="noreferrer" className="text-secondary underline">Политика обработки данных</a>. Условия договора — в <a href="/oferta/" target="_blank" rel="noreferrer" className="text-secondary underline">Публичной оферте</a>.</p>
           </fieldset>
-          {status === "editing" && <SmartCaptcha key={captchaRevision} mount={captcha} onProof={reportProof} onRetry={retryCaptcha} />}
+          {status === "editing" && <SmartCaptcha key={captchaRevision} widget={captcha} onProof={reportProof} onRetry={retryCaptcha} />}
           {notice && <div ref={noticeRef} tabIndex={-1} role="status" className="rounded-xl border border-border bg-accent p-5 text-sm leading-relaxed outline-secondary">{notice}</div>}
           {!submit && <p role="status" className="text-sm text-muted-foreground">Онлайн-отправка пока недоступна. Вы можете связаться с организатором.</p>}
           <button type="submit" disabled={!submit || !hasProof || locked} className={`${action} w-full`}>

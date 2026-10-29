@@ -2,8 +2,9 @@
 
 Agent B scope: buyer form and SmartCaptcha UX only. This source does not switch the public
 booking path, implement Agent A's API, verify CAPTCHA server-side, allocate seats, expire holds,
-create payment operations or authorize publication/deployment. `CUSTODY_IMPACT: NO` — local
-source only; no host configuration, credentials or persistent resources change.
+create payment operations or authorize publication/deployment. `CUSTODY_IMPACT: YES` for the owner-authorized follow-up: existing Flexperiment CAPTCHA keys
+were copied into the Mikluha Coolify project. See VPS-18 and `docs/smartcaptcha-operations.md`.
+No deployment, key rotation or service restart occurred; independent custody is CUSTODY_PENDING.
 
 ## TOUR-81 status checked first
 
@@ -30,9 +31,10 @@ the form on desktop and before it on mobile.
 - `submit(BookingDraft)`: client composition port, **not** a frozen HTTP contract. The whitelist
   includes tourist/contact/consent data and an opaque CAPTCHA proof. No price, profile, partner,
   promo, query/autofill extras, arrival or payment-owner field is sent.
-- `SmartCaptcha` accepts a stable `CaptchaMount`. `smartCaptchaMount(publicKey)` is the real SDK
-  adapter. The development lab injects a synthetic mount and in-memory submit callback; it has
-  no Commerce, Refref, bank or CAPTCHA-provider connection.
+- `SmartCaptcha` wraps the reused Flexperiment React component (`components/booking/vendor/`).
+  Its `onToken` / `resetKey` interface and SDK lifecycle replace the former custom mount/loader.
+  The development lab injects a synthetic widget and in-memory submit callback; real CAPTCHA is
+  available only through an explicit lab switch. Neither mode calls Commerce, Refref or a bank.
 
 No adapter means submission is disabled. Promo is an unnamed disabled input, disabled
 `type="button"` Apply and an accessible reason with no future discount/partner promise.
@@ -42,8 +44,8 @@ changing that context; never replace the presentation underneath an outstanding 
 
 ## CAPTCHA and failure UX
 
-The real widget loads only on protected-form mount. Missing public key, script error or 12-second
-load timeout fails closed in the UI, with an explicit retry. Network/JavaScript errors invalidate
+The reused Flexperiment widget loads only on protected-form mount. Missing public key or script
+error fails closed in the UI, with an explicit retry. Its upstream loader has no added timeout policy. Network/JavaScript errors invalidate
 the proof and ignore late success until the widget is remounted. Token expiry invalidates the proof.
 Each attempt consumes the proof before awaiting the adapter; a definitive rejection remounts the
 widget and keeps tourist/contact inputs in the current page. Tokens and input values are not
@@ -56,7 +58,7 @@ have been committed. No automatic retry, bank navigation or fresh-order suggesti
 "Rejected" is permitted only if the adapter proves no booking was created. `RATE_LIMITED` copy
 asks the user to wait; it does not invent a server cooldown or hold timer.
 
-The SDK contract was checked against [Yandex's official widget methods and events](https://yandex.cloud/en/docs/smartcaptcha/concepts/widget-methods)
+The reused SDK interface was originally checked against [Yandex's official widget methods and events](https://yandex.cloud/en/docs/smartcaptcha/concepts/widget-methods)
 and the existing Flexperiment `docs/smartcaptcha-operations.md` boundary. The browser success
 callback supplies an **unverified proof**; it never proves server admission, inventory or payment.
 
@@ -83,7 +85,7 @@ for double submit, UNKNOWN blocking resubmission, add/remove tourist and missing
 lifecycle tests cover stale callbacks, pending-load unmount, error/retry and listener cleanup.
 
 The existing `launchReady=false` blocks production-content validation as designed. Staging
-validation leaves that gate closed. No new Commerce/API/database code changed; native HTTP,
+validation leaves that gate closed. No new Commerce/API/application-database code changed; native HTTP,
 provider, real CAPTCHA solve/expiry and bank E2E are NOT_RUN here.
 
 Before integration, Agent A owns server verification/replay protection, durable idempotency and
