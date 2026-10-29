@@ -1,0 +1,497 @@
+{
+  "scope": "VPS16_AUTHORIZED_NONPRODUCTION_EPHEMERAL",
+  "candidate": "e46d6a217dcce6e78bfe42d2f894ffcc49422454",
+  "startedAt": "2026-10-29T12:37:39.326578+00:00",
+  "custodyImpact": "YES",
+  "custodyStatus": "CUSTODY_PENDING",
+  "maxDurationSeconds": 600,
+  "before": {
+    "containers": [
+      {
+        "id": "17245029f6625fd6dbec384c109ef4435b8522328a3e43abee2077a3cc1698f9",
+        "name": "/coolify",
+        "image": "sha256:e4e662978b1ea86b9711149caa2e46497bf8f2c03f578c45324d33e42914ff61",
+        "startedAt": "2026-10-29T01:32:00.196698004Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "298e73e9fc0025eedd9ca5b5eeb9822d838fbacb820b05466a53f66e6eac48f7",
+        "name": "/coolify-redis",
+        "image": "sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af",
+        "startedAt": "2026-10-29T01:31:54.560096366Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "c14d9abdb3900cdfa97abb3a2ad4a91f6ef957ae1cb2ecf5f7d4f5a32c349da1",
+        "name": "/coolify-db",
+        "image": "sha256:54e0dd8e8cddcdbb9156c2486eed5a43eccb7214d7c6828097d41ce049fb3984",
+        "startedAt": "2026-10-29T01:31:54.444791595Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "39f5c6340cebd375005d01f4fff82ca3a25608b809925e5381bbb9079ce0d3c8",
+        "name": "/coolify-sentinel",
+        "image": "sha256:81f8ab984ea5c5fdbd696ea2f47f08c9e31ec41db7493a657b53a52256e26a82",
+        "startedAt": "2026-10-28T18:46:28.282152324Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "9da18e5612c6105642f10953b55e2b2c7c64a85c852e28395013696b070a465b",
+        "name": "/flexperiment-fast-cut-canary-platform",
+        "image": "sha256:9c7fee07994457e7b9dd4ac8345e54addd39c91c45e45f49a05bba546e972655",
+        "startedAt": "2026-10-19T03:30:24.951064872Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "9d3cdd16d745b9b62a3d294f933fb146aebeda2c0f6f4e3274ea00545fbd15ea",
+        "name": "/flexperiment-fast-cut-canary-commerce",
+        "image": "sha256:1de5828b602b5d1852fc705598d3742da883134b6e157d8472238a17ce53b43a",
+        "startedAt": "2026-10-19T03:30:18.334078931Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "e778731a7dfd1920c3d9d29565a13bd6216c74f7ec74effccc05cea98fe344c4",
+        "name": "/flexperiment-fast-cut-canary-admin",
+        "image": "sha256:5d3fa609800de8ab98d9ef4a4793612b5f81d9f8fe56cb10003b75aec287bb29",
+        "startedAt": "2026-10-19T03:30:00.411883999Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "28496c7be1d2455e27b938d89f002398e2079434fa7bd7136cc38dfa6b65e5f5",
+        "name": "/flexperiment-art224-lab-v2",
+        "image": "sha256:8b3e50921a56ec3299b262b740216018ed324d06de1e2e54a6c22aaf8393b19b",
+        "startedAt": "2026-10-16T15:09:50.231655206Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "c9ea82cd8cb62dcbee67a12e84fd772e073911f87567876ee887905ac760d2ce",
+        "name": "/awpzjy14ljv4zvyewxafpwv6-20261010T030107",
+        "image": "sha256:02d8e8ed8511dbd1c07d47981f813d39165d9a1bb00c0a999c3dd21657e26523",
+        "startedAt": "2026-10-16T06:26:30.031194981Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "edb995340a382be13a6ce714b54c9361827335921b91a565491618e06a295785",
+        "name": "/flexperiment-canary-tester",
+        "image": "sha256:85eadc71e50fdab0bc4d154a242a46188bd85bbe7f0edfed516f8863eb14dc77",
+        "startedAt": "2026-10-15T02:33:54.423183098Z",
+        "restartCount": 0,
+        "running": true,
+        "health": null
+      },
+      {
+        "id": "6e1d553ca53bbb50d0014035ac95980d9aa493cfc7a6958f486f91b9b67244c5",
+        "name": "/flexperiment-canary-drm-bridge",
+        "image": "sha256:85eadc71e50fdab0bc4d154a242a46188bd85bbe7f0edfed516f8863eb14dc77",
+        "startedAt": "2026-10-14T18:10:52.62516397Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "74927efa3a2182ba1d5721a57f5e8f4c354e47cf7129d150981fe8860b5d324f",
+        "name": "/muptnq5xvb6jc3pktypjwjza-20261013T124133",
+        "image": "sha256:35c8d0a057f59e57a4f3b9c182a4adb1ff78b58ae530ea27c63963149d62900a",
+        "startedAt": "2026-10-13T12:41:46.469396968Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "2779f3fdb3da5fe5b9819c177086a9e18cb707380ada47c30263f84f61fa6d7b",
+        "name": "/gzngatkipv7dv3rkpuaigjg5-20261010T135112",
+        "image": "sha256:9c2d80886f6c89b51aa9ba50a3eb5a0a683fc8e5709e64eadce719056deb6c6b",
+        "startedAt": "2026-10-10T13:51:24.464043896Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "0881b3c9ee1ad89abede9a76eb42514e015822e1d00f68bb01b7fe1cb4195b96",
+        "name": "/zzzr8aq0nw9dc9oowfj8rubj-20261010T025022",
+        "image": "sha256:db106b041fb25ba7225e12829d3f4774641148be12ce997260dd3350a25ba335",
+        "startedAt": "2026-10-10T02:50:58.46733612Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "13ea9be6997211831e4dee694c9152da04893a0898597fd64682097c72a35641",
+        "name": "/esh0beyclohhdjeimuvkv66n",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-04T15:52:29.139958177Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "6e93090459fa19e27f965ad871136eab6dead51fd8ea0b1af7cee2cd7523012b",
+        "name": "/pxetekoyzceundmfpuapik4q-093757083256",
+        "image": "sha256:ae44fd6bcae8062a61bb6ad8829ee183a850eda86ab5dc7382d91431078fc383",
+        "startedAt": "2026-10-04T09:39:27.168888792Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "71fa0df750bc2fd9015a6e392e437c60e6c765bf65a6ec385cb50b0868f32c40",
+        "name": "/wxueju1jakgauffk2mbt5ir7",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-04T04:12:55.263415695Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "cace3bcac58dd609dd45cd6cfa32e66151c1485647b6c3d8cdb5f1d763d18623",
+        "name": "/xmhtpopwwi4mthqbxekwijip-040440974879",
+        "image": "sha256:74a8cf72f5c1b57ca5b6fb78c5d70121ae95b7adea7aaa832c1f36417687ace2",
+        "startedAt": "2026-10-04T04:05:34.691182779Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "5b018809ce1b9d0c3c79a7887a0c2f0c1a61fb5b9b36da399d940daa5f88881c",
+        "name": "/z27zbdanugtx6e8ic4bcpimu",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-03T16:48:17.902295854Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "33d47a9233ea30cf4d2736b2d0d9cc96408ac49f25c2bd52aa0886ffee35df18",
+        "name": "/ypjr0jgszb0cj6kcimcrkhjn",
+        "image": "sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c",
+        "startedAt": "2026-10-02T09:54:16.702075229Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "f645d51a2e5c6d6f6e05198c3053cb68296f21793b35ce1b8629e28bcb56a50f",
+        "name": "/hnzcww9bt5wiplp0vrhvkdv6",
+        "image": "sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c",
+        "startedAt": "2026-09-28T04:51:16.802979537Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "e34696544c3cc9991c335e7c8bc95dfa4f3ffc97b260d04078d8d913a3510048",
+        "name": "/google-doh-dns-host",
+        "image": "sha256:16aa92775703fb524b3e0250a83e0c473c30c17ac66d3cbd5af7d6ceadd1c318",
+        "startedAt": "2026-08-23T09:41:54.698677988Z",
+        "restartCount": 0,
+        "running": true,
+        "health": null
+      },
+      {
+        "id": "109be7d8c5665d7c8e4579c80b56a841d2fc4a6593c8e3c7b20a180e35b58eb0",
+        "name": "/coolify-proxy",
+        "image": "sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d",
+        "startedAt": "2026-08-23T09:41:54.700116535Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      }
+    ],
+    "diskFreeBytes": 27654451200,
+    "load": [
+      0.20849609375,
+      0.19873046875,
+      0.22607421875
+    ]
+  },
+  "serverProbeReference": "server-probe-attempt-1.json: 44 safety checks pass; warm classification assertion FAIL (18/20 HIT)",
+  "realPublicManifestRows": [
+    {
+      "url": "https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp",
+      "expected": {
+        "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+        "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+        "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+      }
+    },
+    {
+      "url": "https://mikluha-maklai.s3.cloud.ru/cms/organized.webp",
+      "expected": {
+        "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+        "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+        "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+      }
+    }
+  ],
+  "manualWindow": {
+    "manifest": {
+      "/processed/898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17/source-0-warm.webp": {
+        "url": "https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp",
+        "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+        "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+        "lastModified": "Wed, 19 Aug 2026 03:31:56 GMT"
+      },
+      "/processed/3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c/source-1-warm.webp": {
+        "url": "https://mikluha-maklai.s3.cloud.ru/cms/organized.webp",
+        "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+        "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+        "lastModified": "Thu, 20 Aug 2026 15:21:25 GMT"
+      }
+    },
+    "transport": "SSH_LOOPBACK_TUNNEL_ONLY",
+    "browserLcp": "NOT_RUN",
+    "openedAt": "2026-10-29T12:37:51.301113+00:00",
+    "sourceConfigsUnmodified": true,
+    "closedBy": "deadline"
+  },
+  "result": "MANUAL_WINDOW_COMPLETED_SERVER_WARM_ASSERTION_REMAINS_FAIL",
+  "composeCleanupExit": 0,
+  "projectContainersAbsent": true,
+  "projectNetworkAbsent": true,
+  "after": {
+    "containers": [
+      {
+        "id": "17245029f6625fd6dbec384c109ef4435b8522328a3e43abee2077a3cc1698f9",
+        "name": "/coolify",
+        "image": "sha256:e4e662978b1ea86b9711149caa2e46497bf8f2c03f578c45324d33e42914ff61",
+        "startedAt": "2026-10-29T01:32:00.196698004Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "298e73e9fc0025eedd9ca5b5eeb9822d838fbacb820b05466a53f66e6eac48f7",
+        "name": "/coolify-redis",
+        "image": "sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af",
+        "startedAt": "2026-10-29T01:31:54.560096366Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "c14d9abdb3900cdfa97abb3a2ad4a91f6ef957ae1cb2ecf5f7d4f5a32c349da1",
+        "name": "/coolify-db",
+        "image": "sha256:54e0dd8e8cddcdbb9156c2486eed5a43eccb7214d7c6828097d41ce049fb3984",
+        "startedAt": "2026-10-29T01:31:54.444791595Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "39f5c6340cebd375005d01f4fff82ca3a25608b809925e5381bbb9079ce0d3c8",
+        "name": "/coolify-sentinel",
+        "image": "sha256:81f8ab984ea5c5fdbd696ea2f47f08c9e31ec41db7493a657b53a52256e26a82",
+        "startedAt": "2026-10-28T18:46:28.282152324Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "9da18e5612c6105642f10953b55e2b2c7c64a85c852e28395013696b070a465b",
+        "name": "/flexperiment-fast-cut-canary-platform",
+        "image": "sha256:9c7fee07994457e7b9dd4ac8345e54addd39c91c45e45f49a05bba546e972655",
+        "startedAt": "2026-10-19T03:30:24.951064872Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "9d3cdd16d745b9b62a3d294f933fb146aebeda2c0f6f4e3274ea00545fbd15ea",
+        "name": "/flexperiment-fast-cut-canary-commerce",
+        "image": "sha256:1de5828b602b5d1852fc705598d3742da883134b6e157d8472238a17ce53b43a",
+        "startedAt": "2026-10-19T03:30:18.334078931Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "e778731a7dfd1920c3d9d29565a13bd6216c74f7ec74effccc05cea98fe344c4",
+        "name": "/flexperiment-fast-cut-canary-admin",
+        "image": "sha256:5d3fa609800de8ab98d9ef4a4793612b5f81d9f8fe56cb10003b75aec287bb29",
+        "startedAt": "2026-10-19T03:30:00.411883999Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "28496c7be1d2455e27b938d89f002398e2079434fa7bd7136cc38dfa6b65e5f5",
+        "name": "/flexperiment-art224-lab-v2",
+        "image": "sha256:8b3e50921a56ec3299b262b740216018ed324d06de1e2e54a6c22aaf8393b19b",
+        "startedAt": "2026-10-16T15:09:50.231655206Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "c9ea82cd8cb62dcbee67a12e84fd772e073911f87567876ee887905ac760d2ce",
+        "name": "/awpzjy14ljv4zvyewxafpwv6-20261010T030107",
+        "image": "sha256:02d8e8ed8511dbd1c07d47981f813d39165d9a1bb00c0a999c3dd21657e26523",
+        "startedAt": "2026-10-16T06:26:30.031194981Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "edb995340a382be13a6ce714b54c9361827335921b91a565491618e06a295785",
+        "name": "/flexperiment-canary-tester",
+        "image": "sha256:85eadc71e50fdab0bc4d154a242a46188bd85bbe7f0edfed516f8863eb14dc77",
+        "startedAt": "2026-10-15T02:33:54.423183098Z",
+        "restartCount": 0,
+        "running": true,
+        "health": null
+      },
+      {
+        "id": "6e1d553ca53bbb50d0014035ac95980d9aa493cfc7a6958f486f91b9b67244c5",
+        "name": "/flexperiment-canary-drm-bridge",
+        "image": "sha256:85eadc71e50fdab0bc4d154a242a46188bd85bbe7f0edfed516f8863eb14dc77",
+        "startedAt": "2026-10-14T18:10:52.62516397Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "74927efa3a2182ba1d5721a57f5e8f4c354e47cf7129d150981fe8860b5d324f",
+        "name": "/muptnq5xvb6jc3pktypjwjza-20261013T124133",
+        "image": "sha256:35c8d0a057f59e57a4f3b9c182a4adb1ff78b58ae530ea27c63963149d62900a",
+        "startedAt": "2026-10-13T12:41:46.469396968Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "2779f3fdb3da5fe5b9819c177086a9e18cb707380ada47c30263f84f61fa6d7b",
+        "name": "/gzngatkipv7dv3rkpuaigjg5-20261010T135112",
+        "image": "sha256:9c2d80886f6c89b51aa9ba50a3eb5a0a683fc8e5709e64eadce719056deb6c6b",
+        "startedAt": "2026-10-10T13:51:24.464043896Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "0881b3c9ee1ad89abede9a76eb42514e015822e1d00f68bb01b7fe1cb4195b96",
+        "name": "/zzzr8aq0nw9dc9oowfj8rubj-20261010T025022",
+        "image": "sha256:db106b041fb25ba7225e12829d3f4774641148be12ce997260dd3350a25ba335",
+        "startedAt": "2026-10-10T02:50:58.46733612Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "13ea9be6997211831e4dee694c9152da04893a0898597fd64682097c72a35641",
+        "name": "/esh0beyclohhdjeimuvkv66n",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-04T15:52:29.139958177Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "6e93090459fa19e27f965ad871136eab6dead51fd8ea0b1af7cee2cd7523012b",
+        "name": "/pxetekoyzceundmfpuapik4q-093757083256",
+        "image": "sha256:ae44fd6bcae8062a61bb6ad8829ee183a850eda86ab5dc7382d91431078fc383",
+        "startedAt": "2026-10-04T09:39:27.168888792Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "71fa0df750bc2fd9015a6e392e437c60e6c765bf65a6ec385cb50b0868f32c40",
+        "name": "/wxueju1jakgauffk2mbt5ir7",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-04T04:12:55.263415695Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "cace3bcac58dd609dd45cd6cfa32e66151c1485647b6c3d8cdb5f1d763d18623",
+        "name": "/xmhtpopwwi4mthqbxekwijip-040440974879",
+        "image": "sha256:74a8cf72f5c1b57ca5b6fb78c5d70121ae95b7adea7aaa832c1f36417687ace2",
+        "startedAt": "2026-10-04T04:05:34.691182779Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "5b018809ce1b9d0c3c79a7887a0c2f0c1a61fb5b9b36da399d940daa5f88881c",
+        "name": "/z27zbdanugtx6e8ic4bcpimu",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-03T16:48:17.902295854Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "33d47a9233ea30cf4d2736b2d0d9cc96408ac49f25c2bd52aa0886ffee35df18",
+        "name": "/ypjr0jgszb0cj6kcimcrkhjn",
+        "image": "sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c",
+        "startedAt": "2026-10-02T09:54:16.702075229Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "f645d51a2e5c6d6f6e05198c3053cb68296f21793b35ce1b8629e28bcb56a50f",
+        "name": "/hnzcww9bt5wiplp0vrhvkdv6",
+        "image": "sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c",
+        "startedAt": "2026-09-28T04:51:16.802979537Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "e34696544c3cc9991c335e7c8bc95dfa4f3ffc97b260d04078d8d913a3510048",
+        "name": "/google-doh-dns-host",
+        "image": "sha256:16aa92775703fb524b3e0250a83e0c473c30c17ac66d3cbd5af7d6ceadd1c318",
+        "startedAt": "2026-08-23T09:41:54.698677988Z",
+        "restartCount": 0,
+        "running": true,
+        "health": null
+      },
+      {
+        "id": "109be7d8c5665d7c8e4579c80b56a841d2fc4a6593c8e3c7b20a180e35b58eb0",
+        "name": "/coolify-proxy",
+        "image": "sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d",
+        "startedAt": "2026-08-23T09:41:54.700116535Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      }
+    ],
+    "diskFreeBytes": 27429167104,
+    "load": [
+      0.1767578125,
+      0.28173828125,
+      0.26513671875
+    ]
+  },
+  "productionIdentityUnchanged": true,
+  "newImageCacheCleanup": [
+    {
+      "reference": "node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402",
+      "newImageReferenceRemovalExit": 0
+    }
+  ],
+  "durationSeconds": 376.099,
+  "totalAuthorizedWallSeconds": 545.335,
+  "finishedAt": "2026-10-29T12:43:55.425640+00:00",
+  "temporaryRootRemoval": "after collector acknowledgment or bounded 15-second grace"
+}

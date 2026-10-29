@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+# One owner-authorized disposable stage. No production env, routes, service operations or secrets.
+import datetime, hashlib, json, os, pathlib, shutil, signal, socket, stat, subprocess, sys, time
+ROOT=pathlib.Path(sys.argv[1]).resolve()
+assert str(ROOT).startswith('/tmp/mikluha-tour88-e46d6a2.') and ROOT.parent == pathlib.Path('/tmp')
+SOURCE=ROOT/'poc/regional-media-cache'
+PROJECT='mikluha-tour88-local'
+START=time.monotonic(); SESSION_START_EPOCH=1793277290.091023; SESSION_END_EPOCH=1793277890.091023; DEADLINE=min(START+510,START+SESSION_END_EPOCH-time.time()-60)
+UID=65534; GID=os.stat('/var/run/docker.sock').st_gid
+REFS=['node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402','nginx:1.31-alpine@sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606','traefik:v3.6@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d']
+REPORT={'scope':'VPS16_AUTHORIZED_NONPRODUCTION_EPHEMERAL','candidate':'e46d6a217dcce6e78bfe42d2f894ffcc49422454','startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'custodyImpact':'YES','custodyStatus':'CUSTODY_PENDING','maxDurationSeconds':600}
+CHILD=None; CREATED_PROJECT=False; BEFORE_IMAGES=None
+
+def emit(event, **values):
+ try: print(json.dumps({'event':event,**values},ensure_ascii=False),flush=True)
+ except BrokenPipeError: pass
+
+def cmd(args, **kwargs):
+ return subprocess.check_output(args,text=True,timeout=min(25,max(1,DEADLINE-time.monotonic())),**kwargs).strip()
+
+def project(*args):
+ return cmd(['docker','compose','-p',PROJECT,'-f',str(SOURCE/'compose.yaml'),*args],env=ENV)
+
+def snapshot():
+ ids=cmd(['docker','ps','-q']).split()
+ rows=[]
+ for ident in ids:
+  rows.append(json.loads(cmd(['docker','inspect',ident,'--format','{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"startedAt":{{json .State.StartedAt}},"restartCount":{{.RestartCount}},"running":{{.State.Running}},"health":{{if index .State "Health"}}{{json (index (index .State "Health") "Status")}}{{else}}null{{end}}}'])))
+ return {'containers':rows,'diskFreeBytes':shutil.disk_usage('/tmp').free,'load':os.getloadavg()}
+
+def interrupted(signum, frame): raise KeyboardInterrupt('stage interrupted')
+for sig in [signal.SIGINT,signal.SIGTERM,signal.SIGHUP]: signal.signal(sig,interrupted)
+ENV={**os.environ,'DOCKER_CONFIG':str(ROOT/'docker-config'),'POC_UID':str(UID),'POC_GID':str(GID)}
+try:
+ assert not cmd(['docker','ps','-aq','--filter','label=com.docker.compose.project='+PROJECT]),'existing project containers'
+ assert not cmd(['docker','network','ls','-q','--filter','label=com.docker.compose.project='+PROJECT]),'existing project network'
+ for port in [18088,18488]:
+  probe=socket.socket();probe.bind(('127.0.0.1',port));probe.close()
+ assert shutil.disk_usage('/tmp').free > 2*1024**3,'low disk'
+ REPORT['before']=snapshot()
+ BEFORE_IMAGES=set(cmd(['docker','image','ls','-q','--no-trunc']).split())
+ (ROOT/'docker-config').mkdir(mode=0o700)
+ # Same UID owns disposable TLS material and runs the three unprivileged containers.
+ # No account/group database is changed; Docker socket group is process-local only.
+ for path in [ROOT,*ROOT.rglob('*')]:
+  if path.is_symlink(): raise RuntimeError('unexpected symlink')
+  os.chown(path,UID,GID)
+ if DEADLINE-time.monotonic()<45: raise RuntimeError('not enough original authorization time remains')
+ CREATED_PROJECT=True
+ # Continue the same stage after the recorded warm-only benchmark assertion.
+ # Safety suite (44 checks) already passed; do not replace its failed result.
+ import urllib.request
+ manifestRows=[]
+ for url in ['https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp','https://mikluha-maklai.s3.cloud.ru/cms/organized.webp']:
+  with urllib.request.urlopen(url,timeout=8) as response:
+   data=response.read(1048577)
+   assert response.status==200 and response.headers.get('Content-Type')=='image/webp' and len(data)<=1048576
+   manifestRows.append({'url':url,'expected':{'sha256':hashlib.sha256(data).hexdigest(),'etag':response.headers.get('ETag'),'lastModified':response.headers.get('Last-Modified')}})
+ REPORT['serverProbeReference']='server-probe-attempt-1.json: 44 safety checks pass; warm classification assertion FAIL (18/20 HIT)'
+ REPORT['realPublicManifestRows']=manifestRows
+ RUNTIME=SOURCE/'.runtime'
+ assert not RUNTIME.exists(),'server suite left runtime'
+ (RUNTIME/'cache').mkdir(parents=True);(RUNTIME/'cache').chmod(0o700)
+ (RUNTIME/'certs').mkdir()
+ objects={}
+ for i,item in enumerate(manifestRows):
+  original=item['expected'];key='/processed/'+original['sha256']+'/source-'+str(i)+'-warm.webp'
+  objects[key]={'url':item['url'],'sha256':original['sha256'],'etag':original['etag'],'lastModified':original['lastModified']}
+ (RUNTIME/'objects.mjs').write_text('export default '+json.dumps(objects)+';\n')
+ (RUNTIME/'allowed.map').write_text(''.join('~^'+key.replace('.','[.]')+'$ 1;\n' for key in objects))
+ (RUNTIME/'fetch-budget.conf').write_text('js_fetch_timeout 8s;\n')
+ subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=media.localhost','-addext','subjectAltName=DNS:media.localhost,IP:127.0.0.1','-keyout',str(RUNTIME/'certs/key.pem'),'-out',str(RUNTIME/'certs/cert.pem')],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=15)
+ for path in [RUNTIME,*RUNTIME.rglob('*')]: os.chown(path,UID,GID)
+ project('up','-d','--wait','--wait-timeout','40')
+ REPORT['manualWindow']={'manifest':objects,'transport':'SSH_LOOPBACK_TUNNEL_ONLY','browserLcp':'NOT_RUN','openedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'sourceConfigsUnmodified':True}
+ emit('CLIENT_WINDOW_READY',root=str(ROOT),remainingSeconds=int(DEADLINE-time.monotonic()),manifest=[{'path':p,'sha256':o['sha256'],'origin':o['url']} for p,o in objects.items()])
+ while time.monotonic()<DEADLINE and not (ROOT/'client-complete').exists(): time.sleep(1)
+ REPORT['manualWindow']['closedBy']='client-complete' if (ROOT/'client-complete').exists() else 'deadline'
+ REPORT['result']='MANUAL_WINDOW_COMPLETED_SERVER_WARM_ASSERTION_REMAINS_FAIL'
+except BaseException as error:
+ REPORT['result']='FAILED_OR_INTERRUPTED';REPORT['errorType']=type(error).__name__;REPORT['error']=str(error)
+finally:
+ for sig in [signal.SIGINT,signal.SIGTERM,signal.SIGHUP]: signal.signal(sig,signal.SIG_IGN)
+ if CHILD is not None and CHILD.poll() is None:
+  try: os.killpg(CHILD.pid,signal.SIGINT);CHILD.wait(timeout=10)
+  except BaseException:
+   try: os.killpg(CHILD.pid,signal.SIGKILL)
+   except ProcessLookupError: pass
+ if CREATED_PROJECT:
+  try:
+   # Cleanup cannot exceed the 10-minute overall stage budget by waiting forever.
+   p=subprocess.run(['docker','compose','-p',PROJECT,'-f',str(SOURCE/'compose.yaml'),'down','--remove-orphans','--timeout','3'],env=ENV,capture_output=True,text=True,timeout=12)
+   REPORT['composeCleanupExit']=p.returncode
+  except BaseException as error: REPORT['cleanupError']=type(error).__name__
+ try:
+  left=cmd(['docker','ps','-aq','--filter','label=com.docker.compose.project='+PROJECT])
+  nets=cmd(['docker','network','ls','-q','--filter','label=com.docker.compose.project='+PROJECT])
+  REPORT['projectContainersAbsent']=not left;REPORT['projectNetworkAbsent']=not nets
+  REPORT['after']=snapshot()
+  before={r['name']:r for r in REPORT['before']['containers']}
+  after={r['name']:r for r in REPORT['after']['containers']}
+  REPORT['productionIdentityUnchanged']=before==after
+  imageResults=[]
+  for ref in REFS:
+   found=subprocess.run(['docker','image','inspect',ref,'--format','{{.Id}}'],capture_output=True,text=True,timeout=5)
+   if BEFORE_IMAGES is not None and found.returncode==0 and found.stdout.strip() not in BEFORE_IMAGES:
+    removed=subprocess.run(['docker','image','rm',ref],capture_output=True,text=True,timeout=8)
+    imageResults.append({'reference':ref,'newImageReferenceRemovalExit':removed.returncode})
+  REPORT['newImageCacheCleanup']=imageResults
+ except BaseException as error: REPORT['postCheckError']=str(error)
+ REPORT['durationSeconds']=round(time.monotonic()-START,3)
+ REPORT['totalAuthorizedWallSeconds']=round(time.time()-SESSION_START_EPOCH,3)
+ REPORT['finishedAt']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+ # No request log, credentials or private-key bytes/hashes are included.
+ REPORT['temporaryRootRemoval']='after collector acknowledgment or bounded 15-second grace'
+ (ROOT/'final-report.json').write_text(json.dumps(REPORT,ensure_ascii=False,indent=2)+'\n')
+ emit('FINAL_REPORT_READY',result=REPORT['result'],root=str(ROOT))
+ ackDeadline=min(START+595,time.monotonic()+15)
+ while time.monotonic()<ackDeadline and not (ROOT/'collected').exists(): time.sleep(.5)
+ shutil.rmtree(ROOT)

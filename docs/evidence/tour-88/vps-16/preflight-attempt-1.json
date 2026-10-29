@@ -1,0 +1,17 @@
+{
+  "scope": "VPS16_AUTHORIZED_NONPRODUCTION_EPHEMERAL",
+  "candidate": "e46d6a217dcce6e78bfe42d2f894ffcc49422454",
+  "startedAt": "2026-10-29T12:30:39.515608+00:00",
+  "custodyImpact": "YES",
+  "custodyStatus": "CUSTODY_PENDING",
+  "maxDurationSeconds": 600,
+  "result": "FAILED_OR_INTERRUPTED",
+  "errorType": "CalledProcessError",
+  "error": "Command '['docker', 'inspect', 'edb995340a38', '--format', '{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"startedAt\":{{json .State.StartedAt}},\"restartCount\":{{.RestartCount}},\"running\":{{.State.Running}},\"health\":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}}}']' returned non-zero exit status 1.",
+  "projectContainersAbsent": true,
+  "projectNetworkAbsent": true,
+  "postCheckError": "Command '['docker', 'inspect', 'edb995340a38', '--format', '{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"startedAt\":{{json .State.StartedAt}},\"restartCount\":{{.RestartCount}},\"running\":{{.State.Running}},\"health\":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}}}']' returned non-zero exit status 1.",
+  "durationSeconds": 0.458,
+  "finishedAt": "2026-10-29T12:30:39.973675+00:00",
+  "temporaryRootRemoved": true
+}

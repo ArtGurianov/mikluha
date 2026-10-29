@@ -1,0 +1,1325 @@
+{
+  "scope": "VPS16_AUTHORIZED_NONPRODUCTION_EPHEMERAL",
+  "candidate": "e46d6a217dcce6e78bfe42d2f894ffcc49422454",
+  "startedAt": "2026-10-29T12:34:50.091023+00:00",
+  "custodyImpact": "YES",
+  "custodyStatus": "CUSTODY_PENDING",
+  "maxDurationSeconds": 600,
+  "before": {
+    "containers": [
+      {
+        "id": "17245029f6625fd6dbec384c109ef4435b8522328a3e43abee2077a3cc1698f9",
+        "name": "/coolify",
+        "image": "sha256:e4e662978b1ea86b9711149caa2e46497bf8f2c03f578c45324d33e42914ff61",
+        "startedAt": "2026-10-29T01:32:00.196698004Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "298e73e9fc0025eedd9ca5b5eeb9822d838fbacb820b05466a53f66e6eac48f7",
+        "name": "/coolify-redis",
+        "image": "sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af",
+        "startedAt": "2026-10-29T01:31:54.560096366Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "c14d9abdb3900cdfa97abb3a2ad4a91f6ef957ae1cb2ecf5f7d4f5a32c349da1",
+        "name": "/coolify-db",
+        "image": "sha256:54e0dd8e8cddcdbb9156c2486eed5a43eccb7214d7c6828097d41ce049fb3984",
+        "startedAt": "2026-10-29T01:31:54.444791595Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "39f5c6340cebd375005d01f4fff82ca3a25608b809925e5381bbb9079ce0d3c8",
+        "name": "/coolify-sentinel",
+        "image": "sha256:81f8ab984ea5c5fdbd696ea2f47f08c9e31ec41db7493a657b53a52256e26a82",
+        "startedAt": "2026-10-28T18:46:28.282152324Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "9da18e5612c6105642f10953b55e2b2c7c64a85c852e28395013696b070a465b",
+        "name": "/flexperiment-fast-cut-canary-platform",
+        "image": "sha256:9c7fee07994457e7b9dd4ac8345e54addd39c91c45e45f49a05bba546e972655",
+        "startedAt": "2026-10-19T03:30:24.951064872Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "9d3cdd16d745b9b62a3d294f933fb146aebeda2c0f6f4e3274ea00545fbd15ea",
+        "name": "/flexperiment-fast-cut-canary-commerce",
+        "image": "sha256:1de5828b602b5d1852fc705598d3742da883134b6e157d8472238a17ce53b43a",
+        "startedAt": "2026-10-19T03:30:18.334078931Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "e778731a7dfd1920c3d9d29565a13bd6216c74f7ec74effccc05cea98fe344c4",
+        "name": "/flexperiment-fast-cut-canary-admin",
+        "image": "sha256:5d3fa609800de8ab98d9ef4a4793612b5f81d9f8fe56cb10003b75aec287bb29",
+        "startedAt": "2026-10-19T03:30:00.411883999Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "28496c7be1d2455e27b938d89f002398e2079434fa7bd7136cc38dfa6b65e5f5",
+        "name": "/flexperiment-art224-lab-v2",
+        "image": "sha256:8b3e50921a56ec3299b262b740216018ed324d06de1e2e54a6c22aaf8393b19b",
+        "startedAt": "2026-10-16T15:09:50.231655206Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "c9ea82cd8cb62dcbee67a12e84fd772e073911f87567876ee887905ac760d2ce",
+        "name": "/awpzjy14ljv4zvyewxafpwv6-20261010T030107",
+        "image": "sha256:02d8e8ed8511dbd1c07d47981f813d39165d9a1bb00c0a999c3dd21657e26523",
+        "startedAt": "2026-10-16T06:26:30.031194981Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "edb995340a382be13a6ce714b54c9361827335921b91a565491618e06a295785",
+        "name": "/flexperiment-canary-tester",
+        "image": "sha256:85eadc71e50fdab0bc4d154a242a46188bd85bbe7f0edfed516f8863eb14dc77",
+        "startedAt": "2026-10-15T02:33:54.423183098Z",
+        "restartCount": 0,
+        "running": true,
+        "health": null
+      },
+      {
+        "id": "6e1d553ca53bbb50d0014035ac95980d9aa493cfc7a6958f486f91b9b67244c5",
+        "name": "/flexperiment-canary-drm-bridge",
+        "image": "sha256:85eadc71e50fdab0bc4d154a242a46188bd85bbe7f0edfed516f8863eb14dc77",
+        "startedAt": "2026-10-14T18:10:52.62516397Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "74927efa3a2182ba1d5721a57f5e8f4c354e47cf7129d150981fe8860b5d324f",
+        "name": "/muptnq5xvb6jc3pktypjwjza-20261013T124133",
+        "image": "sha256:35c8d0a057f59e57a4f3b9c182a4adb1ff78b58ae530ea27c63963149d62900a",
+        "startedAt": "2026-10-13T12:41:46.469396968Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "2779f3fdb3da5fe5b9819c177086a9e18cb707380ada47c30263f84f61fa6d7b",
+        "name": "/gzngatkipv7dv3rkpuaigjg5-20261010T135112",
+        "image": "sha256:9c2d80886f6c89b51aa9ba50a3eb5a0a683fc8e5709e64eadce719056deb6c6b",
+        "startedAt": "2026-10-10T13:51:24.464043896Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "0881b3c9ee1ad89abede9a76eb42514e015822e1d00f68bb01b7fe1cb4195b96",
+        "name": "/zzzr8aq0nw9dc9oowfj8rubj-20261010T025022",
+        "image": "sha256:db106b041fb25ba7225e12829d3f4774641148be12ce997260dd3350a25ba335",
+        "startedAt": "2026-10-10T02:50:58.46733612Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "13ea9be6997211831e4dee694c9152da04893a0898597fd64682097c72a35641",
+        "name": "/esh0beyclohhdjeimuvkv66n",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-04T15:52:29.139958177Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "6e93090459fa19e27f965ad871136eab6dead51fd8ea0b1af7cee2cd7523012b",
+        "name": "/pxetekoyzceundmfpuapik4q-093757083256",
+        "image": "sha256:ae44fd6bcae8062a61bb6ad8829ee183a850eda86ab5dc7382d91431078fc383",
+        "startedAt": "2026-10-04T09:39:27.168888792Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "71fa0df750bc2fd9015a6e392e437c60e6c765bf65a6ec385cb50b0868f32c40",
+        "name": "/wxueju1jakgauffk2mbt5ir7",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-04T04:12:55.263415695Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "cace3bcac58dd609dd45cd6cfa32e66151c1485647b6c3d8cdb5f1d763d18623",
+        "name": "/xmhtpopwwi4mthqbxekwijip-040440974879",
+        "image": "sha256:74a8cf72f5c1b57ca5b6fb78c5d70121ae95b7adea7aaa832c1f36417687ace2",
+        "startedAt": "2026-10-04T04:05:34.691182779Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "5b018809ce1b9d0c3c79a7887a0c2f0c1a61fb5b9b36da399d940daa5f88881c",
+        "name": "/z27zbdanugtx6e8ic4bcpimu",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-03T16:48:17.902295854Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "33d47a9233ea30cf4d2736b2d0d9cc96408ac49f25c2bd52aa0886ffee35df18",
+        "name": "/ypjr0jgszb0cj6kcimcrkhjn",
+        "image": "sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c",
+        "startedAt": "2026-10-02T09:54:16.702075229Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "f645d51a2e5c6d6f6e05198c3053cb68296f21793b35ce1b8629e28bcb56a50f",
+        "name": "/hnzcww9bt5wiplp0vrhvkdv6",
+        "image": "sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c",
+        "startedAt": "2026-09-28T04:51:16.802979537Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "e34696544c3cc9991c335e7c8bc95dfa4f3ffc97b260d04078d8d913a3510048",
+        "name": "/google-doh-dns-host",
+        "image": "sha256:16aa92775703fb524b3e0250a83e0c473c30c17ac66d3cbd5af7d6ceadd1c318",
+        "startedAt": "2026-08-23T09:41:54.698677988Z",
+        "restartCount": 0,
+        "running": true,
+        "health": null
+      },
+      {
+        "id": "109be7d8c5665d7c8e4579c80b56a841d2fc4a6593c8e3c7b20a180e35b58eb0",
+        "name": "/coolify-proxy",
+        "image": "sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d",
+        "startedAt": "2026-08-23T09:41:54.700116535Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      }
+    ],
+    "diskFreeBytes": 27654803456,
+    "load": [
+      0.05126953125,
+      0.166015625,
+      0.22412109375
+    ]
+  },
+  "serverExitCode": 1,
+  "serverProbe": {
+    "capturedAt": "2026-10-29T12:34:50.802812+00:00",
+    "scope": "LOCAL_SYNTHETIC_ONLY",
+    "checks": [
+      {
+        "check": "verified TLS, MISS then HIT, identical bytes",
+        "pass": true,
+        "evidence": [
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "51",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:35:01 GMT",
+              "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+              "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 51,
+            "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+            "ttfbMs": 5.215,
+            "totalMs": 5.239
+          },
+          {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "51",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:35:01 GMT",
+              "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+              "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 51,
+            "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+            "ttfbMs": 2.543,
+            "totalMs": 2.563
+          }
+        ]
+      },
+      {
+        "check": "WebP, nosniff, CORS, no cookie, browser revalidation",
+        "pass": true,
+        "evidence": {
+          "access-control-allow-origin": "*",
+          "cache-control": "public, max-age=0, must-revalidate",
+          "content-length": "51",
+          "content-type": "image/webp",
+          "date": "Thu, 29 Oct 2026 12:35:01 GMT",
+          "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+          "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+          "server": "nginx",
+          "x-cache-status": "HIT",
+          "x-content-type-options": "nosniff"
+        }
+      },
+      {
+        "check": "HEAD has no body",
+        "pass": true,
+        "evidence": "HEAD"
+      },
+      {
+        "check": "browser ETag conditional request",
+        "pass": true,
+        "evidence": {
+          "status": 304,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "date": "Thu, 29 Oct 2026 12:35:01 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "HIT",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "ttfbMs": 2.342,
+          "totalMs": 2.364
+        }
+      },
+      {
+        "check": "private sentinel actually exists at fixture origin",
+        "pass": true,
+        "evidence": {
+          "status": 200,
+          "headers": {
+            "content-type": "image/jpeg",
+            "date": "Thu, 29 Oct 2026 12:35:01 GMT",
+            "connection": "keep-alive",
+            "keep-alive": "timeout=5",
+            "transfer-encoding": "chunked"
+          },
+          "bytes": 77,
+          "sha256": "96fd41210a9d29972b7658be642fb53ae000efeb19e497d0abfd66fd65aeadcc",
+          "ttfbMs": 0.937,
+          "totalMs": 0.963
+        }
+      },
+      {
+        "check": "deny raw target /originals/exists.jpg",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /processed/../originals/exists.jpg",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /processed/%2e%2e/originals/exists.jpg",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /processed/%252e%252e/originals/exists.jpg",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp?x=1",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp?url=http://origin/originals/exists.jpg",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp/..",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /https://origin/originals/exists.jpg",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /processed/%2f..%2foriginals/exists.jpg",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /processed/%5c..%5coriginals/exists.jpg",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /processed/unknown/hero.webp",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "deny raw target /PROCESSED/057388113A2F24C03AC11D06242D8687D9F70E16372E63A1DC7E4149BEAF2C00/HERO.WEBP",
+        "pass": true,
+        "evidence": 404
+      },
+      {
+        "check": "edge normalization only reaches the same public key",
+        "pass": true,
+        "evidence": {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 12:35:02 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "HIT",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 3.239,
+          "totalMs": 3.274
+        }
+      },
+      {
+        "check": "edge normalization only reaches the same public key",
+        "pass": true,
+        "evidence": {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 12:35:02 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "HIT",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 2.953,
+          "totalMs": 2.981
+        }
+      },
+      {
+        "check": "private denial never contacted origin",
+        "pass": true,
+        "evidence": {
+          "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp": 2,
+          "/originals/exists.jpg": 1
+        }
+      },
+      {
+        "check": "reject credential-bearing request",
+        "pass": true,
+        "evidence": [
+          "Authorization"
+        ]
+      },
+      {
+        "check": "reject credential-bearing request",
+        "pass": true,
+        "evidence": [
+          "Cookie"
+        ]
+      },
+      {
+        "check": "reject mutation",
+        "pass": true,
+        "evidence": "POST"
+      },
+      {
+        "check": "host override rejected at edge",
+        "pass": true,
+        "evidence": "Host"
+      },
+      {
+        "check": "untrusted headers cannot vary origin bytes",
+        "pass": true,
+        "evidence": {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 12:35:02 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 3.376,
+          "totalMs": 3.397
+        }
+      },
+      {
+        "check": "concurrent MISS collapse",
+        "pass": true,
+        "evidence": {
+          "upstreamRequests": 1,
+          "statuses": [
+            "HIT",
+            "MISS",
+            "HIT",
+            "HIT",
+            "HIT",
+            "HIT",
+            "HIT",
+            "HIT",
+            "HIT",
+            "HIT",
+            "HIT",
+            "HIT"
+          ]
+        }
+      },
+      {
+        "check": "expired cache revalidated with ETag",
+        "pass": true,
+        "evidence": {
+          "status": 200,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "content-length": "51",
+            "content-type": "image/webp",
+            "date": "Thu, 29 Oct 2026 12:35:04 GMT",
+            "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+            "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+            "server": "nginx",
+            "x-cache-status": "REVALIDATED",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 51,
+          "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+          "ttfbMs": 3.661,
+          "totalMs": 3.711
+        }
+      },
+      {
+        "check": "missing is not cached",
+        "pass": true,
+        "evidence": {
+          "statuses": [
+            404,
+            404
+          ],
+          "upstreamRequests": 2
+        }
+      },
+      {
+        "check": "error is not cached",
+        "pass": true,
+        "evidence": {
+          "statuses": [
+            503,
+            503
+          ],
+          "upstreamRequests": 2
+        }
+      },
+      {
+        "check": "timeout is not cached",
+        "pass": true,
+        "evidence": {
+          "statuses": [
+            504,
+            504
+          ],
+          "upstreamRequests": 2
+        }
+      },
+      {
+        "check": "cookie response never enters cache",
+        "pass": true,
+        "evidence": [
+          {
+            "status": 502,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "no-store",
+              "content-length": "150",
+              "content-type": "text/html",
+              "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 150,
+            "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+            "ttfbMs": 3.202,
+            "totalMs": 3.224
+          },
+          {
+            "status": 502,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "no-store",
+              "content-length": "150",
+              "content-type": "text/html",
+              "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 150,
+            "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+            "ttfbMs": 2.724,
+            "totalMs": 2.744
+          }
+        ]
+      },
+      {
+        "check": "private response never enters cache",
+        "pass": true,
+        "evidence": [
+          {
+            "status": 502,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "no-store",
+              "content-length": "150",
+              "content-type": "text/html",
+              "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 150,
+            "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+            "ttfbMs": 2.908,
+            "totalMs": 2.926
+          },
+          {
+            "status": 502,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "no-store",
+              "content-length": "150",
+              "content-type": "text/html",
+              "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 150,
+            "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+            "ttfbMs": 2.808,
+            "totalMs": 2.826
+          }
+        ]
+      },
+      {
+        "check": "wrong-type response never enters cache",
+        "pass": true,
+        "evidence": [
+          {
+            "status": 415,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "no-store",
+              "content-length": "172",
+              "content-type": "text/html",
+              "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 172,
+            "sha256": "928299c2af4335d94caf368ec76901df3380f798fb438410a5fecd52d50db660",
+            "ttfbMs": 2.706,
+            "totalMs": 2.725
+          },
+          {
+            "status": 415,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "no-store",
+              "content-length": "172",
+              "content-type": "text/html",
+              "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+              "server": "nginx",
+              "x-cache-status": "MISS",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 172,
+            "sha256": "928299c2af4335d94caf368ec76901df3380f798fb438410a5fecd52d50db660",
+            "ttfbMs": 3.558,
+            "totalMs": 3.583
+          }
+        ]
+      },
+      {
+        "check": "X-Accel-Redirect cannot expose original",
+        "pass": true,
+        "evidence": "upstream internal redirect ignored"
+      },
+      {
+        "check": "wrong-type is refused before delivery/cache",
+        "pass": true,
+        "evidence": {
+          "status": 415,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "172",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 172,
+          "sha256": "928299c2af4335d94caf368ec76901df3380f798fb438410a5fecd52d50db660",
+          "ttfbMs": 2.81,
+          "totalMs": 2.832
+        }
+      },
+      {
+        "check": "oversize is refused before delivery/cache",
+        "pass": true,
+        "evidence": {
+          "status": 502,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 4.049,
+          "totalMs": 4.078
+        }
+      },
+      {
+        "check": "chunked is refused before delivery/cache",
+        "pass": true,
+        "evidence": {
+          "status": 502,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 5.383,
+          "totalMs": 5.405
+        }
+      },
+      {
+        "check": "changed is refused before delivery/cache",
+        "pass": true,
+        "evidence": {
+          "status": 502,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 2.818,
+          "totalMs": 2.838
+        }
+      },
+      {
+        "check": "http-redirect is refused before delivery/cache",
+        "pass": true,
+        "evidence": {
+          "status": 502,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 2.591,
+          "totalMs": 2.608
+        }
+      },
+      {
+        "check": "untrusted-tls is refused before delivery/cache",
+        "pass": true,
+        "evidence": {
+          "status": 502,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "150",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:35:06 GMT",
+            "server": "nginx",
+            "x-cache-status": "MISS",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 150,
+          "sha256": "61b30d408583991fd69f3dec694e154cb652471e663328ad9c8482c9021ab5db",
+          "ttfbMs": 5.846,
+          "totalMs": 5.868
+        }
+      },
+      {
+        "check": "origin outage never serves stale cached photo",
+        "pass": true,
+        "evidence": {
+          "status": 503,
+          "headers": {
+            "access-control-allow-origin": "*",
+            "cache-control": "no-store",
+            "content-length": "190",
+            "content-type": "text/html",
+            "date": "Thu, 29 Oct 2026 12:35:09 GMT",
+            "server": "nginx",
+            "x-cache-status": "EXPIRED",
+            "x-content-type-options": "nosniff"
+          },
+          "bytes": 190,
+          "sha256": "b429e25e7813a9e2b90dcec11d9cb5287751246128dd6c76a7349774829c5554",
+          "ttfbMs": 3.341,
+          "totalMs": 3.364
+        }
+      },
+      {
+        "check": "scoped revoke: denied key, removed cache file, sibling retained",
+        "pass": true,
+        "evidence": {
+          "revokedStatus": 404,
+          "removedFiles": 1,
+          "sibling": {
+            "status": 200,
+            "headers": {
+              "access-control-allow-origin": "*",
+              "cache-control": "public, max-age=0, must-revalidate",
+              "content-length": "51",
+              "content-type": "image/webp",
+              "date": "Thu, 29 Oct 2026 12:35:09 GMT",
+              "etag": "\"057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00\"",
+              "last-modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+              "server": "nginx",
+              "x-cache-status": "HIT",
+              "x-content-type-options": "nosniff"
+            },
+            "bytes": 51,
+            "sha256": "057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00",
+            "ttfbMs": 3.196,
+            "totalMs": 3.225
+          }
+        }
+      },
+      {
+        "check": "cache failure is visible (no fabricated success)",
+        "pass": true,
+        "evidence": "edge upstream down"
+      },
+      {
+        "check": "direct origin remains independently available",
+        "pass": true,
+        "evidence": "direct"
+      },
+      {
+        "check": "real S3 direct byte identity",
+        "pass": true,
+        "evidence": {
+          "sampleCount": 10,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 179.886,
+            "p75": 194.217,
+            "p95": 495.888
+          },
+          "totalMs": {
+            "p50": 330.586,
+            "p75": 354.179,
+            "p95": 649.192
+          },
+          "hitCount": 0
+        }
+      },
+      {
+        "check": "real S3 cold byte identity",
+        "pass": true,
+        "evidence": {
+          "sampleCount": 10,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 364.639,
+            "p75": 450.691,
+            "p95": 690.397
+          },
+          "totalMs": {
+            "p50": 521.71,
+            "p75": 607.26,
+            "p95": 847.413
+          },
+          "hitCount": 0
+        }
+      },
+      {
+        "check": "real S3 warm byte identity",
+        "pass": true,
+        "evidence": {
+          "sampleCount": 20,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 2.917,
+            "p75": 3.079,
+            "p95": 232.899
+          },
+          "totalMs": {
+            "p50": 158.552,
+            "p75": 158.742,
+            "p95": 388.436
+          },
+          "hitCount": 18
+        }
+      },
+      {
+        "check": "real S3 cold requests are MISS",
+        "pass": true,
+        "evidence": {
+          "sampleCount": 10,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 364.639,
+            "p75": 450.691,
+            "p95": 690.397
+          },
+          "totalMs": {
+            "p50": 521.71,
+            "p75": 607.26,
+            "p95": 847.413
+          },
+          "hitCount": 0
+        }
+      },
+      {
+        "check": "real S3 measured warm requests are HIT",
+        "pass": false,
+        "evidence": {
+          "sampleCount": 20,
+          "errorCount": 0,
+          "ttfbMs": {
+            "p50": 2.917,
+            "p75": 3.079,
+            "p95": 232.899
+          },
+          "totalMs": {
+            "p50": 158.552,
+            "p75": 158.742,
+            "p95": 388.436
+          },
+          "hitCount": 18
+        }
+      }
+    ],
+    "observations": {
+      "responseSizeGate": {
+        "status": "PASS",
+        "maxBytes": 1048576,
+        "contentLengthAndChunkedOversize": "502; generic error only; never cached",
+        "njsMinimum": "1.0.2"
+      },
+      "mimeGate": {
+        "status": "PASS",
+        "wrongType": "415; generic error only; never cached"
+      },
+      "localWarmSynthetic": {
+        "ttfbMs": {
+          "p50": 2.867,
+          "p75": 2.976,
+          "p95": 3.469
+        },
+        "totalMs": {
+          "p50": 2.887,
+          "p75": 2.999,
+          "p95": 3.491
+        },
+        "hitRate": 0.4166666666666667,
+        "sampleCount": 12,
+        "warning": "local Docker TLS, tiny synthetic bytes; not S3, regional speed or LCP"
+      },
+      "upstreamRequestsByFixtureKey": {
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp": 5,
+        "/originals/exists.jpg": 1,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/gallery.webp": 3,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/collapse.webp": 1,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/missing.webp": 2,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/error.webp": 2,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/timeout.webp": 2,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/cookie.webp": 2,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/private.webp": 2,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/wrong-type.webp": 3,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/redirect.webp": 1,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/oversize.webp": 1,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/chunked.webp": 1,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/changed.webp": 1,
+        "/processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/http-redirect.webp": 1
+      }
+    },
+    "productionQualification": "NO_GO",
+    "ownerDecision": "PENDING",
+    "testedFiles": {
+      "compose.yaml": "3e9671b4673f5e6ab3728d92de83da049d2946042b5bb8c62fbb669709efef1e",
+      "gate.mjs": "143c632b7351fd36dc280369a981a9d809d88f7638010d2ee8b6bbc9f0b6aacf",
+      "inventory-vps.py": "660b512703da013c217bfe1865e4b7ffe10bf2cf7c18dd43e6d6bcce87505ded",
+      "manual-probe.py": "e4c1927ce14cbe47c9c0c86bb46c27e8d668414a7e05e4d09f2701bb9ec65fae",
+      "measure-direct.py": "6ea31de4b648e46085b08ab507a3b446ca27f0c28ff0c77d6114a13f0f2927e8",
+      "nginx.conf": "810a84f57ba4da4a66219fdf75cdc97415c32ee43556dac46479dc15de28b99e",
+      "origin.mjs": "460ea88ee4e1d68ce63b4e01c2cbe53739489fbfccf42776026c2f98d62a3381",
+      "run.py": "cf85f57f5c759b54009318be4dfafe676d88d8fdd222e3a8aa9a2158c92d1faa",
+      "traefik.yaml": "2df4110ac44118c30b6eecc772af53a8886edbe9ae168d407f61d21a6f59afe9"
+    },
+    "enforcedContainerLimits": {
+      "edge": {
+        "memory": 100663296,
+        "nanoCpus": 250000000,
+        "pids": 64,
+        "readOnly": true
+      },
+      "cache": {
+        "memory": 134217728,
+        "nanoCpus": 250000000,
+        "pids": 32,
+        "readOnly": true
+      },
+      "origin": {
+        "memory": 100663296,
+        "nanoCpus": 250000000,
+        "pids": 32,
+        "readOnly": true
+      }
+    },
+    "boundedFetcherPackage": "nginx-module-njs-1.31.8.1.0.2-r1 description:\nnginx njs dynamic modules\n\nnginx-module-njs-1.31.8.1.0.2-r1 webpage:\nhttps://nginx.org/\n\nnginx-module-njs-1.31.8.1.0.2-r1 installed size:\n9924 KiB",
+    "images": [
+      {
+        "ID": "sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402",
+        "ContainerName": "mikluha-tour88-local-origin-1",
+        "Repository": "node",
+        "Tag": "",
+        "Platform": "linux/amd64",
+        "Size": 60711996,
+        "Created": "2026-09-23T21:09:27.761584925Z",
+        "LastTagTime": "2026-10-29T12:34:57.501847909Z"
+      },
+      {
+        "ID": "sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d",
+        "ContainerName": "mikluha-tour88-local-edge-1",
+        "Repository": "traefik",
+        "Tag": "",
+        "Platform": "linux/amd64",
+        "Size": 54757291,
+        "Created": "2026-07-31T21:02:58.889730321Z",
+        "LastTagTime": "2026-08-18T07:05:42.294092998Z"
+      },
+      {
+        "ID": "sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606",
+        "ContainerName": "mikluha-tour88-local-cache-1",
+        "Repository": "nginx",
+        "Tag": "",
+        "Platform": "linux/amd64",
+        "Size": 26354394,
+        "Created": "2026-10-21T23:23:41.2514755Z",
+        "LastTagTime": "2026-10-29T09:05:49.487273528Z"
+      }
+    ],
+    "resources": "{\"BlockIO\":\"946kB / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"89ef7ef2dcf263a8765af4ba811ea96e7ab4c71a58a2c92bcd6c34c19aa39473\",\"ID\":\"89ef7ef2dcf2\",\"MemPerc\":\"16.76%\",\"MemUsage\":\"16.09MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-edge-1\",\"NetIO\":\"132kB / 206kB\",\"PIDs\":\"7\"}\n{\"BlockIO\":\"0B / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"37f8ef5a3c7fc6e65b0b9ff7afe71763e949d2dce85d5e253b8590387833aa3e\",\"ID\":\"37f8ef5a3c7f\",\"MemPerc\":\"3.56%\",\"MemUsage\":\"4.562MiB / 128MiB\",\"Name\":\"mikluha-tour88-local-cache-1\",\"NetIO\":\"3.42kB / 3.26kB\",\"PIDs\":\"4\"}\n{\"BlockIO\":\"12.3kB / 0B\",\"CPUPerc\":\"0.00%\",\"Container\":\"2cdd7ccfbe241b131f538e9c16fa371636d6a2be257ea54e8556f0ecbd1cb49c\",\"ID\":\"2cdd7ccfbe24\",\"MemPerc\":\"14.40%\",\"MemUsage\":\"13.82MiB / 96MiB\",\"Name\":\"mikluha-tour88-local-origin-1\",\"NetIO\":\"30.5kB / 2.22MB\",\"PIDs\":\"7\"}",
+    "result": "FAIL",
+    "error": "real S3 measured warm requests are HIT: {'sampleCount': 20, 'errorCount': 0, 'ttfbMs': {'p50': 2.917, 'p75': 3.079, 'p95': 232.899}, 'totalMs': {'p50': 158.552, 'p75': 158.742, 'p95': 388.436}, 'hitCount': 18}"
+  },
+  "failureLogTail": " Image node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 Pulling \n f7f2d304681a Pulling fs layer 0B\n d39db1cf9caa Pulling fs layer 0B\n e554276b05e6 Pulling fs layer 0B\n d39db1cf9caa Download complete 0B\n f7f2d304681a Downloading 1.049MB\n f7f2d304681a Downloading 4.194MB\n f7f2d304681a Downloading 7.34MB\n f7f2d304681a Downloading 11.53MB\n e554276b05e6 Download complete 0B\n f7f2d304681a Downloading 13.63MB\n f7f2d304681a Downloading 16.78MB\n f7f2d304681a Downloading 18.87MB\n f7f2d304681a Downloading 22.02MB\n f7f2d304681a Downloading 24.12MB\n f7f2d304681a Downloading 27.26MB\n f7f2d304681a Downloading 29.36MB\n f7f2d304681a Downloading 31.46MB\n f7f2d304681a Downloading 34.6MB\n f7f2d304681a Downloading 37.75MB\n f7f2d304681a Downloading 40.89MB\n f7f2d304681a Downloading 44.04MB\n 15c907cd5cbc Download complete 0B\n f7f2d304681a Downloading 48.23MB\n f7f2d304681a Downloading 51.38MB\n f7f2d304681a Downloading 54.53MB\n f7f2d304681a Download complete 0B\n 707399b387b7 Download complete 0B\n f7f2d304681a Extracting 1B\n f7f2d304681a Extracting 1B\n f7f2d304681a Extracting 1B\n f7f2d304681a Extracting 1B\n f7f2d304681a Extracting 1B\n f7f2d304681a Extracting 1B\n f7f2d304681a Extracting 1B\n f7f2d304681a Extracting 1B\n d39db1cf9caa Pull complete 0B\n d39db1cf9caa Pull complete 0B\n e554276b05e6 Pull complete 0B\n f7f2d304681a Pull complete 0B\n Image node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 Pulled \n Network mikluha-tour88-local_lab Creating \n Network mikluha-tour88-local_lab Creating \n Network mikluha-tour88-local_lab Created \n Network mikluha-tour88-local_lab Created \n Container mikluha-tour88-local-origin-1 Creating \n Container mikluha-tour88-local-origin-1 Created \n Container mikluha-tour88-local-cache-1 Creating \n Container mikluha-tour88-local-cache-1 Created \n Container mikluha-tour88-local-edge-1 Creating \n Container mikluha-tour88-local-edge-1 Created \n Container mikluha-tour88-local-origin-1 Starting \n Container mikluha-tour88-local-origin-1 Started \n Container mikluha-tour88-local-cache-1 Starting \n Container mikluha-tour88-local-cache-1 Started \n Container mikluha-tour88-local-edge-1 Starting \n Container mikluha-tour88-local-edge-1 Started \n Container mikluha-tour88-local-origin-1 Waiting \n Container mikluha-tour88-local-cache-1 Waiting \n Container mikluha-tour88-local-edge-1 Waiting \n Container mikluha-tour88-local-edge-1 Healthy \n Container mikluha-tour88-local-origin-1 Healthy \n Container mikluha-tour88-local-cache-1 Healthy \nPASS verified TLS, MISS then HIT, identical bytes\nPASS WebP, nosniff, CORS, no cookie, browser revalidation\nPASS HEAD has no body\nPASS browser ETag conditional request\nPASS private sentinel actually exists at fixture origin\nPASS deny raw target /originals/exists.jpg\nPASS deny raw target /processed/../originals/exists.jpg\nPASS deny raw target /processed/%2e%2e/originals/exists.jpg\nPASS deny raw target /processed/%252e%252e/originals/exists.jpg\nPASS deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp?x=1\nPASS deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp?url=http://origin/originals/exists.jpg\nPASS deny raw target /processed/057388113a2f24c03ac11d06242d8687d9f70e16372e63a1dc7e4149beaf2c00/hero.webp/..\nPASS deny raw target /https://origin/originals/exists.jpg\nPASS deny raw target /processed/%2f..%2foriginals/exists.jpg\nPASS deny raw target /processed/%5c..%5coriginals/exists.jpg\nPASS deny raw target /processed/unknown/hero.webp\nPASS deny raw target /PROCESSED/057388113A2F24C03AC11D06242D8687D9F70E16372E63A1DC7E4149BEAF2C00/HERO.WEBP\nPASS edge normalization only reaches the same public key\nPASS edge normalization only reaches the same public key\nPASS private denial never contacted origin\nPASS reject credential-bearing request\nPASS reject credential-bearing request\nPASS reject mutation\nPASS host override rejected at edge\nPASS untrusted headers cannot vary origin bytes\nPASS concurrent MISS collapse\nPASS expired cache revalidated with ETag\nPASS missing is not cached\nPASS error is not cached\nPASS timeout is not cached\nPASS cookie response never enters cache\nPASS private response never enters cache\nPASS wrong-type response never enters cache\nPASS X-Accel-Redirect cannot expose original\nPASS wrong-type is refused before delivery/cache\nPASS oversize is refused before delivery/cache\nPASS chunked is refused before delivery/cache\nPASS changed is refused before delivery/cache\nPASS http-redirect is refused before delivery/cache\nPASS untrusted-tls is refused before delivery/cache\nPASS origin outage never serves stale cached photo\n Container mikluha-tour88-local-cache-1 Stopping \n Container mikluha-tour88-local-cache-1 Stopped \n Container mikluha-tour88-local-cache-1 Starting \n Container mikluha-tour88-local-cache-1 Started \nPASS scoped revoke: denied key, removed cache file, sibling retained\n Container mikluha-tour88-local-cache-1 Stopping \n Container mikluha-tour88-local-cache-1 Stopped \nPASS cache failure is visible (no fabricated success)\nPASS direct origin remains independently available\n Container mikluha-tour88-local-cache-1 Starting \n Container mikluha-tour88-local-cache-1 Started \n Container mikluha-tour88-local-cache-1 Stopping \n Container mikluha-tour88-local-cache-1 Stopped \n Container mikluha-tour88-local-cache-1 Starting \n Container mikluha-tour88-local-cache-1 Started \nPASS real S3 direct byte identity\nPASS real S3 cold byte identity\nPASS real S3 warm byte identity\nPASS real S3 cold requests are MISS\nFAIL real S3 measured warm requests are HIT\n\n Container mikluha-tour88-local-edge-1 Stopping \n Container mikluha-tour88-local-edge-1 Stopped \n Container mikluha-tour88-local-edge-1 Removing \n Container mikluha-tour88-local-edge-1 Removed \n Container mikluha-tour88-local-cache-1 Stopping \n Container mikluha-tour88-local-cache-1 Stopped \n Container mikluha-tour88-local-cache-1 Removing \n Container mikluha-tour88-local-cache-1 Removed \n Container mikluha-tour88-local-origin-1 Stopping \n Container mikluha-tour88-local-origin-1 Stopped \n Container mikluha-tour88-local-origin-1 Removing \n Container mikluha-tour88-local-origin-1 Removed \n Network mikluha-tour88-local_lab Removing \n Network mikluha-tour88-local_lab Removed \nTraceback (most recent call last):\n  File \"/tmp/mikluha-tour88-e46d6a2.jmTjlCNi/poc/regional-media-cache/run.py\", line 303, in <module>\n    check('real S3 measured warm requests are HIT', item['warmSummary']['hitCount'] == 20, item['warmSummary'])\n  File \"/tmp/mikluha-tour88-e46d6a2.jmTjlCNi/poc/regional-media-cache/run.py\", line 51, in check\n    raise AssertionError(f'{name}: {evidence}')\nAssertionError: real S3 measured warm requests are HIT: {'sampleCount': 20, 'errorCount': 0, 'ttfbMs': {'p50': 2.917, 'p75': 3.079, 'p95': 232.899}, 'totalMs': {'p50': 158.552, 'p75': 158.742, 'p95': 388.436}, 'hitCount': 18}\n",
+  "result": "FAILED_OR_INTERRUPTED",
+  "errorType": "RuntimeError",
+  "error": "server suite failed",
+  "composeCleanupExit": 0,
+  "projectContainersAbsent": true,
+  "projectNetworkAbsent": true,
+  "after": {
+    "containers": [
+      {
+        "id": "17245029f6625fd6dbec384c109ef4435b8522328a3e43abee2077a3cc1698f9",
+        "name": "/coolify",
+        "image": "sha256:e4e662978b1ea86b9711149caa2e46497bf8f2c03f578c45324d33e42914ff61",
+        "startedAt": "2026-10-29T01:32:00.196698004Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "298e73e9fc0025eedd9ca5b5eeb9822d838fbacb820b05466a53f66e6eac48f7",
+        "name": "/coolify-redis",
+        "image": "sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af",
+        "startedAt": "2026-10-29T01:31:54.560096366Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "c14d9abdb3900cdfa97abb3a2ad4a91f6ef957ae1cb2ecf5f7d4f5a32c349da1",
+        "name": "/coolify-db",
+        "image": "sha256:54e0dd8e8cddcdbb9156c2486eed5a43eccb7214d7c6828097d41ce049fb3984",
+        "startedAt": "2026-10-29T01:31:54.444791595Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "39f5c6340cebd375005d01f4fff82ca3a25608b809925e5381bbb9079ce0d3c8",
+        "name": "/coolify-sentinel",
+        "image": "sha256:81f8ab984ea5c5fdbd696ea2f47f08c9e31ec41db7493a657b53a52256e26a82",
+        "startedAt": "2026-10-28T18:46:28.282152324Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "9da18e5612c6105642f10953b55e2b2c7c64a85c852e28395013696b070a465b",
+        "name": "/flexperiment-fast-cut-canary-platform",
+        "image": "sha256:9c7fee07994457e7b9dd4ac8345e54addd39c91c45e45f49a05bba546e972655",
+        "startedAt": "2026-10-19T03:30:24.951064872Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "9d3cdd16d745b9b62a3d294f933fb146aebeda2c0f6f4e3274ea00545fbd15ea",
+        "name": "/flexperiment-fast-cut-canary-commerce",
+        "image": "sha256:1de5828b602b5d1852fc705598d3742da883134b6e157d8472238a17ce53b43a",
+        "startedAt": "2026-10-19T03:30:18.334078931Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "e778731a7dfd1920c3d9d29565a13bd6216c74f7ec74effccc05cea98fe344c4",
+        "name": "/flexperiment-fast-cut-canary-admin",
+        "image": "sha256:5d3fa609800de8ab98d9ef4a4793612b5f81d9f8fe56cb10003b75aec287bb29",
+        "startedAt": "2026-10-19T03:30:00.411883999Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "28496c7be1d2455e27b938d89f002398e2079434fa7bd7136cc38dfa6b65e5f5",
+        "name": "/flexperiment-art224-lab-v2",
+        "image": "sha256:8b3e50921a56ec3299b262b740216018ed324d06de1e2e54a6c22aaf8393b19b",
+        "startedAt": "2026-10-16T15:09:50.231655206Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "unhealthy"
+      },
+      {
+        "id": "c9ea82cd8cb62dcbee67a12e84fd772e073911f87567876ee887905ac760d2ce",
+        "name": "/awpzjy14ljv4zvyewxafpwv6-20261010T030107",
+        "image": "sha256:02d8e8ed8511dbd1c07d47981f813d39165d9a1bb00c0a999c3dd21657e26523",
+        "startedAt": "2026-10-16T06:26:30.031194981Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "edb995340a382be13a6ce714b54c9361827335921b91a565491618e06a295785",
+        "name": "/flexperiment-canary-tester",
+        "image": "sha256:85eadc71e50fdab0bc4d154a242a46188bd85bbe7f0edfed516f8863eb14dc77",
+        "startedAt": "2026-10-15T02:33:54.423183098Z",
+        "restartCount": 0,
+        "running": true,
+        "health": null
+      },
+      {
+        "id": "6e1d553ca53bbb50d0014035ac95980d9aa493cfc7a6958f486f91b9b67244c5",
+        "name": "/flexperiment-canary-drm-bridge",
+        "image": "sha256:85eadc71e50fdab0bc4d154a242a46188bd85bbe7f0edfed516f8863eb14dc77",
+        "startedAt": "2026-10-14T18:10:52.62516397Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "74927efa3a2182ba1d5721a57f5e8f4c354e47cf7129d150981fe8860b5d324f",
+        "name": "/muptnq5xvb6jc3pktypjwjza-20261013T124133",
+        "image": "sha256:35c8d0a057f59e57a4f3b9c182a4adb1ff78b58ae530ea27c63963149d62900a",
+        "startedAt": "2026-10-13T12:41:46.469396968Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "2779f3fdb3da5fe5b9819c177086a9e18cb707380ada47c30263f84f61fa6d7b",
+        "name": "/gzngatkipv7dv3rkpuaigjg5-20261010T135112",
+        "image": "sha256:9c2d80886f6c89b51aa9ba50a3eb5a0a683fc8e5709e64eadce719056deb6c6b",
+        "startedAt": "2026-10-10T13:51:24.464043896Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "0881b3c9ee1ad89abede9a76eb42514e015822e1d00f68bb01b7fe1cb4195b96",
+        "name": "/zzzr8aq0nw9dc9oowfj8rubj-20261010T025022",
+        "image": "sha256:db106b041fb25ba7225e12829d3f4774641148be12ce997260dd3350a25ba335",
+        "startedAt": "2026-10-10T02:50:58.46733612Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "13ea9be6997211831e4dee694c9152da04893a0898597fd64682097c72a35641",
+        "name": "/esh0beyclohhdjeimuvkv66n",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-04T15:52:29.139958177Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "6e93090459fa19e27f965ad871136eab6dead51fd8ea0b1af7cee2cd7523012b",
+        "name": "/pxetekoyzceundmfpuapik4q-093757083256",
+        "image": "sha256:ae44fd6bcae8062a61bb6ad8829ee183a850eda86ab5dc7382d91431078fc383",
+        "startedAt": "2026-10-04T09:39:27.168888792Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "71fa0df750bc2fd9015a6e392e437c60e6c765bf65a6ec385cb50b0868f32c40",
+        "name": "/wxueju1jakgauffk2mbt5ir7",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-04T04:12:55.263415695Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "cace3bcac58dd609dd45cd6cfa32e66151c1485647b6c3d8cdb5f1d763d18623",
+        "name": "/xmhtpopwwi4mthqbxekwijip-040440974879",
+        "image": "sha256:74a8cf72f5c1b57ca5b6fb78c5d70121ae95b7adea7aaa832c1f36417687ace2",
+        "startedAt": "2026-10-04T04:05:34.691182779Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "5b018809ce1b9d0c3c79a7887a0c2f0c1a61fb5b9b36da399d940daa5f88881c",
+        "name": "/z27zbdanugtx6e8ic4bcpimu",
+        "image": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "startedAt": "2026-10-03T16:48:17.902295854Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "33d47a9233ea30cf4d2736b2d0d9cc96408ac49f25c2bd52aa0886ffee35df18",
+        "name": "/ypjr0jgszb0cj6kcimcrkhjn",
+        "image": "sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c",
+        "startedAt": "2026-10-02T09:54:16.702075229Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "f645d51a2e5c6d6f6e05198c3053cb68296f21793b35ce1b8629e28bcb56a50f",
+        "name": "/hnzcww9bt5wiplp0vrhvkdv6",
+        "image": "sha256:0637954999d01b7c9ce9167db2da50656e2590d3b884f1c600c5f63bb6e6773c",
+        "startedAt": "2026-09-28T04:51:16.802979537Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      },
+      {
+        "id": "e34696544c3cc9991c335e7c8bc95dfa4f3ffc97b260d04078d8d913a3510048",
+        "name": "/google-doh-dns-host",
+        "image": "sha256:16aa92775703fb524b3e0250a83e0c473c30c17ac66d3cbd5af7d6ceadd1c318",
+        "startedAt": "2026-08-23T09:41:54.698677988Z",
+        "restartCount": 0,
+        "running": true,
+        "health": null
+      },
+      {
+        "id": "109be7d8c5665d7c8e4579c80b56a841d2fc4a6593c8e3c7b20a180e35b58eb0",
+        "name": "/coolify-proxy",
+        "image": "sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d",
+        "startedAt": "2026-08-23T09:41:54.700116535Z",
+        "restartCount": 0,
+        "running": true,
+        "health": "healthy"
+      }
+    ],
+    "diskFreeBytes": 27429543936,
+    "load": [
+      0.26318359375,
+      0.2138671875,
+      0.23681640625
+    ]
+  },
+  "productionIdentityUnchanged": true,
+  "newImageCacheCleanup": [
+    {
+      "reference": "node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402",
+      "newImageReferenceRemovalExit": 0
+    }
+  ],
+  "durationSeconds": 52.862,
+  "finishedAt": "2026-10-29T12:35:42.952557+00:00",
+  "temporaryRootRemoval": "after collector acknowledgment or bounded 15-second grace"
+}

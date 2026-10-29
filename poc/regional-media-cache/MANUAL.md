@@ -42,3 +42,19 @@ prepared cache state. A localhost cache does not measure Kemerovo-to-VPS latency
 
 Send the resulting JSON, or its summary, in the current chat for analysis.
 Do not commit personal network names or unreviewed probe output to the repository.
+
+
+## Temporary VPS tunnel session (VPS-16)
+
+`manual-vps-probe.py --vpn off` consumes the operator-provided temporary
+`~/Documents/TOUR-88/vps-session.json` and public test CA in that directory. It
+opens only a local SSH forward to the authorized loopback cache and closes it
+on exit. It does not disable VPN, change system trust, install a remote cache,
+start production traffic or extend a session deadline. An expired session
+refuses. Do not reuse a historical session file to recreate a deleted VPS test.
+
+The 2026-10-29 run used ten samples per image/path (40 requests), all with exact
+byte identity. The archived executed source hash is in the raw result; the
+current script resolves its helper relative to its own file for portability.
+Cache states are observed, not assumed; SSH connection reuse, test TTL and the
+small sample prevent native-HTTPS/LCP or production admission claims.

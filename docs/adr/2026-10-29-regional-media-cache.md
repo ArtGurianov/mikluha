@@ -3,8 +3,10 @@
 2026-10-29. **Production NOT QUALIFIED. Owner decision A/B/C PENDING.**
 The owner requested continued local-cache research and did **not** accept B.
 Direct S3 remains the existing default; no TurboFlare activation or production
-cutover is authorized by this PoC. CUSTODY_IMPACT: **NO** for work executed so
-far: local test resources and owner-authorized read-only VPS/S3 requests only.
+cutover is authorized by this PoC. **CUSTODY_IMPACT: YES**: the owner subsequently
+authorized a bounded, disposable three-container VPS experiment (VPS-16). Its
+resources are now removed. Custody remains **CUSTODY_PENDING**, separately from
+source/test success; see the infrastructure receipt and outstanding drift below.
 
 Scope: [TOUR-88](https://app.plane.so/art-workspace/browse/TOUR-88/),
 [protocol/budgets](../plans/2026-10-29-tour-88-regional-media-cache-design.md),
@@ -112,12 +114,66 @@ a regional VPS verdict. 40/40 measured local warm responses were HIT. Source
 hashes tie the 44 synthetic checks and 54 combined checks to the candidate.
 Warm loopback speed alone cannot pass regional cold-regression or LCP budgets.
 
-Local enforced caps: cache 128 MiB / 0.25 CPU / 32 pids, test origin and Traefik
+## Owner-authorized VPS experiment and Kemerovo tunnel run
+
+[VPS-16](https://app.plane.so/art-workspace/browse/VPS-16/) authorized only a
+one-off, ≤10-minute stack: three capped containers, private test bridge, new
+nonce directory, throwaway self-signed identity, loopback ports 18088/18488.
+Pinned candidate `e46d6a217dcce6e78bfe42d2f894ffcc49422454` ran unchanged. The
+operational controller and source receipts are archived under evidence/vps-16;
+no production identity, DNS, shared proxy/network or application env was changed.
+
+One preflight attempt stopped before containers because a snapshot template
+assumed every container had Health. Its directory was removed. The corrected
+server run passed **all 44 safety checks**, but its strict warm benchmark
+assertion failed at **18/20 HIT**: two requests revalidated with the two-second
+lab TTL. Status/bytes were correct. The failed result is retained, not relabeled
+PASS. A bounded client window then continued the same experiment with the same
+source/configs, two finite public aliases and the original overall cutoff.
+
+Owner-run Mac probe, Kemerovo home / VPN off by declaration, 19:41:04–19:41:53
+Asia/Novosibirsk: **40/40 valid responses and byte hashes**, 10 requests/image/path.
+The cache path uses a persistent SSH tunnel and a separately verified test CA;
+the direct path uses fresh remote TCP/TLS. It is not native public HTTPS parity.
+
+| WebP / p75 metric, ms | Direct (10) | Mixed cache (10) | HIT only (4) |
+|---|---|---|---|
+| thumbnail TTFB | 546 | 405 | 138 |
+| thumbnail full transfer | 950 | 802 | 397 |
+| gallery TTFB | 562 | 714 | 134 |
+| gallery full transfer | 1952 | 1292 | 633 |
+
+Each image had 1 MISS, 5 REVALIDATED, 4 HIT. Mixed p75 transfer improved ~16%/~34%,
+but gallery mixed p75 TTFB regressed ~27%. HIT-only p75 TTFB is ~75% lower, based
+on only four responses each. One MISS/image is insufficient for controlled cold
+p95; this 40% observed HIT fraction under TTL=2s is not a production hit-rate or
+billing estimate. The tunnel, small sample, different connection reuse and
+missing native HTTPS/LCP prevent production GO. Longer TTL must be tested with
+real revocation constraints rather than silently chosen to improve this result.
+
+The working stage lasted **545 seconds** from the server-run start to window
+cleanup. Project containers/network and new image reference were removed,
+all nonce directories disappeared, both loopback ports were independently bound
+successfully afterwards, and production container IDs/start/restart/health
+snapshots matched. No public endpoint remains. Request/controller/probe hashes,
+failed raw results and independent cleanup receipts are retained.
+
+Post-cleanup canonical infrastructure drift is **REVIEW_REQUIRED**: 17 config
+changes versus its stored baseline, 58 package rows, 3 custody refresh targets,
+0 unverified previously captured bundles. No auto-correction was attempted.
+The removed test resources are recorded as disposable observations, not added
+as nonexistent installed paths to the active baseline ledgers. A fresh custody
+capture and isolated restore of that generation were **NOT_RUN**; these need
+owner/external-volume participation. Source CI and successful cleanup cannot
+be reported as custody PASS.
+
+Experiment-enforced caps: cache 128 MiB / 0.25 CPU / 32 pids, test origin and Traefik
 96 MiB / 0.25 CPU each; roots read-only. NGINX allows 16 active requests,
 20 requests/s + burst 32 and 1 MiB/s downstream per response. Cache
 `max_size=32m` is asynchronous eviction, **not a filesystem quota**. Hard disk,
 I/O and aggregate traffic limits, burst/eviction saturation and commercial p95
-regression remain unqualified; no shared-VPS load was applied. Snapshot resource
+regression remain unqualified. Only this bounded photo experiment was applied
+to the shared VPS; no load was sent to commercial APIs. Snapshot resource
 usage is not peak evidence.
 
 ## Revocation, legal and decision gates
@@ -150,7 +206,7 @@ justify a separate CDN assessment.
 | Real public bytes through local cache + verified S3 TLS | Local `--real-s3` evidence; not regional VPS traffic |
 | Kemerovo direct baseline | 60/60 measured responses OK, operator declares VPN off |
 | Real immutable S3 ingest and known existing private original ACL | NOT_RUN; TOUR-63 needed |
-| Kemerovo→VPS cold/warm, other cities/mobile/LCP, commercial budgets | NOT_RUN |
+| Kemerovo→VPS | Exploratory SSH-tunnel data; 10/image/path, mixed TTFB regression; native HTTPS/cold/mobile/LCP/commercial budgets NOT_RUN |
 | Real media-host DNS/TLS, SSR-to-cache rollback, hard disk/I/O/traffic | NOT_QUALIFIED |
 | Exact VPS/bucket placement and legal acceptance | NOT_CONFIRMED / NOT_RUN |
 | Owner A/B/C | PENDING; owner chose to continue research |
@@ -158,4 +214,4 @@ justify a separate CDN assessment.
 A needs the missing receipts, then separately approved production implementation,
 infrastructure resource authorities, rollback and fresh custody/restore evidence.
 Only an accepted A changes TOUR-56/63/68/53. Default remains direct S3, TurboFlare
-NOT QUALIFIED. No task completion, CI success or local result activates production.
+NOT QUALIFIED. No task completion, CI success or experimental result activates production.
