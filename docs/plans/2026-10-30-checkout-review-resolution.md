@@ -15,11 +15,11 @@ Reuse Flexperiment's component and shared credentials per explicit owner instruc
 | Item | Impact | Decision and reason |
 | --- | --- | --- |
 | GPT payment A → B → A | critical fix | Actually clear selected payment on every condition transition before rendering children. Returning to A cannot restore it. Retain tourist/contact input. |
-| GPT stale quote/terms/options | material improvement | Explicit `refresh_required` codes and user-triggered read-only quote refresh. No implicit second booking submission. Require fresh selection and consents. Failed refresh stays recoverable. |
+| GPT stale quote/terms/options | material improvement | Explicit `refresh_required` codes and user-triggered read-only quote refresh. No implicit second booking submission. Require fresh selection; re-confirm consent when legal document versions change. Failed refresh stays recoverable. |
 | GPT hung SDK | material improvement | 10-second deadline, failed-script removal, listener/timer cleanup and new promise on retry. Regression uses no load/error event and then a late callback. |
 | GPT key pairing | material improvement | Read-only Coolify audit checks matching 20 characters after prefixes, source/target equality and website scopes in process. Only booleans leave the host. |
 | OPUS request identity | material improvement | Draft carries trusted session `clientRequestId`; UNKNOWN shows it. Recovery bootstrap blocks a remounted form. Durable ID/session and server idempotency remain A integration prerequisites. |
-| OPUS quote correlation | material improvement | Opaque input revision changes on participant add/remove and any tourist field edit. Quote must echo it, match departure/session/count and be the latest refresh. Out-of-order replies are ignored. |
+| OPUS quote correlation | material improvement | Opaque input revision changes on participant add/remove and committed changes to qualified pricing fields. Ordinary tourist details do not invalidate the quote. Quote must echo the revision, match departure/session/count and be the latest refresh. Out-of-order replies are ignored. |
 | OPUS consent guard | material improvement | Draft builder rejects absent/false adult and PD confirmations independently of browser validation. |
 | OPUS dispatch certainty | material improvement | Adapter can return `not_dispatched` only if it proves no dispatch occurred. All unclassified exceptions still mean UNKNOWN. |
 | OPUS unnecessary CAPTCHA reset | minor enhancement | Preserve a valid unconsumed proof during passenger/quote edits; it is not a quote signature. Submission consumes it before await; provider expiry/error/manual retry still invalidates it. |
@@ -39,6 +39,10 @@ may have reached the server. Keep the existing conservative UNKNOWN behavior in 
 
 Do not replace/rotate the shared provider keys: the owner explicitly requested reuse. Shared
 quota, provider settings and rotation affect both consumers and require coordinated operations.
+
+The second review identified excessive invalidation and an overbroad quote DTO at `ed5cf45`.
+The minimal pricing projection and text-input regressions supersede that behavior; see
+`2026-10-30-checkout-pricing-inputs-design.md`. A schema flag alone does not qualify PD processing.
 
 ## Conflicts / decisions needed
 

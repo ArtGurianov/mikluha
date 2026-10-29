@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, LockKeyhole, Plus, ShieldCheck } from "lucide-react";
-import { bookingDraft, bookingPassengers, bookingRefusals } from "@/lib/native-checkout";
+import { bookingDraft, bookingRefusals, priceAffectingInputNames, quotePricingInputs } from "@/lib/native-checkout";
 import type { BookingDraft, BookingOutcome, BookingPresentation, QuoteRefreshRequest } from "@/lib/native-checkout";
 import { SmartCaptcha, type CaptchaWidget } from "./smartcaptcha";
 
@@ -40,6 +40,17 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
     setSourceSnapshot(suppliedSnapshot); setView(suppliedView); setRefreshing(false);
   }
   const formRef = useRef<HTMLFormElement>(null);
+  const committedPricing = useRef<string | null>(null);
+  const pricingBaselineContext = useRef("");
+  const [pricingEditing, setPricingEditing] = useState(false);
+  const pricingNames = priceAffectingInputNames(view, participants);
+  const pricingSchema = JSON.stringify([participants, view.touristDataSchema]);
+  useEffect(() => {
+    if (formRef.current && pricingBaselineContext.current !== pricingSchema) {
+      committedPricing.current = JSON.stringify(quotePricingInputs(new FormData(formRef.current), view, participants));
+      pricingBaselineContext.current = pricingSchema;
+    }
+  }, [participants, pricingSchema, view]);
   const busy = useRef(false);
   const [notice, setNotice] = useState("");
   const [paymentChoice, setPaymentChoice] = useState<{ quoteRef: string; quoteHash: string; optionRef: string } | null>(null);
@@ -61,8 +72,9 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy.current || refreshing || status !== "editing" || view.session.recoveryRequired || !quoteReady || !submit || !proof.current) return;
-    const draft = bookingDraft(new FormData(event.currentTarget), view, participants, proof.current, inputRevision);
+    if (busy.current || refreshing || status !== "editing" || view.session.recoveryRequired || !submit || !proof.current) return;
+    if (commitPricingInputs() || !quoteReady) return;
+    const draft = bookingDraft(new FormData(event.currentTarget), view, participants, proof.current, currentInputRevision.current);
     if (!draft || !selectedPayment || draft.paymentChoiceRef !== selectedPayment.ref) return;
     busy.current = true;
     activeRefresh.current = null;
@@ -76,7 +88,7 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
     if (outcome.kind === "refresh_required") {
       setPaymentChoice(null);
       setStatus("refresh_required");
-      setNotice("Цена, способы оплаты или документы изменились. Обновите условия, заново выберите платёж и подтвердите согласия.");
+      setNotice("Цена, способы оплаты или документы изменились. Обновите условия и заново выберите платёж. Новая редакция документов потребует повторного согласия.");
       busy.current = false;
     } else if (outcome.kind === "rejected" || outcome.kind === "not_dispatched") {
       setStatus("editing");
@@ -107,8 +119,18 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
     setParticipants(ids);
     invalidateInputs();
   }
+  function commitPricingInputs() {
+    if (!formRef.current) return false;
+    const snapshot = JSON.stringify(quotePricingInputs(new FormData(formRef.current), view, participants));
+    const changed = committedPricing.current !== null && committedPricing.current !== snapshot;
+    committedPricing.current = snapshot;
+    setPricingEditing(false);
+    if (changed) invalidateInputs();
+    return changed;
+  }
   async function updateQuote() {
     if (!refreshQuote || locked || refreshing || activeRefresh.current || !formRef.current) return;
+    commitPricingInputs();
     const requestId = crypto.randomUUID();
     const revision = currentInputRevision.current;
     activeRefresh.current = requestId;
@@ -116,7 +138,7 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
     setPaymentChoice(null);
     try {
       const updated = await refreshQuote({ clientRequestId: view.session.clientRequestId, departureId: view.departureId,
-        inputRevision: revision, passengers: bookingPassengers(new FormData(formRef.current), view, participants),
+        inputRevision: revision, ...quotePricingInputs(new FormData(formRef.current), view, participants),
         touristDataSchema: { ref: view.touristDataSchema.ref, hash: view.touristDataSchema.hash } });
       if (activeRefresh.current !== requestId || currentInputRevision.current !== revision) return;
       if (updated.quote.inputRevision !== revision || updated.quote.participantCount !== participants.length
@@ -144,7 +166,11 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
         ))}
       </ol>
       <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10">
-        <form ref={formRef} method="post" onSubmit={send} onChange={(event) => { const name = event.target.getAttribute("name") ?? ""; if (/^p\d/.test(name)) invalidateInputs(); }} className="grid min-w-0 gap-5" aria-label="Данные для бронирования" aria-busy={status === "submitting"}>
+        <form ref={formRef} method="post" onSubmit={send} onChange={(event) => {
+          if (!pricingNames.includes(event.target.getAttribute("name") ?? "")) return;
+          if (event.target.tagName === "SELECT") commitPricingInputs();
+          else { setPricingEditing(true); activeRefresh.current = null; setRefreshing(false); }
+        }} onBlur={(event) => { if (pricingNames.includes(event.target.getAttribute("name") ?? "")) commitPricingInputs(); }} className="grid min-w-0 gap-5" aria-label="Данные для бронирования" aria-busy={status === "submitting"}>
           <fieldset disabled={locked} className={card}>
             <legend className="px-2 text-lg font-semibold">Контакты заказчика</legend>
             <p className="mb-5 text-sm text-muted-foreground">Заказчик участвует в поездке как турист № 1. На email придут документы и чек.</p>
@@ -194,10 +220,10 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
             </div>
             <p id={`${prefix}-promo`} className="mt-4 text-sm leading-relaxed text-muted-foreground">Промокоды при онлайн-бронировании не принимаются. Цена в Заявке не зависит от промокода, и применить его после оформления или оплаты нельзя.</p>
           </fieldset>
-          <fieldset key={JSON.stringify([view.session.clientRequestId, view.terms, view.pdConsent, view.touristDataSchema, inputRevision, status === "refresh_required"])} disabled={locked} className={`${card} space-y-4`}>
+          <fieldset key={JSON.stringify([view.session.clientRequestId, view.terms, view.pdConsent])} disabled={locked} className={`${card} space-y-4`}>
             <legend className="px-2 text-lg font-semibold">Перед отправкой</legend>
             <label className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="pdConsent" value="yes" required /><span>Я отдельно даю <a className="text-secondary underline underline-offset-4" href="/soglasie-pd/" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a> в опубликованной редакции.</span></label>
-            <label className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="adultsOnly" value="yes" required /><span>Все туристы совершеннолетние.</span></label>
+            <label key={participants.join(",")} className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="adultsOnly" value="yes" required /><span>Все туристы совершеннолетние.</span></label>
             <p className="text-xs leading-relaxed text-muted-foreground">Данные туристов нужны для оформления и исполнения договора. Состав данных и основания обработки указаны в <a href="/privacy-policy/" target="_blank" rel="noreferrer" className="text-secondary underline">Политике обработки данных</a>. Условия договора — в <a href="/oferta/" target="_blank" rel="noreferrer" className="text-secondary underline">Публичной оферте</a>.</p>
           </fieldset>
           {!quoteReady && <p className="text-sm text-muted-foreground">Условия требуют обновления. Ожидаем обновлённые цены и условия оплаты.</p>}
@@ -206,7 +232,7 @@ export function NativeCheckout({ view: suppliedView, captcha, submit, refreshQuo
           {status === "editing" && !locked && <SmartCaptcha key={captchaRevision} widget={captcha} onProof={reportProof} onRetry={retryCaptcha} />}
           <div ref={noticeRef} tabIndex={-1} role="status" className={notice || status === "unknown" || view.session.recoveryRequired ? "rounded-xl border border-border bg-accent p-5 text-sm leading-relaxed outline-secondary" : "sr-only"}>{notice}{(status === "unknown" || view.session.recoveryRequired) && <p>Сначала уточните состояние заявки у организатора. Код обращения: {view.session.clientRequestId}. Перезагрузка страницы не разрешает повторную отправку.</p>}</div>
           {!submit && <p className="text-sm text-muted-foreground">Онлайн-отправка пока недоступна. Вы можете связаться с организатором.</p>}
-          <button type="submit" disabled={!submit || !hasProof || locked || status !== "editing" || refreshing || !quoteReady || !view.touristDataSchema.ready || !selectedPayment} className={`${action} w-full`}>
+          <button type="submit" disabled={!submit || !hasProof || locked || status !== "editing" || pricingEditing || refreshing || !quoteReady || !view.touristDataSchema.ready || !selectedPayment} className={`${action} w-full`}>
             {status === "submitting" ? "Отправляем заявку…" : status === "unknown" ? "Нужно уточнить состояние заявки" : status === "review" ? "Заявка получена" : "Перейти к проверке заявки"}<ArrowRight className="size-4" aria-hidden />
           </button>
           <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><LockKeyhole className="mt-0.5 size-3.5 shrink-0" aria-hidden />Отправка формы не списывает деньги. Оплата — после проверки Заявки.</p>

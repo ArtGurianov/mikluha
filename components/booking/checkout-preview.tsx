@@ -47,7 +47,7 @@ export function CheckoutPreview() {
     <section aria-label="Стенд checkout UI" className="border-y border-secondary/20 bg-secondary/5 px-4 py-5 text-sm sm:px-8">
       <div className="mx-auto max-w-6xl">
         <p className="font-semibold">Локальный UI-стенд · TOUR-28 / TOUR-49</p>
-        <p className="mt-1 text-muted-foreground">Синтетический выезд. Заявки, места и платежи не создаются. Вводите только вымышленные данные. Реальная CAPTCHA подключается только по переключателю ниже.</p>
+        <p className="mt-1 text-muted-foreground">Синтетический выезд. Заявки, места и платежи не создаются. Вводите только вымышленные данные. Тестовая сессия сбрасывается при перезагрузке. Реальная CAPTCHA подключается только по переключателю ниже.</p>
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <label className="grid gap-1">Ответ адаптера<select className="max-w-full rounded-lg border border-border bg-card p-2" value={scenario} onChange={(event) => setScenario(event.target.value as typeof scenario)}>
             <option value="CAPTCHA_INVALID">CAPTCHA не принята</option><option value="CAPTCHA_UNAVAILABLE">CAPTCHA недоступна</option><option value="RATE_LIMITED">Слишком много попыток</option><option value="NOT_ENOUGH_SEATS">Нет мест</option><option value="SALES_CLOSED">Продажи закрыты</option><option value="FORM_INVALID">Ошибка данных</option><option value="unknown">Ответ потерян / UNKNOWN</option><option value="review">Заявка получена</option>
@@ -64,7 +64,7 @@ export function CheckoutPreview() {
       </div>
     </section>
     <NativeCheckout key={session} view={view} captcha={realCaptcha ? undefined : SyntheticCaptcha} submit={connected ? submit : undefined} refreshQuote={async (request) => {
-      const updated = previewBookingView(request.passengers.length, policy);
+      const updated = previewBookingView(request.participantCount, policy);
       updated.quote.inputRevision = request.inputRevision;
       return updated;
     }} />
