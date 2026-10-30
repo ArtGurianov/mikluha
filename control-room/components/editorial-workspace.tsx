@@ -129,7 +129,7 @@ function EntityEditor({ collection, item, role, fail, onClose, onDirtyChange }: 
       {role === 'OWNER' && <button className="secondary" disabled={busy || contentInvalid || dirty || !entity.draft} onClick={() => setConfirmPublish(v => !v)}>Опубликовать…</button>}
     </div>
     {confirmPublish && <div className="publication-confirm"><h3>Опубликовать сохранённый черновик {entity.draft?.revision}?</h3><p>Материал станет доступен публичному сайту. Статус продаж выездов не меняется.</p>
-      {legal && <><label>Дата вступления в силу<input type="date" required value={effectiveOn} onChange={e => setEffectiveOn(e.target.value)} /></label><label>Основание одобрения владельцем<textarea required maxLength={2000} value={approval} onChange={e => setApproval(e.target.value)} /></label><p className="muted">Публикация не подписывает поручение обработки данных и не выбирает условия для оплаты.</p></>}
+      {legal && <><label>Дата вступления в силу<input type="date" required min={new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(new Date())} value={effectiveOn} onChange={e => setEffectiveOn(e.target.value)} /></label><label>Основание одобрения владельцем<textarea required maxLength={2000} value={approval} onChange={e => setApproval(e.target.value)} /></label><p className="muted">Публикация не подписывает поручение обработки данных и не выбирает условия для оплаты.</p></>}
       <button disabled={busy || legal && (!effectiveOn || !approval.trim())} onClick={() => void run('publish')}>Подтвердить публикацию</button>
     </div>}
     {preview && <article className="preview"><h3>Предпросмотр черновика</h3><p className="muted">Текстовый предпросмотр; изменения ещё не опубликованы.</p><DocumentPreview value={document} /></article>}

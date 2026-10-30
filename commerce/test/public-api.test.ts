@@ -99,7 +99,7 @@ test('effective legal publication reaches public HTTP without private approval m
   const doc = {slug:'public-privacy',title:'Политика',content:{body:'Approved synthetic text'}};
   await db.admin.query("SELECT fn_save_content_draft($1,0,$2,'editor')",[id,doc]);
   assert.ok(!(await readPublic()).legalPages.some(p=>p.slug==='public-privacy'));
-  await db.publisher.query("SELECT fn_admin_publish_legal($1,1,0,'2026-01-01','private approval note','owner')",[id]);
+  await db.publisher.query("SELECT fn_admin_publish_legal($1,1,0,(clock_timestamp() AT TIME ZONE 'Europe/Moscow')::date,'private approval note','owner')",[id]);
   const result = await readPublic();
   assert.equal(result.legalPages.find(p=>p.slug==='public-privacy')?.body,doc.content.body);
   assert.ok(!JSON.stringify(result).includes('private approval note'));

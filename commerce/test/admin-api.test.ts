@@ -674,7 +674,10 @@ test('TOUR-64 legal approval is OWNER-only, versioned, hashed, date-bound and le
   const draft = {expectedRevision:0,document};
   assert.equal((await call('PUT',`/api/content/${id}/draft`,{cookie:owner.cookie,body:draft})).status,200);
   assert.equal((await db.pool.query('SELECT * FROM public_legal WHERE slug=$1',['privacy-stage-a'])).rowCount,0);
-  const body = {expectedDraftRevision:1,expectedPublishedVersion:0,effectiveOn:'2026-01-01',approval:'Synthetic OWNER approval'};
+  const moscowDate = (ms: number) => new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow'}).format(new Date(ms));
+  const body = {expectedDraftRevision:1,expectedPublishedVersion:0,effectiveOn:moscowDate(Date.now()),approval:'Synthetic OWNER approval'};
+  const yesterday = await call('POST',`/api/content/${id}/publish-legal`,{cookie:owner.cookie,body:{...body,effectiveOn:moscowDate(Date.now()-86_400_000)}});
+  assert.deepEqual([yesterday.status,yesterday.body.error],[422,'LEGAL_EFFECTIVE_IN_PAST']);
   for (const [cookie,status] of [[undefined,401],[editor.cookie,403]] as const) assert.equal((await call('POST',`/api/content/${id}/publish-legal`,{...(cookie?{cookie}:{}),body})).status,status);
   assert.equal((await call('POST',`/api/content/${id}/publish-legal`,{cookie:owner.cookie,body:{...body,approval:''}})).status,422);
   assert.equal((await call('POST',`/api/content/${id}/publish-legal`,{cookie:owner.cookie,body:{...body,effectiveOn:'2026-02-31'}})).status,422);
