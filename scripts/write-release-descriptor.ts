@@ -7,7 +7,7 @@ import { makeSiteReleaseDescriptor } from "../lib/release-descriptor";
 
 async function main() {
   const root = process.cwd();
-  const snapshot = JSON.parse(await readFile(path.join(root, ".cms-cache", "content.json"), "utf8")) as ContentSnapshot;
+  const snapshot = JSON.parse(await readFile(path.join(root, ".site-build", "content.json"), "utf8")) as ContentSnapshot;
   const descriptor = makeSiteReleaseDescriptor(process.env.SOURCE_COMMIT ?? "", snapshot.legalPages);
   await mkdir(path.join(root, "public"), { recursive: true });
   await writeFile(path.join(root, "public", "release.json"), `${JSON.stringify(descriptor)}\n`, { encoding: "utf8", mode: 0o444 });

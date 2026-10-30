@@ -13,13 +13,12 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import yaml from "js-yaml";
 
 import {
+  type AssetSourcePolicy,
+  SITE_MEDIA_POLICY,
   assertImageSource,
   assertVideoSource,
-  createAssetSourcePolicy,
-  type CmsMediaConfig,
 } from "../lib/cms/asset-source";
 import type { ContentSnapshot, ImageAsset } from "../lib/cms/types";
 import { hasQualifiedRefundPolicy } from "../lib/contract-readiness";
@@ -29,8 +28,8 @@ import { findMarkdownPolicyViolations } from "../lib/cms/markdown-policy";
 import { isStaging } from "../lib/site";
 import { getTodayInTimezone } from "../lib/tours";
 
-const CACHE_FILE = path.resolve(process.cwd(), ".cms-cache", "content.json");
-const ADMIN_CONFIG_FILE = path.resolve(process.cwd(), "public/admin/config.yml");
+const CACHE_FILE = path.resolve(process.cwd(), ".site-build", "content.json");
+
 const PUBLIC_DIR = path.resolve(process.cwd(), "public");
 const PHONE_RE = /^\+7\d{10}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -91,7 +90,7 @@ function validateMarkdown(markdown: string, documentField: string) {
   }
 }
 
-function validateImage(image: ImageAsset | undefined, documentField: string, policy: ReturnType<typeof createAssetSourcePolicy>) {
+function validateImage(image: ImageAsset | undefined, documentField: string, policy: AssetSourcePolicy) {
   if (!image) return;
   try {
     assertImageSource(image.src, policy);
@@ -102,10 +101,7 @@ function validateImage(image: ImageAsset | undefined, documentField: string, pol
 }
 
 async function main() {
-  const [raw, adminConfigText] = await Promise.all([
-    readFile(CACHE_FILE, "utf-8"),
-    readFile(ADMIN_CONFIG_FILE, "utf-8"),
-  ]);
+  const raw = await readFile(CACHE_FILE, "utf-8");
   const snapshot = JSON.parse(raw) as ContentSnapshot;
   // `--baked`: the SSR build (build:ssr). Its catalog comes from Commerce at request time and is
   // gated there (lib/launch-gate.ts); what the image bakes in — site settings and legal pages, and
@@ -113,7 +109,7 @@ async function main() {
   const content: ContentSnapshot = process.argv.includes("--baked")
     ? { ...snapshot, tours: [], departures: [], reports: [], reviews: [], organizers: [] }
     : snapshot;
-  const mediaPolicy = createAssetSourcePolicy(yaml.load(adminConfigText) as CmsMediaConfig);
+  const mediaPolicy = SITE_MEDIA_POLICY;
 
   const tourIds = new Set(content.tours.map((t) => t.id));
   const departureById = new Map(content.departures.map((d) => [d.id, d]));
@@ -245,7 +241,7 @@ async function main() {
   // servable and must not shadow an existing section or build artifact. Tours
   // and reports sit under a fixed /tours//reports/ prefix, so they only need
   // the URL-safety check above, not a reserved-word check. The CMS rejects
-  // both while typing (public/admin/config.yml field `pattern`s); this is the
+  // both while typing (the content schema field `pattern`s); this is the
   // backstop for documents written or hand-edited outside it.
   for (const p of content.legalPages) {
     if (slugs.has(`legal:${p.slug}`)) fail(`Duplicate legal page slug: ${p.slug}`);
@@ -288,7 +284,7 @@ async function main() {
   // The site itself drops a departure from every listing and from the booking
   // modal once its start date is behind the build's "today", so a rebuild is
   // what actually fixes a stale page (see the scheduled run in
-  // .github/workflows/publish.yml). This is a warning, not an error: failing
+  // the request-time catalog read). This is a warning, not an error: failing
   // here would block exactly the rebuild that takes the stale date down.
   for (const d of content.departures) {
     if (today && d.isListed && d.bookingStatus === "OPEN" && d.startDate < today) {
@@ -320,7 +316,7 @@ async function main() {
     }
     for (const blocker of openDepartureContractBlockers(content)) fail(`Production release blocked — ${blocker}.`);
     for (const blocker of demoBlockers) {
-      fail(`Production release blocked — ${blocker}. Replace it in the CMS and commit.`);
+      fail(`Production release blocked — ${blocker}. Replace it through the owning content workflow.`);
     }
   } else if (isStaging) {
     warn(
@@ -329,7 +325,7 @@ async function main() {
   } else {
     fail(
       'Production release blocked — "Сайт готов к публичному запуску" (siteSettings.launchReady) is off, ' +
-        "so this content is still considered demo data. Turn it on in the CMS once the real details are in place, " +
+        "so this content is still considered demo data. Enable it in the reviewed settings release once the real details are in place, " +
         "or build with DEPLOY_ENV=staging for a demo/preview release." +
         (demoBlockers.length > 0
           ? `\n   Still to replace before it can be turned on:\n${demoBlockers.map((b) => `     - ${b}`).join("\n")}`

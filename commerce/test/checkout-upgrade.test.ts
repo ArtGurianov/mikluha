@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import type { Bookable } from '../src/catalog.js';
-import { issueState, onReturn, pay, zayavkaOf, type CheckoutDeps } from '../src/checkout.js';
+import { issueState, onReturn, pay, zayavkaOf, type CheckoutDeps } from './retired/checkout.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { buildContractSnapshot, contractSnapshotHash } from '../src/contract-snapshot.js';
 import { migrate } from '../src/migrate.js';
 import { setSalesOpen } from '../src/orders.js';
-import { RefrefClient } from '../src/refref.js';
+import { RefrefClient } from './retired/refref.js';
 import { buildSnapshot, snapshotDigest } from '../src/snapshot.js';
 import { contractHash, sha256Hex } from '../src/zayavka.js';
 import { FakeRefref } from './fake-refref.js';

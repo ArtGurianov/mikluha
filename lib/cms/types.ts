@@ -1,25 +1,11 @@
 /**
- * The CMS integration boundary.
- *
- * `Raw*` = the shape a Sveltia CMS content file actually has on disk once
- * parsed from YAML by scripts/sync-content.ts. These are hand-written and kept
- * in sync by hand with public/admin/config.yml's field list — there is no
- * schema-extraction/typegen step for a Git-based CMS, so a field renamed in
- * one place and not the other only shows up as a normalize.ts crash naming the
- * offending document, same as it always did for a genuinely missing field.
- *
- * `*DTO` = the internal, CMS-agnostic shapes the app renders, with assets
- * resolved to local paths. These stay hand-written on purpose: they are the
- * seam that lets the CMS be replaced without touching UI components.
- *
- * Raw -> DTO conversion (and every optional-field decision it implies) lives
- * in ./normalize.ts.
+ * Raw projection/settings inputs and the normalized DTOs rendered by the site.
+ * Conversion and optional-field decisions live in normalize.ts.
  */
-
 export type BookingStatus = "OPEN" | "CLOSED" | "CANCELLED";
 
 /**
- * An image field as Sveltia's `image` + `alt` object pair writes it. `image`
+ * An image reference with its alternative text. `image`
  * is either a direct Object Storage URL or a tracked `/media/demo/*.webp`
  * fallback. No build step downloads or transforms it.
  */

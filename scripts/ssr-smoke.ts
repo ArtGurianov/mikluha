@@ -56,6 +56,9 @@ async function main() {
     uncachedNoCookie(tour.res, `/tours/${tourSlug}/`);
   }
 
+  for (const path of ["/admin/", "/admin/config.yml", "/admin/sveltia-cms.js"]) {
+    check((await page(path)).res.status === 404, `${path} is retired`);
+  }
   const legal = await page("/oferta/");
   check(legal.res.status === 200, "GET /oferta/ is 200");
 
@@ -102,12 +105,16 @@ async function main() {
     await fixture("/__fixture/down");
     try {
       const outage = await page("/");
-      check(outage.res.status >= 500, `Commerce outage: GET / is an error (${outage.res.status})`);
-      // Next answers with its error document; the browser renders the layout (which never reads
-      // Commerce) and app/error.tsx from the payload. What matters here: no price, tour or booking
-      // link reaches the response, and the legal pages keep working.
+      check(outage.res.status === 200 && outage.html.includes("Расписание временно недоступно"), `Commerce outage: GET / is an error (${outage.res.status})`);
+      // Read the raw response: no hydration is needed for the outage message.
       check(!outage.html.includes("₽") && !outage.html.includes('href="/tours/') && !outage.html.includes("/book"),
         "Commerce outage: no prices, tours or booking links");
+      uncachedNoCookie(outage.res, "outage");
+      check(outage.html.includes('name="robots" content="noindex, nofollow"'), "outage is noindex");
+      for (const path of [`/tours/${tourSlug}/`, "/reports/altai-june-2026/"]) {
+        const result = await page(path);
+        check(result.html.includes("Расписание временно недоступно") && !result.html.includes("₽"), `${path} outage visible without JS, no prices`);
+      }
       check((await page("/oferta/")).res.status === 200, "Commerce outage: GET /oferta/ is still 200");
     } finally {
       await fixture("/__fixture/up");

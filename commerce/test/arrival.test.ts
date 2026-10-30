@@ -9,8 +9,8 @@ import { after, before, beforeEach, describe, test } from 'node:test';
 import {
   ATTEMPT_CEILING_MS, arrivalTarget, Arrivals, BUY_BUDGET_MS, CONTEXT_COOKIE, CONTEXT_MAX_AGE_SECONDS, contextCookie,
   MAX_ACTIVE_CLAIMS, newContextId, RETRY_INTERVAL_MS, validContextId,
-} from '../src/arrival.js';
-import { RefrefClient } from '../src/refref.js';
+} from './retired/arrival.js';
+import { RefrefClient } from './retired/refref.js';
 import { FakeVnext } from './fake-vnext.js';
 import { captureLog } from './helpers.js';
 

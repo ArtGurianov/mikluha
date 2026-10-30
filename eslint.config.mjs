@@ -12,8 +12,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Vendored build artifact (scripts/vendor-admin-cms.ts) — never hand-edited.
-    "public/admin/sveltia-cms.js",
     // A separate service with its own package and checks (commerce/README.md).
     "commerce/**",
     // The static Control Room: its own package and build (control-room/README.md).

@@ -10,11 +10,11 @@ import { readMigrations } from './dist/migration-integrity.js';
 import { migrate } from './dist/migrate.js';
 import { contractSnapshotIntact } from './dist/contract-snapshot.js';
 import { reserve, setSalesOpen, maintain } from './dist/orders.js';
-import { issueState, ownsOrder } from './dist/checkout.js';
+import { createRetiredCheckoutHandler } from './dist/retired-checkout.js';
 import { reserveNativePurchase } from './dist/purchases.js';
 import { SchemaAdmission, schemaWorker } from './dist/schema-admission.js';
 import { schemaReadiness } from './dist/schema-readiness.js';
-import { createCommerceServer, readiness } from './dist/server.js';
+import { createCommerceServer, readiness, routes } from './dist/server.js';
 
 const identity = await readBuildIdentity('/app/identity/identity.json');
 assert.equal(identity.sourceCommit, process.env.QUALIFICATION_SOURCE_COMMIT, 'image must identify the declared exact HEAD');
@@ -54,9 +54,9 @@ try {
   const deps = { pool, catalog, migrations, schemaHead: migrations.length, sourceCommit: identity.sourceCommit, startedAt: new Date() };
   const admission = new SchemaAdmission(() => schemaReadiness(pool, deps));
   let routeCalls = 0, workerCalls = 0;
-  server = createCommerceServer({ ...deps, admission }, async (_req, res) => {
+  server = createCommerceServer({ ...deps, admission }, routes(createRetiredCheckoutHandler('https://site.example.invalid'), async (_req, res) => {
     routeCalls++; res.end('operation'); return true;
-  });
+  }));
   const worker = schemaWorker(admission, [async () => { workerCalls++; }], error => { throw error; });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -99,8 +99,13 @@ try {
   assert.equal((await pool.query('SELECT lifecycle_profile FROM purchase_current WHERE purchase_ref = $1', [purchase.purchaseRef])).rows[0].lifecycle_profile, 'NATIVE_NO_REFERRAL');
   const contract = (await pool.query('SELECT contract_snapshot, contract_snapshot_sha256 FROM orders WHERE order_ref = $1', [result.orderRef])).rows[0];
   assert.equal(contractSnapshotIntact(contract.contract_snapshot, contract.contract_snapshot_sha256), true);
-  const state = await issueState(pool, result.orderRef); assert.ok(state);
-  assert.equal(await ownsOrder(pool, result.orderRef, state), true);
+  for (const [method, path] of [['GET', '/book'], ['POST', '/orders'], ['POST', '/orders/old/pay'], ['GET', '/arrive']]) {
+    const retired = await fetch(base + path, { method, redirect: 'manual' });
+    assert.equal(retired.status, 410);
+    assert.equal(retired.headers.get('set-cookie'), null);
+    assert.equal(retired.headers.get('location'), null);
+    await retired.text();
+  }
   const maintenance = await maintain(pool, () => {}, new Date(now.getTime() + 31 * 60_000));
   assert.equal(maintenance.expired, 2);
   assert.equal((await readiness({ ...deps, sourceCommit: 'b'.repeat(40) })).reason, 'SCHEMA_AHEAD_INCOMPATIBLE');
@@ -120,7 +125,7 @@ try {
   await owner.query('DELETE FROM schema_migration_compatibility WHERE version = 12');
   assert.equal((await readiness(deps)).reason, 'SCHEMA_ATTESTATION_MISMATCH');
   await admission.drain(); await worker.drain();
-  console.log(`SCHEMA_OLD_IMAGE=PASS source=${identity.sourceCommit} bundled=${bundledHead} database=${forwardHead} reserve=PASS purchase=PASS contract=PASS state=PASS maintenance=PASS negatives=PASS`);
+  console.log(`SCHEMA_OLD_IMAGE=PASS source=${identity.sourceCommit} bundled=${bundledHead} database=${forwardHead} reserve=PASS purchase=PASS contract=PASS retired=PASS maintenance=PASS negatives=PASS`);
 } finally {
   if (server) { server.closeAllConnections(); await new Promise(r => server.close(r)); }
   await pool?.end(); await operator?.end(); await owner.end(); rmSync(dir, { recursive: true, force: true });

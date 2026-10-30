@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
-import { AfterResponse } from '../src/arrival.js';
+import { AfterResponse } from './retired/arrival.js';
 import { createAdminServer } from '../src/admin/api.js';
 import { processEmailOutbox } from '../src/email.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
@@ -163,7 +163,7 @@ test('commerce readyz reads schema once, preserves independent legal admission a
 });
 
 test('HTTP request admitted before shutdown can register its arrival before returning', async () => {
-  const { Arrivals, newContextId } = await import('../src/arrival.js');
+  const { Arrivals, newContextId } = await import('./retired/arrival.js');
   const admission = new SchemaAdmission(() => schemaReadiness(db.pool, build));
   const after = new AfterResponse(admission);
   let sends = 0;

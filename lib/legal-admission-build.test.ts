@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -18,8 +18,8 @@ const departure = { departureTime: "00:30", returnTime: "21:00", departurePoint:
   services: [{ name: "Экскурсия", supplier: "ИП Тестовый", included: true }] };
 
 function fixture() {
-  const collection = (name: string) => readdirSync(join(root, "content", name)).filter((f) => f.endsWith(".yml")).map((file) => ({
-    ...yaml.load(readFileSync(join(root, "content", name, file), "utf8"), { schema: yaml.JSON_SCHEMA }) as object,
+  const collection = (name: string) => readdirSync(join(root, name === "legal" ? "content" : "test-fixtures/catalog", name)).filter((f) => f.endsWith(".yml")).map((file) => ({
+    ...yaml.load(readFileSync(join(root, name === "legal" ? "content" : "test-fixtures/catalog", name, file), "utf8"), { schema: yaml.JSON_SCHEMA }) as object,
     _slug: file.slice(0, -4),
   }));
   const raw = { siteSettings: yaml.load(readFileSync(join(root, "content/site-settings.yml"), "utf8"), { schema: yaml.JSON_SCHEMA }),
@@ -33,12 +33,11 @@ function fixture() {
   for (const o of content.organizers) o.isDemo = false;
   content.legalPages.find((p) => p.slug === "oferta")!.refundPolicy = "FULL_ONLY";
   const dir = mkdtempSync(join(tmpdir(), "mikluha-build-contract-"));
-  mkdirSync(join(dir, ".cms-cache"));
-  mkdirSync(join(dir, "public/admin"), { recursive: true });
-  cpSync(join(root, "public/admin/config.yml"), join(dir, "public/admin/config.yml"));
+  mkdirSync(join(dir, ".site-build"));
+  mkdirSync(join(dir, "public"), { recursive: true });
   symlinkSync(join(root, "public/media"), join(dir, "public/media"), "dir");
   const run = () => {
-    writeFileSync(join(dir, ".cms-cache/content.json"), JSON.stringify(content));
+    writeFileSync(join(dir, ".site-build/content.json"), JSON.stringify(content));
     return spawnSync(process.execPath, ["--import", join(root, "node_modules/tsx/dist/loader.mjs"), join(root, "scripts/validate-content.ts")],
       { cwd: dir, env: { ...process.env, DEPLOY_ENV: "production" }, encoding: "utf8", timeout: 10_000 });
   };

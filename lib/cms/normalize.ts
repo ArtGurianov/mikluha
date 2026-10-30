@@ -17,7 +17,7 @@ import type {
 
 /**
  * A content file's fields are only as reliable as whatever last wrote it —
- * the Sveltia UI's `required: true` is an editor-side affordance, not a
+ * the the legacy editor UI's `required: true` is an editor-side affordance, not a
  * guarantee about what's on disk, and files can also be hand-edited. Every
  * field a rendered page genuinely cannot do without is asserted here — at the
  * very start of the build, with the offending document named, rather than as
@@ -62,7 +62,7 @@ function maybeImage(ref: RawImageRef | undefined | null): ImageAsset | undefined
   return { alt: ref.alt?.trim() || "", src: ref.image };
 }
 
-/** The Hero background video is mandatory content, not an optional embellishment — see hero.video's `required: true` in public/admin/config.yml. */
+/** The Hero background video is mandatory content, not an optional embellishment — see hero.video's `required: true` in the content schema. */
 function video(ref: { file?: string | null } | undefined | null, what: string): VideoAsset {
   const src = requiredString(ref?.file, `${what} (video has no uploaded asset)`);
   return { src };
@@ -85,7 +85,7 @@ function flag(value: boolean | undefined | null): boolean {
 /**
  * Every relation field (tour/departure/report/review references, etc.) points
  * at a document by its *filename* (`value_field: "{{slug}}"` in
- * public/admin/config.yml), while tours/reports/legalPages also expose their
+ * the content schema), while tours/reports/legalPages also expose their
  * slug as an editable field for routing (`/tours/<slug>/`, ...). The CMS's
  * `slug: "{{fields.slug}}"` collection template keeps the two identical at
  * creation time, but nothing stops a hand-edit of the `slug` field without

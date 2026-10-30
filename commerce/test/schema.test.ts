@@ -1,3 +1,4 @@
+import { loadCatalog, sourceFixtureDir } from './retired/catalog.js';
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -6,7 +7,6 @@ import { after, before, test } from 'node:test';
 
 import pg from 'pg';
 
-import { loadCatalog } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { migrate, schemaHead } from '../src/migrate.js';
 import { readiness } from '../src/server.js';
@@ -76,7 +76,7 @@ test('ready only at exactly this build\'s schema', async () => {
 });
 
 test("the site's own content/ loads, as the image ships it", () => {
-  const catalog = loadCatalog(join(MIGRATIONS_DIR, '..', '..', 'content'));
+  const catalog = loadCatalog(sourceFixtureDir());
   assert.ok(catalog.departures.size > 0);
   for (const d of catalog.departures.values()) assert.match(d.startsOn, /^\d{4}-\d{2}-\d{2}$/);
 });

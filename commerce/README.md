@@ -1,3 +1,27 @@
+# Native Commerce runtime (TOUR-60/66, 2026-10-30)
+
+The current public process (`src/bin/serve.ts`) serves anonymous `/public/v1/catalog`, health,
+identity and readiness. Retired `/book`, `/orders`, `/return`, `/arrive` and `/documents` paths
+return 410 for every method. It creates no Refref client and starts no legacy payment worker.
+Refref credentials are no longer required or read. Sales remain CLOSED pending native checkout
+qualification. Settings and legal release remain code-owned read-only inputs pending TOUR-59;
+Git/YAML tours/departures do not ship in the image. Native purchase/database/Admin contracts remain.
+
+Build context is the repository root: `docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=<40-hex> .`.
+`pnpm build` clears old output before compiling. The runtime includes `src/` output only;
+`test/retired` and `test-fixtures/catalog` preserve historical evidence outside the image.
+
+Current env: `DATABASE_URL`, `COMMERCE_ENVIRONMENT`, `CONTENT_DIR`, `COMMERCE_ORIGIN`, `SITE_ORIGIN`,
+Notisend settings and the immutable build identity. Production legal/schema admission still applies.
+No credentials are added or rotated by this source change. New DB backup/restore before real data
+and live setup remain TOUR-65/67/VPS-15. The source PR makes no deployment or sales claim.
+
+## Historical implementation and qualification record
+
+The following pre-2026-10-30 material records previous slices. References to Refref checkout,
+Sveltia, static-site releases, Git/YAML catalogs and their runtime credentials are superseded above.
+Do not use those historical instructions to restore a retired system.
+
 # mikluha-commerce
 
 Target design for a separate merchant-native Refref v10 transition, with mandatory deposits
@@ -646,6 +670,11 @@ writers must invoke it and bind the accepted immutable revision before admission
 The current content-backed document path is not claimed to enforce this future gate.
 
 ## Immutable migration history (ART-317)
+
+For a new database, [TOUR-57 clean-schema preparation](runbooks/clean-schema.md)
+replays the complete locked journal in isolated PostgreSQL 16 and exports a
+review manifest and schema-only SQL. It uses the existing migrations unchanged;
+installation and target recovery evidence remain separate actions.
 
 `migrations/migration.lock` fixes the filename, version and SHA-256 of every SQL file. Append a
 new journal entry, SQL file and lock entry together; never rewrite a committed entry. Startup

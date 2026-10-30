@@ -5,19 +5,13 @@
 //   source commit         read from the image's immutable /app/identity/identity.json
 //   COMMERCE_ORIGIN       fixed in production: https://book.mikluha-maklai.ru
 //   SITE_ORIGIN           fixed in production: https://mikluha-maklai.ru
-//   REFREF_API_BASE       fixed in production: https://api.refref.ru/v1-rc
-//   REFREF_CHECKOUT_ORIGIN  fixed in production: https://checkout.refref.ru
-//   REFREF_VNEXT_API_BASE  ignored: native ingress is NATIVE_NO_REFERRAL (TOUR-81), so /arrive claims
-//                         nothing and no vNext client is built even when it is set.
-//   REFREF_BUSINESS_ID, REFREF_BUSINESS_SLUG, REFREF_API_KEY   Mikluha's Refref Business and its key
 //   NOTISEND_API_KEY, NOTISEND_FROM_EMAIL, NOTISEND_FROM_NAME   Notisend transactional email (optional NOTISEND_REPLY_TO)
 // The SSR site reads GET /public/v1/catalog (public-api.ts) over the internal network.
 
 import pg from 'pg';
 
 import { PRODUCTION_BUILD_IDENTITY_FILE, readBuildIdentity } from '../build-identity.js';
-import { assertProductionContent, loadCatalog } from '../catalog.js';
-import { reconcileAll, type CheckoutDeps } from '../checkout.js';
+import { assertProductionContent, loadSiteRelease } from '../catalog.js';
 import { env, environment, MIGRATIONS_DIR, productionAddress } from '../config.js';
 import { NotisendClient, processEmailOutbox } from '../email.js';
 import { processExecutionNotices } from '../execution-notice.js';
@@ -27,40 +21,27 @@ import { readMigrations } from '../migration-integrity.js';
 import { maintain } from '../orders.js';
 import { SchemaAdmission, schemaWorker } from '../schema-admission.js';
 import { schemaReadiness } from '../schema-readiness.js';
-import { RefrefClient } from '../refref.js';
 import { createPublicApiHandler } from '../public-api.js';
 import { createCommerceServer, routes, SERVICE } from '../server.js';
-import { createWebHandler } from '../web.js';
+import { createRetiredCheckoutHandler } from '../retired-checkout.js';
 
 const log = jsonLogger(SERVICE);
 const which = environment();
-const catalog = loadCatalog(env('CONTENT_DIR'));
+const catalog = loadSiteRelease(env('CONTENT_DIR'));
 if (which === 'PRODUCTION') assertProductionContent(catalog);
 const identityPath = which === 'PRODUCTION' ? PRODUCTION_BUILD_IDENTITY_FILE
   : (process.env.BUILD_IDENTITY_FILE || PRODUCTION_BUILD_IDENTITY_FILE);
 const identity = await readBuildIdentity(identityPath);
 const commerceOrigin = productionAddress(which, 'COMMERCE_ORIGIN', env('COMMERCE_ORIGIN'));
 const siteOrigin = productionAddress(which, 'SITE_ORIGIN', env('SITE_ORIGIN'));
-const refrefApiBase = productionAddress(which, 'REFREF_API_BASE', env('REFREF_API_BASE'));
-const checkoutOrigin = productionAddress(which, 'REFREF_CHECKOUT_ORIGIN', env('REFREF_CHECKOUT_ORIGIN'));
 const legalAdmission = which === 'PRODUCTION'
   ? new LiveSiteReleaseAdmission(siteOrigin, { sourceCommit: identity.sourceCommit, catalog }) : undefined;
 if (legalAdmission !== undefined) await legalAdmission.verify();
 const migrations = readMigrations(MIGRATIONS_DIR);
 const pool = new pg.Pool({ connectionString: env('DATABASE_URL'), max: 8 });
-const initiationPool = new pg.Pool({ connectionString: env('DATABASE_URL'), max: 2, connectionTimeoutMillis: 3000 });
 const admission = new SchemaAdmission(() => schemaReadiness(pool, {
   schemaHead: migrations.length, migrations, sourceCommit: identity.sourceCommit,
 }));
-const checkout: CheckoutDeps = {
-  pool, initiationPool, catalog, log,
-  ...(legalAdmission ? { legalAdmission } : {}),
-  refref: new RefrefClient({ apiBase: refrefApiBase, apiKey: env('REFREF_API_KEY') }),
-  merchant: {
-    businessId: env('REFREF_BUSINESS_ID'), businessSlug: env('REFREF_BUSINESS_SLUG'),
-    checkoutOrigin, origin: commerceOrigin, siteOrigin,
-  },
-};
 const email = new NotisendClient({
   apiKey: env('NOTISEND_API_KEY'), fromEmail: env('NOTISEND_FROM_EMAIL'),
   fromName: env('NOTISEND_FROM_NAME'), commerceOrigin,
@@ -70,13 +51,13 @@ const server = createCommerceServer({
   pool, catalog, admission, schemaHead: migrations.length, migrations,
   sourceCommit: identity.sourceCommit, startedAt: new Date(), ...(legalAdmission ? { legalAdmission } : {}),
   onError: (e) => log('request_failed', { error: e instanceof Error ? e.name : 'unknown' }),
-}, routes(createPublicApiHandler(pool), createWebHandler(checkout, which === 'STAGING')));
+}, routes(createPublicApiHandler(pool), createRetiredCheckoutHandler(siteOrigin)));
 const port = Number(process.env.PORT ?? 3000);
 server.listen(port, '0.0.0.0', () => log('listening', { port, environment: which, departures: catalog.departures.size,
-  ingress: 'NATIVE_NO_REFERRAL', vnextApiBaseIgnored: Boolean(process.env.REFREF_VNEXT_API_BASE) }));
+  ingress: 'NATIVE_NO_REFERRAL', sales: 'CLOSED' }));
 
 const maintenance = schemaWorker(admission, [
-  () => reconcileAll(checkout), () => maintain(pool, log),
+  () => maintain(pool, log),
 ], (e) => log('maintenance_failed', { error: e instanceof Error ? e.name : 'unknown' }));
 const mail = schemaWorker(admission, [
   () => processEmailOutbox(pool, email, log), () => processExecutionNotices(pool, email, log),
@@ -96,7 +77,7 @@ const stop = () => {
   const admitted = admission.drain(); // Synchronously refuses new HTTP/worker admission.
   const http = new Promise<void>((resolve) => { server.close(() => resolve()); });
   void Promise.all([http, admitted, maintenance.drain(), mail.drain()])
-    .then(() => Promise.all([pool.end(),initiationPool.end()]))
+    .then(() => Promise.all([pool.end()]))
     .then(() => process.exit(0))
     .catch(() => { log('shutdown_failed', {}); process.exit(1); });
 

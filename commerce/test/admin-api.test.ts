@@ -14,10 +14,10 @@ import { base32Decode, hotp, totpStep, TOTP_STEP_SECONDS } from '../src/admin/to
 import type { Catalog } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { schemaHead } from '../src/migrate.js';
-import type { CheckoutDeps } from '../src/checkout.js';
+import type { CheckoutDeps } from './retired/checkout.js';
 import { reserve, setSalesOpen } from '../src/orders.js';
 import { createCommerceServer } from '../src/server.js';
-import { createWebHandler } from '../src/web.js';
+import { createWebHandler } from './retired/web.js';
 import pg from 'pg';
 
 import { fixtureCatalog, freshDb, tourist, type TestDb } from './helpers.js';

@@ -4,7 +4,7 @@ import type { ContentSnapshot, LegalPageDTO } from "./cms/types";
  * Slugs a legalPage document must never take: app/[legalSlug]/ sits at the site
  * root, so a document claiming one of these would either shadow a real route or
  * collide with a build artifact in /out. Enforced twice — in the CMS, so the
- * editor finds out while typing (public/admin/config.yml's `slug` field `pattern`),
+ * editor finds out while typing (the content schema's `slug` field `pattern`),
  * and in scripts/validate-content.ts, so a document written or hand-edited
  * outside the CMS can never reach a release.
  */
