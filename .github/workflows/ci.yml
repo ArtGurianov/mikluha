@@ -186,6 +186,16 @@ jobs:
       - name: Unchanged exact-HEAD image on compatible forward schema
         run: pnpm exec tsx scripts/qualify-schema-image.ts mikluha-commerce:head-ci "$EXPECTED_HEAD_SHA"
 
+      - name: Clean schema from the full exact-HEAD journal (TOUR-57)
+        run: node scripts/prepare-clean-schema.mjs mikluha-commerce:head-ci "$EXPECTED_HEAD_SHA" "$RUNNER_TEMP/tour57-clean-schema"
+
+      - name: Clean-schema review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tour57-clean-schema-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/tour57-clean-schema/
+          if-no-files-found: error
+
   # The static Control Room (control-room/README.md, ART-363): its own package; `build` ends with the
   # no-secret check over the exported files, and the image is built as Coolify would.
   control-room:

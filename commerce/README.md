@@ -647,6 +647,11 @@ The current content-backed document path is not claimed to enforce this future g
 
 ## Immutable migration history (ART-317)
 
+For a new database, [TOUR-57 clean-schema preparation](runbooks/clean-schema.md)
+replays the complete locked journal in isolated PostgreSQL 16 and exports a
+review manifest and schema-only SQL. It uses the existing migrations unchanged;
+installation and target recovery evidence remain separate actions.
+
 `migrations/migration.lock` fixes the filename, version and SHA-256 of every SQL file. Append a
 new journal entry, SQL file and lock entry together; never rewrite a committed entry. Startup
 and the migrator validate the complete directory before using it. The migrator also verifies
