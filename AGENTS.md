@@ -71,9 +71,34 @@ installers, backup paths, and persistent state that needs a key to restore.
 Code that is not yet deployed is NO.
 
 For YES, list each changed resource and its authority (Coolify env, SOPS host
-credential, encrypted external bundle, or this project's backup tool) and open
-or link an issue in the infrastructure project. Until that repository's drift
-check is clean and a fresh capture exists, report `CUSTODY_PENDING`. A
-successful deployment is not custody evidence. Never put plaintext secrets in
-Git, PRs, Plane, Linear or logs, and never rotate keys or change the host without
-explicit owner authorization.
+credential, encrypted external bundle, or this project's backup tool) and link
+VPS-15. Never put plaintext secrets in Git, PRs, Plane or logs.
+
+### OWNER exception — clean-slate Mikluha replacement (2026-10-30)
+
+The owner explicitly approved [clean-slate replacement](docs/decisions/2026-10-30-clean-slate-owner-decision.md)
+and weakening the former legacy/custody acceptance. This subsection overrides
+conflicting generic infrastructure/old roadmap requirements **for Mikluha only**.
+
+- No migration/import of demo data, Sveltia/legacy checkout compatibility, old DB
+  restore/PITR, retained legacy volume, fallback to old static site, or legacy
+  recovery qualification is required. Preserve compact existing evidence in
+  private infrastructure PR #19 and historical legal/payment/fiscal records.
+- Verified obsolete Mikluha-only resources may be hard-deleted under this GO,
+  with exact resource/consumer checks and deletion receipts. Shared canary,
+  Refref production, Flexperiment, shared proxy/control plane, banking principal
+  and others' backups/credentials are not authorized deletion targets.
+- Overall VPS drift PASS and whole-host external capture/restore are not gates
+  for this replacement. Review changed Mikluha resources and their actual shared
+  dependencies, record their authority/post-state, and update affected inventory.
+  Keep unrelated REVIEW_REQUIRED/CUSTODY_PENDING findings visible but non-blocking;
+  never label overall drift PASS or complete recovery without actual evidence.
+- New DB: automatic encrypted/off-host logical backup and one successful isolated
+  restore before real Admin/content/legal data entry. Full PITR and independent
+  external custody-device qualification are deferred to before real sales; owner
+  accepts the possible loss of edits between scheduled dumps.
+- Only target-architecture tests are required; remove legacy payment endpoints
+  rather than implement compatibility. Maintenance page is the temporary public
+  state. Actual-flow public/Admin privacy and versioned legal publication remain.
+- Sales remain CLOSED; this exception authorizes no real bank operation or sales
+  activation. Other projects' contracts are unchanged.
