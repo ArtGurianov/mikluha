@@ -189,6 +189,15 @@ jobs:
       - name: Clean schema from the full exact-HEAD journal (TOUR-57)
         run: node scripts/prepare-clean-schema.mjs mikluha-commerce:head-ci "$EXPECTED_HEAD_SHA" "$RUNNER_TEMP/tour57-clean-schema"
 
+      - name: Clean-schema preparation rejects a different source identity
+        run: |
+          if node scripts/prepare-clean-schema.mjs mikluha-commerce:head-ci 0000000000000000000000000000000000000000 "$RUNNER_TEMP/tour57-rejected" > "$RUNNER_TEMP/tour57-rejected.log" 2>&1; then
+            echo 'A mismatched source identity was accepted'
+            exit 1
+          fi
+          rg -q IMAGE_SOURCE_MISMATCH "$RUNNER_TEMP/tour57-rejected.log"
+          test ! -e "$RUNNER_TEMP/tour57-rejected"
+
       - name: Clean-schema review artifacts
         uses: actions/upload-artifact@v4
         with:

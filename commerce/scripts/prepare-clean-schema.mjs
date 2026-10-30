@@ -20,6 +20,7 @@ const runtime = `tour57-probe-${suffix}`;
 let networkCreated = false;
 let postgresCreated = false;
 let runtimeStarted = false;
+let completed;
 try {
   docker('network', 'create', '--internal', network); networkCreated = true;
   docker('run', '-d', '--name', postgres, '--network', network, '--tmpfs', '/var/lib/postgresql/data',
@@ -31,10 +32,11 @@ try {
   }
   if (!ready) throw new Error('DISPOSABLE_POSTGRES_NOT_READY');
   runtimeStarted = true;
+  const probeSource = readFileSync(fileURLToPath(new URL('./clean-schema-probe.mjs', import.meta.url)));
   const probe = execFileSync('docker', ['run', '--rm', '-i', '--name', runtime, '--network', network,
     '-e', `MIGRATION_DATABASE_URL=postgres://postgres:disposable-schema-only@${postgres}:5432/postgres`,
     '-e', `EXPECTED_SOURCE_COMMIT=${expectedSource}`, commerceImage, 'node', '--input-type=module'], {
-    input: readFileSync(fileURLToPath(new URL('./clean-schema-probe.mjs', import.meta.url))),
+    input: probeSource,
     encoding: 'utf8', timeout: 90_000, maxBuffer: 1024 * 1024,
   });
   const report = JSON.parse(probe);
@@ -45,9 +47,11 @@ try {
   writeFileSync(join(dir, 'schema.sql'), schema, { flag: 'wx' });
   const manifest = { format: 1, task: 'TOUR-57', scope: 'disposable clean-schema qualification; not installation or recovery evidence',
     createdAt: new Date().toISOString(), commerceImage, postgresImage, ...report,
+    preparationScriptSha256: createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex'),
+    probeSha256: createHash('sha256').update(probeSource).digest('hex'),
     schemaSqlSha256: createHash('sha256').update(schema).digest('hex') };
   writeFileSync(join(dir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' });
-  console.log(`CLEAN_SCHEMA=PASS head=${report.schemaHead} manifest=${join(dir, 'manifest.json')}`);
+  completed = `CLEAN_SCHEMA=PASS head=${report.schemaHead} manifest=${join(dir, 'manifest.json')}`;
 } finally {
   const failures = [];
   for (const [created, name] of [[runtimeStarted, runtime], [postgresCreated, postgres]]) {
@@ -58,3 +62,4 @@ try {
   if (networkCreated) { try { docker('network', 'rm', network); } catch { failures.push(network); } }
   if (failures.length) throw new Error(`DISPOSABLE_CLEANUP_FAILED: ${failures.join(',')}`);
 }
+console.log(completed);
