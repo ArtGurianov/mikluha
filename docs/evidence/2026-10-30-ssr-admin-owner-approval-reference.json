@@ -1,0 +1,7 @@
+{
+  "format": "mikluha-owner-approval-reference/1",
+  "access": "PUBLIC: application repository; primary chat provenance is kept only in the PRIVATE infrastructure repository.",
+  "privateReceiptUrl": "https://github.com/ArtGurianov/adman-vps-infrastructure/blob/ab4dfdb3b5ca1dc84ca7772faee885301a575889/evidence/mikluha/2026-10-30-owner-approval-provenance.json",
+  "privateReceiptSha256": "52c77c8934e6462ecc75c70af9e8bedff023ad052e107c67ddfebbbaee39c172",
+  "scope": "Exact review.3 content approved; not an installation, legal publication, domain or sales receipt."
+}
