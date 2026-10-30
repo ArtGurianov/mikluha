@@ -5,8 +5,9 @@ Canonical current decision: [clean-slate owner decision](../decisions/2026-10-30
 Historical revisions remain in Git/private review evidence, not active gates.
 
 1. Inventory exact Mikluha-only obsolete resources and protect shared neighbors.
-2. Remove legacy DB/runtime/stand-in/writers; preserve compact evidence, not a
-   running old stack. Use maintenance; no Sveltia/static fallback.
+2. Legacy DB/runtime/stand-in retirement under the one-time 2026-10-30 GO is
+   executed (private infrastructure PR #19). Preserve compact evidence and use
+   maintenance. New deletions/host changes require a separate explicit owner GO.
 3. Develop only SSR + Control Room + native Commerce on a clean schema, with
    ZERO_IMPORT and direct S3; preserve versioned legal publication.
 4. New DB automatic backup plus one isolated restore before real data entry;

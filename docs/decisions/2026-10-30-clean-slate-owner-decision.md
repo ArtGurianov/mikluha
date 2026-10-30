@@ -17,11 +17,13 @@ is not required to retain those records.
 - Build only the new SSR + Control Room + native Commerce architecture, on a
   fresh DB from exact immutable migrations. No demo/media import, legacy Refref
   checkout, Sveltia compatibility, dual writers or old-schema upgrade path.
-- Hard-delete verified obsolete **Mikluha-exclusive** DBs/containers/volumes,
-  stand-in state, old static serving and retired writers/configuration. Remove
-  stale inventory entries and stop timers targeting deleted resources. Resource
-  identity/consumer checks and a concrete deletion receipt are required; another
-  generic architecture/recovery approval is not.
+- The one-time GO dated 2026-10-30 retired verified obsolete **Mikluha-exclusive**
+  DBs/containers/volumes, stand-in state, old static serving and their local
+  configuration/backup units, as recorded in private infrastructure PR #19.
+  This deletion authorization is executed, not standing authority. New deletions
+  (including any new DB or S3 objects), key rotations and host changes require
+  separate explicit owner authorization for the specific operation. Unfinished
+  provider cleanup remains recorded as unfinished; it is not a standing mandate.
 - A shared Refref canary is not Mikluha-exclusive. Retain shared services/data;
   retire Mikluha stand-in and deny its specific initiation capability instead.
   Do not revoke the shared Alfa merchant/principal or unrelated credentials.
@@ -43,6 +45,9 @@ is not required to retain those records.
   belongs to first sales, not to removal of legacy or development.
 - Publish new legal documents with version/hash/effective date/approval; the
   migration's processing_instruction DRAFT is not a signed approval.
+- Control Room's first release covers OWNER-authorized editors, preview and
+  publication with sales CLOSED. Paid-order changes and verified customer-notice
+  delivery remain TOUR-64's later stage before sales, not an SSR release blocker.
 - Keep sales CLOSED. Real financial operations and public sales still require
   their separate TOUR-38/provider authorization. Do not create a test payment as
   a deletion/installation probe.
@@ -51,8 +56,8 @@ is not required to retain those records.
 
 1. Record this decision in AGENTS and Plane; enumerate exact obsolete resources
    and protected neighbors from fresh read-only inventory.
-2. Remove verified exclusive legacy and its writers; deny Mikluha admission in
-   any retained shared canary. Keep maintenance instead of preserving a fallback.
+2. Completed retirement is recorded in private infrastructure PR #19. Keep
+   maintenance instead of a fallback; obtain a separate GO for new host changes.
 3. Build the new source only: TOUR-63 stage 1, TOUR-64, SSR-only TOUR-65, TOUR-66.
 4. Install exact selected new services/schema, retarget automatic backups, prove
    one restore before real data entry, correct actual-flow disclosures and verify

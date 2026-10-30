@@ -73,6 +73,8 @@ Code that is not yet deployed is NO.
 For YES, list each changed resource and its authority (Coolify env, SOPS host
 credential, encrypted external bundle, or this project's backup tool) and link
 VPS-15. Never put plaintext secrets in Git, PRs, Plane or logs.
+Never rotate keys or change the host without explicit owner authorization for
+the specific operation.
 
 ### OWNER exception — clean-slate Mikluha replacement (2026-10-30)
 
@@ -84,8 +86,10 @@ conflicting generic infrastructure/old roadmap requirements **for Mikluha only**
   restore/PITR, retained legacy volume, fallback to old static site, or legacy
   recovery qualification is required. Preserve compact existing evidence in
   private infrastructure PR #19 and historical legal/payment/fiscal records.
-- Verified obsolete Mikluha-only resources may be hard-deleted under this GO,
-  with exact resource/consumer checks and deletion receipts. Shared canary,
+- The one-time hard-delete GO dated 2026-10-30 has been executed for the legacy
+  resources listed in private infrastructure PR #19's execution receipt. It is
+  not standing authority: new deletions, including any new DB or S3 objects,
+  require a separate explicit owner GO. Shared canary,
   Refref production, Flexperiment, shared proxy/control plane, banking principal
   and others' backups/credentials are not authorized deletion targets.
 - Overall VPS drift PASS and whole-host external capture/restore are not gates
