@@ -20,6 +20,8 @@
 //   report, review, organizer or legal)
 //   GET  /api/departures/<id>/affected-orders   order references and states only (OWNER, EDITOR)
 //   GET  /api/changes/<id>/notices              per-order notice states (OWNER, EDITOR)
+//   GET/POST /api/media                   list metadata / bounded authenticated upload (OWNER, EDITOR)
+//   POST /api/media/<id>/publish|revoke    asynchronous commands (live OWNER only)
 //   GET  /api/audit?before=<id>            (OWNER)
 //
 // Publishing and classifying are the OWNER's, decided from the live session alone: the actor is
@@ -33,6 +35,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
 import type pg from 'pg';
+
+import { enqueue } from '../media/service.js';
+import { MediaError } from '../media/transform.js';
 
 import { MIGRATIONS_DIR } from '../config.js';
 import { readMigrations, type LockedMigration } from '../migration-integrity.js';
@@ -108,19 +113,26 @@ function cookieToken(req: IncomingMessage): string | undefined {
 
 function readJson(req: IncomingMessage, limit: number): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    let raw = '';
-    let bytes = 0;
+    let raw = '', bytes = 0, finished = false;
+    const fail = (error: Error) => { if (!finished) { finished = true; raw = ''; clearTimeout(timer); reject(error); } };
+    const timer = setTimeout(() => fail(new HttpError(408,'BODY_TIMEOUT')),20_000);
+    if (Number(req.headers['content-length']) > limit) { fail(new HttpError(413,'BODY_TOO_LARGE')); req.resume(); return; }
     req.setEncoding('utf8');
-    req.on('data', (c: string) => { bytes += Buffer.byteLength(c); if (bytes <= limit) raw += c; });
-    req.on('end', () => {
-      if (bytes > limit) { reject(new HttpError(413, 'BODY_TOO_LARGE')); return; }
-      try {
-        const v = JSON.parse(raw) as unknown;
-        if (v === null || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object');
-        resolve(v as Record<string, unknown>);
-      } catch { reject(new HttpError(400, 'BODY_INVALID')); }
+    req.on('data',(chunk:string) => {
+      if (finished) return;
+      bytes += Buffer.byteLength(chunk);
+      if (bytes > limit) fail(new HttpError(413,'BODY_TOO_LARGE')); else raw += chunk;
     });
-    req.on('error', reject);
+    req.on('end',() => {
+      if (finished) return;
+      try {
+        const value: unknown = JSON.parse(raw);
+        if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error();
+        finished = true; raw = ''; clearTimeout(timer); resolve(value as Record<string,unknown>);
+      } catch { fail(new HttpError(400,'BODY_INVALID')); }
+    });
+    req.on('error',fail);
+    req.on('aborted',() => fail(new HttpError(400,'BODY_ABORTED')));
   });
 }
 
@@ -129,6 +141,7 @@ const int = (v: unknown) => (typeof v === 'number' && Number.isSafeInteger(v) &&
 
 /** Database refusals the editor can act on, by the code the migration raises. */
 const DB_CODES: Record<string, number> = {
+  MEDIA_UNKNOWN: 404, MEDIA_STATE_CONFLICT: 409, MEDIA_IDEMPOTENCY_CONFLICT: 409, MEDIA_QUEUE_FULL: 429, MEDIA_INVALID: 422,
   DRAFT_REVISION_CONFLICT: 409, PUBLISHED_VERSION_CONFLICT: 409, DEPARTURE_SCHEDULE_LOCKED: 409,
   TOUR_IDENTITY_IMMUTABLE: 409, DEPARTURE_IDENTITY_IMMUTABLE: 409, TOUR_NOT_PUBLISHED: 409,
   TOUR_DOCUMENT_INVALID: 422, DEPARTURE_DOCUMENT_INVALID: 422, TOUR_UNKNOWN: 404, DEPARTURE_UNKNOWN: 404,
@@ -154,14 +167,15 @@ export async function assertAdminLogin(pool: pg.Pool, capability: 'admin_app' | 
     pg_has_role(current_user, 'commerce_app', 'MEMBER') AS commerce,
     pg_has_role(current_user, 'commerce_operator', 'MEMBER') AS commerce_operator,
     pg_has_role(current_user, 'admin_operator', 'MEMBER') AS admin_operator,
+    pg_has_role(current_user, 'media_worker', 'MEMBER') AS media,
     (SELECT rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication FROM pg_roles WHERE rolname = current_user) AS privileged`);
   const r = rows[0]!;
-  if (!r.unmasked || (capability === 'admin_app' ? !r.admin || r.publisher : !r.publisher || r.admin) || r.commerce || r.commerce_operator || r.admin_operator || r.privileged) throw new Error('ADMIN_LOGIN_NOT_ISOLATED');
+  if (!r.unmasked || (capability === 'admin_app' ? !r.admin || r.publisher : !r.publisher || r.admin) || r.commerce || r.commerce_operator || r.admin_operator || r.media || r.privileged) throw new Error('ADMIN_LOGIN_NOT_ISOLATED');
 }
 
 /** Credentials of the public service or an operator must never be in this process's environment. */
 export const FOREIGN_ENVIRONMENT = ['DATABASE_URL', 'OPERATOR_DATABASE_URL', 'ADMIN_OPERATOR_DATABASE_URL', 'MIGRATION_DATABASE_URL',
-  'REFREF_API_KEY', 'NOTISEND_API_KEY', 'GITHUB_TOKEN', 'AWS_SECRET_ACCESS_KEY', 'S3_SECRET_ACCESS_KEY'];
+  'REFREF_API_KEY', 'NOTISEND_API_KEY', 'GITHUB_TOKEN', 'AWS_SECRET_ACCESS_KEY', 'S3_SECRET_ACCESS_KEY','MEDIA_DATABASE_URL','MEDIA_S3_ACCESS_KEY_ID','MEDIA_S3_SECRET_ACCESS_KEY'];
 export function assertAdminEnvironment(env: NodeJS.ProcessEnv): void {
   const found = FOREIGN_ENVIRONMENT.filter(name => env[name] !== undefined && env[name] !== '');
   if (found.length > 0) throw new Error(`ADMIN_ENVIRONMENT_FOREIGN: ${found.join(', ')}`);
@@ -181,6 +195,7 @@ export function createAdminServer(deps: AdminDeps): Server {
   const host = new URL(deps.origin).host;
   const keys = adminKeys(deps.totpKey, deps.auditKeys);
   const loginLimit = deps.loginLimit ?? new GlobalLoginLimit();
+  let uploadsInFlight = 0;
 
   const admission = deps.admission ?? new SchemaAdmission(() => schemaReadiness(deps.pool, {
     schemaHead: deps.schemaHead, migrations: deps.migrations ?? readMigrations(MIGRATIONS_DIR), sourceCommit: deps.sourceCommit,
@@ -442,10 +457,66 @@ export function createAdminServer(deps: AdminDeps): Server {
       evidence: auditEvidence(keys, { ...r, adminId }, attestation) })) });
   }
 
+  async function media(req: IncomingMessage, res: ServerResponse, path: string, method: string) {
+    const s = await authorize(
+      req,
+      method === 'GET' ? 'editorial.read' : path === '/api/media' ? 'editorial.draft' : 'editorial.publish',
+    );
+    if (method === 'GET' && path === '/api/media') {
+      const rows = await deps.pool.query('SELECT * FROM admin_media ORDER BY created_at DESC LIMIT 100');
+      send(res, 200, { assets: rows.rows });
+      return;
+    }
+    const match = /^\/api\/media\/([0-9a-f-]{36})\/(publish|revoke)$/.exec(path);
+    if (method !== 'POST' || (path !== '/api/media' && (!match || !UUID.test(match[1]!))))
+      throw new HttpError(404, 'NOT_FOUND');
+    const upload = path === '/api/media';
+    if (upload && uploadsInFlight >= 2) throw new HttpError(429, 'MEDIA_QUEUE_FULL');
+    if (upload) uploadsInFlight++;
+    try {
+      const body = await readJson(req, upload ? 12 * 1024 * 1024 : MAX_AUTH_BODY);
+      const client = await (upload ? deps.pool : deps.publisherPool).connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SET LOCAL lock_timeout='5s'");
+        const live = await lockSession(client, keys, cookieToken(req)!, s.adminId, now);
+        if (!live || live.id !== s.id) throw new HttpError(401, 'UNAUTHENTICATED');
+        if (!allowed(live.role, upload ? 'editorial.draft' : 'editorial.publish'))
+          throw new HttpError(403, 'FORBIDDEN');
+        const id = upload ? await enqueue(client, body, actor(live)) : match![1]!;
+        if (!upload)
+          await client.query('SELECT fn_media_request($1,$2,$3)', [id, match![2]!.toUpperCase(), actor(live)]);
+        await audit(client, keys, {
+          adminId: live.adminId,
+          actor: live.login,
+          action: upload ? 'MEDIA.UPLOADED' : `MEDIA.${match![2]!.toUpperCase()}_REQUESTED`,
+          outcome: 'OK',
+          entityType: 'media_asset',
+          entityId: id,
+          details: { sessionId: live.id, authAuditId: live.authAuditId },
+        });
+        await client.query('COMMIT');
+        send(res, 202, { id, state: upload ? 'UPLOADED' : `${match![2]!.toUpperCase()}_REQUESTED` });
+      } catch (e) {
+        await client.query('ROLLBACK');
+        if (e instanceof MediaError) throw new HttpError(e.status, e.code);
+        if (e instanceof HttpError) throw e;
+        if ((e as { code?: string }).code === '55P03') throw new HttpError(409, 'MEDIA_BUSY');
+        throw dbError(e);
+      } finally {
+        client.release();
+      }
+    } finally {
+      if (upload) uploadsInFlight--;
+    }
+  }
+
   async function route(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
     const method = req.method ?? 'GET';
     const path = url.pathname;
     if (method !== 'GET' && method !== 'HEAD') guardWrite(req);
+
+    if (path === '/api/media' || path.startsWith('/api/media/')) return media(req,res,path,method);
 
     if (path === '/api/auth/login' && method === 'POST') return login(req, res);
     if (path === '/api/auth/enroll' && method === 'POST') return enroll(req, res);

@@ -69,3 +69,13 @@ test("only the catalog schema this site understands is accepted", () => {
   assert.throws(() => parsePublicCatalog({ ...catalog(), reviews: undefined }), /PUBLIC_CATALOG_INVALID/);
   assert.throws(() => parsePublicCatalog(null), /PUBLIC_CATALOG_INVALID/);
 });
+
+test("withdrawn media placeholders keep required covers and galleries renderable in direct SSR", () => {
+  const data = catalog();
+  const unavailable = { image: "/media/image-unavailable.svg", alt: "Фотография недоступна" };
+  data.tours[0]!.content.coverImage = unavailable;
+  data.tours[0]!.content.gallery = [unavailable];
+  const normalized = normalizeCatalog(projectionToRaw(data));
+  assert.equal(normalized.tours[0]!.coverImage.src, unavailable.image);
+  assert.equal(normalized.tours[0]!.gallery[0]!.src, unavailable.image);
+});

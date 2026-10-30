@@ -69,6 +69,13 @@ server {
         proxy_buffering off;
 
         # The proxy settings above are inherited; proxy_pass is not, so it is repeated.
+        location = /api/media {
+            client_max_body_size 12m;
+            proxy_request_buffering off;
+            client_body_timeout 20s;
+            proxy_pass $admin_api;
+        }
+
         location /api/auth/ {
             client_max_body_size 4k;
             limit_req zone=admin_auth burst=20 nodelay;

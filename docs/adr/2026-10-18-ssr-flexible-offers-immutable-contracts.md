@@ -129,3 +129,13 @@ Admin login requires a password and a **TOTP** code (RFC 6238: SHA-1, 6 digits, 
 - **ART-368:** SSR E2E, recovery proofs and the owner-authorized hard cut.
 
 None of this opens sales.
+
+## 2026-10-30 · TOUR-63 stage 1 media contract
+
+The owner's current TOUR-63 scope supersedes the historical TurboFlare acceptance: first-party
+Control Room media → private originals / bounded isolated worker → published processed WebP at
+direct HTTPS Cloud.ru S3 is the mandatory and sufficient delivery stage. VPS-17 opt-in is a separate,
+deferred non-blocking task with its own technical/legal GO. It is not a CDN-prefix substitution.
+The source/runtime contract, lifecycle, capability boundaries, read-back and revocation limitations
+are in [commerce/media/README.md](../../commerce/media/README.md). Code readiness does not attest
+provider configuration, installation, new-database recovery or sales activation.

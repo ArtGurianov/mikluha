@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { MediaPanel } from "./media-panel";
+
 import { api, ApiError, messageFor, type SessionInfo } from "@/lib/api";
 
 // The signed-in shell: the session (refresh, logout, other sessions), the editorial overview and,
@@ -20,7 +22,7 @@ interface AuditEntry {
   evidence: "ATTESTED" | "FORGED" | "UNVERIFIABLE" | "OPERATOR";
 }
 
-type Tab = "sessions" | "tours" | "departures" | "audit";
+type Tab = "media" | "sessions" | "tours" | "departures" | "audit";
 
 const time = (iso: string) => new Date(iso).toLocaleString("ru-RU");
 const rub = (k: number | null) => (k === null ? "—" : `${(k / 100).toLocaleString("ru-RU")} ₽`);
@@ -62,7 +64,7 @@ export default function Dashboard() {
   }
 
   if (!me) return <p className="muted">{error ?? "Загрузка…"}</p>;
-  const tabs: [Tab, string][] = [["sessions", "Сессии"], ["tours", "Туры"], ["departures", "Выезды"]];
+  const tabs: [Tab, string][] = [["sessions", "Сессии"], ["tours", "Туры"], ["departures", "Выезды"], ["media", "Фото"]];
   if (me.role === "OWNER") tabs.push(["audit", "Аудит"]);
 
   return (
@@ -82,6 +84,7 @@ export default function Dashboard() {
       {tab === "sessions" && <Sessions me={me} onChange={setMe} fail={fail} />}
       {tab === "tours" && <Tours fail={fail} />}
       {tab === "departures" && <Departures fail={fail} />}
+      {tab === "media" && <MediaPanel role={me.role} fail={fail} />}
       {tab === "audit" && <Audit fail={fail} />}
     </>
   );
