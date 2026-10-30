@@ -1,6 +1,6 @@
 /**
  * Where the SSR site sends browsers for media, decided at request time
- * (ADR v2.3 §2; TOUR-56 qualifies it, TOUR-63 owns the image pipeline).
+ * (ADR v2.3 §2; TOUR-63 owns the image pipeline; TOUR-56 is historical).
  * Switching is a configuration change and a restart of the same image: no
  * rebuild, no content release.
  *
@@ -13,8 +13,14 @@
  * MEDIA_ORIGIN_BASE is the boundary: point it at the public processed-variant
  * prefix (e.g. https://mikluha-maklai.s3.cloud.ru/cms/), and nothing outside
  * it — a private original, another bucket, a same-origin /media/demo/ file —
- * is ever rewritten to the CDN. Direct is the normal production mode until
- * TurboFlare is qualified both technically and legally.
+ * is ever rewritten by this legacy path-preserving mode. Direct cloud.ru
+ * remains the production default after the OWNER canceled TurboFlare.
+ *
+ * VPS-17 Shared Asset Cache has a separate exact-manifest namespace and paths:
+ * simply setting MEDIA_CDN_BASE=assets.refref.ru is NOT a qualified mapping.
+ * TOUR-63 stage 2 must add/test the per-media version, publisher, readiness,
+ * revoke and fallback contract before first-party Control Room photos opt in.
+ * This comment update makes no runtime behavior change.
  */
 
 export type MediaDelivery =
