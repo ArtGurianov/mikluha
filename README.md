@@ -19,9 +19,11 @@ PostgreSQL описан в [ADR v2.3](docs/adr/2026-10-18-ssr-flexible-offers-im
 исторический PoC TurboFlare — в [TOUR-56](docs/plans/2026-10-29-tour-56-turboflare-poc.md),
 а актуальное решение — в [docs/DECISIONS.md](docs/DECISIONS.md): TurboFlare
 окончательно отменён; обработанные изображения Control Room сначала идут
-напрямую через cloud.ru S3. Подключение к Shared Asset Cache
-(`assets.refref.ru`, VPS-17) требует отдельной приёмки TOUR-63/68 и не
-блокирует SSR hard cut. Граница действующего
+напрямую через cloud.ru S3. Подключение фотографий Control Room к Shared Asset Cache
+(`assets.refref.ru`, VPS-17) отложено до отдельной технической и юридической
+приёмки в будущей TOUR-задаче. Для SSR hard cut обязательны только этап 1
+TOUR-63 (прямой S3) и общий privacy/legal release TOUR-68; VPS-17 их не
+блокирует. Граница действующего
 платёжного контракта и целевого Refref v9 — в
 [статусе TOUR-интеграции](docs/refref-v9-contract-status.md).
 
