@@ -36,22 +36,31 @@ CUSTODY_IMPACT: YES с перечислением ресурсов и authority 
   репозитории; здесь только [ссылка на точный commit и SHA-256 файла](../evidence/2026-10-30-ssr-admin-owner-approval-reference.json).
   Receipt подтверждает происхождение решения, но не заменяет Commerce approval
   или публикацию. Право прочитать публичную ссылку не даёт доступа к private repo.
+  После merge private PR #20 перепроверить неизменность receipt и закрепить
+  ссылку за точным merge commit в main приватного репозитория (не за плавающим
+  main); SHA-256 файла должен остаться тем же.
 
 ## 0. Два разных допуска
 
 **Phase A — приватный служебный контур и две legal редакции.** Приёмка на
-синтетике, чистая рабочая БД, необходимые OWNER/EDITOR accounts и публикация
+синтетике, чистая рабочая БД, только действительно необходимые OWNER accounts
+и публикация
 только уже утверждённых privacy-policy/cookies после backup/restore и остальных
 условий этого этапа. Полный сценарий удаления произвольного content payload не
 является требованием Phase A; её post-backup сценарий 2.3-A использует только
-существующие disable/revoke/media-withdrawal операции. Это планируемый ограниченный
+существующие disable/revoke/media-withdrawal операции. Проверку роли EDITOR
+проводить только на synthetic accounts одноразовой acceptance БД; реальный
+EDITOR-доступ в рабочей БД не выдавать в Phase A. Его выдача — после подтверждённой
+необходимости и отдельного допуска Phase B. Это планируемый ограниченный
 допуск, не фактическое GO на host mutations или выполненная приёмка.
 
 **Phase B — реальный контент с ПД третьих лиц.** Реальные организаторы, отзывы,
 контакты, персональные изображения и их загрузка даже в draft запрещены до
 [TOUR-94](https://app.plane.so/art-workspace/browse/TOUR-94/): штатная процедура
 прекращения хранения/обезличивания revision payload и полный restore сценарий
-2.3-B. Снятие публикации прекращает выдачу, но не удаляет ПД из immutable history.
+2.3-B. Формальная точка допуска — [TOUR-95](https://app.plane.so/art-workspace/browse/TOUR-95/),
+заблокированная TOUR-94 (blocks). Done prerequisite само по себе не открывает
+контент. Снятие публикации прекращает выдачу, но не удаляет ПД из immutable history.
 Обычный editor UI технически не вводит эту границу автоматически: при Phase A
 исполнитель работает по явному allowlist (два legal slug и минимальные accounts),
 проверяет отсутствие стороннего контента; общий доступ к наполнению не выдаётся.
@@ -89,7 +98,9 @@ RepoDigests всех images. Теги/CI не заменяют digest read-back.
 содержать изменения PR #62, в том числе live Commerce legal authority и renderer
 `7763a775bf9fc5b484c304f80e7d72b871ae21f7` (единственный H1/таблицы). Проверить
 ancestry, соответствующие source files и actual-image smoke, не только номер PR.
-Предпочтительный путь — отдельно разрешённый merge #62, затем точный main SHA
+Предпочтительный путь — отдельно разрешённый merge #62, затем перенаправление
+документационного PR #63 с ветки #62 на main и проверка оставшегося diff/CI;
+после отдельно разрешённого merge #63 выбирается точный main SHA
 с новой image/CI-квалификацией. Merge этим runbook не разрешён. Установка draft
 HEAD `ddd7f893915a7892ee62f7a6537feb5eca784848` допустима только если он и его
 digests прямо названы в отдельной OWNER-авторизации. Любое обновление кандидата
@@ -224,7 +235,8 @@ T0 → replay T1 до ingress/worker → payload отсутствует в read/
 ### 2.4 Чистая рабочая БД после Phase A acceptance PASS
 
 После Phase A PASS создать **другую**, чистую рабочую БД из тех же qualified image digests
-и полного журнала. Не копировать acceptance dump, accounts, audit, legal history
+и полного журнала. В рабочей Phase A создавать только необходимые OWNER accounts;
+EDITOR остаётся проверкой одноразовой БД. Не копировать acceptance dump, accounts, audit, legal history
 или synthetic media. Её собственные credentials/keys и независимый prefix
 зарегистрировать в authority; повторить schema/role/config/readiness пробы без
 synthetic пользователей или публикаций. Первоначально legal_publication,

@@ -64,3 +64,23 @@ not copied into this PUBLIC repository. Other unchanged legal/sales gates remain
 Validation: source review, repository visibility read-back, exact approved body
 hashes, reference-file SHA-256, relative links/JSON, public commit ancestry/content
 privacy check and diff whitespace. No runtime/provider tests rerun for docs only.
+
+
+## Admission-review follow-up
+
+Material improvement: Phase A working DB creates only necessary OWNER accounts.
+EDITOR capability tests stay on disposable synthetic accounts; a real EDITOR is
+not enrolled until confirmed need and Phase B admission. This narrows operational
+access without claiming an API-level kind restriction or changing approved text.
+
+CI run 41089176031 on 41e2405 was independently read back as 5/5 SUCCESS.
+That result does not transfer to a later docs commit. PR #62 and private PR #20
+are still OPEN at this check; no merge/retarget or receipt-link rewrite has been
+performed. Merge #62 first under separate authority, then retarget #63 to main,
+check its remaining diff/CI and merge only with authorization. After private
+#20 merge, pin the receipt URL to its exact main merge commit and recheck the
+same file SHA-256; a moving main URL weakens the reference.
+
+Tracking: created TOUR-95 for actual Phase B content admission. TOUR-94 blocks
+TOUR-95 through a built-in dependency; TOUR-67/68/93 are related rather than
+blanket-blocked. This preserves the independent limited Phase A path.
