@@ -16,7 +16,14 @@ PostgreSQL описан в [ADR v2.3](docs/adr/2026-10-18-ssr-flexible-offers-im
 исходники Admin/Commerce не означают выполненный cutover. SSR-сборка
 (`pnpm run build:ssr`, `Dockerfile.ssr`, релиз по digest) существует рядом со
 статической и описана в [TOUR-60](docs/plans/2026-10-29-tour-60-ssr-source-ready.md);
-переключатель медиа и PoC TurboFlare — в [TOUR-56](docs/plans/2026-10-29-tour-56-turboflare-poc.md). Граница действующего
+исторический PoC TurboFlare — в [TOUR-56](docs/plans/2026-10-29-tour-56-turboflare-poc.md),
+а актуальное решение — в [docs/DECISIONS.md](docs/DECISIONS.md): TurboFlare
+окончательно отменён; обработанные изображения Control Room сначала идут
+напрямую через cloud.ru S3. Подключение фотографий Control Room к Shared Asset Cache
+(`assets.refref.ru`, VPS-17) отложено до отдельной технической и юридической
+приёмки в будущей TOUR-задаче. Для SSR hard cut обязательны только этап 1
+TOUR-63 (прямой S3) и общий privacy/legal release TOUR-68; VPS-17 их не
+блокирует. Граница действующего
 платёжного контракта и целевого Refref v9 — в
 [статусе TOUR-интеграции](docs/refref-v9-contract-status.md).
 
@@ -25,6 +32,10 @@ PostgreSQL описан в [ADR v2.3](docs/adr/2026-10-18-ssr-flexible-offers-im
 Это документационный draft: действующий код, договоры и допуск продаж не меняются.
 
 Сайт туристического агентства «Миклуха Маклай» — каталог направлений/выездов, фотоотчёты, отзывы и информационный Booking Modal (QR + бронь + телефон организатора, без сбора пользовательских данных). Архитектурные инварианты и причины, по которым они такие — `docs/DECISIONS.md`.
+
+Сейчас работает legacy Sveltia/SSG, но целевая архитектура — самописный
+Control Room + SSR; полное удаление Sveltia/Git-based publishing запланировано
+в TOUR-66 при отдельно разрешённом cutover TOUR-67. Это ещё не завершено.
 
 Next.js App Router + TypeScript, pure static export (`output: 'export'`), shadcn/ui поверх Tailwind CSS v4. Контент — YAML-файлы в `content/` (этот репозиторий), редактируются через `/admin` (Sveltia CMS, коммитит прямо в GitHub по fine-grained PAT) или руками. И сайт, и `/admin` входят в один статический `/out`; своего application/serverless runtime нет. Медиа отдаются браузеру напрямую из Object Storage без build-time или runtime обработки.
 
