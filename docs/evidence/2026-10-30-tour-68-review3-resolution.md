@@ -87,3 +87,12 @@ Sources: [FNS](https://egrul.nalog.ru/index.html),
 [Web Interface Guidelines](https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md).
 
 CUSTODY_IMPACT: NO — source and read-only verification; no host state changed.
+
+## Subsequent OWNER decision — 2026-10-30
+
+The pending text-approval item above is now resolved: following the independent
+review, the owner explicitly confirmed “OWNER дал GO” for both exact review.3
+hashes. The formal record is
+`docs/decisions/2026-10-30-ssr-admin-legal-owner-approval.md`.
+Neither public body changed. Publication, effective date, Commerce-side
+attestation and actual-flow operational acceptance are not claimed completed.

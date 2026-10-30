@@ -1,7 +1,9 @@
 # SSR/Admin legal candidate — 2026-10-30
 
-Candidate revision: `2026-10-30.ssr-admin.review.3`.
-Status: DRAFT, NOT PUBLISHED, no exact-byte OWNER approval yet. This directory
+Approved text revision: `2026-10-30.ssr-admin.review.3`.
+Status: APPROVED BY OWNER on 2026-10-30, NOT PUBLISHED. Exact-byte approval:
+[`docs/decisions/2026-10-30-ssr-admin-legal-owner-approval.md`](../../decisions/2026-10-30-ssr-admin-legal-owner-approval.md).
+This directory
 is not imported or activated automatically. Effective date is intentionally not
 invented: OWNER chooses it at legal publication (Moscow date, no backdating).
 
@@ -13,9 +15,9 @@ invented: OWNER chooses it at legal publication (Moscow date, no backdating).
 The owner proposed indefinite or product-lifetime Admin retention. Candidate
 uses product operation as an upper bound for necessary minimal access/action
 evidence, with earlier purpose-based termination and separate lawful holds.
-No automatic session/audit/backup deletion is claimed. This proposal is not
-approval of the exact public wording, an installed erasure process, a provider
-account qualification or future sales processing.
+No automatic session/audit/backup deletion is claimed. Exact public wording is
+now separately approved in the OWNER decision above; that approval does not
+qualify an installed erasure process, provider account or future sales processing.
 
 The old `content/legal/*.yml` is retained without rewriting historical legal
 bytes. TOUR-59 removes its runtime fallback. OWNER must enter/publish these
@@ -74,8 +76,9 @@ checks do not impose future sales qualification or whole-VPS review.
 
 Review.3 replaces review.2's **privacy** approval request. Cookies stays byte-for-
 byte at `71d4e6fbbca71d707d904fe2f370d2245a4e4faa16ecdd998f7cd0d980e2252c`.
-Reviewer recommendations quoted by the owner are review evidence; no separate
-OWNER approval of the exact candidate text is recorded yet.
+Reviewer recommendations quoted by the owner remain review evidence. The
+subsequent explicit message “OWNER дал GO” separately approves these exact
+text hashes; the OWNER decision above records it without changing either body.
 
 Adman's account privacy policy is not proof of the hosting customer's entire
 VPS processing. The public text now states the RF hosting fact directly, based
