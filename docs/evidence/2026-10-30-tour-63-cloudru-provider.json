@@ -1,0 +1,123 @@
+{
+  "format": "tour63-cloudru-provider-receipt/1",
+  "capturedUtc": "2026-10-30T11:06:35.403167+00:00",
+  "authorization": "Owner GO: necessary Cloud.ru actions; synthetic qualification only; no real photos or deployment",
+  "endpoint": "https://s3.cloud.ru",
+  "region": "ru-central-1",
+  "bucket": {
+    "localName": "mikluha-media-v1",
+    "id": "482dc603-99f8-409a-898c-a94967f4e2cf",
+    "publicOrigin": "https://mikluha-media-art-v1.s3.cloud.ru",
+    "storageClass": "SINGLE",
+    "realContent": "NOT_ADMITTED",
+    "quotaConsoleLabel": "1 GB"
+  },
+  "serviceAccount": {
+    "id": "6eebe1e8-7df4-4905-85f1-c3e29b28a539",
+    "projectRole": "Services User",
+    "bucketRoles": [
+      "s3e.editor",
+      "s3e.viewer",
+      "s3e.viewer-acl"
+    ],
+    "otherBucketRoles": [],
+    "temporaryKey": "DELETED; console shows no access keys; signed configuration read denied",
+    "localSecretCapture": "REMOVED",
+    "status": "DISABLED; console read-back verified"
+  },
+  "sdkReport": {
+    "format": "tour63-provider-qualification/1",
+    "id": "c066be7b-d946-4fba-b405-22cb7021c07e",
+    "providerTransport": "PASS",
+    "deletion": "PASS",
+    "adminSsrInstallation": "NOT_RUN",
+    "policyIamReadback": "NOT_RUN",
+    "backupRestore": "NOT_RUN",
+    "keys": [
+      "media/v1/c066be7b-d946-4fba-b405-22cb7021c07e/9fa0f2ae2b655c877690c6ed5649dad9f248147f7e21d0f8011636c20d627162/original",
+      "media/v1/c066be7b-d946-4fba-b405-22cb7021c07e/9fa0f2ae2b655c877690c6ed5649dad9f248147f7e21d0f8011636c20d627162/480.webp",
+      "media/v1/c066be7b-d946-4fba-b405-22cb7021c07e/9fa0f2ae2b655c877690c6ed5649dad9f248147f7e21d0f8011636c20d627162/960.webp",
+      "media/v1/c066be7b-d946-4fba-b405-22cb7021c07e/9fa0f2ae2b655c877690c6ed5649dad9f248147f7e21d0f8011636c20d627162/1600.webp"
+    ]
+  },
+  "configurationReadback": {
+    "get-bucket-versioning": {},
+    "get-bucket-acl": {
+      "Owner": {
+        "ID": "b426a543-2393-4011-9e4f-f318bf15f576"
+      },
+      "Grants": [
+        {
+          "Grantee": {
+            "ID": "b426a543-2393-4011-9e4f-f318bf15f576",
+            "Type": "CanonicalUser"
+          },
+          "Permission": "FULL_CONTROL"
+        }
+      ]
+    },
+    "get-bucket-ownership-controls": {
+      "OwnershipControls": {
+        "Rules": [
+          {
+            "ObjectOwnership": "BucketOwnerEnforced"
+          }
+        ]
+      }
+    },
+    "get-bucket-cors": {
+      "CORSRules": [
+        {
+          "AllowedMethods": [
+            "GET",
+            "HEAD"
+          ],
+          "AllowedOrigins": [
+            "https://mikluha-maklai.ru"
+          ],
+          "ExposeHeaders": [
+            "ETag",
+            "Content-Type",
+            "Content-Length",
+            "Cache-Control"
+          ],
+          "MaxAgeSeconds": 60
+        }
+      ]
+    },
+    "get-bucket-policy": {
+      "Policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"PublicProcessedWebpOnly\",\"Effect\":\"Allow\",\"Principal\":\"*\",\"NotPrincipal\":{},\"Action\":\"s3:GetObject\",\"NotAction\":[],\"Resource\":[\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/480.webp\",\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/960.webp\",\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/1600.webp\"],\"NotResource\":[],\"Condition\":{}},{\"Sid\":\"MediaWorkerKnownObjects\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::b426a543-2393-4011-9e4f-f318bf15f576:service_account/6eebe1e8-7df4-4905-85f1-c3e29b28a539\"},\"NotPrincipal\":{},\"Action\":[\"s3:GetObject\",\"s3:PutObject\",\"s3:DeleteObject\"],\"NotAction\":[],\"Resource\":[\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/original\",\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/480.webp\",\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/960.webp\",\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/1600.webp\"],\"NotResource\":[],\"Condition\":{}},{\"Sid\":\"MediaWorkerKnownKeysOnly\",\"Effect\":\"Deny\",\"Principal\":{\"AWS\":\"arn:aws:iam::b426a543-2393-4011-9e4f-f318bf15f576:service_account/6eebe1e8-7df4-4905-85f1-c3e29b28a539\"},\"NotPrincipal\":{},\"Action\":[\"s3:GetObject\",\"s3:PutObject\",\"s3:DeleteObject\"],\"NotAction\":[],\"Resource\":[],\"NotResource\":[\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/original\",\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/480.webp\",\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/960.webp\",\"arn:aws:s3:::mikluha-media-v1/media/v1/*/*/1600.webp\"],\"Condition\":{}},{\"Sid\":\"MediaWorkerNoBucketMutation\",\"Effect\":\"Deny\",\"Principal\":{\"AWS\":\"arn:aws:iam::b426a543-2393-4011-9e4f-f318bf15f576:service_account/6eebe1e8-7df4-4905-85f1-c3e29b28a539\"},\"NotPrincipal\":{},\"Action\":[\"s3:CreateBucket\",\"s3:DeleteBucket\",\"s3:PutBucket*\",\"s3:DeleteBucket*\",\"s3:PutPublicAccessBlock\",\"s3:DeletePublicAccessBlock\"],\"NotAction\":[],\"Resource\":\"arn:aws:s3:::mikluha-media-v1\",\"NotResource\":[],\"Condition\":{}}]}\n"
+    },
+    "list-objects-v2": {
+      "RequestCharged": null,
+      "Prefix": ""
+    }
+  },
+  "negativeChecks": {
+    "outOfPrefixPut": "403 AccessDenied",
+    "bucketPolicyMutation": "403 AccessDenied",
+    "legacyBucketConfiguration": "403 AccessDenied",
+    "conditionalOverwrite": "412 PreconditionFailed",
+    "anonymousOriginal": "403 AccessDenied",
+    "PutObjectAcl": "501 NotImplemented; removed from implementation"
+  },
+  "cleanup": {
+    "fourFixtureKeys": "authenticated 404 and anonymous 403/404 for all four",
+    "extraDiagnosticProbe": "tour63-scope-negative/probe.txt deleted, authenticated NoSuchKey verified",
+    "finalListObjectsV2": "EMPTY"
+  },
+  "sourceSha256": {
+    "commerce/src/media/storage.ts": "9771c4759e524e4af0bd153de4ae67291f0d5795891d6574d7f0762f1fa6d5aa",
+    "commerce/src/media/policy.ts": "1886444076ee62a4b0e3572256c2f976fc586e6263ba27880bf779941a80ffe3",
+    "commerce/src/media/service.ts": "8003763f15ad4dcf6dbea56c5a8b8dc0e9d0a3be61d5d2cbc59a243cfc141ed6",
+    "commerce/src/bin/media-qualification.ts": "e967277d9fd53df6c9b194f381dfe04b64b394f9a11b580a376fe66e6b76e01e",
+    "commerce/media/transform.py": "4ca8bd3fd0f07b56897fa15f525500504967954e85193ed6057215969d2b72fc"
+  },
+  "notQualified": [
+    "production installation",
+    "installed Control Room to worker to S3 to SSR",
+    "production DB backup and isolated restore",
+    "real-photo legal/content admission",
+    "sales activation"
+  ]
+}

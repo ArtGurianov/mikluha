@@ -12,6 +12,7 @@ const source = Buffer.from(
   'base64',
 );
 const publicOrigin = env('MEDIA_S3_PUBLIC_ORIGIN');
+const principalArn = env('MEDIA_S3_PRINCIPAL_ARN');
 const endpoint = env('MEDIA_S3_ENDPOINT'),
   bucket = env('MEDIA_S3_BUCKET');
 const action = process.argv[2];
@@ -30,6 +31,7 @@ const plan = {
   endpoint,
   bucket,
   publicOrigin,
+  principalArn,
   keys: [`${prefix}/original`, ...processed.map((v) => `${prefix}/${v.profile}.webp`)],
   variants: processed.map((v) => ({ profile: v.profile, sha256: v.sha256, bytes: v.bytes.length })),
 };
@@ -46,6 +48,7 @@ if (action === 'plan') {
     endpoint,
     bucket,
     publicOrigin,
+    principalArn,
     region: env('MEDIA_S3_REGION'),
     accessKeyId: env('MEDIA_S3_ACCESS_KEY_ID'),
     secretAccessKey: env('MEDIA_S3_SECRET_ACCESS_KEY'),
@@ -57,13 +60,13 @@ if (action === 'plan') {
     await storage.assertConfiguration();
     attempted = true;
     await storage.privateWrite(plan.keys[0]!, source, 'application/octet-stream');
-    for (const v of processed) {
-      const key = `${prefix}/${v.profile}.webp`;
-      await storage.privateWrite(key, v.bytes, 'image/webp');
-      await storage.privateWrite(key, v.bytes, 'image/webp'); // exact replay must not overwrite
-    }
-    await storage.verifyPrivate(plan.keys[0]!);
-    for (const v of processed) {
+    await storage.privateWrite(plan.keys[0]!, source, 'application/octet-stream'); // exact replay
+    const readback = await storage.readOriginal(plan.keys[0]!, digest(source));
+    const regenerated = await transform(readback);
+    if (JSON.stringify(regenerated.map((v) => ({
+      profile: v.profile, sha256: v.sha256, bytes: v.bytes.length,
+    }))) !== JSON.stringify(plan.variants)) throw new Error('MEDIA_PROFILE_CHANGED');
+    for (const v of regenerated) {
       const key = `${prefix}/${v.profile}.webp`;
       const variant: StoredVariant = {
         key,
@@ -74,7 +77,8 @@ if (action === 'plan') {
         height: v.height,
         profile: v.profile,
       };
-      await storage.publish(variant);
+      await storage.publish(variant, v.bytes);
+      await storage.publish(variant, v.bytes); // public replay also stays immutable
     }
     pass = true;
   } catch {

@@ -1,11 +1,14 @@
 import {
   DeleteObjectCommand,
   GetBucketVersioningCommand,
+  GetBucketPolicyCommand,
+  GetBucketAclCommand,
+  GetBucketOwnershipControlsCommand,
   GetObjectCommand,
-  PutObjectAclCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { assertPublicVariantPolicy } from './policy.js';
 import { digest, MediaError } from './transform.js';
 
 export const PUBLIC_CACHE = 'public, max-age=60, must-revalidate';
@@ -22,7 +25,8 @@ export interface MediaStorage {
   assertConfiguration(): Promise<void>;
   privateWrite(key: string, body: Buffer, contentType: string): Promise<void>;
   verifyPrivate(key: string): Promise<void>;
-  publish(variant: StoredVariant): Promise<void>;
+  readOriginal(key: string, sha256: string): Promise<Buffer>;
+  publish(variant: StoredVariant, body: Buffer): Promise<void>;
   remove(key: string): Promise<void>;
   url(key: string): string;
 }
@@ -33,6 +37,7 @@ export interface StorageConfig {
   accessKeyId: string;
   secretAccessKey: string;
   publicOrigin?: string;
+  principalArn?: string;
 }
 /** No request selects an endpoint, bucket, key, URL, ACL or cache policy. */
 export class S3MediaStorage implements MediaStorage {
@@ -51,7 +56,9 @@ export class S3MediaStorage implements MediaStorage {
       !/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(config.bucket) ||
       !config.region ||
       !config.accessKeyId ||
-      !config.secretAccessKey
+      !config.secretAccessKey ||
+      (config.principalArn !== undefined &&
+        !/^arn:aws:iam::[0-9a-f-]{36}:service_account\/[0-9a-f-]{36}$/.test(config.principalArn))
     )
       throw new Error('MEDIA_STORAGE_CONFIG');
     // Local bucket names and public global/domain names may differ on Cloud.ru.
@@ -93,6 +100,25 @@ export class S3MediaStorage implements MediaStorage {
     });
     // Suspended buckets retain versions too: deletion confirmation would be incomplete.
     if (v.Status !== undefined) throw new Error('MEDIA_VERSIONING_UNSUPPORTED');
+    const [policy, acl, ownership] = await Promise.all([
+      this.client.send(new GetBucketPolicyCommand({ Bucket: this.config.bucket }), {
+        abortSignal: AbortSignal.timeout(10_000),
+      }),
+      this.client.send(new GetBucketAclCommand({ Bucket: this.config.bucket }), {
+        abortSignal: AbortSignal.timeout(10_000),
+      }),
+      this.client.send(new GetBucketOwnershipControlsCommand({ Bucket: this.config.bucket }), {
+        abortSignal: AbortSignal.timeout(10_000),
+      }),
+    ]);
+    assertPublicVariantPolicy(policy.Policy, this.config.bucket, this.config.principalArn);
+    if (!acl.Grants?.length || acl.Grants.some((g) => g.Grantee?.Type !== 'CanonicalUser'))
+      throw new Error('MEDIA_ACL_UNCONFIRMED');
+    if (
+      ownership.OwnershipControls?.Rules?.length !== 1 ||
+      ownership.OwnershipControls.Rules[0]?.ObjectOwnership !== 'BucketOwnerEnforced'
+    )
+      throw new Error('MEDIA_OWNERSHIP_UNCONFIRMED');
   }
   private async anonymous(key: string, cors = false): Promise<Response> {
     return fetch(this.url(key), {
@@ -133,7 +159,7 @@ export class S3MediaStorage implements MediaStorage {
     }
     return Buffer.concat(chunks);
   }
-  async privateWrite(key: string, body: Buffer, contentType: string): Promise<void> {
+  private async writeOnce(key: string, body: Buffer, contentType: string, cache: string): Promise<void> {
     this.key(key);
     try {
       await this.client.send(
@@ -141,9 +167,8 @@ export class S3MediaStorage implements MediaStorage {
           Bucket: this.config.bucket,
           Key: key,
           Body: body,
-          ACL: 'private',
           ContentType: contentType,
-          CacheControl: contentType === 'image/webp' ? PUBLIC_CACHE : 'private, no-store',
+          CacheControl: cache,
           IfNoneMatch: '*',
         }),
         { abortSignal: AbortSignal.timeout(10_000) },
@@ -153,17 +178,35 @@ export class S3MediaStorage implements MediaStorage {
     }
     if (digest(await this.read(key, body.length)) !== digest(body))
       throw new Error('MEDIA_IMMUTABLE_CONFLICT');
+  }
+  async privateWrite(key: string, body: Buffer, contentType: string): Promise<void> {
+    this.key(key);
+    if (
+      !key.endsWith('/original') ||
+      contentType !== 'application/octet-stream' ||
+      body.length > 8 * 1024 * 1024
+    )
+      throw new Error('MEDIA_ORIGINAL_ONLY');
+    await this.writeOnce(key, body, contentType, 'private, no-store');
     await this.verifyPrivate(key);
   }
-  async publish(variant: StoredVariant): Promise<void> {
+  async readOriginal(key: string, sha256: string): Promise<Buffer> {
+    this.key(key);
+    if (!key.endsWith('/original')) throw new Error('MEDIA_ORIGINAL_ONLY');
+    await this.verifyPrivate(key);
+    const bytes = await this.read(key, 8 * 1024 * 1024);
+    if (digest(bytes) !== sha256) throw new Error('MEDIA_ORIGINAL_READBACK');
+    return bytes;
+  }
+  async publish(variant: StoredVariant, body: Buffer): Promise<void> {
     this.key(variant.key);
     if (variant.url !== this.url(variant.key)) throw new Error('MEDIA_URL');
-    // Never grant public-read to an original, even if private DB state is corrupted.
     if (variant.key.endsWith('/original')) throw new Error('MEDIA_ORIGINAL_PRIVATE');
-    await this.client.send(
-      new PutObjectAclCommand({ Bucket: this.config.bucket, Key: variant.key, ACL: 'public-read' }),
-      { abortSignal: AbortSignal.timeout(10_000) },
-    );
+    if (body.length !== variant.bytes || digest(body) !== variant.sha256)
+      throw new Error('MEDIA_VARIANT_INVALID');
+    // Cloud.ru Evolution has no PutObjectAcl. The reviewed bucket policy grants anonymous
+    // GetObject only to the three WebP names; these bytes do not exist until OWNER publication.
+    await this.writeOnce(variant.key, body, 'image/webp', PUBLIC_CACHE);
     const r = await this.anonymous(variant.key, true);
     if (
       r.status !== 200 ||

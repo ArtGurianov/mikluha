@@ -80,9 +80,16 @@ class Store implements MediaStorage {
     if (this.fail) throw Error('OFFLINE');
     this.objects.set(k, b);
   }
-  async publish(v: StoredVariant) {
+  async readOriginal(k: string, sha: string) {
     if (this.fail) throw Error('OFFLINE');
-    assert.equal(digest(this.objects.get(v.key)!), v.sha256);
+    const bytes = this.objects.get(k)!;
+    assert.equal(digest(bytes), sha);
+    return bytes;
+  }
+  async publish(v: StoredVariant, b: Buffer) {
+    if (this.fail) throw Error('OFFLINE');
+    assert.equal(digest(b), v.sha256);
+    this.objects.set(v.key, b);
     this.published.add(v.key);
   }
   async remove(k: string) {
@@ -143,6 +150,22 @@ test('real bounded decoder: WebP variants without source metadata, no upscaling'
     await assert.rejects(transform(unsafe));
   }
 });
+test('actual EXIF GPS/orientation and ICC/XMP are removed from emitted WebP', async () => {
+  const tagged = execFileSync(python, ['-c', `from PIL import Image; import io,sys
+im=Image.new('RGB',(64,48),'red'); ex=Image.Exif(); ex[274]=6
+ex[34853]={1:'N',2:(55.0,45.0,0.0),3:'E',4:(37.0,36.0,0.0)}
+b=io.BytesIO(); im.save(b,'WEBP',exif=ex,icc_profile=b'PRIVATE-ICC',xmp=b'PRIVATE-XMP'); sys.stdout.buffer.write(b.getvalue())`]);
+  const inspect = (bytes: Buffer) => JSON.parse(execFileSync(python, ['-c', `from PIL import Image; import io,sys,json
+im=Image.open(io.BytesIO(sys.stdin.buffer.read())); e=im.getexif()
+print(json.dumps({'gps':34853 in e,'orientation':e.get(274),'private':any(k in im.info for k in ('exif','icc_profile','xmp'))}))`], { input: bytes }).toString());
+  assert.equal(inspect(tagged).gps, true, 'fixture contains real GPS IFD');
+  assert.equal(inspect(tagged).orientation, 6);
+  for (const v of await transform(tagged)) {
+    assert.equal(v.width, 48);
+    assert.equal(v.height, 64);
+    assert.deepEqual(inspect(v.bytes), { gps: false, orientation: null, private: false });
+  }
+});
 test('DB capability boundaries and NULL/wrong-type refusals', async () => {
   await assert.rejects(db.pool.query('SELECT * FROM media_asset'), /permission denied/);
   await assert.rejects(db.admin.query('SELECT * FROM media_asset'), /permission denied/);
@@ -171,6 +194,7 @@ test('complete lifecycle: private READY, owner publication, immediate withdrawal
   await assert.rejects(put({ ...v, alt: 'changed' }), /MEDIA_IDEMPOTENCY_CONFLICT/);
   assert.equal(await workOne(db.media, storage), true);
   assert.equal((await row(v.id)).state, 'READY');
+  assert.equal(storage.objects.size, 1, 'READY stores only a private original; no processed object yet');
   assert.equal(storage.published.size, 0);
   assert.equal((await db.pool.query('SELECT * FROM public_media WHERE id=$1', [v.id])).rowCount, 0);
   assert.equal((await row(v.id)).source_bytes, null);
@@ -255,10 +279,10 @@ test('an in-flight publication cannot resurrect media after committed OWNER with
     entered = r;
   });
   const publish = storage.publish.bind(storage);
-  storage.publish = async (variant) => {
+  storage.publish = async (variant, bytes) => {
     entered();
     await gate;
-    await publish(variant);
+    await publish(variant, bytes);
   };
   const processing = workOne(db.media, storage);
   await started;
@@ -290,6 +314,7 @@ test('provider qualification plan is offline, exact-key and hash bounded, never 
         MEDIA_S3_ENDPOINT: 'https://s3.cloud.ru',
         MEDIA_S3_BUCKET: 'qualification-fixture',
         MEDIA_S3_PUBLIC_ORIGIN: 'https://qualification-global-name.s3.cloud.ru',
+        MEDIA_S3_PRINCIPAL_ARN: 'arn:aws:iam::synthetic:service_account/synthetic',
       },
       encoding: 'utf8',
     },

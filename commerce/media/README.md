@@ -1,8 +1,9 @@
 # TOUR-63 · direct S3 image contract
 
-CUSTODY_IMPACT: NO for this source-only change. Sales remain CLOSED. No deployed database,
-Cloud.ru bucket, credential or host resource is changed by this PR. Installation is a separate
-operation: record changed resources/authorities and link VPS-15. Apply the Mikluha clean-slate
+CUSTODY_IMPACT: YES for the separately authorized Cloud.ru qualification: new dedicated bucket,
+policy/CORS, scoped service account and temporary access key (revoked after qualification). See the
+dated provider receipt. No deployed database or VPS resource was changed. Sales remain CLOSED.
+Host installation is a separate operation: record changed resources/authorities and link VPS-15. Apply the Mikluha clean-slate
 exception in AGENTS.md; do not report unrelated whole-VPS drift as PASS.
 
 ## API / editorial integration (TOUR-64)
@@ -49,6 +50,7 @@ it is neither owner nor migration login. The process refuses other applications'
 The worker environment contains only its dedicated `MEDIA_DATABASE_URL`, `MEDIA_S3_ENDPOINT`
 (shared API origin, e.g. `https://s3.cloud.ru`), `MEDIA_S3_BUCKET`, `MEDIA_S3_REGION`,
 `MEDIA_S3_PUBLIC_ORIGIN` (verified bucket global/domain HTTPS origin),
+`MEDIA_S3_PRINCIPAL_ARN` (the dedicated Cloud.ru service account ARN),
 `MEDIA_S3_ACCESS_KEY_ID`, `MEDIA_S3_SECRET_ACCESS_KEY`. Secrets are enrolled separately through the
 approved host/Coolify secret authority, never committed. Admin must not receive these values.
 No AWS credential chain is used. Region and bucket must be verified with the actual account.
@@ -57,20 +59,35 @@ because browser CORS uses the bucket's public host. The local API bucket name an
 name can differ; deriving the public hostname from the local name is refused. See the provider
 [public-access contract](https://cloud.ru/docs/s3e/ug/topics/guides__public-access-for-bucket). Only the disposable loopback HTTPS fixture uses public path style.
 
-Use a newly qualified private-by-default bucket with object ACLs supported, **versioning never
-enabled** (even Suspended is refused), no public bucket-wide read/list/write policy, no replication
-or unaccounted retained object versions. The worker cannot configure bucket policy/CORS/versioning.
-IAM needs bucket GetBucketVersioning and object PutObject/GetObject/DeleteObject under the exact
-`media/v1/*` prefix; PutObjectAcl public-read is allowed **only** on `*/480.webp`, `*/960.webp`,
-`*/1600.webp`, never originals. Bucket listing, bucket administration and unrelated backup prefixes
-are not needed. Restrict principals/resources in the actual provider and independently read back
-those grants before use. Legacy Sveltia and backup credentials are not this worker's credentials.
+Use a newly qualified private-by-default bucket, **versioning never enabled** (even Suspended is
+refused), BucketOwnerEnforced ownership and no public ACL grants. Cloud.ru Evolution returns
+NotImplemented for PutObjectAcl; the worker never calls it or sends an ACL header. Configure the
+reviewed policy from `publicVariantPolicy(bucket, principalArn)` in `src/media/policy.ts`:
+
+- Anonymous GetObject only on the three `media/v1/*/*/{480,960,1600}.webp` names; never original,
+  listing, writes or the whole bucket.
+- The enrolled principal has GetObject/PutObject/DeleteObject on those names and `original`.
+- Explicit Deny outside those four key patterns and for bucket configuration mutations. Restrict
+  the account's provider roles to this dedicated bucket: editor, viewer and viewer-acl. Never use
+  s3e.admin, tenant.edit or Project Administrator: those bypass bucket-policy restrictions.
+
+The worker reads versioning, policy, ACL and ownership controls before processing. Policy read-back
+requires the exact anonymous/worker grants and mandatory fences (extra Deny rules are allowed).
+Canonical empty provider fields are accepted, nonempty alternate selectors/conditions are not.
+Provider role propagation can lag console updates: prove positive private read, signed absence,
+negative out-of-prefix write, bucket mutation denial and unrelated-bucket denial before enrollment.
+Only the operator configures policy/CORS/versioning, never the worker. No replication or unaccounted
+retained versions are admitted. Legacy Sveltia and backup credentials are not worker credentials.
+The runtime does not list objects. Cloud.ru's viewer role can list this dedicated bucket; it grants
+no unrelated bucket access, and listing is not published anonymously. Verify that privilege when
+reviewing actual provider roles rather than claiming it is absent.
 
 Configure browser GET/HEAD CORS for `https://mikluha-maklai.ru` (and separately approved staging
 origins); no credentialed browser requests. Public GET must return ACAO matching that origin or
 `*`, Content-Type `image/webp`, and `Cache-Control: public, max-age=60, must-revalidate`. No CDN is
-used. Public ACL is set only after OWNER admission and anonymous full-byte/hash/MIME/size/CORS/cache
-read-back is required before PUBLISHED. An unconfirmed private-original/variant admission
+used. WebP objects are first uploaded only after OWNER admission; the narrow bucket policy makes
+those paths public. Anonymous full-byte/hash/MIME/size/CORS/cache read-back is required before
+PUBLISHED. An unconfirmed private-original admission
 quarantines the record and immediately queues deletion of all four known keys; it must not leave a
 possibly public original waiting for five admission retries. PRIVACY_UNCONFIRMED is visible in Admin. There may be partial public variants while publication is
 pending; they were explicitly authorized, but are not yet discoverable through the public catalog.
@@ -78,8 +95,11 @@ pending; they were explicitly authorized, but are not yet discoverable through t
 Keys: `media/v1/<asset UUID>/<original SHA256>/{original,480.webp,960.webp,1600.webp}`. Conditional
 PUT prevents overwrites, including retries after a crash. Bytes are immutable, not browser retention.
 Do not silently change the v1 encoder/profile for pending records: a future transform version gets a
-new namespace and asset ID. The source remains private; READY variants remain private too. Full
-signed read-back and anonymous 403/404 are checked after each private write.
+new namespace and asset ID. The source remains private. READY stores variant hashes/dimensions/URLs in the database, but
+processed bytes do not yet exist in S3. On publication the worker privately re-reads/verifies the
+original and regenerates the pinned profile, refusing changed hashes/dimensions before writing.
+Full signed read-back and anonymous 403/404 are checked after each original write. Public variant
+writes also require signed hash and anonymous full-byte verification, including replay.
 
 The decoder accepts one frame, at most 16,000,000 pixels and 8192 per side, applies EXIF orientation,
 then copies pixels to fresh images before emitting WebP at widths 480/960/1600 without upscaling.
@@ -136,7 +156,7 @@ HTTPS certificate, bucket CORS/cache, partial failure and confirmed deletion. Th
 pages/Control Room against the installed worker and qualify the changed DB backup/restore. Do not
 infer installation, provider PASS, recovery PASS or sales GO from unit tests, CI or a draft PR.
 
-An offline provider-test plan is available in the media image (endpoint/local bucket/public origin env needed):
+An offline provider-test plan is available in the media image (endpoint/local bucket/public origin/principal ARN env needed):
 
 ```sh
 node dist/bin/media-qualification.js plan > /tmp/tour63-provider-plan.json

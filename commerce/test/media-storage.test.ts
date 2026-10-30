@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { before, after, test } from 'node:test';
 import { S3MediaStorage, PUBLIC_CACHE, type StoredVariant } from '../src/media/storage.js';
 import { decodeIsolated } from '../src/media/decoder.js';
+import { publicVariantPolicy, assertPublicVariantPolicy } from '../src/media/policy.js';
 import { digest } from '../src/media/transform.js';
 
 let server: Server, endpoint: string, store: S3MediaStorage;
@@ -73,6 +74,23 @@ before(async () => {
         error(403, 'SignatureDoesNotMatch');
         return;
       }
+      if (u.searchParams.has('policy') && auth) {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify(publicVariantPolicy('fixture-bucket')));
+        return;
+      }
+      if (u.searchParams.has('ownershipControls') && auth) {
+        res.end(
+          '<OwnershipControls><Rule><ObjectOwnership>BucketOwnerEnforced</ObjectOwnership></Rule></OwnershipControls>',
+        );
+        return;
+      }
+      if (u.searchParams.has('acl') && req.method === 'GET' && auth) {
+        res.end(
+          '<AccessControlPolicy><Owner><ID>owner</ID></Owner><AccessControlList><Grant><Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser"><ID>owner</ID></Grantee><Permission>FULL_CONTROL</Permission></Grant></AccessControlList></AccessControlPolicy>',
+        );
+        return;
+      }
       if (u.searchParams.has('versioning') && auth) {
         res.end(
           `<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${versioned ? '<Status>Enabled</Status>' : ''}</VersioningConfiguration>`,
@@ -81,13 +99,7 @@ before(async () => {
       }
       if (req.method === 'PUT' && auth) {
         if (u.searchParams.has('acl')) {
-          const o = objects.get(k);
-          if (!o) {
-            error(404, 'NoSuchKey');
-            return;
-          }
-          o.public = req.headers['x-amz-acl'] === 'public-read';
-          res.end();
+          error(501, 'NotImplemented');
           return;
         }
         if (objects.has(k) && req.headers['if-none-match'] === '*') {
@@ -98,7 +110,7 @@ before(async () => {
           body,
           mime: String(req.headers['content-type']),
           cache: String(req.headers['cache-control']),
-          public: req.headers['x-amz-acl'] === 'public-read',
+          public: /\/(480|960|1600)\.webp$/.test(k),
         });
         res.end();
         return;
@@ -155,11 +167,13 @@ test('TLS + SigV4 conditional writes, anonymous denial, verified public WebP, co
     'base64',
   );
   const body = (await decodeIsolated(originalBytes))[0]!.bytes;
-  await store.privateWrite(key, body, 'image/webp');
-  assert.equal((await fetch(store.url(key))).status, 403);
-  await store.privateWrite(key, body, 'image/webp');
+  const original = key.replace('480.webp', 'original');
+  await store.privateWrite(original, originalBytes, 'application/octet-stream');
+  assert.equal((await fetch(store.url(original))).status, 403);
+  assert.equal((await fetch(store.url(key))).status, 404, 'prepared WebP is not uploaded before publish');
+  await store.privateWrite(original, originalBytes, 'application/octet-stream');
   await assert.rejects(
-    store.privateWrite(key, Buffer.from('changed'), 'image/webp'),
+    store.privateWrite(original, Buffer.from('changed'), 'application/octet-stream'),
     /MEDIA_IMMUTABLE_CONFLICT|MEDIA_READBACK/,
   );
   const v: StoredVariant = {
@@ -172,19 +186,19 @@ test('TLS + SigV4 conditional writes, anonymous denial, verified public WebP, co
     profile: 480,
   };
   badMime = true;
-  await assert.rejects(store.publish(v), /MEDIA_PUBLIC_READBACK/);
+  await assert.rejects(store.publish(v, body), /MEDIA_PUBLIC_READBACK/);
   badMime = false;
   badCors = true;
-  await assert.rejects(store.publish(v), /MEDIA_PUBLIC_READBACK/);
+  await assert.rejects(store.publish(v, body), /MEDIA_PUBLIC_READBACK/);
   badCors = false;
-  await store.publish(v);
+  await store.publish(v, body);
+  await store.publish(v, body);
+  await assert.rejects(store.publish(v, Buffer.from('tampered')), /MEDIA_VARIANT_INVALID/);
   const response = await fetch(v.url);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), PUBLIC_CACHE);
-  const original = key.replace('480.webp', 'original');
-  await store.privateWrite(original, originalBytes, 'application/octet-stream');
   await assert.rejects(
-    store.publish({ ...v, key: original, url: store.url(original) }),
+    store.publish({ ...v, key: original, url: store.url(original) }, body),
     /MEDIA_ORIGINAL_PRIVATE/,
   );
   failDelete = true;
@@ -216,4 +230,39 @@ test('unsafe storage configuration and client-selected keys are refused', () => 
   assert.equal(remote.url(key), `https://different-global-name.s3.cloud.ru/${key}`);
   assert.throws(() => store.url('../../secret'));
   assert.throws(() => store.url('media/v1/private'));
+});
+
+test('only the exact three processed WebP paths may be publicly readable', () => {
+  const good = publicVariantPolicy('fixture-bucket');
+  assertPublicVariantPolicy(JSON.stringify(good), 'fixture-bucket');
+  assertPublicVariantPolicy(JSON.stringify({...good,Statement:[{...good.Statement[0],NotPrincipal:{},NotAction:[],NotResource:[],Condition:{}}]}),'fixture-bucket');
+  for (const change of [
+    { Resource: ['arn:aws:s3:::fixture-bucket/*'] },
+    { Action: ['s3:GetObject', 's3:PutObject'] },
+    { Principal: { AWS: '*' } },
+    { NotResource: 'anything' },
+  ])
+    assert.throws(() =>
+      assertPublicVariantPolicy(
+        JSON.stringify({ ...good, Statement: [{ ...good.Statement[0], ...change }] }),
+        'fixture-bucket',
+      ),
+    );
+  assert.throws(() => assertPublicVariantPolicy(undefined, 'fixture-bucket'));
+});
+
+
+test('worker policy requires the enrolled private-read grant and key/bucket mutation fences', () => {
+  const principal = 'arn:aws:iam::11111111-1111-4111-8111-111111111111:service_account/22222222-2222-4222-8222-222222222222';
+  const good = publicVariantPolicy('fixture-bucket', principal);
+  assertPublicVariantPolicy(JSON.stringify(good), 'fixture-bucket', principal);
+  for (let index = 1; index < good.Statement.length; index++) {
+    assert.throws(() => assertPublicVariantPolicy(JSON.stringify({ ...good,
+      Statement: good.Statement.filter((_, i) => i !== index),
+    }), 'fixture-bucket', principal));
+    assert.throws(() => assertPublicVariantPolicy(JSON.stringify({ ...good,
+      Statement: good.Statement.map((s, i) => i === index ? { ...s, Condition: { StringEquals: { 'aws:SourceIp': '127.0.0.1' } } } : s),
+    }), 'fixture-bucket', principal));
+  }
+  assert.throws(() => assertPublicVariantPolicy(JSON.stringify(good), 'fixture-bucket', principal.replace('22222222-', '33333333-')));
 });

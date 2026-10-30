@@ -91,7 +91,6 @@ export async function workOne(pool: pg.Pool, storage: MediaStorage): Promise<boo
         variants = [];
         for (const v of processed) {
           const key = `${prefix}/${v.profile}.webp`;
-          await storage.privateWrite(key, v.bytes, 'image/webp');
           variants.push({
             key,
             url: storage.url(key),
@@ -104,8 +103,20 @@ export async function workOne(pool: pg.Pool, storage: MediaStorage): Promise<boo
         }
         state = 'READY';
       } else if (row.state === 'PUBLISH_REQUESTED') {
-        await storage.verifyPrivate(`${prefix}/original`);
-        for (const variant of variants) await storage.publish(variant);
+        const original = await storage.readOriginal(`${prefix}/original`, row.source_sha256);
+        const processed = await transform(original);
+        for (const variant of variants) {
+          const output = processed.find((v) => v.profile === variant.profile);
+          if (
+            !output ||
+            output.sha256 !== variant.sha256 ||
+            output.bytes.length !== variant.bytes ||
+            output.width !== variant.width ||
+            output.height !== variant.height
+          )
+            throw new MediaError('MEDIA_PROFILE_CHANGED', 503);
+          await storage.publish(variant, output.bytes);
+        }
         state = 'PUBLISHED';
       } else {
         // Fixed known keys, not a client prefix/list operation. Partial/unknown deletion stays pending.

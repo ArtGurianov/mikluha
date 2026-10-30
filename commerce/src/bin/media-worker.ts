@@ -42,6 +42,7 @@ const storage = new S3MediaStorage({
   endpoint: env('MEDIA_S3_ENDPOINT'),
   bucket: env('MEDIA_S3_BUCKET'),
   publicOrigin: env('MEDIA_S3_PUBLIC_ORIGIN'),
+  principalArn: env('MEDIA_S3_PRINCIPAL_ARN'),
   region: env('MEDIA_S3_REGION'),
   accessKeyId: env('MEDIA_S3_ACCESS_KEY_ID'),
   secretAccessKey: env('MEDIA_S3_SECRET_ACCESS_KEY'),
