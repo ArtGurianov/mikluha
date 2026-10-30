@@ -60,3 +60,39 @@ would require opening launchReady just to serve the first legal publication.
 Updated the subprocess test to prove that unqualified sale content reaches
 immutable image admission while the separate bookable/refund refusal tests
 remain unchanged. No runtime change in this correction. Hosted rerun follows.
+
+## Review.3 rendering and exact document verification
+
+Runtime rendering commit `7763a775bf9fc5b484c304f80e7d72b871ae21f7`:
+leading-body title detection via Markdown AST, one H1 with publication metadata,
+header-free compatibility, later H1 demotion, semantic tables with equal-width
+columns, keyboard-focusable horizontal scrolling and sticky-header clearance.
+Stored Markdown bytes remain intact. Cookies retains review.2's exact hash.
+
+- Site suite 124/124; targeted renderer and existing image-guard tests 4/4,
+  including full candidate bodies, missing/blank-prefixed/Setext/later titles.
+- Site lint and TypeScript; staging production-mode build passed.
+- Standalone direct-media/raw-HTML SSR smoke: 34/34, including active publication
+  changes without rebuild, corrupt/missing text and outage/recovery.
+- Actual Chrome DOM and screenshot inspection of complete privacy candidate at
+  360, 390 and 1440 px: document width equals viewport, one H1. Mobile table
+  regions are 326/356 px with 640 px scroll content; desktop tables fit at
+  718 px. Equal columns avoid compressed subject labels. Table top after
+  focus/scroll is 96 px; sticky header bottom 65 px. ArrowRight scrolls the
+  focused region (0 → 40 px) with visible outline. Complete cookies body at
+  360 px has one H1, no page overflow and its original text SHA-256 metadata.
+- Both candidate SHA-256 manifest entries and evidence JSON syntax verified.
+  FNS official search/extract confirms the unusual full/short company names;
+  raw extract/personal/address data were not committed.
+- TOUR-93 records the owner's named responsible director and the initial/manual
+  successor procedure. No automatic Plane recurrence or executed review claimed.
+
+Initial smoke invocation lacked EXPECT_COMMIT/media checker parameters and
+failed those two caller checks; supplying the existing required parameters
+passed all 34 without a runtime workaround. Local read-only generated release
+identity was regenerated normally for the runtime commit. Full hosted checks
+for prior review.2 `c1ae5d4` passed 5/5 (run 41068409510); final review.3 hosted
+head is reported independently in the PR/Plane, not inferred from that run.
+
+This is source/synthetic-browser evidence, not a deployed SSR/Admin receipt,
+new-DB backup/restore receipt, public legal publication or domain/sales GO.

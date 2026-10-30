@@ -1,6 +1,6 @@
 # SSR/Admin legal candidate — 2026-10-30
 
-Candidate revision: `2026-10-30.ssr-admin.review.2`.
+Candidate revision: `2026-10-30.ssr-admin.review.3`.
 Status: DRAFT, NOT PUBLISHED, no exact-byte OWNER approval yet. This directory
 is not imported or activated automatically. Effective date is intentionally not
 invented: OWNER chooses it at legal publication (Moscow date, no backdating).
@@ -41,8 +41,8 @@ CUSTODY_IMPACT: NO — reviewable source only; no deployed state changed.
 ## Review.2 changes and approval boundary
 
 Replaces the prior exact-byte approval request; prior privacy/cookies SHA-256s
-are historical draft identities, not approvals of this revision. Runtime source
-is unchanged. Review resolution and direct read-only logging facts are in
+are historical draft identities, not approvals of this revision. Review.2 changed
+the documents only; review.3 also changes rendering. Review resolution and direct read-only logging facts are in
 `docs/evidence/2026-10-30-tour-68-review-resolution.md` and
 `docs/evidence/2026-10-30-tour-68-logging-readonly.json`.
 
@@ -69,3 +69,41 @@ provider terms (including commissioned processing where required), and category
 review of preserved test-payment/fiscal evidence without assuming all subject
 identities are synthetic. Old/demo media are not reapproved. These actual-flow
 checks do not impose future sales qualification or whole-VPS review.
+
+## Review.3 and rendering
+
+Review.3 replaces review.2's **privacy** approval request. Cookies stays byte-for-
+byte at `71d4e6fbbca71d707d904fe2f370d2245a4e4faa16ecdd998f7cd0d980e2252c`.
+Reviewer recommendations quoted by the owner are review evidence; no separate
+OWNER approval of the exact candidate text is recorded yet.
+
+Adman's account privacy policy is not proof of the hosting customer's entire
+VPS processing. The public text now states the RF hosting fact directly, based
+on the provider passport and owner-confirmed placement. Cloud.ru Evolution
+Object Storage is explicitly in the RF: the dedicated media-bucket receipt
+records `ru-central-1`, and Cloud.ru's storage FAQ confirms RF data centres.
+This does not qualify the future new-DB backup: its target and isolated restore
+still require their own receipts before real use. The misleading reference to
+"public distribution of visitors' data" is removed; employee and contractor
+access bases are distinguished.
+
+The unusual operator name is retained: the official FNS EGRUL search and
+extract retrieved 2026-10-30 match INN 4205435867 / OGRN 1264200007631 and
+`ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ "ООО МИКЛУХА МАКЛАЙ"`.
+Only the necessary company facts and source digest are retained in repository
+evidence, not the full extract or its personal/address sections.
+
+Publication must use each **complete file**, including its initial Markdown H1.
+LegalPageView renders that title once, with publication metadata, and demotes
+later H1 headings for hierarchy. Stored bodies and Commerce text-hash inputs
+are never trimmed. Header-free existing publications retain their CMS title.
+Tables have semantic headers, readable cells and a keyboard-focusable horizontal
+scroll region; the document itself must fit mobile width.
+
+The owner appointed director **Гурьянов Артур Борисович** responsible for the
+quarterly retention review on 2026-10-30. The internal execution procedure is
+`docs/runbooks/ssr-admin-retention-review.md`. Appointment is not evidence of a
+completed review or an implemented deletion operation. Initial review precedes
+real SSR/Admin processing; the first dated successor is anchored to that actual
+review/admission, never an invented launch date. This source directory remains
+NOT PUBLISHED; domain cutover and sales stay outside this approval.
