@@ -1,0 +1,49 @@
+# Source template. Enroll credentials/network/DB backup only under separately scoped owner GO.
+services:
+  media-worker:
+    build:
+      context: ../..
+      dockerfile: commerce/Dockerfile
+      target: media-worker
+      args:
+        SOURCE_COMMIT: ${SOURCE_COMMIT:?exact reviewed commit}
+    env_file: ${MEDIA_ENV_FILE:?operator-managed media-only env outside git}
+    volumes:
+      - decoder-socket:/run/media-decoder:ro
+    depends_on: [media-decoder]
+    init: true
+    user: '1000:1000'
+    read_only: true
+    mem_limit: 256m
+    cpus: 0.25
+    pids_limit: 16
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 180s
+    restart: unless-stopped
+    # Attach default to the DB's private network explicitly at installation. No ports / proxy labels.
+  media-decoder:
+    build:
+      context: ../..
+      dockerfile: commerce/Dockerfile
+      target: media-decoder
+      args:
+        SOURCE_COMMIT: ${SOURCE_COMMIT:?exact reviewed commit}
+    network_mode: none
+    volumes:
+      - decoder-socket:/run/media-decoder
+    init: true
+    user: '1000:1000'
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 32
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30s
+    restart: unless-stopped
+    # NO env_file, app/DB/S3 credentials, public ports or IP network. Only the socket volume.
+volumes:
+  decoder-socket: {}

@@ -109,6 +109,15 @@
         "runtimeCommits": [],
         "evidence": "TOUR-76 purchase identity schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-29-tour-76-purchase-identity-design.md."
       }
+    },
+    {
+      "version": 18,
+      "file": "0018_direct_s3_media.sql",
+      "checksum": "6e9ddab7d80c49e72919aa9e4b4e16fb6b315bb92249830e3c98c2d15b6f2781",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "TOUR-63 direct S3 schema; exact bundled-head runtime only. See docs/plans/2026-10-30-tour-63-direct-s3-design.md."
+      }
     }
   ]
 }

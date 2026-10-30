@@ -32,6 +32,7 @@ export interface TestDb {
   /** The Admin API's login (admin_app). */
   readonly admin: pg.Pool;
   readonly publisher: pg.Pool;
+  readonly media: pg.Pool;
   /** An admin operator's login (admin_operator), as over SSH. */
   readonly adminOperator: pg.Pool;
   readonly url: URL;
@@ -50,7 +51,7 @@ export async function freshDb(migrationsDir = MIGRATIONS_DIR): Promise<TestDb> {
   await owner.connect();
   await migrate(owner, migrationsDir);
   for (const [login, role] of [[RUNTIME_ROLE, 'commerce_app'], [OPERATOR_ROLE, 'commerce_operator'], [ADMIN_ROLE, 'admin_app'],
-    [ADMIN_OPERATOR_ROLE, 'admin_operator'], [PUBLISHER_ROLE, 'admin_publisher']]) {
+    [ADMIN_OPERATOR_ROLE, 'admin_operator'], [PUBLISHER_ROLE, 'admin_publisher'], ['commerce_test_media','media_worker']]) {
     await owner.query(`DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${login}') THEN
         CREATE ROLE ${login} LOGIN PASSWORD '${PASSWORD}' IN ROLE ${role};
@@ -71,17 +72,18 @@ export async function freshDb(migrationsDir = MIGRATIONS_DIR): Promise<TestDb> {
   const initiation = as(RUNTIME_ROLE,2);
   const operator = as(OPERATOR_ROLE, 2);
   const adminPool = as(ADMIN_ROLE, 4);
+  const media = as('commerce_test_media',2);
   const publisher = as(PUBLISHER_ROLE, 4);
   const adminOperator = as(ADMIN_OPERATOR_ROLE, 2);
   let teardown: Promise<void> | undefined;
   return {
-    owner, pool, initiation, operator, admin: adminPool, adminOperator, publisher, url, name,
+    owner, pool, initiation, operator, admin: adminPool, adminOperator, publisher, media, url, name,
     async drop(timeoutMs = 10_000) {
       // Reuse cleanup after a bounded diagnostic failure, so a test can release its leaked
       // client and await the same operation instead of ending a pool twice.
       teardown ??= (async () => {
         try {
-          await Promise.all([pool.end(), initiation.end(), operator.end(), adminPool.end(), adminOperator.end(), publisher.end()]);
+          await Promise.all([media.end(), pool.end(), initiation.end(), operator.end(), adminPool.end(), adminOperator.end(), publisher.end()]);
           // pg-pool removes clients before their socket-end callbacks finish.
           await Promise.all(clientClosures);
           await owner.end();

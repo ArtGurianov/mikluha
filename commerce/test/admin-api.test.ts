@@ -648,3 +648,28 @@ test('configuration: an https origin only, and no foreign credential in the envi
     assert.throws(() => assertAdminEnvironment({ ADMIN_DATABASE_URL: 'x', [name]: 'secret' }), new RegExp(name));
   }
 });
+
+describe('TOUR-63 authenticated media command boundary',()=>{
+  test('editor uploads, only OWNER requests publication/deletion, rights are not public',async()=>{
+    const editor=await enrolled('media-editor','EDITOR');const owner=await enrolled('media-owner');
+    const id=(await import('node:crypto')).randomUUID();
+    const body={id,data:Buffer.from('invalid image, rejected asynchronously').toString('base64'),alt:'Алтай',credit:'Автор',rightsBasis:'CONSENT',rightsReference:'private-consent-record',rightsConfirmed:true};
+    assert.equal((await call('POST','/api/media',{body})).status,401);
+    assert.equal((await call('POST','/api/media',{body,cookie:editor.cookie,headers:{origin:'https://evil.test'}})).status,403);
+    assert.equal((await call('POST','/api/media',{body:{...body,bucket:'public'},cookie:editor.cookie})).status,422);
+    assert.equal((await call('POST','/api/media',{body,cookie:editor.cookie})).status,202);
+    assert.equal((await call('POST','/api/media',{body,cookie:editor.cookie})).status,202);
+    assert.equal((await call('POST',`/api/media/${id}/publish`,{body:{},cookie:editor.cookie})).status,403);
+    assert.equal((await call('POST',`/api/media/${id}/revoke`,{body:{},cookie:editor.cookie})).status,403);
+    assert.equal((await call('POST',`/api/media/${id}/publish`,{body:{},cookie:owner.cookie})).status,409);
+    const listing=await call('GET','/api/media',{cookie:editor.cookie});assert.equal(listing.status,200);
+    assert.equal(JSON.stringify(listing.body).includes(body.data),false);assert.equal(JSON.stringify(listing.body).includes('source_bytes'),false);
+    assert.equal((await call('POST',`/api/media/${id}/revoke`,{body:{actor:'spoof'},cookie:owner.cookie})).status,202);
+    assert.equal((await db.owner.query('SELECT state FROM media_asset WHERE id=$1',[id])).rows[0].state,'REVOKE_REQUESTED');
+    const events=await db.owner.query('SELECT actor,event FROM media_event WHERE asset_id=$1 ORDER BY id',[id]);
+    assert.equal(events.rows.at(-1).actor,'admin:media-owner');
+    assert.equal((await auditRows('MEDIA.REVOKE_REQUESTED')).at(-1).details.sessionId.length,36);
+    await setDisabled(db.adminOperator,'media-editor',true,'operator','media test revocation');
+    assert.equal((await call('POST','/api/media',{body:{...body,id:(await import('node:crypto')).randomUUID()},cookie:editor.cookie})).status,401);
+  });
+});

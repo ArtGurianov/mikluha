@@ -7,10 +7,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test --test-concurrency=1 \"test/**/*.test.ts\"",
+    "test": "sh scripts/with-media-tls.sh tsx --test --test-concurrency=1 \"test/**/*.test.ts\"",
     "test:sabotage": "node scripts/test-business-sabotage.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1160.0",
     "js-yaml": "^4.1.0",
     "pg": "^8.23.1"
   },

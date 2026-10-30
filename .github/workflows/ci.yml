@@ -139,7 +139,13 @@ jobs:
       # test/editorial-contract.test.ts restores a pg_dump of the migrated schema with psql.
       - run: pg_dump --version && psql --version
 
+      - name: Isolated image decoder dependencies (Linux)
+        run: |
+          python3 -m venv /tmp/media-python
+          /tmp/media-python/bin/pip install --only-binary=:all: -r media/requirements.txt
       - run: pnpm test
+        env:
+          MEDIA_PYTHON: /tmp/media-python/bin/python
 
       - name: Business-invariant sabotage sensitivity (ART-327)
         run: pnpm run test:sabotage

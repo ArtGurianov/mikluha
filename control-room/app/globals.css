@@ -37,3 +37,10 @@ th, td { text-align: left; border-bottom: 1px solid var(--line); padding: .5rem 
 .qr { width: 220px; height: 220px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: .5rem; }
 code.secret { font-size: 1rem; letter-spacing: .08em; word-break: break-all; }
 .row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }
+.media-fields { display: grid; gap: .9rem; border: 1px solid var(--line); border-radius: 1rem; padding: 1rem; min-width: 0; }
+.media-fields select { padding: .65rem .75rem; font: inherit; border: 1px solid #cfc1b3; border-radius: .6rem; background: var(--card); color: var(--ink); }
+.media-fields .check { display: flex; align-items: flex-start; gap: .6rem; }
+.media-fields input[type="checkbox"] { flex: none; margin-top: .3rem; accent-color: var(--rust); }
+.media-list { list-style: none; padding: 0; }
+.media-list li { padding: 1rem 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.media-fields input:not([type="checkbox"]), .media-fields select { width: 100%; min-width: 0; }

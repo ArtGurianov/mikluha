@@ -784,3 +784,10 @@ follow-up. No repository access rules are changed here.
 The ART-327 business sabotage harness rehashes SQL mutants only in its disposable scratch copy so
 that setup reaches the selected business assertion. It restores both SQL and scratch lock after
 each mutant. This does not change the committed lock or waive the DAG/history sabotage checks.
+
+### Direct image pipeline (TOUR-63)
+
+The [media contract and runbook](media/README.md) define the authenticated Control Room endpoints,
+separate media-only worker/S3 principal, bounded Linux decoder, rights/public projection and confirmed
+withdrawal lifecycle. Migration 0018 is append-only. Source-only work does not enroll credentials,
+apply the migration, install the worker or qualify Cloud.ru. VPS-17 is not a stage-1 dependency.

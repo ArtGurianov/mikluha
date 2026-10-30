@@ -66,5 +66,9 @@
   {
     "version": 17,
     "file": "0017_purchase_identity_and_revisions.sql"
+  },
+  {
+    "version": 18,
+    "file": "0018_direct_s3_media.sql"
   }
 ]
