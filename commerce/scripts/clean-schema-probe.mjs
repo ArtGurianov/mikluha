@@ -44,6 +44,10 @@ try {
     ['media_worker', 'admin_user', 'SELECT', false], ['commerce_app', 'public_media', 'SELECT', true],
     ['commerce_app', 'media_asset', 'SELECT', false], ['admin_app', 'admin_media', 'SELECT', true],
     ['admin_app', 'media_asset', 'SELECT', false],
+    // TOUR-64/65: legal text and sales state reach readers only through their views.
+    ['commerce_app', 'public_legal', 'SELECT', true], ['commerce_app', 'legal_publication', 'SELECT', false],
+    ['admin_app', 'legal_publication', 'SELECT', true], ['admin_app', 'legal_publication', 'UPDATE', false],
+    ['admin_app', 'admin_sales_status', 'SELECT', true], ['admin_app', 'sales_switch', 'SELECT', false],
     ...roles.flatMap(role => ['schema_migrations', 'schema_migration_compatibility', 'processing_instruction']
       .map(table => [role, table, 'UPDATE', false])),
   ]) {
@@ -63,6 +67,11 @@ try {
     ['admin_app', 'fn_media_enqueue(uuid,text,bytea,text,text,text,text,text,boolean)', true],
     ['admin_app', 'fn_media_request(uuid,text,text)', false],
     ['admin_publisher', 'fn_media_request(uuid,text,text)', true],
+    ['admin_publisher', 'fn_admin_publish_legal(uuid,integer,integer,date,text,text)', true],
+    ['admin_app', 'fn_admin_publish_legal(uuid,integer,integer,date,text,text)', false],
+    ['admin_publisher', 'fn_admin_pause_all(text)', true], ['admin_app', 'fn_admin_pause_all(text)', false],
+    ['admin_app', 'fn_admin_departure_controls(uuid,integer,text,integer,boolean,text)', false],
+    ['commerce_app', 'fn_publish_departure_stage_a(uuid,integer,integer,text)', false],
   ]) {
     assert.equal((await owner.query('SELECT has_function_privilege($1,$2,$3) AS allowed', [role, `public.${fn}`, 'EXECUTE'])).rows[0].allowed, allowed, `${role} ${fn}`);
   }
