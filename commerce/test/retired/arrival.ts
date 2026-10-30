@@ -29,9 +29,9 @@ import { randomBytes } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 import { performance } from 'node:perf_hooks';
 
-import type { SchemaAdmission } from './schema-admission.js';
-import { ExpiryQueue } from './expiry-queue.js';
-import type { Logger } from './log.js';
+import type { SchemaAdmission } from '../../src/schema-admission.js';
+import { ExpiryQueue } from '../../src/expiry-queue.js';
+import type { Logger } from '../../src/log.js';
 import type { ArrivalClaimReceipt, RefrefResult } from './refref.js';
 import { errorCode } from './refref.js';
 

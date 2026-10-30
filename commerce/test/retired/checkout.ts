@@ -16,17 +16,17 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 
 import type pg from 'pg';
 
-import { bookingCutoff, bookingCutoffAt } from './booking-window.js';
+import { bookingCutoff, bookingCutoffAt } from '../../src/booking-window.js';
 
-import { contractSnapshotIntact, type ContractSnapshot } from './contract-snapshot.js';
-import { refundWorkflowQualified, type Catalog } from './catalog.js';
-import type { Logger } from './log.js';
-import type { LegalReleaseAdmission } from './legal-admission.js';
+import { contractSnapshotIntact, type ContractSnapshot } from '../../src/contract-snapshot.js';
+import { refundWorkflowQualified, type Catalog } from '../../src/catalog.js';
+import type { Logger } from '../../src/log.js';
+import type { LegalReleaseAdmission } from '../../src/legal-admission.js';
 import { errorCode, type CheckoutAttempt, type RefrefClient, type ResolvedResolution } from './refref.js';
-import { contractHash, renderZayavka, sha256Hex } from './zayavka.js';
-import type { Tourist } from './orders.js';
-import { isPurchaseOrder } from './purchases.js';
-import { buildSnapshot, LINE_REF, OBLIGATION_REF, orderLine, resolutionInputHash, snapshotDigest, type Json, type OrderDeal } from './snapshot.js';
+import { contractHash, renderZayavka, sha256Hex } from '../../src/zayavka.js';
+import type { Tourist } from '../../src/orders.js';
+import { isPurchaseOrder } from '../../src/purchases.js';
+import { buildSnapshot, LINE_REF, OBLIGATION_REF, orderLine, resolutionInputHash, snapshotDigest, type Json, type OrderDeal } from '../../src/snapshot.js';
 
 export interface Merchant {
   /** Refref Business id and slug. */

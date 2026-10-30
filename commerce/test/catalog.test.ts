@@ -1,3 +1,4 @@
+import { loadCatalog, sourceFixtureDir } from './retired/catalog.js';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -5,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { assertProductionContent, bookable, departureContract, loadCatalog, tourContract } from '../src/catalog.js';
+import { assertProductionContent, bookable, departureContract, tourContract } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { fixtureCatalog } from './helpers.js';
 
@@ -23,7 +24,7 @@ test('a complete OPEN/listed/non-demo departure cannot bypass documented-expense
 
 test('complete departure product replaces defaults; a null/partial override never borrows them', () => {
   const dir = mkdtempSync(join(tmpdir(), 'commerce-override-'));
-  cpSync(join(MIGRATIONS_DIR, '..', '..', 'content'), dir, { recursive: true });
+  cpSync(sourceFixtureDir(), dir, { recursive: true });
   const d = fixture().departures.get('trip')!;
   const raw = { tour: 'altai', startDate: d.startsOn, endDate: d.endsOn, bookingStatus: 'OPEN', price: 26500,
     capacity: 40, isListed: true, isDemo: false };
@@ -52,7 +53,7 @@ test('departure requires exact valid times and services never default to include
 });
 
 test('the real Altai draft keeps supplied facts, missing conditions and closed launch boundary', () => {
-  const catalog = loadCatalog(join(MIGRATIONS_DIR, '..', '..', 'content'));
+  const catalog = loadCatalog(sourceFixtureDir());
   const d = catalog.departures.get('altai-1')!;
   assert.equal(catalog.launchReady, false);
   assert.equal(catalog.refundPolicy, 'DOCUMENTED_EXPENSES');
@@ -67,7 +68,7 @@ test('the real Altai draft keeps supplied facts, missing conditions and closed l
 
 test('production entrypoint refuses unqualified policy before identity, secrets or database connection', () => {
   const dir = mkdtempSync(join(tmpdir(), 'commerce-unqualified-'));
-  cpSync(join(MIGRATIONS_DIR, '..', '..', 'content'), dir, { recursive: true });
+  cpSync(sourceFixtureDir(), dir, { recursive: true });
   const settings = join(dir, 'site-settings.yml');
   writeFileSync(settings, readFileSync(settings, 'utf8').replace('launchReady: false', 'launchReady: true'));
   const result = spawnSync(process.execPath, ['--import', 'tsx', 'src/bin/serve.ts'], {
@@ -80,7 +81,7 @@ test('production entrypoint refuses unqualified policy before identity, secrets 
 
 test('omitted or unknown offer refund policy fails closed at catalog load', () => {
   const dir = mkdtempSync(join(tmpdir(), 'commerce-policy-'));
-  cpSync(join(MIGRATIONS_DIR, '..', '..', 'content'), dir, { recursive: true });
+  cpSync(sourceFixtureDir(), dir, { recursive: true });
   const path = join(dir, 'legal', 'oferta.yml');
   const original = readFileSync(path, 'utf8');
   for (const value of ['', 'refundPolicy: QUALIFIED']) {

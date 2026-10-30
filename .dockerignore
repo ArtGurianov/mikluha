@@ -6,9 +6,10 @@ control-room
 out
 .cms-cache
 public/generated/cms
-public/admin/sveltia-cms.js
 .git
 .env*
 !.env.example
 *.log
 .DS_Store
+
+commerce/test

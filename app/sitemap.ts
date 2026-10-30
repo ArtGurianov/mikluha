@@ -5,8 +5,7 @@ import { getDocumentLastModified, getHomeLastModified, getTourLastModified } fro
 import { resolveCanonicalBase } from "@/lib/site";
 import { getListedTours, getTodayInTimezone } from "@/lib/tours";
 
-// What `output: "export"` requires of a metadata route. It does not make the SSR sitemap static:
-// loadContent() waits for the request there, so it lists what Commerce publishes now.
+// loadContent() waits for the request, so the sitemap lists what Commerce publishes now.
 export const revalidate = false;
 
 /**

@@ -3,7 +3,7 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
 import { setImmediate as tick } from 'node:timers/promises';
 import { test } from 'node:test';
-import { AfterResponse, Arrivals, newContextId } from '../src/arrival.js';
+import { AfterResponse, Arrivals, newContextId } from './retired/arrival.js';
 import { SchemaAdmission } from '../src/schema-admission.js';
 
 const response = () => new ServerResponse(new IncomingMessage(new Socket()));

@@ -4,9 +4,9 @@ import { test } from 'node:test';
 
 import {
   Arrivals, ATTEMPT_CEILING_MS, BUY_BUDGET_MS, CLAIM_TTL_MS, MAX_ACTIVE_CLAIMS, MAX_QUEUED_CLAIMS, newContextId,
-} from '../src/arrival.js';
-import type { ArrivalClaimer } from '../src/arrival.js';
-import type { ArrivalClaimReceipt, RefrefResult } from '../src/refref.js';
+} from './retired/arrival.js';
+import type { ArrivalClaimer } from './retired/arrival.js';
+import type { ArrivalClaimReceipt, RefrefResult } from './retired/refref.js';
 
 const origin = 'https://book.mikluha.example';
 const unknown = { kind: 'UNKNOWN', cause: 'TRANSPORT' } as const;

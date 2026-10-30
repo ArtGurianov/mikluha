@@ -1,13 +1,8 @@
-// What can be sold, read from the site's own content/ (the same YAML the static build reads).
-//
-// The service is built from the same commit as the content, so a published price change reaches it
-// with its next deploy; an order freezes its price when it is created and never re-reads it.
-// Fail-closed: a departure is bookable only when everything below holds, and any malformed file
-// stops the service from starting rather than selling something half-described.
-
+// Shared contract types/parsers and code-owned settings/legal release.
+// The catalog is supplied by PostgreSQL public projections, never Git/YAML.
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import yaml from 'js-yaml';
 
@@ -79,7 +74,6 @@ export interface Catalog {
   readonly pdConsent: PersonalDataConsent;
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 function load(file: string): Record<string, unknown> {
@@ -141,48 +135,10 @@ export function departureContract(raw: unknown): DepartureContract | null {
   };
 }
 
-function optInt(doc: Record<string, unknown>, key: string, where: string, min: number): number | null {
-  const v = doc[key];
-  if (v === undefined || v === null) return null;
-  if (typeof v !== 'number' || !Number.isSafeInteger(v) || v < min) throw new Error(`CATALOG_INVALID: ${where} ${key}`);
-  return v;
-}
-
-export function loadCatalog(contentDir: string): Catalog {
+export function loadSiteRelease(contentDir: string): Catalog {
   const settings = load(join(contentDir, 'site-settings.yml'));
   const timezone = str(settings, 'timezone', 'site-settings');
-  const tours = new Map<string, { title: string; contract: TourContract | null }>();
-  for (const f of readdirSync(join(contentDir, 'tours')).filter((x) => x.endsWith('.yml'))) {
-    const t = load(join(contentDir, 'tours', f));
-    tours.set(str(t, 'slug', f), { title: str(t, 'title', f), contract: tourContract(t.contract) });
-  }
   const departures = new Map<string, Departure>();
-  for (const f of readdirSync(join(contentDir, 'departures')).filter((x) => x.endsWith('.yml'))) {
-    const slug = basename(f, '.yml');
-    const d = load(join(contentDir, 'departures', f));
-    const tourSlug = str(d, 'tour', slug);
-    const tour = tours.get(tourSlug);
-    if (tour === undefined) throw new Error(`CATALOG_INVALID: ${slug} names unknown tour ${tourSlug}`);
-    const dc = departureContract(d.contract);
-    // Whole replacement, never a merge: an incomplete override cannot borrow another trip's facts.
-    const rawContract = record(d.contract);
-    const product = Object.hasOwn(rawContract, 'product') ? tourContract(rawContract.product) : tour.contract;
-    const startsOn = str(d, 'startDate', slug);
-    const endsOn = str(d, 'endDate', slug);
-    if (!DATE.test(startsOn) || !DATE.test(endsOn) || endsOn < startsOn) throw new Error(`CATALOG_INVALID: ${slug} dates`);
-    const status = d.bookingStatus;
-    if (status !== 'OPEN' && status !== 'CLOSED' && status !== 'CANCELLED') throw new Error(`CATALOG_INVALID: ${slug} bookingStatus`);
-    const price = optInt(d, 'price', slug, 1);
-    departures.set(slug, {
-      slug, tourSlug, tourTitle: tour.title, startsOn, endsOn, bookingStatus: status,
-      priceKopecks: price === null ? null : price * 100,
-      capacity: optInt(d, 'capacity', slug, 1),
-      contract: product !== null && dc !== null ? { tour: product, departure: dc } : null,
-      // Visibility is fail-closed on the site too: only an explicit true.
-      isListed: d.isListed === true,
-      isDemo: d.isDemo === true,
-    });
-  }
   const artifact = (slug: string): BookingTerms => {
     const page = load(join(contentDir, 'legal', `${slug}.yml`));
     const content = str(page, 'content', slug);

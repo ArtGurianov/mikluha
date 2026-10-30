@@ -15,7 +15,7 @@ assert.ok(['postgres:', 'postgresql:'].includes(database.protocol)
   && ['127.0.0.1', '[::1]', 'localhost'].includes(database.hostname), 'Only loopback test PostgreSQL is allowed');
 assert.ok(!database.search, 'Connection overrides are not allowed');
 
-const checkout = 'src/checkout.ts';
+const checkout = 'test/retired/checkout.ts';
 const edit = (file, from, to) => ({ file, from, to });
 // Every anchor must occur exactly once; drift is a hard failure, never a skipped mutation.
 const mutants = [

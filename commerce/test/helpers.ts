@@ -1,3 +1,4 @@
+import { loadCatalog } from './retired/catalog.js';
 // A fresh database per test file, migrated by the owner, used by a login that is only a member of
 // commerce_app (the service), one that is only a member of commerce_operator, one that is only a
 // member of admin_app (the Admin API) and one that is only a member of admin_operator, as in production. TEST_DATABASE_URL is a superuser on a disposable server.
@@ -8,7 +9,7 @@ import { join } from 'node:path';
 
 import pg from 'pg';
 
-import { loadCatalog, type Catalog } from '../src/catalog.js';
+import { type Catalog } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import type { Logger } from '../src/log.js';
 import type { TouristInput } from '../src/orders.js';

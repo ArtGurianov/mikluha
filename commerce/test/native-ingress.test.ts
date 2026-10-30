@@ -11,16 +11,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
-import { CONTEXT_COOKIE, newContextId } from '../src/arrival.js';
+import { CONTEXT_COOKIE, newContextId } from './retired/arrival.js';
 import type { Catalog } from '../src/catalog.js';
-import type { CheckoutDeps } from '../src/checkout.js';
+import type { CheckoutDeps } from './retired/checkout.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { schemaHead } from '../src/migrate.js';
 import { setSalesOpen } from '../src/orders.js';
 import { BookingRateLimiter } from '../src/rate-limit.js';
-import { RefrefClient } from '../src/refref.js';
+import { RefrefClient } from './retired/refref.js';
 import { createCommerceServer } from '../src/server.js';
-import { createWebHandler } from '../src/web.js';
+import { createWebHandler } from './retired/web.js';
 import { FakeRefref } from './fake-refref.js';
 import { FakeVnext } from './fake-vnext.js';
 import { captureLog, fixtureCatalog, freshDb, seedCatalog, type TestDb, resetOrders } from './helpers.js';
@@ -272,7 +272,7 @@ describe('the real entrypoint with REFREF_VNEXT_API_BASE populated', () => {
         BUILD_IDENTITY_FILE: identity, DATABASE_URL: String(db.pool.options.connectionString), PORT: String(port),
         COMMERCE_ORIGIN: COMMERCE, SITE_ORIGIN: SITE, REFREF_API_BASE: refref.base,
         REFREF_CHECKOUT_ORIGIN: 'https://checkout.refref.example', REFREF_VNEXT_API_BASE: vnext.base,
-        REFREF_BUSINESS_ID: MERCHANT_ID, REFREF_BUSINESS_SLUG: 'mikluha', REFREF_API_KEY: 'rk_test',
+        REFREF_BUSINESS_ID: MERCHANT_ID, REFREF_BUSINESS_SLUG: 'mikluha', REFREF_API_KEY: '',
         NOTISEND_API_KEY: 'ns_test', NOTISEND_FROM_EMAIL: 'noreply@mikluha.example', NOTISEND_FROM_NAME: 'Миклуха' },
     });
     let out = '';
@@ -293,40 +293,31 @@ describe('the real entrypoint with REFREF_VNEXT_API_BASE populated', () => {
     return out;
   }
 
-  test('/arrive claims nothing before, after the response, across a restart, and legacy read-back still runs', async () => {
-    // The spawned service runs on the real clock: so does this legacy order, so each run only reads it back.
+  test('retired routes cannot claim, reserve, pay or reconcile, including across restart', async () => {
     clock = new Date();
-    const { ref } = await legacyPendingOrder('altai-2099-06-01');
+    await legacyPendingOrder('altai-2099-06-01');
     const earlier = refref.requests.length;
     const cookie = oldContext();
     const proofs = [vnext.issue(), vnext.issue()];
-    const outputs: string[] = [];
     for (const proof of proofs) {
-      const readBefore = legacyReadBacks();
-      outputs.push(await withService(async (svc, output) => {
-        const r = await http('GET', `/arrive?arrival=${proof}&to=/tours/`, { cookie, base: svc });
-        assert.equal(r.status, 302);
-        assert.equal(r.location, `${SITE}/tours/`);
-        assert.deepEqual(r.setCookie, []);
-        await http('GET', '/book?departure=altai-1', { cookie, base: svc }); // a later request of the same browser
-        // The maintenance worker's legacy reconciliation reads the existing order back on start.
-        const deadline = Date.now() + 10_000;
-        while (legacyReadBacks() === readBefore && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
-        assert.ok(legacyReadBacks() > readBefore, `this process read the legacy order back:\n${output()}`);
+      const out = await withService(async (svc) => {
+        for (const [method, path] of [['GET', `/arrive?arrival=${proof}&to=/tours/`],
+          ['GET', '/book?departure=altai-1'], ['POST', '/orders'], ['POST', '/orders/old/pay'],
+          ['GET', '/return?rt=secret'], ['GET', '/orders/old']]) {
+          const r = await http(method!, path!, { cookie, base: svc });
+          assert.equal(r.status, 410, `${method} ${path}`);
+          assert.equal(r.location, undefined);
+          assert.deepEqual(r.setCookie, []);
+        }
         await settle();
-      }));
-    }
-    assert.equal(vnext.hits, 0, 'no claim from either process');
-    assert.ok(legacyReadBacks() >= 2, `legacy read-backs: ${legacyReadBacks()}`);
-    assert.ok(refref.requests.slice(earlier).every((q) => q.method === 'GET' && q.path.includes(ref)),
-      'the services only read the legacy order back');
-    for (const out of outputs) {
+      });
       const listening = out.split('\n').filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>)
         .find((l) => l.event === 'listening')!;
       assert.equal(listening.ingress, 'NATIVE_NO_REFERRAL');
-      assert.equal(listening.vnextApiBaseIgnored, true);
-      assert.doesNotMatch(out, /arrival_claim|arrival_captured/);
-      for (const proof of proofs) assert.ok(!out.includes(proof), 'no proof in the service output');
+      assert.equal(listening.sales, 'CLOSED');
+      assert.ok(!out.includes(proof));
     }
+    assert.equal(vnext.hits, 0);
+    assert.equal(refref.requests.length, earlier, 'no legacy read-back worker or client');
   });
 });

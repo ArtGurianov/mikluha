@@ -18,15 +18,15 @@
 import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-import { bookingCutoff } from './booking-window.js';
-import type { ContractSnapshot } from './contract-snapshot.js';
+import { bookingCutoff } from '../../src/booking-window.js';
+import type { ContractSnapshot } from '../../src/contract-snapshot.js';
 
 import { arrivalTarget } from './arrival.js';
-import type { Json } from './snapshot.js';
-import { bookablePublished } from './public-content.js';
+import type { Json } from '../../src/snapshot.js';
+import { bookablePublished } from '../../src/public-content.js';
 import { orderBookingCutoff, paymentDeadline, handoffUrl, issueState, onReturn, ownsOrder, pay, reconcileOrder, zayavkaOf, type CheckoutDeps } from './checkout.js';
-import { countryName, MAX_SEATS_PER_ORDER, reserve, type BookingRequest, type TouristInput } from './orders.js';
-import { BookingRateLimiter } from './rate-limit.js';
+import { countryName, MAX_SEATS_PER_ORDER, reserve, type BookingRequest, type TouristInput } from '../../src/orders.js';
+import { BookingRateLimiter } from '../../src/rate-limit.js';
 
 /** Citizenships offered in the form, Russia first. Any country code is accepted by the service. */
 const CITIZENSHIPS = ['RU', 'BY', 'KZ', 'KG', 'AM', 'AZ', 'UZ', 'TJ', 'TM', 'MD', 'GE', 'MN', 'CN'];

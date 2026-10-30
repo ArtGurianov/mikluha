@@ -19,15 +19,8 @@ test('production accepts only the normalized fixed public and provider addresses
 
 test('production rejects redirected or modified trust boundaries', () => {
   const rejectedHttps: Array<[keyof typeof PRODUCTION_ADDRESSES, string]> = [
-    ['REFREF_API_BASE', 'https://attacker.example/v1-rc'],
-    ['REFREF_API_BASE', 'https://api.refref.ru.attacker.example/v1-rc'],
-    ['REFREF_API_BASE', 'https://api.refref.ru:444/v1-rc'],
-    ['REFREF_API_BASE', 'https://api.refref.ru/v1-rc/'],
-    ['REFREF_API_BASE', 'https://api.refref.ru/v1-rc?redirected=true'],
-    ['REFREF_API_BASE', 'https://secret@api.refref.ru/v1-rc'],
     ['COMMERCE_ORIGIN', 'https://attacker.example'],
     ['SITE_ORIGIN', 'https://attacker.example'],
-    ['REFREF_CHECKOUT_ORIGIN', 'https://attacker.example'],
   ];
 
   for (const [name, value] of rejectedHttps) {
@@ -39,15 +32,15 @@ test('production rejects redirected or modified trust boundaries', () => {
     );
   }
   assert.throws(
-    () => productionAddress('PRODUCTION', 'REFREF_API_BASE', 'http://api.refref.ru/v1-rc'),
-    /CONFIG_PRODUCTION_ADDRESS_MISMATCH: REFREF_API_BASE/,
+    () => productionAddress('PRODUCTION', 'COMMERCE_ORIGIN', 'http://book.mikluha-maklai.ru'),
+    /CONFIG_PRODUCTION_ADDRESS_MISMATCH: COMMERCE_ORIGIN/,
   );
   assert.throws(
-    () => productionAddress('PRODUCTION', 'REFREF_API_BASE', 'not-a-url'),
-    /CONFIG_INVALID: REFREF_API_BASE/,
+    () => productionAddress('PRODUCTION', 'COMMERCE_ORIGIN', 'not-a-url'),
+    /CONFIG_INVALID: COMMERCE_ORIGIN/,
   );
 });
 
 test('staging keeps addresses configurable and returns the configured value unchanged', () => {
-  assert.equal(productionAddress('STAGING', 'REFREF_API_BASE', 'http://127.0.0.1:3000'), 'http://127.0.0.1:3000');
+  assert.equal(productionAddress('STAGING', 'COMMERCE_ORIGIN', 'http://127.0.0.1:3000'), 'http://127.0.0.1:3000');
 });
