@@ -1,4 +1,4 @@
-# Mikluha SSR/Admin hard cut — execution review, revision 3, 2026-10-30
+# Mikluha SSR/Admin hard cut — execution review, revision 4, 2026-10-30
 
 Status: review draft, incorporating both rounds of OPUS and GPT reviews. This is an
 operational simplification proposal, not an approved roadmap replacement or
@@ -46,19 +46,57 @@ baseline, never a reserved number. Agent A owns migration numbering/journal;
 role C supplies media SQL specification and contract tests. CI checks uniqueness,
 append-only bytes/checksums and clean application. No agent is dispatched here.
 
-## Cutover gates versus later sales gates
+## Two production phases: installation/data entry and public traffic
 
-| Required for SSR/Admin cutover | Evidence / owner |
-|---|---|
-| Relevant current-system inventory and retained test/legal history | TOUR-82-A; no whole TOUR-82-B prerequisite |
-| Source-ready SSR/Admin and restricted roles | TOUR-60::SSR_SOURCE_READY, TOUR-64/66; immutable image identity |
-| SSR capacity/control slice | Proposed TOUR-65 stage: bookingStatus, OWNER OPEN/CLOSED, atomic pause/resume/batch/capacity, one lock model and no oversell |
-| Direct-S3 new media and versioned legal publication | TOUR-63 stage 1, TOUR-58/59; approved sources/rights, private originals, bounded transforms |
-| Privacy of the actual SSR/Admin/logging/media flows | SSR_PRIVACY_READY under TOUR-68; truthful policy, hosting/recipients/access/logs and legal approval |
-| Exact target database and usable recovery | TOUR-17/57, VPS-15; backup targets new DB, fresh dump read-back, isolated restore and current required PITR/custody proofs |
-| CLOSED across all reachable new/legacy payment paths | TOUR-67 negative acceptance; UI, API, old links/caches/routes, missing config fails closed |
-| Owner-authorized canary payment deny in advance or same window | REFREF-125::CANARY_PAYMENT_DENIED, separate scope/GO; no new real payment probe |
-| Concrete install/switch/recovery manifest and explicit OWNER GO | TOUR-67/VPS-15; named DNS, routes, exact images/schema/config/roles/backup and recovery target |
+**Phase A — authorized installation, then restricted Admin/data entry.** Public
+traffic remains on the existing site. The installation GO must name its technical
+staging and real-use boundary. A0 permits only the specifically approved empty
+DB/schema/config installation and isolated/synthetic validation, with production
+Admin origin inaccessible to users and no real Admin accounts/content/legal
+records entered. No technical staging permission is inferred from this draft.
+
+Before A0, qualify exact-source logical/PITR recovery in an isolated environment
+and approve the drift route and installation scope. After the explicitly approved
+empty target exists, verify its real backup target/stream/read-back and actual
+installed schema/role/recovery correspondence. Stop at the A-READY boundary until
+all A requirements below pass. This avoids pretending an uninstalled target can
+already have an installed backup receipt, or allowing real Admin data before
+recovery proof. Initial real owner enrolment itself is a real-data operation.
+
+A-READY admits protected Control Room use: actual admin identities, sessions,
+audit/logging, editorial content and legal preparation. Its privacy/access,
+backup/recovery, key and drift gates must already be satisfied. Use first-approved
+actual flows: private media staging is permitted only in approved scope; exposing
+public variants during A requires their public-media/rights/privacy approval at
+that time, not postponed to B. Sales and provider initiation stay globally CLOSED.
+
+**Phase B — separately authorized public traffic switch.** SSR receives public
+traffic only after B-READY, while Admin gates from A remain valid. Active legal
+versions/public rendering, public logs/media/privacy, all-path CLOSED, scoped
+canary deny and fallback receipts must be accepted. No whole native checkout,
+Refref v10 or optional image-cache completion is required.
+
+The phase A GO and phase B GO are distinct authorizations, possibly within one
+maintenance window. A's permission does not authorize B; B cannot retroactively
+supply missing Admin/data-entry approval. A-READY is an evidence condition inside
+the named owner scope, not an automatic extra GO or permission from a status.
+
+## Required gates by phase
+
+| Gate | Earliest required boundary | Evidence / owner |
+|---|---|---|
+| Relevant inventory; retained old/test/legal evidence | Before A installation; refresh before B | TOUR-82-A, no whole TOUR-82-B prerequisite |
+| Source/images/schema/roles selected; isolated exact-source recovery proven | Before authorized A0 installation | TOUR-60::SSR_SOURCE_READY, TOUR-17/57, VPS-15; no production restore rehearsal |
+| Overall drift route and installation manifest | Before A0; revalidate after changes and before B | VPS-15/shared host owners; overall PASS by default, explicit accepted exception only |
+| Real target backup + logical/PITR correspondence + matching key recovery | A-READY, before first real Admin/content/legal write | Actual new DB identity/streams/roles; independent read-back/recovery, fresh custody as required |
+| Admin slice of SSR_PRIVACY_READY and restricted Admin origin | A-READY, including first owner enrolment | TOUR-68/64, VPS-15: identities, sessions, audit, IP/logs, access controls and retention |
+| Source-ready Control Room and SSR-control/capacity slice | Before A-READY for the functions admitted there; full switch scope before B | TOUR-64/66, proposed TOUR-65 SSR stage: OWNER control, atomic locks/capacity, no oversell |
+| New media pipeline, approved rights/private originals/bounded transform | Before use in A; public delivery approval before first exposure in A or B | TOUR-63 stage 1; ZERO_IMPORT |
+| Versioned legal publication and public legal-page parity | Before B-READY, plus any earlier real publication in A | TOUR-58/59: termsRef/version/hash/effective date/approval |
+| Public SSR/log/media slice of SSR_PRIVACY_READY | Before B-READY, or earlier exposure of each flow | TOUR-68; do not defer already active Admin/media processing |
+| Global CLOSED and provider initiation denied | A0 onward for new stack; all-path switch acceptance at B-READY | TOUR-67 UI/API/legacy/stale paths, missing config fails closed |
+| Scoped CANARY_PAYMENT_DENIED | Before B, or start of its explicitly authorized window | REFREF-125 separate GO; no live create/refund probe |
+| Approved static fallback or maintenance page; exact traffic manifest | B-READY | TOUR-67/VPS-15; no writers, no restored legacy payment admission |
 
 | Later / independent gate | Boundary |
 |---|---|
@@ -171,10 +209,12 @@ A scope limited to files edited by this release is insufficient if shared
 recovery/routing/credential dependencies remain unreviewed. Audit ciphertext
 preservation is a different gate from operational host drift and recovery.
 
-## Installation manifest: required concrete fields
+## Phase A installation manifest and phase B traffic manifest
 
-No unresolved placeholders are allowed in the executable manifest presented for
-GO. This review chooses a preferred topology, subject to the installation review:
+No unresolved placeholders are allowed in the executable manifest for the scope
+of each GO. Mark every resource/action A0, A-READY or B; phase-A operation cannot
+wait for B privacy/recovery approval. This review chooses a preferred topology,
+subject to the installation review:
 
 1. **Database placement:** a new named DB inside the existing dedicated Mikluha
    PostgreSQL container/volume, preserving old mikluha_commerce. Record actual
@@ -208,15 +248,17 @@ GO. This review chooses a preferred topology, subject to the installation review
 7. **Admission/recovery:** negative matrix, canary deny receipt, target backup/
    restore/PITR/custody receipts, stop conditions and any explicitly accepted
    exceptions, including the chosen overall-drift route and disposition of each
-   shared-host finding. No new bank/refund probe as a verification shortcut.
+   shared-host finding. Record A-READY and B-READY independently. No new bank/
+   refund probe as a verification shortcut.
 8. **Credentials:** consumer-by-consumer list for each proposed PAT/Sveltia S3
    revocation, evidence of no backup/new-media/shared consumer, owner approval,
    method of proving old write denial and recovery of the new stack without it.
    Do not use an unapproved upload/push to prove denial in production.
 
-## Owner-authorized maintenance window
+## Phase B owner-authorized traffic-switch window
 
-1. Reconfirm inventory, exact manifests and global CLOSED. Unexpected operations
+1. Confirm A-READY/real-use receipts and B-READY prerequisites, then reconfirm
+   inventory, exact manifests and global CLOSED. Unexpected operations
    or unknown outcome stop the switch and preserve evidence. Installation and
    traffic switching are separate named owner authorizations, even in one window.
 2. Execute separately approved REFREF-125 CANARY_PAYMENT_DENIED before traffic
