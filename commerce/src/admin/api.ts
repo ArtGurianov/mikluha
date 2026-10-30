@@ -15,8 +15,8 @@
 //   POST /api/tours                        {slug}                        (OWNER, EDITOR)
 //   PUT  /api/tours/<id>/draft             {expectedRevision, document}  (OWNER, EDITOR)
 //   POST /api/tours/<id>/publish           {expectedDraftRevision, expectedPublishedVersion}  (OWNER)
-//   … the same for /api/departures (create takes {slug, tourId}; publish also {classification,
-//   notice} for an execution change, ADR v2.3 §4) and /api/content (create takes {kind, slug}:
+//   … the same for /api/departures (create takes {slug, tourId}; Stage A refuses order-affecting
+//   changes and classification) and /api/content (create takes {kind, slug}:
 //   report, review, organizer or legal)
 //   GET  /api/departures/<id>/affected-orders   order references and states only (OWNER, EDITOR)
 //   GET  /api/changes/<id>/notices              per-order notice states (OWNER, EDITOR)
@@ -46,7 +46,7 @@ import { schemaReadiness } from '../schema-readiness.js';
 
 import {
   affectedOrders, changeNotices, createContentItem, createDeparture, createTour, EditorialError, publishContentItem,
-  publishDeparture, publishTour, saveContentDraft, saveDepartureDraft, saveTourDraft, type Classification, type ContentKind,
+  publishTour, saveContentDraft, saveDepartureDraft, saveTourDraft, type Classification, type ContentKind,
   type Document,
 } from '../editorial.js';
 import type { Logger } from '../log.js';
@@ -142,6 +142,10 @@ const int = (v: unknown) => (typeof v === 'number' && Number.isSafeInteger(v) &&
 /** Database refusals the editor can act on, by the code the migration raises. */
 const DB_CODES: Record<string, number> = {
   MEDIA_UNKNOWN: 404, MEDIA_STATE_CONFLICT: 409, MEDIA_IDEMPOTENCY_CONFLICT: 409, MEDIA_QUEUE_FULL: 429, MEDIA_INVALID: 422,
+  DEPARTURE_CONTROL_CONFLICT: 409, GLOBAL_OPERATOR_STOP: 409, CAPACITY_BELOW_TAKEN: 409,
+  DEPARTURE_CANCELLED: 409, DEPARTURE_NOT_PUBLIC: 409, DEPARTURE_STARTED: 409, DEPARTURE_INCOMPLETE: 409,
+  DEPARTURE_CLOSE_BEFORE_HIDE: 409, DEPARTURE_STATUS_INVALID: 422, DEPARTURE_CONTROL_INVALID: 422,
+  LEGAL_APPROVAL_INVALID: 422, ORDER_CHANGE_STAGE_B_REQUIRED: 409, BATCH_UNKNOWN: 404,
   DRAFT_REVISION_CONFLICT: 409, PUBLISHED_VERSION_CONFLICT: 409, DEPARTURE_SCHEDULE_LOCKED: 409,
   TOUR_IDENTITY_IMMUTABLE: 409, DEPARTURE_IDENTITY_IMMUTABLE: 409, TOUR_NOT_PUBLISHED: 409,
   TOUR_DOCUMENT_INVALID: 422, DEPARTURE_DOCUMENT_INVALID: 422, TOUR_UNKNOWN: 404, DEPARTURE_UNKNOWN: 404,
@@ -155,6 +159,7 @@ function dbError(e: unknown): HttpError {
   if (err.code === '23505') return new HttpError(409, 'SLUG_TAKEN');
   if (err.code === '23503') return new HttpError(404, 'TOUR_UNKNOWN');
   if (err.code === '23514' || err.code === '22023' || err.code === '22P02') return new HttpError(422, 'INVALID');
+  if (err.code === '22007' || err.code === '22008') return new HttpError(422, 'INVALID');
   throw e;
 }
 
@@ -334,13 +339,17 @@ export function createAdminServer(deps: AdminDeps): Server {
   async function listDepartures(res: ServerResponse) {
     const { rows } = await deps.pool.query(`SELECT d.id, d.slug, d.tour_id AS "tourId", d.starts_on::text AS "startsOn",
       d.ends_on::text AS "endsOn", d.price_kopecks AS "priceKopecks", d.booking_status AS "bookingStatus", d.is_listed AS "isListed",
-      d.published_version AS "publishedVersion", d.published_at AS "publishedAt", r.revision AS "draftRevision"
+      d.published_version AS "publishedVersion", d.published_at AS "publishedAt", r.revision AS "draftRevision",
+      d.capacity, d.control_version AS "controlVersion", d.cancellation_requested_at AS "cancellationRequestedAt",
+      (SELECT taken_seats FROM admin_departure_inventory WHERE id = d.id) AS "takenSeats"
       FROM departure d LEFT JOIN departure_draft r ON r.departure_id = d.id ORDER BY d.starts_on NULLS LAST, d.created_at`);
     send(res, 200, { departures: rows.map(r => ({ ...r, priceKopecks: r.priceKopecks === null ? null : Number(r.priceKopecks) })) });
   }
 
   async function listContent(res: ServerResponse) {
-    const { rows } = await deps.pool.query(`SELECT c.id, c.kind, c.slug, c.published_version AS "publishedVersion",
+    const { rows } = await deps.pool.query(`SELECT c.id, c.kind, c.slug,
+      CASE WHEN c.kind = 'legal' THEN (SELECT max(version) FROM legal_publication WHERE item_id = c.id)
+        ELSE c.published_version END AS "publishedVersion",
       c.published_at AS "publishedAt", d.revision AS "draftRevision"
       FROM content_item c LEFT JOIN content_item_draft d ON d.item_id = c.id ORDER BY c.kind, c.created_at`);
     send(res, 200, { items: rows });
@@ -352,9 +361,14 @@ export function createAdminServer(deps: AdminDeps): Server {
     if (rows[0] === undefined) throw new HttpError(404, `${kind.toUpperCase()}_UNKNOWN`);
     const draft = (await deps.pool.query(`SELECT revision, document, updated_by AS "updatedBy", updated_at AS "updatedAt"
       FROM ${table}_draft WHERE ${key} = $1`, [id])).rows[0] ?? null;
-    const revisions = (await deps.pool.query(`SELECT version, draft_revision AS "draftRevision", document_sha256 AS "documentSha256",
-      published_by AS "publishedBy", published_at AS "publishedAt" FROM ${table}_revision WHERE ${key} = $1 ORDER BY version DESC`, [id])).rows;
-    send(res, 200, { [kind]: rows[0].row, draft, revisions });
+    const legal = kind === 'content' && rows[0].row.kind === 'legal';
+    const revisions = (await deps.pool.query(legal
+      ? `SELECT version, draft_revision AS "draftRevision", document, document_sha256 AS "documentSha256",
+          text_sha256 AS "textSha256", approved_by AS "publishedBy", published_at AS "publishedAt",
+          effective_on::text AS "effectiveOn", approval FROM legal_publication WHERE item_id = $1 ORDER BY version DESC`
+      : `SELECT version, draft_revision AS "draftRevision", document, document_sha256 AS "documentSha256",
+          published_by AS "publishedBy", published_at AS "publishedAt" FROM ${table}_revision WHERE ${key} = $1 ORDER BY version DESC`, [id])).rows;
+    send(res, 200, { [kind]: rows[0].row, draft, revisions, publishedDocument: revisions[0]?.document ?? null });
   }
 
   async function create(req: IncomingMessage, res: ServerResponse, kind: Kind) {
@@ -395,9 +409,8 @@ export function createAdminServer(deps: AdminDeps): Server {
   }
 
   /**
-   * OWNER only, from the live session alone. An execution change on a sold departure takes its
-   * classification and customer notice here (EQUIVALENT applies it with one notice per order;
-   * MATERIAL publishes nothing and routes it to move/cancel). The publish and its Admin audit row,
+   * OWNER only, from the live session alone. Stage A refuses paid-order schedule/contract changes;
+   * the classification/provider-notice workflow is a separate Stage B receipt. The publish and its Admin audit row,
    * which names this session and its AUTH.LOGIN row, commit together.
    */
   async function publish(req: IncomingMessage, res: ServerResponse, kind: Kind, id: string) {
@@ -411,6 +424,7 @@ export function createAdminServer(deps: AdminDeps): Server {
           || typeof body.notice !== 'string') throw new HttpError(422, 'EXECUTION_CHANGE_CLASSIFICATION_INVALID');
       change = { classification: body.classification, notice: body.notice };
     }
+    if (change !== undefined) throw new HttpError(409, 'ORDER_CHANGE_STAGE_B_REQUIRED');
     const at = { draftRevision: expected.draftRevision, publishedVersion: expected.publishedVersion };
     const client = await deps.publisherPool.connect();
     try {
@@ -421,7 +435,8 @@ export function createAdminServer(deps: AdminDeps): Server {
       if (live === undefined || live.id !== s.id) throw new HttpError(401, 'UNAUTHENTICATED');
       if (!allowed(live.role, 'editorial.publish')) throw new HttpError(403, 'FORBIDDEN');
       let result: { outcome: string; version: number; changeId: string | null; affectedOrders: number };
-      if (kind === 'departure') result = await publishDeparture(client, id, at, actor(s), change);
+      if (kind === 'departure') result = (await client.query(
+        'SELECT fn_publish_departure_stage_a($1,$2,$3,$4) AS r', [id, at.draftRevision, at.publishedVersion, actor(s)])).rows[0].r;
       else {
         const version = await (kind === 'tour' ? publishTour : publishContentItem)(client, id, at, actor(s));
         result = { outcome: 'PUBLISHED', version, changeId: null, affectedOrders: 0 };
@@ -437,6 +452,52 @@ export function createAdminServer(deps: AdminDeps): Server {
       await client.query('ROLLBACK');
       throw e instanceof HttpError ? e : editorialError(e);
     } finally { client.release(); }
+  }
+
+  /** One privileged transaction, with account/session locks and an authentication-linked audit. */
+  async function ownerCommand(req: IncomingMessage, res: ServerResponse, action: string,
+    command: (client: pg.PoolClient, body: Record<string, unknown>, s: Session) => Promise<Record<string, unknown>>,
+    entity?: { type: string; id: string }) {
+    const s = await authorize(req, action === 'LEGAL.PUBLISHED' ? 'legal.publish' : 'departure.controls');
+    const body = await readJson(req, MAX_AUTH_BODY);
+    const client = await deps.publisherPool.connect();
+    try {
+      await client.query('BEGIN');
+      const live = await lockSession(client, keys, cookieToken(req)!, s.adminId, now);
+      if (live === undefined || live.id !== s.id) throw new HttpError(401, 'UNAUTHENTICATED');
+      if (live.role !== 'OWNER') throw new HttpError(403, 'FORBIDDEN');
+      const result = await command(client, body, live);
+      await audit(client, keys, { adminId: live.adminId, actor: live.login, action, outcome: 'OK',
+        ...(entity ? { entityType: entity.type, entityId: entity.id } : typeof result.batchId === 'string'
+          ? { entityType: 'departure_control_batch', entityId: result.batchId } : {}),
+        details: { sessionId: live.id, authAuditId: live.authAuditId, result: JSON.stringify(result) } });
+      await client.query('COMMIT');
+      send(res, 200, result);
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e instanceof HttpError ? e : editorialError(e);
+    } finally { client.release(); }
+  }
+
+  async function controls(req: IncomingMessage, res: ServerResponse, id: string) {
+    return ownerCommand(req, res, 'DEPARTURE.CONTROLS', async (client, body, s) => {
+      const expected = int(body.expectedVersion);
+      if (expected === undefined || (body.bookingStatus !== undefined && !['OPEN','CLOSED'].includes(String(body.bookingStatus)))
+        || (body.capacity !== undefined && (int(body.capacity) === undefined || Number(body.capacity) < 1 || Number(body.capacity) > 100000))
+        || (body.isListed !== undefined && typeof body.isListed !== 'boolean')) throw new HttpError(422, 'INVALID');
+      return (await client.query('SELECT fn_admin_departure_controls($1,$2,$3,$4,$5,$6) AS r',
+        [id, expected, body.bookingStatus ?? null, body.capacity ?? null, body.isListed ?? null, actor(s)])).rows[0].r;
+    }, { type: 'departure', id });
+  }
+
+  async function legalPublish(req: IncomingMessage, res: ServerResponse, id: string) {
+    return ownerCommand(req, res, 'LEGAL.PUBLISHED', async (client, body, s) => {
+      const draft = int(body.expectedDraftRevision), version = int(body.expectedPublishedVersion);
+      if (draft === undefined || version === undefined || typeof body.effectiveOn !== 'string'
+        || !/^\d{4}-\d{2}-\d{2}$/.test(body.effectiveOn) || str(body.approval, 2000) === undefined) throw new HttpError(422, 'LEGAL_APPROVAL_INVALID');
+      return (await client.query('SELECT fn_admin_publish_legal($1,$2,$3,$4,$5,$6) AS r',
+        [id, draft, version, body.effectiveOn, body.approval, actor(s)])).rows[0].r;
+    }, { type: 'content_item', id });
   }
 
   /**
@@ -556,6 +617,25 @@ export function createAdminServer(deps: AdminDeps): Server {
       return;
     }
     if (path === '/api/audit' && method === 'GET') return auditLog(req, res, url);
+    if (path === '/api/departure-controls' && method === 'GET') {
+      await authorize(req, 'editorial.read');
+      const [switchResult, batches] = await Promise.all([
+        deps.pool.query('SELECT open FROM admin_sales_status'),
+        deps.pool.query(`SELECT b.id, b.created_at AS "createdAt", b.actor, count(m.departure_id)::int AS closed
+          FROM departure_control_batch b LEFT JOIN departure_control_batch_member m ON m.batch_id = b.id
+          GROUP BY b.id ORDER BY b.created_at DESC LIMIT 50`),
+      ]);
+      send(res, 200, { globalSalesOpen: switchResult.rows[0]?.open === true, batches: batches.rows }); return;
+    }
+    if (path === '/api/departure-controls/pause-all' && method === 'POST') return ownerCommand(req, res, 'DEPARTURE.PAUSE_ALL',
+      async (client, _body, s) => (await client.query('SELECT fn_admin_pause_all($1) AS r', [actor(s)])).rows[0].r);
+    const resume = /^\/api\/departure-controls\/([0-9a-f-]+)\/resume$/.exec(path);
+    if (resume && UUID.test(resume[1]!) && method === 'POST') return ownerCommand(req, res, 'DEPARTURE.RESUME_BATCH',
+      async (client, _body, s) => (await client.query('SELECT fn_admin_resume_batch($1,$2) AS r', [resume[1], actor(s)])).rows[0].r);
+    const control = /^\/api\/departures\/([0-9a-f-]+)\/controls$/.exec(path);
+    if (control && UUID.test(control[1]!) && method === 'POST') return controls(req, res, control[1]!);
+    const legal = /^\/api\/content\/([0-9a-f-]+)\/publish-legal$/.exec(path);
+    if (legal && UUID.test(legal[1]!) && method === 'POST') return legalPublish(req, res, legal[1]!);
 
     const orders = /^\/api\/departures\/([0-9a-f-]{36})\/affected-orders$/.exec(path);
     if (orders && method === 'GET' && UUID.test(orders[1]!)) {

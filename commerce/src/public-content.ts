@@ -15,6 +15,23 @@ export interface PublicTour {
   readonly publishedVersion: number;
 }
 
+export interface PublicLegalPage {
+  readonly slug: string;
+  readonly title: string;
+  readonly body: string;
+  readonly publishedVersion: number;
+  readonly documentSha256: string;
+  readonly textSha256: string;
+  readonly effectiveOn: string;
+}
+
+/** Only effective, explicitly approved publications; neither drafts nor approval notes are public. */
+export async function publicLegalPages(pool: pg.Pool | pg.PoolClient): Promise<PublicLegalPage[]> {
+  return (await pool.query<PublicLegalPage>(`SELECT slug, document->>'title' AS title, document #>> '{content,body}' AS body,
+    version AS "publishedVersion", document_sha256 AS "documentSha256", text_sha256 AS "textSha256",
+    effective_on::text AS "effectiveOn" FROM public_legal ORDER BY slug`)).rows;
+}
+
 /** A published, listed departure in the shape the checkout already sells (catalog.ts Departure). */
 export interface PublicDeparture extends Departure {
   readonly timezone: string;

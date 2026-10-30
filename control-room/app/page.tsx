@@ -1,38 +1,36 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { EditorialWorkspace } from "@/components/editorial-workspace";
 
 import { MediaPanel } from "./media-panel";
 
 import { api, ApiError, messageFor, type SessionInfo } from "@/lib/api";
 
 // The signed-in shell: the session (refresh, logout, other sessions), the editorial overview and,
-// for the OWNER, the audit. Editors for tours and departures come with ART-365 on the same API.
+// for the OWNER, the audit. All editors and operational controls use the same isolated API.
 
 interface LiveSession { id: string; createdAt: string; lastSeenAt: string; idleExpiresAt: string; absoluteExpiresAt: string }
-interface Tour { id: string; slug: string; title: string | null; publishedVersion: number | null; draftRevision: number | null }
-interface Departure {
-  id: string; slug: string; startsOn: string | null; endsOn: string | null; priceKopecks: number | null;
-  bookingStatus: string; isListed: boolean; publishedVersion: number | null; draftRevision: number | null;
-}
 interface AuditEntry {
   id: number; at: string; actor: string; action: string; outcome: string; entityType: string | null; entityId: string | null;
   /** ATTESTED: written by the Admin API; FORGED: invalid MAC; UNVERIFIABLE: historical key unavailable; OPERATOR: an operator's or the owner's login. */
   evidence: "ATTESTED" | "FORGED" | "UNVERIFIABLE" | "OPERATOR";
 }
 
-type Tab = "media" | "sessions" | "tours" | "departures" | "audit";
+type Tab = "media" | "sessions" | "tours" | "departures" | "content" | "audit";
 
 const time = (iso: string) => new Date(iso).toLocaleString("ru-RU");
-const rub = (k: number | null) => (k === null ? "—" : `${(k / 100).toLocaleString("ru-RU")} ₽`);
 /** Refresh when less than this much idle time is left and the person is active. */
 const REFRESH_BEFORE_MS = 10 * 60_000;
 
 export default function Dashboard() {
   const router = useRouter();
   const [me, setMe] = useState<SessionInfo | null>(null);
-  const [tab, setTab] = useState<Tab>("sessions");
+  const [tab, setTab] = useState<Tab>("tours");
+  const [unsaved, setUnsaved] = useState(false);
+  const refreshing = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const fail = useCallback((err: unknown) => {
@@ -48,7 +46,9 @@ export default function Dashboard() {
     if (!me) return;
     const onActivity = () => {
       if (new Date(me.idleExpiresAt).getTime() - Date.now() > REFRESH_BEFORE_MS) return;
-      api<SessionInfo>("POST", "/auth/refresh", {}).then(setMe, fail);
+      if (refreshing.current) return;
+      refreshing.current = true;
+      api<SessionInfo>("POST", "/auth/refresh", {}).then(setMe, fail).finally(() => { refreshing.current = false; });
     };
     window.addEventListener("pointerdown", onActivity);
     window.addEventListener("keydown", onActivity);
@@ -59,12 +59,13 @@ export default function Dashboard() {
   }, [me, fail]);
 
   async function logout() {
+    if (unsaved && !window.confirm("Есть несохранённые изменения. Выйти без сохранения?")) return;
     await api("POST", "/auth/logout", {}).catch(() => undefined);
     router.replace("/login/");
   }
 
   if (!me) return <p className="muted">{error ?? "Загрузка…"}</p>;
-  const tabs: [Tab, string][] = [["sessions", "Сессии"], ["tours", "Туры"], ["departures", "Выезды"], ["media", "Фото"]];
+  const tabs: [Tab, string][] = [["sessions", "Сессии"], ["tours", "Туры"], ["departures", "Выезды"], ["content", "Материалы"], ["media", "Фото"]];
   if (me.role === "OWNER") tabs.push(["audit", "Аудит"]);
 
   return (
@@ -78,12 +79,13 @@ export default function Dashboard() {
       {error && <p className="error" role="alert">{error}</p>}
       <nav className="tabs">
         {tabs.map(([key, label]) => (
-          <button key={key} className={tab === key ? undefined : "secondary"} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>
+          <button key={key} className={tab === key ? undefined : "secondary"} aria-pressed={tab === key} onClick={() => {
+            if (tab !== key && (!unsaved || window.confirm("Есть несохранённые изменения. Перейти без сохранения?"))) setTab(key);
+          }}>{label}</button>
         ))}
       </nav>
       {tab === "sessions" && <Sessions me={me} onChange={setMe} fail={fail} />}
-      {tab === "tours" && <Tours fail={fail} />}
-      {tab === "departures" && <Departures fail={fail} />}
+      {(tab === "tours" || tab === "departures" || tab === "content") && <EditorialWorkspace key={tab} collection={tab} role={me.role} fail={fail} onDirtyChange={setUnsaved} />}
       {tab === "media" && <MediaPanel role={me.role} fail={fail} />}
       {tab === "audit" && <Audit fail={fail} />}
     </>
@@ -118,50 +120,6 @@ function Sessions({ me, onChange, fail }: { me: SessionInfo; onChange: (s: Sessi
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function Tours({ fail }: { fail: (e: unknown) => void }) {
-  const [tours, setTours] = useState<Tour[] | null>(null);
-  useEffect(() => { api<{ tours: Tour[] }>("GET", "/tours").then(r => setTours(r.tours), fail); }, [fail]);
-  if (!tours) return <p className="muted">Загрузка…</p>;
-  return (
-    <div className="card">
-      <table>
-        <thead><tr><th>Slug</th><th>Название</th><th>Опубликовано</th><th>Черновик</th></tr></thead>
-        <tbody>
-          {tours.map(t => (
-            <tr key={t.id}><td>{t.slug}</td><td>{t.title ?? "—"}</td><td>{t.publishedVersion ? `v${t.publishedVersion}` : "нет"}</td><td>{t.draftRevision ?? "—"}</td></tr>
-          ))}
-        </tbody>
-      </table>
-      {tours.length === 0 && <p className="muted">Туров пока нет.</p>}
-    </div>
-  );
-}
-
-function Departures({ fail }: { fail: (e: unknown) => void }) {
-  const [list, setList] = useState<Departure[] | null>(null);
-  useEffect(() => { api<{ departures: Departure[] }>("GET", "/departures").then(r => setList(r.departures), fail); }, [fail]);
-  if (!list) return <p className="muted">Загрузка…</p>;
-  return (
-    <div className="card">
-      <table>
-        <thead><tr><th>Slug</th><th>Даты</th><th>Цена</th><th>Продажи</th><th>Опубликовано</th></tr></thead>
-        <tbody>
-          {list.map(d => (
-            <tr key={d.id}>
-              <td>{d.slug}</td>
-              <td>{d.startsOn ? `${d.startsOn} — ${d.endsOn}` : "—"}</td>
-              <td>{rub(d.priceKopecks)}</td>
-              <td>{d.bookingStatus}{d.isListed ? "" : " · скрыт"}</td>
-              <td>{d.publishedVersion ? `v${d.publishedVersion}` : "нет"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {list.length === 0 && <p className="muted">Выездов пока нет.</p>}
     </div>
   );
 }

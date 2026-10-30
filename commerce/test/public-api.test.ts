@@ -71,7 +71,7 @@ describe('public catalog API', () => {
     assert.equal(dep.tourSlug, d.tourSlug);
     assert.equal(dep.priceKopecks, 3_400_000);
     assert.equal(dep.contract?.departure.departureTime, '06:00');
-    assert.deepEqual(Object.keys(body).sort(), ['departures', 'organizers', 'reports', 'reviews', 'schema', 'tours']);
+    assert.deepEqual(Object.keys(body).sort(), ['departures', 'legalPages', 'organizers', 'reports', 'reviews', 'schema', 'tours']);
   });
 
   test('a saved draft never reaches the catalog until it is published', async () => {
@@ -92,3 +92,17 @@ describe('public catalog API', () => {
     assert.equal((await fetch(`${base}/public/v1/catalog/extra`)).status, 404);
   });
 });
+
+// Legal drafts and future approvals remain private; the public receipt carries only effective text.
+test('effective legal publication reaches public HTTP without private approval metadata', async () => {
+  const id = (await db.admin.query("SELECT fn_create_content_item('legal','public-privacy','editor') AS id")).rows[0].id;
+  const doc = {slug:'public-privacy',title:'Политика',content:{body:'Approved synthetic text'}};
+  await db.admin.query("SELECT fn_save_content_draft($1,0,$2,'editor')",[id,doc]);
+  assert.ok(!(await readPublic()).legalPages.some(p=>p.slug==='public-privacy'));
+  await db.publisher.query("SELECT fn_admin_publish_legal($1,1,0,'2026-01-01','private approval note','owner')",[id]);
+  const result = await readPublic();
+  assert.equal(result.legalPages.find(p=>p.slug==='public-privacy')?.body,doc.content.body);
+  assert.ok(!JSON.stringify(result).includes('private approval note'));
+  assert.ok(!JSON.stringify(result).includes('approvedBy'));
+});
+async function readPublic(): Promise<PublicCatalog> { return await (await fetch(`${base}${PUBLIC_CATALOG_PATH}`)).json() as PublicCatalog; }

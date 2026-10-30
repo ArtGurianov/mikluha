@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   'editorial.publish': ['OWNER'],
   // Offer terms, privacy, refund/payment policy and PD consent releases (ART-358 adds their rows).
   'legal.publish': ['OWNER'],
+  'departure.controls': ['OWNER'],
   'audit.read': ['OWNER'],
 } as const satisfies Record<string, readonly Role[]>;
 export type Permission = keyof typeof PERMISSIONS;

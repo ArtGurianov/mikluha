@@ -271,7 +271,7 @@ describe('the boundary', () => {
     assert.ok(!JSON.stringify(log.body).includes(PASSWORD));
   });
 
-  test('publishing and classification: OWNER only, from the live session, linked to its login', async () => {
+  test('Stage A publication refuses paid-order changes for every classification, preserving new-quote prices', async () => {
     const owner = await enrolled('exec-owner');
     const editor = await enrolled('exec-editor', 'EDITOR');
     const tour = (await call('POST', '/api/tours', { cookie: owner.cookie, body: { slug: 'exec-tour' } })).body.id as string;
@@ -301,7 +301,7 @@ describe('the boundary', () => {
 
     assert.equal((await save(2, { ...doc, contract: { tour: { ...t, route: 'Другой маршрут' }, departure: d } })).status, 200);
     const unclassified = await pub(owner.cookie, 3, 1);
-    assert.deepEqual([unclassified.status, unclassified.body.error], [409, 'EXECUTION_CHANGE_CLASSIFICATION_REQUIRED']);
+    assert.deepEqual([unclassified.status, unclassified.body.error], [409, 'ORDER_CHANGE_STAGE_B_REQUIRED']);
     const change = { classification: 'EQUIVALENT', notice: 'Маршрут заменён равноценным.', by: 'owner' };
     // Naming the owner in the request is worth nothing: no session, a revoked one, or an editor's.
     assert.equal((await pub(undefined, 3, 1, change)).status, 401);
@@ -312,23 +312,16 @@ describe('the boundary', () => {
 
     const listed = await call('GET', `/api/departures/${dep}/affected-orders`, { cookie: editor.cookie });
     assert.deepEqual(listed.body.orders, [{ orderRef: r.ok ? r.orderRef : '', status: 'RESERVED' }]);
-    const applied = await pub(owner.cookie, 3, 1, change);
-    assert.equal(applied.status, 200, JSON.stringify(applied.body));
-    assert.deepEqual([applied.body.outcome, applied.body.version, applied.body.affectedOrders], ['APPLIED', 2, 1]);
-    const changeId = applied.body.changeId as string;
-    const recorded = (await db.owner.query('SELECT classified_by, login_role FROM departure_execution_change WHERE id = $1', [changeId])).rows[0];
-    assert.deepEqual(recorded, { classified_by: 'admin:exec-owner', login_role: 'commerce_test_admin_publisher' });
-    // The Admin audit of the classification names the session and the password + TOTP login behind it.
-    const link = (await db.owner.query(`SELECT a.actor, l.action AS auth_action, l.actor AS auth_actor, l.entity_id = a.details->>'sessionId' AS same_session
-      FROM admin_audit a JOIN admin_audit l ON l.id = (a.details->>'authAuditId')::bigint
-      WHERE a.action = 'DEPARTURE.EXECUTION_CHANGE_EQUIVALENT' AND a.details->>'changeId' = $1`, [changeId])).rows;
-    assert.deepEqual(link, [{ actor: 'exec-owner', auth_action: 'AUTH.LOGIN', auth_actor: 'exec-owner', same_session: true }]);
-    const notices = await call('GET', `/api/changes/${changeId}/notices`, { cookie: editor.cookie });
-    assert.deepEqual((notices.body.notices as { state: string }[]).map(n => n.state), ['PENDING']);
-
-    // A price is edited freely; it reaches new quotes only.
-    assert.equal((await save(3, { ...doc, contract: { tour: { ...t, route: 'Другой маршрут' }, departure: d }, priceKopecks: 3_200_000 })).status, 200);
-    assert.deepEqual((await pub(owner.cookie, 4, 2)).body, { outcome: 'PUBLISHED', version: 3, changeId: null, affectedOrders: 0 });
+    const original = (await db.owner.query('SELECT contract_snapshot_sha256 FROM orders WHERE order_ref=$1', [r.ok ? r.orderRef : ''])).rows[0];
+    for (const classification of ['EQUIVALENT', 'MATERIAL']) {
+      const refused = await pub(owner.cookie, 3, 1, { ...change, classification });
+      assert.deepEqual([refused.status, refused.body.error], [409, 'ORDER_CHANGE_STAGE_B_REQUIRED']);
+    }
+    assert.equal((await db.owner.query('SELECT count(*)::int AS n FROM departure_execution_change WHERE departure_id=$1',[dep])).rows[0].n, 0);
+    // Restore original accepted contract; price changes apply only to future quotes.
+    assert.equal((await save(3, { ...doc, priceKopecks: 3_200_000 })).status, 200);
+    assert.deepEqual((await pub(owner.cookie, 4, 1)).body, { outcome: 'PUBLISHED', version: 2, changeId: null, affectedOrders: 0 });
+    assert.deepEqual((await db.owner.query('SELECT contract_snapshot_sha256 FROM orders WHERE order_ref=$1', [r.ok ? r.orderRef : ''])).rows[0], original);
   });
 
   test('content and legal items are created by editors and published by the OWNER', async () => {
@@ -672,4 +665,61 @@ describe('TOUR-63 authenticated media command boundary',()=>{
     await setDisabled(db.adminOperator,'media-editor',true,'operator','media test revocation');
     assert.equal((await call('POST','/api/media',{body:{...body,id:(await import('node:crypto')).randomUUID()},cookie:editor.cookie})).status,401);
   });
+});
+
+test('TOUR-64 legal approval is OWNER-only, versioned, hashed, date-bound and leaves processing instruction DRAFT', async () => {
+  const owner = await enrolled('legal-stage-owner'), editor = await enrolled('legal-stage-editor', 'EDITOR');
+  const id = (await call('POST','/api/content',{cookie:owner.cookie,body:{kind:'legal',slug:'privacy-stage-a'}})).body.id as string;
+  const document = {slug:'privacy-stage-a',title:'Политика',content:{body:'Версия для локального теста.'}};
+  const draft = {expectedRevision:0,document};
+  assert.equal((await call('PUT',`/api/content/${id}/draft`,{cookie:owner.cookie,body:draft})).status,200);
+  assert.equal((await db.pool.query('SELECT * FROM public_legal WHERE slug=$1',['privacy-stage-a'])).rowCount,0);
+  const body = {expectedDraftRevision:1,expectedPublishedVersion:0,effectiveOn:'2026-01-01',approval:'Synthetic OWNER approval'};
+  for (const [cookie,status] of [[undefined,401],[editor.cookie,403]] as const) assert.equal((await call('POST',`/api/content/${id}/publish-legal`,{...(cookie?{cookie}:{}),body})).status,status);
+  assert.equal((await call('POST',`/api/content/${id}/publish-legal`,{cookie:owner.cookie,body:{...body,approval:''}})).status,422);
+  assert.equal((await call('POST',`/api/content/${id}/publish-legal`,{cookie:owner.cookie,body:{...body,effectiveOn:'2026-02-31'}})).status,422);
+  const published = await call('POST',`/api/content/${id}/publish-legal`,{cookie:owner.cookie,body});
+  assert.equal(published.status,200,JSON.stringify(published.body));
+  assert.equal(published.body.textSha256,`sha256:${createHash('sha256').update(document.content.body).digest('hex')}`);
+  assert.equal((await call('POST',`/api/content/${id}/publish-legal`,{cookie:owner.cookie,body})).status,409);
+  const read = await call('GET',`/api/content/${id}`,{cookie:owner.cookie});
+  assert.deepEqual(read.body.publishedDocument,document);
+  assert.equal((read.body.revisions as {version:number}[])[0]!.version,1);
+  const pub = (await db.pool.query('SELECT * FROM public_legal WHERE slug=$1',['privacy-stage-a'])).rows[0];
+  assert.equal(pub.version,1); assert.deepEqual(pub.document,document);
+  assert.equal((await db.pool.query('SELECT status FROM processing_instruction')).rows[0].status,'DRAFT');
+  await assert.rejects(db.admin.query('DELETE FROM legal_publication'),/permission denied/);
+  await assert.rejects(db.owner.query('UPDATE legal_publication SET approval=approval'),/EDITORIAL_HISTORY_IMMUTABLE/);
+  await assert.rejects(db.owner.query("UPDATE content_item SET slug='changed-legal' WHERE id=$1",[id]),/CONTENT_IDENTITY_IMMUTABLE/);
+  await assert.rejects(db.owner.query('DELETE FROM content_item WHERE id=$1',[id]),/CONTENT_IDENTITY_IMMUTABLE/);
+  const events = await auditRows('LEGAL.PUBLISHED'); assert.equal(events.at(-1)?.actor,'legal-stage-owner');
+  assert.ok(events.at(-1)?.details.authAuditId);
+  // Future publication is retained in Admin history, but does not replace today's effective text.
+  await call('PUT',`/api/content/${id}/draft`,{cookie:owner.cookie,body:{expectedRevision:1,document:{...document,content:{body:'Будущая редакция'}}}});
+  assert.equal((await call('POST',`/api/content/${id}/publish-legal`,{cookie:owner.cookie,body:{...body,expectedDraftRevision:2,expectedPublishedVersion:1,effectiveOn:'2099-01-01'}})).status,200);
+  assert.equal((await db.pool.query('SELECT version FROM public_legal WHERE slug=$1',['privacy-stage-a'])).rows[0].version,1);
+});
+
+test('TOUR-65 HTTP controls require live OWNER, validate, audit, and cannot clear the global stop',async()=>{
+  const owner=await enrolled('controls-owner'),editor=await enrolled('controls-editor','EDITOR');
+  const tour=(await call('POST','/api/tours',{cookie:owner.cookie,body:{slug:'control-http-tour'}})).body.id as string;
+  await call('PUT',`/api/tours/${tour}/draft`,{cookie:owner.cookie,body:{expectedRevision:0,document:{slug:'control-http-tour',title:'Тур',contract:null,content:{}}}});
+  await call('POST',`/api/tours/${tour}/publish`,{cookie:owner.cookie,body:{expectedDraftRevision:1,expectedPublishedVersion:0}});
+  const id=(await call('POST','/api/departures',{cookie:owner.cookie,body:{slug:'control-http',tourId:tour}})).body.id as string;
+  const path=`/api/departures/${id}/controls`, body={expectedVersion:0,capacity:10,by:'owner'};
+  assert.equal((await call('POST',path,{body})).status,401);
+  assert.equal((await call('POST',path,{cookie:editor.cookie,body})).status,403);
+  assert.equal((await call('POST',path,{cookie:owner.cookie,body:{...body,capacity:1.5}})).status,422);
+  const result=await call('POST',path,{cookie:owner.cookie,body}); assert.equal(result.status,200,JSON.stringify(result.body));
+  assert.equal(result.body.bookingStatus,'CLOSED');
+  assert.equal((await call('POST',path,{cookie:owner.cookie,body})).status,409);
+  await setSalesOpen(db.operator,false,'test','test global stop');
+  const state=await call('GET','/api/departure-controls',{cookie:owner.cookie});assert.equal(state.body.globalSalesOpen,false);
+  assert.deepEqual((await call('POST',path,{cookie:owner.cookie,body:{expectedVersion:result.body.controlVersion,bookingStatus:'OPEN'}})).body,{error:'GLOBAL_OPERATOR_STOP'});
+  const paused=await call('POST','/api/departure-controls/pause-all',{cookie:owner.cookie,body:{}});assert.equal(paused.status,200);
+  assert.equal((await call('POST','/api/departure-controls/pause-all',{cookie:editor.cookie,body:{}})).status,403);
+  assert.equal((await db.pool.query('SELECT open FROM sales_switch')).rows[0].open,false);
+  const events=await auditRows('DEPARTURE.CONTROLS'); assert.equal(events.at(-1)?.actor,'controls-owner');assert.ok(events.at(-1)?.details.authAuditId);
+  await revokeSessions(db.adminOperator,'controls-owner','art','test revocation');
+  assert.equal((await call('POST',path,{cookie:owner.cookie,body:{expectedVersion:result.body.controlVersion,capacity:12}})).status,401);
 });

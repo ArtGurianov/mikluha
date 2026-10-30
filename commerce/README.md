@@ -820,3 +820,38 @@ The [media contract and runbook](media/README.md) define the authenticated Contr
 separate media-only worker/S3 principal, bounded Linux decoder, rights/public projection and confirmed
 withdrawal lifecycle. Migration 0018 is append-only. Source-only work does not enroll credentials,
 apply the migration, install the worker or qualify Cloud.ru. VPS-17 is not a stage-1 dependency.
+### TOUR-64 Stage A / TOUR-65 Admin contract
+
+Forward migration `0019_control_room_editors_and_departure_controls.sql` adds
+publisher-only departure controls and versioned legal approval. Historical
+migration bytes remain unchanged. No host or production database was changed.
+
+| Endpoint | OWNER command / read model |
+|---|---|
+| `GET /api/departure-controls` | redacted global-open flag and recent batch receipts; global switch remains operator-only |
+| `POST /api/departures/<id>/controls` | `expectedVersion`, optional `bookingStatus` (`OPEN`/`CLOSED`), `capacity`, `isListed`; no CANCELLED setter |
+| `POST /api/departure-controls/pause-all` | one transaction; returns immutable `batchId` and closed count |
+| `POST /api/departure-controls/<batchId>/resume` | rechecks current admission; returns opened count and skipped IDs/reasons |
+| `POST /api/content/<id>/publish-legal` | `expectedDraftRevision`, `expectedPublishedVersion`, `effectiveOn`, explicit approval; immutable document/text hashes |
+
+All privileged commands recheck the live session under account/session locks and
+commit an attested AUTH.LOGIN-linked audit in the same transaction. The API actor
+comes from the session. Raw sales-switch, purchase and personal-data tables stay
+unreadable to Admin; `admin_sales_status` and `admin_departure_inventory` expose
+only the required operational values. Capacity consumes migration 0017's canonical
+`fn_departure_taken_seats`, with no separate allocation ledger. OPEN takes the
+global switch share lock, then the batch barrier, row and existing departure
+advisory lock. Batch rows are locked in ID order; manual control touches supersede
+a prior batch, including CLOSED→CLOSED. Uncertain payment states are never freed.
+
+The Stage A Admin publication entry refuses schedule/contract changes if any order
+exists; underlying Stage B primitives and historical snapshots remain intact.
+Legal approval is separate from checkout release selection and processing-
+instruction signature. `/public/v1/catalog` adds `legalPages`: slug/title/body,
+publishedVersion, documentSha256, textSha256 and effectiveOn. It excludes drafts,
+future-effective versions and private approval notes. The SSR consumer must adopt
+this feed in its separately reviewed integration.
+
+TOUR-63's `0018_direct_s3_media.sql` precedes this suffix. Never rewrite an already
+committed migration on main or an applied database journal. This contract does not
+claim qualification of the media pipeline or clean-schema installation.
