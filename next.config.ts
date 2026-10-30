@@ -45,4 +45,10 @@ const nextConfig: NextConfig = ssr
       env: { SITE_RENDERING: "export" },
     };
 
+// App Router matches leaf names exactly (page.<extension>). Keep the synthetic checkout lab
+// discoverable by `next dev` only; production builds have no route or mock checkout bundle.
+nextConfig.pageExtensions = process.env.NODE_ENV === "development"
+  ? ["tsx", "ts", "jsx", "js", "preview.tsx"]
+  : ["tsx", "ts", "jsx", "js"];
+
 export default nextConfig;

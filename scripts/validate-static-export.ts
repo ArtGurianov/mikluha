@@ -82,6 +82,9 @@ async function main() {
   if (!(await exists(path.join(OUT_DIR, "index.html")))) {
     fail("/out/index.html is missing");
   }
+  if (await exists(path.join(OUT_DIR, "checkout-preview"))) {
+    fail("Development checkout preview must never be exported");
+  }
   if (!(await exists(path.join(OUT_DIR, "sitemap.xml")))) {
     fail("/out/sitemap.xml is missing");
   }
