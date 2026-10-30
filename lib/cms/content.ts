@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { cache } from "react";
 
 import { assertCatalogLaunchReady } from "../launch-gate";
+import { parsePublicLegalPages } from "./legal-projection";
 import { mediaDeliveryFromEnv, withMediaDelivery } from "./media-delivery";
 import { normalizeCatalog } from "./normalize";
 import { fetchPublicCatalog, projectionToRaw } from "./projection";
@@ -26,8 +27,7 @@ function loadSnapshot(): ContentSnapshot {
 let cached: ContentSnapshot | null = null;
 
 /**
- * Packaged settings/legal snapshot, read once per process. Its catalog is empty. Settings/legal
- * change with code, like the legal release Commerce is built from.
+ * Build inputs, read once per process. Only settings are public runtime authority.
  */
 export function getBakedContent(): ContentSnapshot {
   if (!cached) {
@@ -36,17 +36,24 @@ export function getBakedContent(): ContentSnapshot {
   return cached;
 }
 
-export type SiteContent = Pick<ContentSnapshot, "siteSettings" | "legalPages">;
+export type SiteContent = Pick<ContentSnapshot, "siteSettings" | "legalPages"> & { legalAvailable: boolean };
+
+// Share the same Commerce read across page, metadata and footer in one render only.
+const loadProjection = cache(fetchPublicCatalog);
+export const loadLegalPages = cache(async () => {
+  await connection();
+  try { return parsePublicLegalPages((await loadProjection()).legalPages); }
+  catch { return null; }
+});
 
 /**
- * Site settings and legal pages only, never Commerce: the root layout and the
- * legal pages render through a Commerce outage. Under SSR it still waits for
- * the request, so the media delivery switch applies without a rebuild.
+ * The shell survives Commerce failure, but never substitutes packaged legal text.
  */
 export const loadSiteContent = cache(async (): Promise<SiteContent> => {
-  const { siteSettings, legalPages } = getBakedContent();
   await connection();
-  return withMediaDelivery({ siteSettings, legalPages }, mediaDeliveryFromEnv());
+  const { siteSettings } = getBakedContent();
+  const legalPages = await loadLegalPages();
+  return withMediaDelivery({ siteSettings, legalPages: legalPages ?? [], legalAvailable: legalPages !== null }, mediaDeliveryFromEnv());
 });
 
 /**
@@ -60,10 +67,12 @@ export const loadSiteContent = cache(async (): Promise<SiteContent> => {
 export const loadContent = cache(async (): Promise<ContentSnapshot> => {
   await connection();
   const baked = getBakedContent();
-  const catalog = normalizeCatalog(projectionToRaw(await fetchPublicCatalog()));
+  const projection = await loadProjection();
+  const catalog = normalizeCatalog(projectionToRaw(projection));
+  const legalPages = parsePublicLegalPages(projection.legalPages);
   if (baked.siteSettings.launchReady) assertCatalogLaunchReady(catalog);
   return withMediaDelivery(
-    { ...baked, ...catalog, source: "commerce", generatedAt: new Date().toISOString() },
+    { ...baked, ...catalog, legalPages, source: "commerce", generatedAt: new Date().toISOString() },
     mediaDeliveryFromEnv(),
   );
 });

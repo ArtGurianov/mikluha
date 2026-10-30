@@ -41,6 +41,7 @@ type CommerceDepartureContract = Omit<RawDepartureContract, "product" | "service
 /** Only the fields this site reads; Commerce owns the full shape. */
 export interface PublicCatalog {
   schema: typeof PUBLIC_CATALOG_SCHEMA;
+  legalPages: unknown[];
   tours: { slug: string; title: string; content: Doc }[];
   departures: {
     slug: string;

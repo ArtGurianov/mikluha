@@ -14,6 +14,7 @@ export const RESERVED_SLUGS = [
   "_next",
   "generated",
   "api",
+  "admin",
   "index",
   "404",
   "robots.txt",

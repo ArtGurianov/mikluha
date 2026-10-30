@@ -8,6 +8,7 @@ const image = (name: string) => ({ image: `https://mikluha-maklai.s3.cloud.ru/cm
 
 const catalog = (): PublicCatalog => ({
   schema: PUBLIC_CATALOG_SCHEMA,
+  legalPages: [],
   tours: [{
     slug: "altai", title: "Алтай",
     // An editor's document cannot move the tour or unlist it: the projection's columns win.

@@ -10,6 +10,7 @@
  * Test controls (local only): PUT /__fixture/catalog replaces the document,
  * PUT /__fixture/down makes the catalog answer 503, PUT /__fixture/up undoes it.
  */
+import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage } from "node:http";
 import path from "node:path";
@@ -45,6 +46,12 @@ async function fixtureCatalog(): Promise<PublicCatalog> {
     .filter((r) => r.isListed === true && (!r.tour || listedTours.has(r.tour)));
   return {
     schema: PUBLIC_CATALOG_SCHEMA,
+    legalPages: ["oferta", "privacy-policy", "soglasie-pd"].map((slug) => {
+      const body = `Проверочная редакция Commerce: ${slug}. Только синтетические данные.`;
+      return { slug, title: `Документ ${slug}`, body, publishedVersion: 1, effectiveOn: "2026-01-01",
+        documentSha256: `sha256:${"a".repeat(64)}`,
+        textSha256: `sha256:${createHash("sha256").update(body).digest("hex")}` };
+    }),
     tours: tours.map((t) => ({ slug: t._slug, title: t.title ?? "", content: rest(t, "slug", "title", "isListed", "contract") })),
     departures: departures.map((d) => ({
       slug: d._slug, tourSlug: d.tour!, startsOn: d.startDate ?? "", endsOn: d.endDate ?? "",

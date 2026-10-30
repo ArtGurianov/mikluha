@@ -6,9 +6,11 @@ import type { LegalPageDTO, SiteSettingsDTO } from "@/lib/cms/types";
 export function Footer({
   siteSettings,
   legalPages,
+  legalAvailable = true,
 }: {
   siteSettings: SiteSettingsDTO;
   legalPages: LegalPageDTO[];
+  legalAvailable?: boolean;
 }) {
   const { company, socials } = siteSettings;
   const year = new Date().getFullYear();
@@ -54,6 +56,7 @@ export function Footer({
         </div>
 
         <nav aria-label="Дополнительные ссылки" className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm md:justify-end">
+          {!legalAvailable && <Link href="/privacy-policy/" className="underline underline-offset-4">Юридические документы временно недоступны</Link>}
           {socials.maxChannelUrl && (
             <a
               href={socials.maxChannelUrl}

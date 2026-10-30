@@ -18,7 +18,7 @@ const manrope = Manrope({
 
 export async function generateMetadata(): Promise<Metadata> {
   const { siteSettings } = await loadSiteContent();
-  // Never Commerce here, so a legal page renders through its outage. Each tour page sets its own image.
+  // Settings keep the shell renderable during an outage. Legal text has its own authority.
   const canonicalCoverImage = siteSettings.seo.ogImage?.src ?? undefined;
 
   return {
@@ -77,7 +77,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         />
         <Header siteSettings={siteSettings} />
         <main className="flex-1">{children}</main>
-        <Footer siteSettings={siteSettings} legalPages={legalPages} />
+        <Footer siteSettings={siteSettings} legalPages={legalPages} legalAvailable={content.legalAvailable} />
       </body>
     </html>
   );
