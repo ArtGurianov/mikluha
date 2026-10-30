@@ -66,17 +66,20 @@ test('the real Altai draft keeps supplied facts, missing conditions and closed l
   assert.equal(d.contract, null);
 });
 
-test('production entrypoint refuses unqualified policy before identity, secrets or database connection', () => {
+test('read-only production startup requires image identity independently of sale qualification', () => {
   const dir = mkdtempSync(join(tmpdir(), 'commerce-unqualified-'));
   cpSync(sourceFixtureDir(), dir, { recursive: true });
   const settings = join(dir, 'site-settings.yml');
-  writeFileSync(settings, readFileSync(settings, 'utf8').replace('launchReady: false', 'launchReady: true'));
+  // Keep launchReady=false and the unqualified sale policy. Read-only serving must
+  // reach its immutable image admission, not require activation of customer sales.
+  assert.match(readFileSync(settings, 'utf8'), /launchReady: false/);
   const result = spawnSync(process.execPath, ['--import', 'tsx', 'src/bin/serve.ts'], {
     cwd: join(MIGRATIONS_DIR, '..'), encoding: 'utf8', timeout: 10_000,
     env: { ...process.env, COMMERCE_ENVIRONMENT: 'PRODUCTION', CONTENT_DIR: dir },
   });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /REFUND_WORKFLOW_UNQUALIFIED/);
+  assert.match(result.stderr, /BUILD_IDENTITY_UNREADABLE/);
+  assert.doesNotMatch(result.stderr, /REFUND_WORKFLOW_UNQUALIFIED|CONTENT_NOT_LAUNCH_READY/);
 });
 
 test('omitted or unknown offer refund policy fails closed at catalog load', () => {

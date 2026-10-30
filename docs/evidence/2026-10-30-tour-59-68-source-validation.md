@@ -49,3 +49,14 @@ separate from this source evidence and must precede the relevant real use.
 
 CUSTODY_IMPACT: NO — source, local disposable PostgreSQL and synthetic SSR only;
 no host/env/network/proxy route/credential or deployed persistent state changed.
+
+## Hosted review correction
+
+Initial GitHub run 41058384245 passed verify, site-ssr, commerce-image and
+control-room. Commerce ran 417 tests: 416 passed; its old production-startup
+expectation still required refund/sales qualification before image identity.
+That expectation contradicts the sales-CLOSED read-only SSR/Admin scope: it
+would require opening launchReady just to serve the first legal publication.
+Updated the subprocess test to prove that unqualified sale content reaches
+immutable image admission while the separate bookable/refund refusal tests
+remain unchanged. No runtime change in this correction. Hosted rerun follows.
