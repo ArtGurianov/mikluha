@@ -6,8 +6,8 @@
 #   docker build --build-arg SOURCE_COMMIT=$(git rev-parse HEAD) .
 #
 # The build reads no production data: every page is rendered on request. What the image carries from
-# content/ is what changes with code — site settings and the legal pages, the same files Commerce's
-# image takes its legal release from — plus the build-baked /release.json that /identity serves.
+# content/ provides site settings; runtime legal text comes from Commerce. The build-baked
+# /release.json served by /identity identifies code independently of published legal text.
 
 FROM node:22-alpine AS deps
 WORKDIR /app
