@@ -18,7 +18,7 @@ import { loadContentYaml } from "../lib/cms/content-yaml";
 import { PUBLIC_CATALOG_SCHEMA, type PublicCatalog } from "../lib/cms/projection";
 import type { RawDeparture, RawOrganizer, RawReport, RawReview, RawTour } from "../lib/cms/types";
 
-const CONTENT_DIR = path.resolve(process.cwd(), "content");
+const CONTENT_DIR = path.resolve(process.cwd(), "test-fixtures/catalog");
 
 async function collection<T>(folder: string): Promise<(T & { _slug: string })[]> {
   const dir = path.join(CONTENT_DIR, folder);

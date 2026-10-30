@@ -4,9 +4,9 @@ import { after, before, beforeEach, test } from 'node:test';
 
 import pg from 'pg';
 
-import { issueState, onReturn, pay, reconcileAll, zayavkaOf, type CheckoutDeps } from '../src/checkout.js';
+import { issueState, onReturn, pay, reconcileAll, zayavkaOf, type CheckoutDeps } from './retired/checkout.js';
 import { maintain, reserve, setSalesOpen } from '../src/orders.js';
-import { RefrefClient } from '../src/refref.js';
+import { RefrefClient } from './retired/refref.js';
 import { FakeRefref } from './fake-refref.js';
 import { captureLog, fixtureCatalog, freshDb, seedCatalog, tourist, type TestDb, resetOrders } from './helpers.js';
 

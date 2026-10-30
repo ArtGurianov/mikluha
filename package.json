@@ -3,22 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "pnpm run vendor:admin && pnpm run sync:content",
+    "predev": "pnpm run prepare:site",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test \"lib/**/*.test.ts\"",
-    "clean": "rm -rf .next out .cms-cache public/generated/cms public/release.json",
-    "vendor:admin": "tsx scripts/vendor-admin-cms.ts",
-    "validate:cms-config": "tsx scripts/validate-cms-config.ts",
-    "sync:content": "tsx scripts/sync-content.ts",
+    "clean": "rm -rf .next .site-build public/release.json",
     "write:release": "tsx scripts/write-release-descriptor.ts",
     "validate:content": "tsx scripts/validate-content.ts",
-    "validate:out": "tsx scripts/validate-static-export.ts",
     "healthcheck": "tsx scripts/healthcheck.ts",
-    "build:production": "pnpm run clean && pnpm run validate:cms-config && pnpm run vendor:admin && pnpm run lint && pnpm run test && pnpm run sync:content && pnpm run validate:content && pnpm run write:release && pnpm run build && pnpm run validate:out",
-    "build:ssr": "pnpm run clean && pnpm run lint && pnpm run test && pnpm run sync:content && pnpm run validate:content -- --baked && pnpm run write:release && SITE_RENDERING=ssr next build"
+    "build:production": "pnpm run clean && pnpm run lint && pnpm run test && pnpm run prepare:site && pnpm run validate:content -- --baked && pnpm run write:release && next build",
+    "build:ssr": "pnpm run build:production",
+    "prepare:site": "tsx scripts/prepare-site.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -38,14 +35,12 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
-    "@sveltia/cms": "^0.193.0",
     "@tailwindcss/postcss": "^4",
     "@types/js-yaml": "^4.0.9",
     "@types/jsdom": "30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "ajv": "^8.20.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "jsdom": "30.0.1",

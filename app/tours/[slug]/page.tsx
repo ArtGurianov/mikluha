@@ -1,3 +1,4 @@
+import { CatalogUnavailable } from "@/components/site/catalog-unavailable";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -9,12 +10,11 @@ import { Breadcrumbs } from "@/components/site/breadcrumbs";
 import { MarkdownContent } from "@/components/site/markdown-content";
 import { DepartureBookingCard } from "@/components/tours/departure-booking-card";
 import { MobileBookingDock } from "@/components/tours/mobile-booking-dock";
-import { getBakedContent, loadContent } from "@/lib/cms/content";
+import { loadCatalogPage } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
-import { isSsr, resolveCanonicalBase } from "@/lib/site";
+import { resolveCanonicalBase } from "@/lib/site";
 import { buildBreadcrumbJsonLd, buildTouristTripJsonLd, getTourBreadcrumbs } from "@/lib/structured-data";
 import {
-  getListedTours,
   getNextDeparture,
   getReportsForTour,
   getReviewsForTour,
@@ -22,20 +22,10 @@ import {
   getTourBySlug,
 } from "@/lib/tours";
 
-/**
- * Static export: every page. SSR: no export at all — with one, Next treats the
- * route as prerendered and refuses the per-request Commerce read.
- */
-export const generateStaticParams = isSsr
-  ? undefined
-  : () => {
-      const content = getBakedContent();
-      return getListedTours(content).map((tour) => ({ slug: tour.slug }));
-    };
-
 export async function generateMetadata(props: PageProps<"/tours/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
-  const content = await loadContent();
+  const content = await loadCatalogPage();
+  if (!content) return { title: "Расписание временно недоступно", robots: { index: false, follow: false } };
   const tour = getTourBySlug(content, slug);
   if (!tour) return {};
 
@@ -53,7 +43,8 @@ export async function generateMetadata(props: PageProps<"/tours/[slug]">): Promi
 
 export default async function TourPage(props: PageProps<"/tours/[slug]">) {
   const { slug } = await props.params;
-  const content = await loadContent();
+  const content = await loadCatalogPage();
+  if (!content) return <CatalogUnavailable />;
   const tour = getTourBySlug(content, slug);
   if (!tour) notFound();
 

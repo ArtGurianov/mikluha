@@ -25,8 +25,6 @@ export function environment(): 'STAGING' | 'PRODUCTION' {
 export const PRODUCTION_ADDRESSES = {
   COMMERCE_ORIGIN: 'https://book.mikluha-maklai.ru',
   SITE_ORIGIN: 'https://mikluha-maklai.ru',
-  REFREF_API_BASE: 'https://api.refref.ru/v1-rc',
-  REFREF_CHECKOUT_ORIGIN: 'https://checkout.refref.ru',
 } as const;
 
 export type ProductionAddressName = keyof typeof PRODUCTION_ADDRESSES;

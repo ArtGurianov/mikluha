@@ -1,3 +1,4 @@
+import { CatalogUnavailable } from "@/components/site/catalog-unavailable";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -6,9 +7,9 @@ import { Gallery } from "@/components/gallery/gallery";
 import { HeroMedia } from "@/components/home/hero-media";
 import { CmsImage } from "@/components/media/cms-image";
 import { Breadcrumbs } from "@/components/site/breadcrumbs";
-import { getBakedContent, loadContent } from "@/lib/cms/content";
+import { loadCatalogPage } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
-import { isSsr, isStaging, resolveCanonicalBase } from "@/lib/site";
+import { isStaging, resolveCanonicalBase } from "@/lib/site";
 import { buildBreadcrumbJsonLd, getReportBreadcrumbs } from "@/lib/structured-data";
 import {
   formatDepartureDateRange,
@@ -19,20 +20,10 @@ import {
   getTourById,
 } from "@/lib/tours";
 
-/**
- * Static export: every page. SSR: no export at all — with one, Next treats the
- * route as prerendered and refuses the per-request Commerce read.
- */
-export const generateStaticParams = isSsr
-  ? undefined
-  : () => {
-      const content = getBakedContent();
-      return content.reports.map((report) => ({ slug: report.slug }));
-    };
-
 export async function generateMetadata(props: PageProps<"/reports/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
-  const content = await loadContent();
+  const content = await loadCatalogPage();
+  if (!content) return { title: "Расписание временно недоступно", robots: { index: false, follow: false } };
   const report = getReportBySlug(content, slug);
   if (!report) return {};
 
@@ -54,7 +45,8 @@ export async function generateMetadata(props: PageProps<"/reports/[slug]">): Pro
 
 export default async function ReportPage(props: PageProps<"/reports/[slug]">) {
   const { slug } = await props.params;
-  const content = await loadContent();
+  const content = await loadCatalogPage();
+  if (!content) return <CatalogUnavailable />;
   const report = getReportBySlug(content, slug);
   if (!report) notFound();
 

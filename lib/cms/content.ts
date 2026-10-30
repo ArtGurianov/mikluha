@@ -5,18 +5,17 @@ import { connection } from "next/server";
 import { cache } from "react";
 
 import { assertCatalogLaunchReady } from "../launch-gate";
-import { isSsr } from "../site";
 import { mediaDeliveryFromEnv, withMediaDelivery } from "./media-delivery";
 import { normalizeCatalog } from "./normalize";
 import { fetchPublicCatalog, projectionToRaw } from "./projection";
 import type { ContentSnapshot } from "./types";
 
-const CACHE_PATH = path.join(process.cwd(), ".cms-cache", "content.json");
+const CACHE_PATH = path.join(process.cwd(), ".site-build", "content.json");
 
 function loadSnapshot(): ContentSnapshot {
   if (!fs.existsSync(CACHE_PATH)) {
     throw new Error(
-      "CMS content cache not found (.cms-cache/content.json). Run `pnpm run sync:content` first " +
+      "Packaged site content not found (.site-build/content.json). Run `pnpm run prepare:site` first " +
         "(this happens automatically before `pnpm dev`, and is part of `pnpm run build:production`).",
     );
   }
@@ -27,9 +26,8 @@ function loadSnapshot(): ContentSnapshot {
 let cached: ContentSnapshot | null = null;
 
 /**
- * Full normalized content snapshot, read once per build/process from the
- * local CMS cache. Under SSR only its site settings and legal pages are used:
- * they change with code, like the legal release Commerce is built from.
+ * Packaged settings/legal snapshot, read once per process. Its catalog is empty. Settings/legal
+ * change with code, like the legal release Commerce is built from.
  */
 export function getBakedContent(): ContentSnapshot {
   if (!cached) {
@@ -47,13 +45,12 @@ export type SiteContent = Pick<ContentSnapshot, "siteSettings" | "legalPages">;
  */
 export const loadSiteContent = cache(async (): Promise<SiteContent> => {
   const { siteSettings, legalPages } = getBakedContent();
-  if (!isSsr) return { siteSettings, legalPages };
   await connection();
   return withMediaDelivery({ siteSettings, legalPages }, mediaDeliveryFromEnv());
 });
 
 /**
- * What a catalog page renders. Static export: the baked snapshot. SSR
+ * What a catalog page renders. SSR
  * (TOUR-60): one Commerce projection read per request, shared by metadata and
  * the page, with media URLs resolved for the current delivery mode. Never
  * prerendered: a build never reads production data. Once the site is
@@ -61,7 +58,6 @@ export const loadSiteContent = cache(async (): Promise<SiteContent> => {
  * (lib/launch-gate.ts), so publishing cannot bypass the release gate.
  */
 export const loadContent = cache(async (): Promise<ContentSnapshot> => {
-  if (!isSsr) return getBakedContent();
   await connection();
   const baked = getBakedContent();
   const catalog = normalizeCatalog(projectionToRaw(await fetchPublicCatalog()));
@@ -70,4 +66,12 @@ export const loadContent = cache(async (): Promise<ContentSnapshot> => {
     { ...baked, ...catalog, source: "commerce", generatedAt: new Date().toISOString() },
     mediaDeliveryFromEnv(),
   );
+});
+
+/** Only catalog pages degrade to a visible server-rendered state. No stale fallback. */
+export const loadCatalogPage = cache(async (): Promise<ContentSnapshot | null> => {
+  // Keep Next's request boundary outside the error handler (including prerender control flow).
+  await connection();
+  try { return await loadContent(); }
+  catch { return null; }
 });

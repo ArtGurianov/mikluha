@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
-import { RefrefClient } from '../src/refref.js';
+import { RefrefClient } from './retired/refref.js';
 
 test('absolute deadline bounds a trickling response body even when the socket stays active',async()=>{
   let bytes=0;

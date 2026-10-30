@@ -1,10 +1,6 @@
 name: CI
 
-# Independent check of every pull request before merge: the commands a
-# contributor runs locally, then the whole release pipeline in staging mode
-# (production mode is blocked by the launchReady gate while content is demo
-# data). Pull requests only — CMS Saves push straight to main and must not
-# each start a run; Coolify runs build:production again for every release.
+# Independent PR verification of the SSR-only storefront and separate services.
 on:
   pull_request:
 
@@ -51,7 +47,7 @@ jobs:
           SOURCE_COMMIT: ${{ github.sha }}
         run: pnpm run build:production
 
-  # The SSR site (Dockerfile.ssr, TOUR-60) as the release would run it, against the projection fixture:
+  # The SSR site (Dockerfile, TOUR-60) as the release would run it, against the projection fixture:
   # no-store, no cookie, /identity = the build's commit, render on request, the Commerce outage state,
   # and the media switch direct → cdn → direct on the same image (TOUR-56), with no rebuild.
   site-ssr:
@@ -73,8 +69,14 @@ jobs:
 
       - name: Image
         run: >-
-          docker build -f Dockerfile.ssr --build-arg SOURCE_COMMIT="$EXPECT_COMMIT"
+          docker build -f Dockerfile --build-arg SOURCE_COMMIT="$EXPECT_COMMIT"
           --build-arg DEPLOY_ENV=staging --build-arg SITE_URL=https://staging.invalid -t mikluha-site-ssr:ci .
+
+      - name: Retired assets and catalog fixtures are absent from the runtime
+        run: |
+          docker run --rm --entrypoint sh mikluha-site-ssr:ci -c '
+            test ! -d /app/public/admin && test ! -d /app/test-fixtures && test ! -d /app/commerce/test
+          '
 
       - name: Smoke, then switch media and back without a rebuild
         run: |
@@ -182,6 +184,15 @@ jobs:
       - name: Exact-HEAD image
         working-directory: .
         run: docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT="$EXPECTED_HEAD_SHA" -t mikluha-commerce:head-ci .
+
+      - name: Retired transport is absent from the compiled runtime
+        run: |
+          docker run --rm --entrypoint sh mikluha-commerce:head-ci -c '
+            for name in checkout refref arrival web; do
+              test ! -e "/app/commerce/dist/$name.js" || exit 1
+            done
+            test ! -d /app/commerce/test && test ! -d /app/content/tours && test ! -d /app/content/departures
+          '
 
       - name: Unchanged exact-HEAD image on compatible forward schema
         run: pnpm exec tsx scripts/qualify-schema-image.ts mikluha-commerce:head-ci "$EXPECTED_HEAD_SHA"

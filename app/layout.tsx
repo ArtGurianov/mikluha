@@ -3,10 +3,10 @@ import { Manrope } from "next/font/google";
 
 import { Footer } from "@/components/site/footer";
 import { Header } from "@/components/site/header";
-import { getBakedContent, loadSiteContent } from "@/lib/cms/content";
+import { loadSiteContent } from "@/lib/cms/content";
 import { jsonLdScript } from "@/lib/json-ld";
 import { getLegalPagesSorted } from "@/lib/legal";
-import { deployEnv, isSsr, isStaging, resolveCanonicalBase } from "@/lib/site";
+import { deployEnv, isStaging, resolveCanonicalBase } from "@/lib/site";
 import { buildOrganizationJsonLd } from "@/lib/structured-data";
 
 import "./globals.css";
@@ -18,9 +18,8 @@ const manrope = Manrope({
 
 export async function generateMetadata(): Promise<Metadata> {
   const { siteSettings } = await loadSiteContent();
-  // Never Commerce here, so a legal page renders through its outage. The static export keeps its
-  // first-tour fallback; under SSR every tour page sets its own image.
-  const canonicalCoverImage = siteSettings.seo.ogImage?.src ?? (isSsr ? undefined : getBakedContent().tours[0]?.coverImage.src);
+  // Never Commerce here, so a legal page renders through its outage. Each tour page sets its own image.
+  const canonicalCoverImage = siteSettings.seo.ogImage?.src ?? undefined;
 
   return {
     metadataBase: new URL(resolveCanonicalBase(siteSettings.siteUrl)),

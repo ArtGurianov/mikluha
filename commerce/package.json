@@ -3,9 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Mikluha's booking and payment service (docs/DECISIONS.md #9). Not part of the static site.",
+  "description": "Mikluha native Commerce and public projection service.",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "rm -rf dist && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test --test-concurrency=1 \"test/**/*.test.ts\"",
     "test:sabotage": "node scripts/test-business-sabotage.mjs"

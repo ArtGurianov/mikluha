@@ -6,16 +6,16 @@ import type { AddressInfo } from 'node:net';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
 import type { Catalog } from '../src/catalog.js';
-import { pay, reconcileAll, verdict, zayavkaOf, type CheckoutDeps } from '../src/checkout.js';
+import { pay, reconcileAll, verdict, zayavkaOf, type CheckoutDeps } from './retired/checkout.js';
 import { contractHash } from '../src/zayavka.js';
 import { snapshotDigest, type Json } from '../src/snapshot.js';
 import { schemaHead } from '../src/migrate.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { maintain, setSalesOpen } from '../src/orders.js';
 import { BookingRateLimiter } from '../src/rate-limit.js';
-import { RefrefClient, errorCode, type CheckoutAttempt } from '../src/refref.js';
+import { RefrefClient, errorCode, type CheckoutAttempt } from './retired/refref.js';
 import { createCommerceServer } from '../src/server.js';
-import { createWebHandler } from '../src/web.js';
+import { createWebHandler } from './retired/web.js';
 import { FakeRefref } from './fake-refref.js';
 import { captureLog, seedCatalog, fixtureCatalog, freshDb, type TestDb, resetOrders } from './helpers.js';
 

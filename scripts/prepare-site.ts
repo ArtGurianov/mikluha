@@ -1,13 +1,5 @@
 #!/usr/bin/env tsx
-/**
- * Step 1 of the production build pipeline.
- *
- * Reads the Git-committed content set from content/ (written either by hand or
- * through the Sveltia CMS admin panel, which commits directly to this repo via
- * the GitHub API), normalizes it, and writes the final snapshot to
- * .cms-cache/content.json. Media remains as direct Object Storage or tracked
- * demo URLs; no build step downloads or transforms it.
- */
+// Package code-owned settings and legal documents. Catalog data is never baked into the site.
 import { lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import path from "node:path";
@@ -17,7 +9,7 @@ import { normalizeContentSet } from "../lib/cms/normalize";
 import type { RawContentSet } from "../lib/cms/types";
 
 const CONTENT_DIR = path.resolve(process.cwd(), "content");
-const CACHE_DIR = path.resolve(process.cwd(), ".cms-cache");
+const CACHE_DIR = path.resolve(process.cwd(), ".site-build");
 const CACHE_FILE = path.join(CACHE_DIR, "content.json");
 
 /** Reads every *.yml file in a content/ subfolder, tagging each with its filename as `_slug`. */
@@ -74,21 +66,15 @@ async function readSingleton<T>(file: string): Promise<T> {
 }
 
 async function loadContentSet(): Promise<RawContentSet> {
-  const [siteSettings, tours, departures, reports, reviews, organizers, legalPages] = await Promise.all([
+  const [siteSettings, legalPages] = await Promise.all([
     readSingleton<RawContentSet["siteSettings"]>("site-settings.yml"),
-    readCollection<RawContentSet["tours"][number]>("tours"),
-    readCollection<RawContentSet["departures"][number]>("departures"),
-    readCollection<RawContentSet["reports"][number]>("reports"),
-    readCollection<RawContentSet["reviews"][number]>("reviews"),
-    readCollection<RawContentSet["organizers"][number]>("organizers"),
     readCollection<RawContentSet["legalPages"][number]>("legal"),
   ]);
-
-  return { siteSettings, tours, departures, reports, reviews, organizers, legalPages };
+  return { siteSettings, legalPages, tours: [], departures: [], reports: [], reviews: [], organizers: [] };
 }
 
 async function main() {
-  console.log(`[sync-content] source: ${path.relative(process.cwd(), CONTENT_DIR)}/`);
+  console.log(`[prepare-site] source: ${path.relative(process.cwd(), CONTENT_DIR)}/`);
 
   const raw = await loadContentSet();
   const snapshot = normalizeContentSet(raw, "git");
@@ -97,13 +83,13 @@ async function main() {
   await writeFile(CACHE_FILE, JSON.stringify(snapshot, null, 2), "utf-8");
 
   console.log(
-    `[sync-content] wrote ${CACHE_FILE} — tours:${snapshot.tours.length} departures:${snapshot.departures.length} ` +
+    `[prepare-site] wrote ${CACHE_FILE} — tours:${snapshot.tours.length} departures:${snapshot.departures.length} ` +
       `reports:${snapshot.reports.length} reviews:${snapshot.reviews.length} organizers:${snapshot.organizers.length} ` +
       `legalPages:${snapshot.legalPages.length}`,
   );
 }
 
 main().catch((error) => {
-  console.error("[sync-content] failed:", error);
+  console.error("[prepare-site] failed:", error);
   process.exit(1);
 });

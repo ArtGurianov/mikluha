@@ -1,3 +1,8 @@
+ > **2026-10-30 supersession:** historical PR #52 source receipt. Coexistence/static fallback,
+> `SITE_RENDERING`, `Dockerfile.ssr` and old setup assumptions are superseded by
+> [TOUR-60/66 SSR-only cleanup](2026-10-30-tour-60-66-ssr-cleanup.md). Preserve this evidence;
+> do not use its retired-static restore instructions.
+
 # TOUR-60 (ART-360) · SSR source: build, release by digest, identity, rollback
 
 - **Stage claimed by this change:** `SSR_SOURCE_READY` (roadmap v2, 2026-10-29) — for review.

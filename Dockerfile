@@ -1,70 +1,50 @@
 # syntax=docker/dockerfile:1
+# The SSR site (ADR v2.3 §2, §8; TOUR-60): `next start` reading Commerce's public projection on every
+# request. Built by CI for an exact commit and released to a Coolify Docker Image application by digest
+# (.github/workflows/site-ssr-release.yml), never built on the VPS.
+#
+#   docker build --build-arg SOURCE_COMMIT=$(git rev-parse HEAD) .
+#
+# The build reads no production data: every page is rendered on request. What the image carries from
+# content/ is what changes with code — site settings and the legal pages, the same files Commerce's
+# image takes its legal release from — plus the build-baked /release.json that /identity serves.
 
-# ---------------------------------------------------------------------------
-# Stage 1: install dependencies
-# ---------------------------------------------------------------------------
 FROM node:22-alpine AS deps
 WORKDIR /app
-
 RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
-
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 
-# ---------------------------------------------------------------------------
-# Stage 2: clean production build
-#
-# Content lives in content/ (this checked-out repo) — the build reads it
-# straight off disk, no CMS credentials of any kind needed here. The only
-# build-time switch left is DEPLOY_ENV, which controls indexability/canonical
-# URLs, not the content source. Its default ("production") requires
-# siteSettings.launchReady=true; the committed content/ (still demo data)
-# needs `--build-arg DEPLOY_ENV=staging` until real content replaces it.
-# ---------------------------------------------------------------------------
 FROM deps AS build
 WORKDIR /app
-
 ARG DEPLOY_ENV=production
 ARG SITE_URL
 ARG SOURCE_COMMIT
 ARG NEXT_PUBLIC_YANDEX_SMARTCAPTCHA_SITE_KEY
-
 ENV DEPLOY_ENV=$DEPLOY_ENV \
     SITE_URL=$SITE_URL \
     SOURCE_COMMIT=$SOURCE_COMMIT \
     NEXT_PUBLIC_YANDEX_SMARTCAPTCHA_SITE_KEY=$NEXT_PUBLIC_YANDEX_SMARTCAPTCHA_SITE_KEY \
     NEXT_TELEMETRY_DISABLED=1
-
 COPY . .
-
-# The one and only definition of the release pipeline lives in package.json.
-# Spelling the steps out again here let the two drift apart silently: the image
-# build kept running an older list and quietly skipped whole steps (lint, test)
-# that build:production had since grown. Call the script, never re-list its steps.
 RUN pnpm run build:production
 
-# ---------------------------------------------------------------------------
-# Stage 3: production runtime — Nginx serving the static /out only.
-# No Node.js, no CMS credentials, no source code.
-#
-# Deliberately the *stable* branch tag, not a patch version or a digest. A
-# content-triggered rebuild re-runs this Dockerfile from scratch, so the branch
-# tag picks up nginx patch releases — a pinned
-# digest would freeze the runtime until someone remembered to bump it, and
-# nothing here would ever remind them. Exact reproducibility buys little for a
-# server that only hands out static files. The risk a floating tag carries — a bad patch landing between two
-# builds of identical source — is what the candidate healthcheck covers
-# (scripts/healthcheck.ts runs before traffic switches, see RUNBOOK.md).
-# ---------------------------------------------------------------------------
-FROM nginx:1.30-alpine AS runtime
-
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/out /usr/share/nginx/html
-
-EXPOSE 80
-
+FROM node:22-alpine AS runtime
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+WORKDIR /app
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
+COPY --from=build /app/.site-build/content.json ./.site-build/content.json
+RUN chmod 0444 ./public/release.json ./.site-build/content.json
+USER node
+# Coolify's "Ports Exposes" must say 3000 (its default 80 answers 502; ART-360 PoC).
+EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1
-
-CMD ["nginx", "-g", "daemon off;"]
+  CMD wget -qO- http://127.0.0.1:3000/release.json >/dev/null 2>&1 || exit 1
+# Node 22 resolves require() of Next's @swc/helpers through the `module-sync` export condition to
+# ESM files the standalone trace does not copy; without require(esm) it takes the traced CJS ones.
+CMD ["node", "--no-experimental-require-module", "server.js"]

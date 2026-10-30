@@ -8,15 +8,15 @@ import { after, before, beforeEach, describe, test } from 'node:test';
 import pg from 'pg';
 
 import type { Catalog } from '../src/catalog.js';
-import { issueState, onReturn, pay, reconcileOrder, type CheckoutDeps } from '../src/checkout.js';
+import { issueState, onReturn, pay, reconcileOrder, type CheckoutDeps } from './retired/checkout.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { schemaHead } from '../src/migrate.js';
 import { maintain, reserve, setSalesOpen, type BookingRequest, type OrderDeps } from '../src/orders.js';
 import { currentPurchase, purchaseProfileOf, reserveNativePurchase } from '../src/purchases.js';
 import { BookingRateLimiter } from '../src/rate-limit.js';
-import { RefrefClient } from '../src/refref.js';
+import { RefrefClient } from './retired/refref.js';
 import { createCommerceServer } from '../src/server.js';
-import { createWebHandler } from '../src/web.js';
+import { createWebHandler } from './retired/web.js';
 import { FakeRefref } from './fake-refref.js';
 import { fixtureCatalog, forceStatus, freshDb, seedCatalog, tourist, type TestDb, resetOrders } from './helpers.js';
 
