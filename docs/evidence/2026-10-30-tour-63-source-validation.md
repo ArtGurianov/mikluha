@@ -58,3 +58,19 @@ command; provider execution requires separately scoped owner authorization for t
 
 No VPS-17 receipt is needed to finish stage 1. TOUR-63 must not be closed before the independent
 stage-1 provider/installation/recovery evidence above exists.
+
+## Provider discovery / hosted check follow-up
+
+Read-only `aws s3api` discovery found local bucket `mikluha` via `https://s3.cloud.ru`;
+`head-bucket` reported ru-central-1. Default and explicitly path-style requests for ACL, CORS and
+versioning returned AccessDenied; policy read-back did too. No object write/delete or bucket config
+change was attempted. A CLI listing is not privacy or versioning proof. A narrowly scoped readable
+bucket configuration and separately enrolled worker credential remain required.
+
+The public Cloud.ru global/domain name is enrolled separately as MEDIA_S3_PUBLIC_ORIGIN; it is not
+derived from the local bucket name. Local tests cover a deliberately different global name.
+
+Hosted Actions started on the first PR head (so the historical billing block is not assumed current).
+The exact-image probe correctly refused its old pinned schema 17 baseline after the real head
+advanced to 18; its reviewed baseline is now 18, and the additive forward fixture is 19. Runtime
+media-view privileges are checked too. Final hosted result belongs to the exact PR head/checks.

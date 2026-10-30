@@ -150,8 +150,11 @@ test('TLS + SigV4 conditional writes, anonymous denial, verified public WebP, co
   versioned = true;
   await assert.rejects(store.assertConfiguration(), /MEDIA_VERSIONING_UNSUPPORTED/);
   versioned = false;
-  const originalBytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP8z4AdMOEQH6QSAM1BAQ/oQeJvAAAAAElFTkSuQmCC','base64');
-  const body=(await decodeIsolated(originalBytes))[0]!.bytes;
+  const originalBytes = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP8z4AdMOEQH6QSAM1BAQ/oQeJvAAAAAElFTkSuQmCC',
+    'base64',
+  );
+  const body = (await decodeIsolated(originalBytes))[0]!.bytes;
   await store.privateWrite(key, body, 'image/webp');
   assert.equal((await fetch(store.url(key))).status, 403);
   await store.privateWrite(key, body, 'image/webp');
@@ -171,7 +174,9 @@ test('TLS + SigV4 conditional writes, anonymous denial, verified public WebP, co
   badMime = true;
   await assert.rejects(store.publish(v), /MEDIA_PUBLIC_READBACK/);
   badMime = false;
-  badCors=true;await assert.rejects(store.publish(v),/MEDIA_PUBLIC_READBACK/);badCors=false;
+  badCors = true;
+  await assert.rejects(store.publish(v), /MEDIA_PUBLIC_READBACK/);
+  badCors = false;
   await store.publish(v);
   const response = await fetch(v.url);
   assert.equal(response.status, 200);
@@ -200,8 +205,15 @@ test('unsafe storage configuration and client-selected keys are refused', () => 
         secretAccessKey: 's',
       }),
   );
-  const remote=new S3MediaStorage({endpoint:'https://s3.cloud.ru',bucket:'synthetic-bucket',region:'test',accessKeyId:'k',secretAccessKey:'s'});
-  assert.equal(remote.url(key),`https://synthetic-bucket.s3.cloud.ru/${key}`);
+  const remote = new S3MediaStorage({
+    endpoint: 'https://s3.cloud.ru',
+    bucket: 'synthetic-bucket',
+    publicOrigin: 'https://different-global-name.s3.cloud.ru',
+    region: 'test',
+    accessKeyId: 'k',
+    secretAccessKey: 's',
+  });
+  assert.equal(remote.url(key), `https://different-global-name.s3.cloud.ru/${key}`);
   assert.throws(() => store.url('../../secret'));
   assert.throws(() => store.url('media/v1/private'));
 });

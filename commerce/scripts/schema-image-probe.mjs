@@ -19,7 +19,7 @@ import { createCommerceServer, readiness } from './dist/server.js';
 const identity = await readBuildIdentity('/app/identity/identity.json');
 assert.equal(identity.sourceCommit, process.env.QUALIFICATION_SOURCE_COMMIT, 'image must identify the declared exact HEAD');
 const migrations = readMigrations('./migrations');
-const bundledHead=17, forwardHead=18;
+const bundledHead=18, forwardHead=19;
 assert.equal(migrations.length, bundledHead, 'review this qualification when the real baseline advances');
 const owner = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await owner.connect();
@@ -27,6 +27,8 @@ const dir = mkdtempSync(join(tmpdir(), 'schema-proof-'));
 let pool, operator, server;
 try {
   assert.deepEqual(await migrate(owner, './migrations'), Array.from({ length: bundledHead }, (_, i) => i + 1));
+  assert.equal((await owner.query("SELECT has_table_privilege('commerce_app','public_media','SELECT') AS allowed")).rows[0].allowed,true);
+  assert.equal((await owner.query("SELECT has_table_privilege('commerce_app','media_asset','SELECT') AS allowed")).rows[0].allowed,false);
   await owner.query("CREATE ROLE proof_runtime LOGIN PASSWORD 'test-only' IN ROLE commerce_app");
   await owner.query("CREATE ROLE proof_operator LOGIN PASSWORD 'test-only' IN ROLE commerce_operator");
   const url = new URL(process.env.DATABASE_URL);
@@ -63,7 +65,7 @@ try {
   await worker.tick(); assert.equal(workerCalls, 1);
   const before = (await owner.query('SELECT * FROM schema_migrations ORDER BY version')).rows;
   cpSync('./migrations', dir, { recursive: true });
-  const entry = { version: forwardHead, file: '0018_additive_probe.sql' };
+  const entry = { version: forwardHead, file: '0019_additive_probe.sql' };
   const sql = 'ALTER TABLE orders ADD COLUMN forward_probe text DEFAULT NULL;';
   const checksum = createHash('sha256').update(sql).digest('hex');
   const journal = JSON.parse(readFileSync(join(dir, 'journal.json'))); journal.push(entry);

@@ -289,6 +289,7 @@ test('provider qualification plan is offline, exact-key and hash bounded, never 
         ...process.env,
         MEDIA_S3_ENDPOINT: 'https://s3.cloud.ru',
         MEDIA_S3_BUCKET: 'qualification-fixture',
+        MEDIA_S3_PUBLIC_ORIGIN: 'https://qualification-global-name.s3.cloud.ru',
       },
       encoding: 'utf8',
     },

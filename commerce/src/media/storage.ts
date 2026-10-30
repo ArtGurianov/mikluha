@@ -32,6 +32,7 @@ export interface StorageConfig {
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
+  publicOrigin?: string;
 }
 /** No request selects an endpoint, bucket, key, URL, ACL or cache policy. */
 export class S3MediaStorage implements MediaStorage {
@@ -53,11 +54,21 @@ export class S3MediaStorage implements MediaStorage {
       !config.secretAccessKey
     )
       throw new Error('MEDIA_STORAGE_CONFIG');
-    // Cloud.ru browser CORS uses the bucket's domain-style host (legacy policy evidence in
-    // lib/cms/asset-source.test.ts). Only the disposable loopback fixture uses path style publicly.
-    this.publicBase = ['127.0.0.1', 'localhost'].includes(this.endpoint.hostname)
-      ? `${this.endpoint.origin}/${config.bucket}`
-      : `https://${config.bucket}.${this.endpoint.host}`;
+    // Local bucket names and public global/domain names may differ on Cloud.ru.
+    // The operator enrolls the verified public origin; never derive it from the local bucket name.
+    if (['127.0.0.1', 'localhost'].includes(this.endpoint.hostname) && !config.publicOrigin) {
+      this.publicBase = `${this.endpoint.origin}/${config.bucket}`;
+    } else {
+      if (!config.publicOrigin) throw new Error('MEDIA_PUBLIC_ORIGIN_REQUIRED');
+      const publicUrl = new URL(config.publicOrigin);
+      if (
+        publicUrl.protocol !== 'https:' ||
+        publicUrl.origin !== config.publicOrigin ||
+        !publicUrl.hostname.endsWith(`.${this.endpoint.hostname}`)
+      )
+        throw new Error('MEDIA_PUBLIC_ORIGIN_CONFIG');
+      this.publicBase = publicUrl.origin;
+    }
     this.client = new S3Client({
       endpoint: this.endpoint.origin,
       region: config.region,

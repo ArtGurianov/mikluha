@@ -48,11 +48,14 @@ it is neither owner nor migration login. The process refuses other applications'
 
 The worker environment contains only its dedicated `MEDIA_DATABASE_URL`, `MEDIA_S3_ENDPOINT`
 (shared API origin, e.g. `https://s3.cloud.ru`), `MEDIA_S3_BUCKET`, `MEDIA_S3_REGION`,
+`MEDIA_S3_PUBLIC_ORIGIN` (verified bucket global/domain HTTPS origin),
 `MEDIA_S3_ACCESS_KEY_ID`, `MEDIA_S3_SECRET_ACCESS_KEY`. Secrets are enrolled separately through the
 approved host/Coolify secret authority, never committed. Admin must not receive these values.
 No AWS credential chain is used. Region and bucket must be verified with the actual account.
-Cloud.ru public URLs use `https://<bucket>.<endpoint-host>/media/v1/...`, because browser CORS
-uses the bucket's host. Only the disposable loopback HTTPS fixture uses public path style.
+Cloud.ru public URLs use the separately enrolled `MEDIA_S3_PUBLIC_ORIGIN` plus `/media/v1/...`,
+because browser CORS uses the bucket's public host. The local API bucket name and its global/domain
+name can differ; deriving the public hostname from the local name is refused. See the provider
+[public-access contract](https://cloud.ru/docs/s3e/ug/topics/guides__public-access-for-bucket). Only the disposable loopback HTTPS fixture uses public path style.
 
 Use a newly qualified private-by-default bucket with object ACLs supported, **versioning never
 enabled** (even Suspended is refused), no public bucket-wide read/list/write policy, no replication
@@ -133,7 +136,7 @@ HTTPS certificate, bucket CORS/cache, partial failure and confirmed deletion. Th
 pages/Control Room against the installed worker and qualify the changed DB backup/restore. Do not
 infer installation, provider PASS, recovery PASS or sales GO from unit tests, CI or a draft PR.
 
-An offline provider-test plan is available in the media image (only endpoint/bucket env needed):
+An offline provider-test plan is available in the media image (endpoint/local bucket/public origin env needed):
 
 ```sh
 node dist/bin/media-qualification.js plan > /tmp/tour63-provider-plan.json

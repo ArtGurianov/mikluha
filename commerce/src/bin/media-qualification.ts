@@ -11,6 +11,7 @@ const source = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP8z4AdMOEQH6QSAM1BAQ/oQeJvAAAAAElFTkSuQmCC',
   'base64',
 );
+const publicOrigin = env('MEDIA_S3_PUBLIC_ORIGIN');
 const endpoint = env('MEDIA_S3_ENDPOINT'),
   bucket = env('MEDIA_S3_BUCKET');
 const action = process.argv[2];
@@ -28,6 +29,7 @@ const plan = {
   id,
   endpoint,
   bucket,
+  publicOrigin,
   keys: [`${prefix}/original`, ...processed.map((v) => `${prefix}/${v.profile}.webp`)],
   variants: processed.map((v) => ({ profile: v.profile, sha256: v.sha256, bytes: v.bytes.length })),
 };
@@ -43,6 +45,7 @@ if (action === 'plan') {
   const storage = new S3MediaStorage({
     endpoint,
     bucket,
+    publicOrigin,
     region: env('MEDIA_S3_REGION'),
     accessKeyId: env('MEDIA_S3_ACCESS_KEY_ID'),
     secretAccessKey: env('MEDIA_S3_SECRET_ACCESS_KEY'),
