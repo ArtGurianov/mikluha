@@ -23,7 +23,7 @@ try {
   assert.deepEqual(await migrate(owner, './migrations'), []);
   assert.deepEqual((await owner.query('SELECT * FROM schema_migrations ORDER BY version')).rows, history);
 
-  const roles = ['admin_app', 'admin_operator', 'admin_publisher', 'commerce_app', 'commerce_operator'];
+  const roles = ['admin_app', 'admin_operator', 'admin_publisher', 'commerce_app', 'commerce_operator', 'media_worker'];
   const roleState = (await owner.query(`SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
     FROM pg_roles WHERE rolname = ANY($1) ORDER BY rolname`, [roles])).rows;
   assert.deepEqual(roleState.map(r => r.rolname), roles);
@@ -39,6 +39,11 @@ try {
     ['commerce_app', 'departure', 'UPDATE', false], ['commerce_app', 'sales_switch', 'UPDATE', false],
     ['admin_app', 'orders', 'SELECT', false], ['admin_app', 'departure', 'UPDATE', false],
     ['admin_publisher', 'orders', 'SELECT', false], ['admin_operator', 'orders', 'SELECT', false],
+    // TOUR-63: media bytes/keys are reachable only through the worker's functions.
+    ['media_worker', 'orders', 'SELECT', false], ['media_worker', 'media_asset', 'SELECT', false],
+    ['media_worker', 'admin_user', 'SELECT', false], ['commerce_app', 'public_media', 'SELECT', true],
+    ['commerce_app', 'media_asset', 'SELECT', false], ['admin_app', 'admin_media', 'SELECT', true],
+    ['admin_app', 'media_asset', 'SELECT', false],
     ...roles.flatMap(role => ['schema_migrations', 'schema_migration_compatibility', 'processing_instruction']
       .map(table => [role, table, 'UPDATE', false])),
   ]) {
@@ -52,6 +57,12 @@ try {
     ['admin_app', 'fn_set_sales_open(boolean,text,text)', false],
     ['admin_app', 'fn_publish_departure(uuid,integer,integer,text)', false],
     ['admin_publisher', 'fn_publish_departure(uuid,integer,integer,text)', true],
+    ['media_worker', 'fn_media_claim()', true], ['admin_app', 'fn_media_claim()', false],
+    ['commerce_app', 'fn_media_claim()', false],
+    ['media_worker', 'fn_media_enqueue(uuid,text,bytea,text,text,text,text,text,boolean)', false],
+    ['admin_app', 'fn_media_enqueue(uuid,text,bytea,text,text,text,text,text,boolean)', true],
+    ['admin_app', 'fn_media_request(uuid,text,text)', false],
+    ['admin_publisher', 'fn_media_request(uuid,text,text)', true],
   ]) {
     assert.equal((await owner.query('SELECT has_function_privilege($1,$2,$3) AS allowed', [role, `public.${fn}`, 'EXECUTE'])).rows[0].allowed, allowed, `${role} ${fn}`);
   }
