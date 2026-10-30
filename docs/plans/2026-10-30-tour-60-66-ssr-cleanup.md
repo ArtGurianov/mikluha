@@ -53,8 +53,10 @@ CI checks the built images for retired modules/assets and fixture directories.
   packaged site catalog arrays are empty.
 - Legacy route test covers GET/POST/PUT/DELETE and rejects token reflection/cookies/redirects.
 - Business sabotage: 28/28 mutations killed and restored; historical test proof only.
-- Full Commerce tests use a disposable local PostgreSQL 16; dump/restore uses matching version 16
-  clients from that test container. Hosted CI is tracked on the PR, separately from local evidence.
+- Full Commerce suite: 390/390 PASS on a disposable local PostgreSQL 16; dump/restore uses matching version 16
+  clients from that test container. The compiled-image forward-schema probe also passes: schema
+  17 → additive 18, native reserve/purchase/contract, retired routes, maintenance and negative gates.
+  Hosted CI is tracked on the PR, separately from local evidence.
 
 ## Operational boundary
 
