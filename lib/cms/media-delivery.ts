@@ -18,8 +18,9 @@
  *
  * VPS-17 Shared Asset Cache has a separate exact-manifest namespace and paths:
  * simply setting MEDIA_CDN_BASE=assets.refref.ru is NOT a qualified mapping.
- * TOUR-63 stage 2 must add/test the per-media version, publisher, readiness,
- * revoke and fallback contract before first-party Control Room photos opt in.
+ * The deferred photo-cache opt-in needs a separate TOUR task, per-media version,
+ * publisher, readiness, revoke and fallback acceptance and independent legal GO.
+ * None of that is part of TOUR-63 stage 1 or SSR cutover Done criteria.
  * This comment update makes no runtime behavior change.
  */
 
