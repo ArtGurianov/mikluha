@@ -1,0 +1,389 @@
+{
+  "format": 1,
+  "task": "TOUR-57",
+  "scope": "disposable clean-schema qualification; not installation or recovery evidence",
+  "createdAt": "2026-10-30T08:58:17.639Z",
+  "commerceImage": "sha256:0183aab7bcc0eba4bafdc1b7c955da8a9809267bbd7be415b98d7a45df51eec2",
+  "postgresImage": "sha256:ef738a34a8651d11b2bace81c55c7e2187f786b484add6c83070884340074368",
+  "sourceCommit": "089656e0201b7a2aff9d2c9747feabfcf835dfd2",
+  "schemaHead": 17,
+  "applied": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17
+  ],
+  "rerunApplied": [],
+  "journalSha256": "456f4d2309e8661760704fc250b15ae7fc1671e58da5161cad90abf6e14bc851",
+  "lockSha256": "f2807492b5fc65fc6a3d20328447f377e4156047a93e8c858738edae7c58bc33",
+  "migrations": [
+    {
+      "version": 1,
+      "file": "0001_orders.sql",
+      "checksum": "0c1d6911cd96f569d816d221b3f8327e6bfdaf38647e5220804a439549979bd3"
+    },
+    {
+      "version": 2,
+      "file": "0002_checkout.sql",
+      "checksum": "e0294b42d18e75c0f5d33173fcf90ddb5520561cdeafb98af291e6aaa5f7d1b8"
+    },
+    {
+      "version": 3,
+      "file": "0003_tourists_and_contract.sql",
+      "checksum": "0fe4fd622f160ee27370c49eb1a501f51ea63156c339ba97c05280c4fac905a0"
+    },
+    {
+      "version": 4,
+      "file": "0004_pd_consent.sql",
+      "checksum": "f5beb75b4afe0fa20a8bf5236edf0cc1dee76358586bc16954fe101a00197e31"
+    },
+    {
+      "version": 5,
+      "file": "0005_confirmation_outbox.sql",
+      "checksum": "2398b9bbd77037905b49a12eea434a69e7d6c5ed4eea410940966b4d7fa7a660"
+    },
+    {
+      "version": 6,
+      "file": "0006_eis_filing.sql",
+      "checksum": "18d5a2b079e9f8b82604719803168bacf65b77fa9b2d8eb6c2e5ce04da8e69b8"
+    },
+    {
+      "version": 7,
+      "file": "0007_processing_instruction.sql",
+      "checksum": "3fe3a2bd0729227d34bd08a1ef1a4b839139304ed99463cc4d2b97e85c642c18"
+    },
+    {
+      "version": 8,
+      "file": "0008_editorial_offers_and_contract_snapshot.sql",
+      "checksum": "ec9cd9b3aa5f6f48cff741259eff1993eafcae63721676bab76a170fcce52cd4"
+    },
+    {
+      "version": 9,
+      "file": "0009_content_crud_and_execution_changes.sql",
+      "checksum": "34f59f2db910957037c980dd0ad381248f926c4b50ffcef162b588c90ff47a61"
+    },
+    {
+      "version": 10,
+      "file": "0010_execution_change_identity_and_visibility.sql",
+      "checksum": "962b2f012e4f26412fde844a45649498dbb0fd1aa6eadc134e02788a8c3858fc"
+    },
+    {
+      "version": 11,
+      "file": "0011_admin_auth.sql",
+      "checksum": "8e1a798ac90baf4c63600ef340d2a0fb7e84beba47c21359ef4b2a4b38e1b933"
+    },
+    {
+      "version": 12,
+      "file": "0012_schema_compatibility.sql",
+      "checksum": "59dae694c2a6cff960d79f1ff615ad0e888172fff6a2b4462ca030df2656dac6",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "Protocol bootstrap: pre-protocol runtimes remain incompatible."
+      }
+    },
+    {
+      "version": 13,
+      "file": "0013_checkout_quotes_and_cancellation.sql",
+      "checksum": "e895098dced0ac0800538d4164564362fbeb72fc0053fcc70a7a6a3b987f02ba",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "ART-362 checkout schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-23-art-362-checkout-design.md."
+      }
+    },
+    {
+      "version": 14,
+      "file": "0014_attempt_dispatch_evidence.sql",
+      "checksum": "9e9b31ae94eae8bb1b47981527d5a2604e76e6fc35ba4280c3d064479f6a0779",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "ART-362 checkout schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-23-art-362-checkout-design.md."
+      }
+    },
+    {
+      "version": 15,
+      "file": "0015_checkout_operation_scope.sql",
+      "checksum": "b5b5ea77f970f0a8bff6a758be66a706674405b26e330d9cd968e4dd66aab76f",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "ART-362 checkout schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-23-art-362-checkout-design.md."
+      }
+    },
+    {
+      "version": 16,
+      "file": "0016_resolution_lease.sql",
+      "checksum": "1a38157011fa8d9f73ad624a48c2d115431dbc87846d4df534e261b01dc7ab4f",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "ART-362 checkout schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-23-art-362-checkout-design.md."
+      }
+    },
+    {
+      "version": 17,
+      "file": "0017_purchase_identity_and_revisions.sql",
+      "checksum": "75e7dbe02ae0b645c3b30f5d561579f1931bd5679cf757e545ca11c4afc19465",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "TOUR-76 purchase identity schema: older runtimes are not qualified; exact bundled-head runtime only. See docs/plans/2026-10-29-tour-76-purchase-identity-design.md."
+      }
+    }
+  ],
+  "postgresVersion": "16.15",
+  "roles": [
+    {
+      "rolname": "admin_app",
+      "rolcanlogin": false,
+      "rolsuper": false,
+      "rolcreatedb": false,
+      "rolcreaterole": false,
+      "rolreplication": false,
+      "rolbypassrls": false
+    },
+    {
+      "rolname": "admin_operator",
+      "rolcanlogin": false,
+      "rolsuper": false,
+      "rolcreatedb": false,
+      "rolcreaterole": false,
+      "rolreplication": false,
+      "rolbypassrls": false
+    },
+    {
+      "rolname": "admin_publisher",
+      "rolcanlogin": false,
+      "rolsuper": false,
+      "rolcreatedb": false,
+      "rolcreaterole": false,
+      "rolreplication": false,
+      "rolbypassrls": false
+    },
+    {
+      "rolname": "commerce_app",
+      "rolcanlogin": false,
+      "rolsuper": false,
+      "rolcreatedb": false,
+      "rolcreaterole": false,
+      "rolreplication": false,
+      "rolbypassrls": false
+    },
+    {
+      "rolname": "commerce_operator",
+      "rolcanlogin": false,
+      "rolsuper": false,
+      "rolcreatedb": false,
+      "rolcreaterole": false,
+      "rolreplication": false,
+      "rolbypassrls": false
+    }
+  ],
+  "memberships": [],
+  "privileges": [
+    {
+      "role": "commerce_app",
+      "table": "orders",
+      "privilege": "SELECT",
+      "allowed": true
+    },
+    {
+      "role": "commerce_app",
+      "table": "admin_user",
+      "privilege": "SELECT",
+      "allowed": false
+    },
+    {
+      "role": "commerce_app",
+      "table": "departure",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "commerce_app",
+      "table": "sales_switch",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_app",
+      "table": "orders",
+      "privilege": "SELECT",
+      "allowed": false
+    },
+    {
+      "role": "admin_app",
+      "table": "departure",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_publisher",
+      "table": "orders",
+      "privilege": "SELECT",
+      "allowed": false
+    },
+    {
+      "role": "admin_operator",
+      "table": "orders",
+      "privilege": "SELECT",
+      "allowed": false
+    },
+    {
+      "role": "admin_app",
+      "table": "schema_migrations",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_app",
+      "table": "schema_migration_compatibility",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_app",
+      "table": "processing_instruction",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_operator",
+      "table": "schema_migrations",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_operator",
+      "table": "schema_migration_compatibility",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_operator",
+      "table": "processing_instruction",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_publisher",
+      "table": "schema_migrations",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_publisher",
+      "table": "schema_migration_compatibility",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "admin_publisher",
+      "table": "processing_instruction",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "commerce_app",
+      "table": "schema_migrations",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "commerce_app",
+      "table": "schema_migration_compatibility",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "commerce_app",
+      "table": "processing_instruction",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "commerce_operator",
+      "table": "schema_migrations",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "commerce_operator",
+      "table": "schema_migration_compatibility",
+      "privilege": "UPDATE",
+      "allowed": false
+    },
+    {
+      "role": "commerce_operator",
+      "table": "processing_instruction",
+      "privilege": "UPDATE",
+      "allowed": false
+    }
+  ],
+  "rowCounts": {
+    "admin_audit": 0,
+    "admin_login_throttle": 0,
+    "admin_session": 0,
+    "admin_totp": 0,
+    "admin_user": 0,
+    "content_item": 0,
+    "content_item_draft": 0,
+    "content_item_revision": 0,
+    "departure": 0,
+    "departure_cancellation_event": 0,
+    "departure_draft": 0,
+    "departure_execution_change": 0,
+    "departure_organizer": 0,
+    "departure_revision": 0,
+    "editorial_audit": 0,
+    "email_outbox": 0,
+    "execution_change_notice": 0,
+    "order_contact": 0,
+    "order_document": 0,
+    "order_eis": 0,
+    "order_eis_event": 0,
+    "order_event": 0,
+    "order_passenger": 0,
+    "orders": 0,
+    "processing_instruction": 1,
+    "purchase": 0,
+    "purchase_revision": 0,
+    "purchase_revision_participant": 0,
+    "sales_switch": 1,
+    "sales_switch_event": 0,
+    "schema_migration_compatibility": 6,
+    "schema_migrations": 17,
+    "tour": 0,
+    "tour_draft": 0,
+    "tour_revision": 0
+  },
+  "sales": "CLOSED",
+  "processingInstruction": "DRAFT",
+  "schemaReadiness": {
+    "status": "READY",
+    "schema": 17
+  },
+  "checks": [
+    "empty database",
+    "full checksummed journal",
+    "idempotent rerun preserves timestamps",
+    "disjoint NOLOGIN roles",
+    "capability privileges",
+    "no customer/admin/content seed",
+    "sales closed",
+    "processing instruction draft",
+    "schema readiness"
+  ],
+  "preparationScriptSha256": "c2049eb2b8f9d4a7ca3d1738f91355f34fb3293d8101170f42b1c6ba4f310294",
+  "probeSha256": "b5b12da85ab010df649f7d195cd0c24db3e2c39ef94a4827662770b32cdf111d",
+  "schemaSqlSha256": "71e5f3103498243f91cd9fae20942c1ff3dad909f6d1d4750dcd1d8e29c39a96"
+}
