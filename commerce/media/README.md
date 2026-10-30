@@ -115,8 +115,9 @@ promise every such image can be processed. Do not disable limits to make a fixtu
 
 Each storage call has a 10 second deadline, no SDK automatic retries. A job holds its DB row lock
 through I/O, and OWNER requests serialize with it (API gives up waiting after 5 seconds). On
-unconfirmed I/O it remains pending, retries at most five times one minute apart and then needs an
-operator. Other assets continue. Inspect `admin_media.attempts/last_error` and `media_event`; never
+unconfirmed I/O it remains pending and retries five times one minute apart. Upload processing and
+publication then stop and need an operator; a withdrawal keeps retrying every 15 minutes until
+deletion is confirmed, so a withdrawn photo never waits for manual action. Other assets continue. Inspect `admin_media.attempts/last_error` and `media_event`; never
 mark pending deletion complete manually. To retry after repairing storage, an authorized DB owner
 may reset attempts and next_attempt_at for the **specific still-pending** asset, leaving its state,
 rights and events intact. Do not reset REVOKED or change it to READY/PUBLISHED.

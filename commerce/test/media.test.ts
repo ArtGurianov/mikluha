@@ -255,6 +255,28 @@ test('complete lifecycle: private READY, owner publication, immediate withdrawal
     /MEDIA_STATE_CONFLICT/,
   );
 });
+test('withdrawal keeps retrying after the admission retry budget is exhausted', async () => {
+  const v = await put();
+  const storage = new Store();
+  await workOne(db.media, storage);
+  await db.publisher.query('SELECT fn_media_request($1,$2,$3)', [v.id, 'PUBLISH', 'admin:owner']);
+  await workOne(db.media, storage);
+  assert.equal((await row(v.id)).state, 'PUBLISHED');
+  await db.publisher.query('SELECT fn_media_request($1,$2,$3)', [v.id, 'REVOKE', 'admin:owner']);
+  storage.fail = true;
+  for (let i = 0; i < 7; i++) {
+    await db.owner.query('UPDATE media_asset SET next_attempt_at=now() WHERE id=$1', [v.id]);
+    assert.equal(await workOne(db.media, storage), true, `attempt ${i + 1} was claimed`);
+  }
+  const pending = await row(v.id);
+  assert.deepEqual([pending.state, pending.attempts], ['REVOKE_REQUESTED', 5]);
+  assert.ok(pending.next_attempt_at.getTime() > Date.now() + 10 * 60_000, 'backs off instead of spinning');
+  storage.fail = false;
+  await db.owner.query('UPDATE media_asset SET next_attempt_at=now() WHERE id=$1', [v.id]);
+  await workOne(db.media, storage);
+  assert.equal((await row(v.id)).state, 'REVOKED');
+  assert.equal(storage.published.size, 0);
+});
 test('invalid image is rejected before any storage write', async () => {
   const v = input();
   v.data = Buffer.from('not an image').toString('base64');
