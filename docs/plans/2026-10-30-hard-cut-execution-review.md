@@ -1,6 +1,6 @@
-# Mikluha SSR/Admin hard cut — execution review, revision 2, 2026-10-30
+# Mikluha SSR/Admin hard cut — execution review, revision 3, 2026-10-30
 
-Status: review draft, incorporating the OPUS and GPT reviews. This is an
+Status: review draft, incorporating both rounds of OPUS and GPT reviews. This is an
 operational simplification proposal, not an approved roadmap replacement or
 installation/cutover authority. Plane owns live acceptance and dependencies;
 this draft does not change them. Native mode NATIVE_NO_REFERRAL; sales CLOSED.
@@ -81,7 +81,10 @@ HTTP/IP logs and media processing. SALES_PRIVACY_READY covers later customer
 flows. Closed sales alone does not prove no data is processed. Hosting recipient
 questions that affect current flows remain at the SSR stage; only evidenced
 inapplicable/future flows can move later. This is a release-scope boundary, not a
-new legal determination. Current TOUR-68 acceptance is not weakened here.
+new legal determination. The static site already using the same host is relevant
+baseline evidence, but not proof that new Admin/logging flows are unchanged.
+A no-regression comparison is an input to the review; it does not resolve an
+unknown recipient/access path. Current TOUR-68 acceptance is not weakened here.
 
 ## Explicit proposals requiring owner acceptance before use
 
@@ -89,20 +92,84 @@ new legal determination. Current TOUR-68 acceptance is not weakened here.
   encrypted consistent logical dump, checksum/off-host retrieval/readability,
   required configuration/key references and an untouched original DB/volume.
   This avoids a separate old-schema restore rehearsal when it is not a fallback
-  write target. It is a proposal, not a waiver of TOUR-17/57/VPS-15 acceptance.
-- **Target recovery:** one demonstrated isolated restore of a fresh target-DB
-  backup is the proposed minimum. Defer additional PITR exercises only through an
-  explicit revised TOUR-67/VPS-15 recovery acceptance, with a deadline before
-  the first real editorial/admin/legal data write or sales, whichever is earlier.
-  An almost empty DB does not remove the recovery need for Control Room accounts,
-  legal publications or key-bound state. Default remains current PITR acceptance.
+  write target. Include inspection of dump contents and the documented restore
+  procedure; a checksum alone is insufficient. It is a proposal requiring formal
+  scope approval, not a waiver of TOUR-17/57/VPS-15 acceptance.
+- **Target recovery:** retain the existing logical restore and physical PITR
+  gate. Revision 2's optional deferral is withdrawn from the recommendation:
+  Control Room users, content and legal records may be created before traffic
+  switching. Qualify the exact schema/recovery procedure in isolation before
+  real production editorial/admin/legal data is entered; verify installed target
+  backup identity and refresh proof for the actual release before cutover.
+  A successful logical restore alone is not proof of physical PITR.
 - **CUSTODY_PENDING:** a status is not permission to switch. External proof or an
   explicitly accepted recovery alternative must be in the exact owner manifest.
+  The overall drift obligation below is separate from empty custody lists.
 - **Temporary static fallback:** retain the frozen old public static container
   as a route-only fallback during SSR acceptance. This is a proposed recovery
   policy addition; it never restores Sveltia or any writer and needs explicit
   inclusion in switch GO. Confirm that its rendered policy/media/links remain
   acceptable; if not, use an approved static maintenance response instead.
+
+## Recovery scope: logical database backups and cluster-wide PITR
+
+A logical dump identifies the old or new database separately. Physical base
+backup plus WAL describes the entire PostgreSQL cluster: old and new databases
+share its recovery boundary if they share an instance. Do not label a physical
+stream or PITR receipt as independently restoring only the new database.
+
+The manifest records cluster identity, PostgreSQL/image version, base-backup
+identity, WAL archive continuity/timeline and target time/LSN; map these to both
+database names. Logical dump manifests retain their individual DB identities.
+Demonstrate recovery in an isolated instance/volume with applications, jobs,
+production ingress and outbound provider access disabled. Never restore a
+rehearsal over production or mount its live data volume as a writable target.
+
+After cluster recovery, verify the selected point, new DB schema, known fixture
+state and role/grant separation, with paired encryption-key recovery where
+needed. Demonstrate extracting the new database and its required roles/grants
+from that recovered cluster into a separate isolated target; do not blindly
+restore shared cluster globals over production. Returning a DB to production is
+a different, explicitly authorized recovery operation. pg_dump readability or
+successful restore proves logical recovery only, not WAL recovery/PITR. Preserve
+the old DB separately; its presence in the same cluster is no independent copy.
+
+References: [PostgreSQL 16 PITR](https://www.postgresql.org/docs/16/continuous-archiving.html)
+and [pg_basebackup](https://www.postgresql.org/docs/16/app-pgbasebackup.html).
+Cluster configuration files and application keys also need their owning recovery
+route; physical data recovery alone is not complete runtime recovery.
+
+## Overall VPS drift: an explicit owner decision, not a hidden cache dependency
+
+VPS-17 media/cache admission remains deferred and non-blocking for direct-S3
+SSR. Its consumer-specific checker is not the general SSR installation tool.
+However, Mikluha's own AGENTS.md requires the infrastructure drift check clean
+and a fresh capture before reporting this host change free of CUSTODY_PENDING.
+Empty custody_refresh_required/custody_restore_unverified lists alone do not
+prove the overall drift status PASS. VPS-16 retains historical custody/drift
+follow-up; it is not automatically a formal whole-issue dependency of TOUR-67.
+
+Before scheduling cutover, select one route in VPS-15/TOUR-67:
+
+1. **Default under the present contract:** review/reconcile outstanding shared
+   host drift under its owning tasks (including VPS-16), then obtain fresh overall
+   PASS plus changed-resource capture/independent restore proof. Do not change
+   the baseline merely to obtain PASS. Record classified findings, owners,
+   remedial work and estimate before setting the window; no estimate is inferred
+   from a count of differences.
+2. **Only with explicit owner contract exception:** accept a dated scoped gate
+   for this release while the overall host status stays REVIEW_REQUIRED. Specify
+   exactly which AGENTS rule is excepted, affected resource IDs, shared dependency
+   closure (DB/storage, backup/key authority, proxy/TLS, networks/DNS and platform
+   services), reviewed residual drift and why it cannot invalidate the operation,
+   required fresh capture/independent restore and a validity limit/requalification trigger.
+   Obtain acceptance in the manifest and owning contract/Plane record; adapt and
+   test the actual admission/checker only if required. Do not change a cache
+   checker to bypass the general contract or report overall drift PASS.
+
+A scope limited to files edited by this release is insufficient if shared
+recovery/routing/credential dependencies remain unreviewed. Audit ciphertext
+preservation is a different gate from operational host drift and recovery.
 
 ## Installation manifest: required concrete fields
 
@@ -127,7 +194,7 @@ GO. This review chooses a preferred topology, subject to the installation review
    change, certificate issuance or service start is authorized by this document.
 4. **Backup retargeting:** canonical backup TARGETS/profile must name the new DB,
    correct container and restricted backup role, with approved off-host prefix,
-   recipient/key recovery, timers and WAL/base-backup mapping if used. Verify a
+   recipient/key recovery, timers and cluster-wide WAL/base-backup mapping. Verify a
    fresh backup's source DB identity, exact schema and manifest/checksum through
    independent retrieval and isolated restore. An old-DB timer reporting SUCCESS
    is not acceptance. Retain old backups; map old/new streams without overwriting
@@ -140,7 +207,8 @@ GO. This review chooses a preferred topology, subject to the installation review
    switch/reverse-switch commands and read-backs, decision window and retirement.
 7. **Admission/recovery:** negative matrix, canary deny receipt, target backup/
    restore/PITR/custody receipts, stop conditions and any explicitly accepted
-   exceptions. No new bank/refund probe as a verification shortcut.
+   exceptions, including the chosen overall-drift route and disposition of each
+   shared-host finding. No new bank/refund probe as a verification shortcut.
 8. **Credentials:** consumer-by-consumer list for each proposed PAT/Sveltia S3
    revocation, evidence of no backup/new-media/shared consumer, owner approval,
    method of proving old write denial and recovery of the new stack without it.
