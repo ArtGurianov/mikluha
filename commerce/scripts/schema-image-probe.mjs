@@ -19,7 +19,7 @@ import { createCommerceServer, readiness, routes } from './dist/server.js';
 const identity = await readBuildIdentity('/app/identity/identity.json');
 assert.equal(identity.sourceCommit, process.env.QUALIFICATION_SOURCE_COMMIT, 'image must identify the declared exact HEAD');
 const migrations = readMigrations('./migrations');
-const bundledHead=18, forwardHead=19;
+const bundledHead=19, forwardHead=20;
 assert.equal(migrations.length, bundledHead, 'review this qualification when the real baseline advances');
 const owner = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await owner.connect();
@@ -65,7 +65,7 @@ try {
   await worker.tick(); assert.equal(workerCalls, 1);
   const before = (await owner.query('SELECT * FROM schema_migrations ORDER BY version')).rows;
   cpSync('./migrations', dir, { recursive: true });
-  const entry = { version: forwardHead, file: '0019_additive_probe.sql' };
+  const entry = { version: forwardHead, file: '0020_additive_probe.sql' };
   const sql = 'ALTER TABLE orders ADD COLUMN forward_probe text DEFAULT NULL;';
   const checksum = createHash('sha256').update(sql).digest('hex');
   const journal = JSON.parse(readFileSync(join(dir, 'journal.json'))); journal.push(entry);

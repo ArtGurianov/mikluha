@@ -118,6 +118,15 @@
         "runtimeCommits": [],
         "evidence": "TOUR-63 direct S3 schema; exact bundled-head runtime only. See docs/plans/2026-10-30-tour-63-direct-s3-design.md."
       }
+    },
+    {
+      "version": 19,
+      "file": "0019_control_room_editors_and_departure_controls.sql",
+      "checksum": "04724a4277924f7851b427812f3f2172907bd3a4f0026550da97f8e63fecba1a",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "TOUR-64 Stage A / TOUR-65 Admin controls and legal publication. Exact bundled-head runtime only; no sales activation. See docs/plans/2026-10-30-tour-64-65-control-room-design.md."
+      }
     }
   ]
 }

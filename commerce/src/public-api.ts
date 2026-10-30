@@ -9,8 +9,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type pg from 'pg';
 
 import {
-  publicDepartures, publicOrganizers, publicReports, publicReviews, publicTours,
-  type PublicDeparture, type PublicOrganizer, type PublicReport, type PublicReview, type PublicTour,
+  publicDepartures, publicLegalPages, publicOrganizers, publicReports, publicReviews, publicTours,
+  type PublicDeparture, type PublicLegalPage, type PublicOrganizer, type PublicReport, type PublicReview, type PublicTour,
 } from './public-content.js';
 import { resolveMedia } from './media/service.js';
 import type { StoredVariant } from './media/storage.js';
@@ -26,6 +26,7 @@ export interface PublicCatalog {
   readonly organizers: readonly PublicOrganizer[];
   readonly reports: readonly PublicReport[];
   readonly reviews: readonly PublicReview[];
+  readonly legalPages: readonly PublicLegalPage[];
 }
 
 export async function readPublicCatalog(pool: pg.Pool): Promise<PublicCatalog> {
@@ -37,11 +38,13 @@ export async function readPublicCatalog(pool: pg.Pool): Promise<PublicCatalog> {
     const organizers = await publicOrganizers(client);
     const reports = await publicReports(client);
     const reviews = await publicReviews(client);
+    const legalPages = await publicLegalPages(client);
     const media = await client.query<{id:string;alt:string;variants:StoredVariant[]}>('SELECT * FROM public_media');
     const assets = new Map(media.rows.map(row => [row.id,row]));
-    const resolved = resolveMedia({ schema: PUBLIC_CATALOG_SCHEMA, tours, departures, organizers, reports, reviews }, assets) as PublicCatalog;
+    const resolved = resolveMedia({ schema: PUBLIC_CATALOG_SCHEMA, tours, departures, organizers, reports, reviews }, assets) as Omit<PublicCatalog, 'legalPages'>;
     await client.query('COMMIT');
-    return resolved;
+    // Legal text is hashed evidence: it is returned exactly as approved, never media-rewritten.
+    return { ...resolved, legalPages };
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw e;

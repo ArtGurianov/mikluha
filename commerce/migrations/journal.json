@@ -70,5 +70,9 @@
   {
     "version": 18,
     "file": "0018_direct_s3_media.sql"
+  },
+  {
+    "version": 19,
+    "file": "0019_control_room_editors_and_departure_controls.sql"
   }
 ]
