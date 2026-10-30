@@ -1,0 +1,16 @@
+# BuildKit uses this file instead of the root .dockerignore for commerce/Dockerfile.
+# Same list, except commerce/test: only the never-deployed media-test target copies it,
+# and CI checks that the runtime image contains no tests.
+node_modules
+**/node_modules
+commerce/dist
+control-room
+.next
+out
+.cms-cache
+public/generated/cms
+.git
+.env*
+!.env.example
+*.log
+.DS_Store

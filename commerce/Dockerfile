@@ -66,6 +66,7 @@ COPY commerce/test ./test
 COPY commerce/scripts ./scripts
 COPY commerce/legal ./legal
 COPY .github/workflows /app/.github/workflows
+COPY test-fixtures /app/test-fixtures
 USER node
 CMD ["sh", "scripts/with-media-tls.sh", "node", "node_modules/tsx/dist/cli.mjs", "--test", "--test-concurrency=1", "test/**/*.test.ts"]
 
