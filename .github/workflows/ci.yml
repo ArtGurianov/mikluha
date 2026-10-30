@@ -195,7 +195,7 @@ jobs:
             echo 'A mismatched source identity was accepted'
             exit 1
           fi
-          rg -q IMAGE_SOURCE_MISMATCH "$RUNNER_TEMP/tour57-rejected.log"
+          grep -q IMAGE_SOURCE_MISMATCH "$RUNNER_TEMP/tour57-rejected.log"
           test ! -e "$RUNNER_TEMP/tour57-rejected"
 
       - name: Clean-schema review artifacts
