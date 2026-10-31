@@ -70,11 +70,11 @@ owner connection (production-launch §3) and must stay mutually non-membered and
 
 | Login (env) | Custodian | Consumer | Scope | Storage path | Owner-only action | Rotation overlap | PITR / restore impact | Verify |
 |---|---|---|---|---|---|---|---|---|
-| migration owner — `MIGRATION_DATABASE_URL` | **offsite owner store** (store of record); transiently materialised into a root-`0600` file for bootstrap only | one-off migrate container | owns schema, runs attested migrations | `/etc/mikluha-commerce/migration.env` (root `0600`), removed after bootstrap unless it is the approved owner store | yes | rotate in DB; no running service holds it, so no overlap problem | password rotation must be re-applied on the restored copy — a restore reintroduces the pre-rotation password (key/DB divergence, §4) | login works for migrate, never present in the runtime/admin/media env |
-| runtime — `DATABASE_URL` (`commerce_runtime` in `commerce_app`) | Coolify | long-running commerce service | app DML under `commerce_app` grants | Coolify env on `mikluha-commerce` | — | rotate DB password + Coolify env together; brief restart, not a bank-style no-overlap case | restore reintroduces the old password until re-rotated | `pg` connects; it is **absent** from admin/media processes (`assertAdminEnvironment`, `MEDIA_FOREIGN_CREDENTIAL`) |
-| operator — `OPERATOR_DATABASE_URL` (`commerce_operator_login` in `commerce_operator`) | root-`0600` host file | one-off `sales` / `eis` containers | sales switch + EIS filing | `/etc/mikluha-commerce/operator.env` (root `0600`) | yes | rotate in DB + rewrite the env file | restore reintroduces old password | runs only in a one-off container, never `docker exec` into the service |
-| admin app / publish / operator — `ADMIN_DATABASE_URL`, `ADMIN_PUBLISH_DATABASE_URL`, `ADMIN_OPERATOR_DATABASE_URL` | **Coolify (Admin resource)** | Control Room / Admin API | isolated admin capabilities; must not carry commerce/media/operator creds | Admin resource env | — | rotate per login with its service restart | restore reintroduces old passwords | `ADMIN_LOGIN_NOT_ISOLATED` / `FOREIGN_ENVIRONMENT` guards hold |
-| media — `MEDIA_DATABASE_URL` (`media_worker`) | Coolify (media worker) | media worker only | media rows only; isolated login | media worker env | — | rotate + restart media worker | restore reintroduces old password | `MEDIA_LOGIN_NOT_ISOLATED` guard holds |
+| migration owner — `MIGRATION_DATABASE_URL` | **offsite owner store** (store of record); transiently materialised into a root-`0600` file for bootstrap only | one-off migrate container | owns schema, runs attested migrations | `/etc/mikluha-commerce/migration.env` (root `0600`), removed after bootstrap unless it is the approved owner store | yes | rotate in DB; no running service holds it, so no overlap problem | **physical/PITR only:** reintroduces the pre-rotation password → re-apply rotation on the restored cluster. **Logical (`pg_dump`):** carries no role/password at all — role re-created + current credential set (§4) | login works for migrate, never present in the runtime/admin/media env |
+| runtime — `DATABASE_URL` (`commerce_runtime` in `commerce_app`) | Coolify | long-running commerce service | app DML under `commerce_app` grants | Coolify env on `mikluha-commerce` | — | rotate DB password + Coolify env together; brief restart, not a bank-style no-overlap case | **physical/PITR only:** reintroduces the old password until re-rotated. **Logical:** no password carried; set the current credential on the re-created role (§4) | `pg` connects; it is **absent** from admin/media processes (`assertAdminEnvironment`, `MEDIA_FOREIGN_CREDENTIAL`) |
+| operator — `OPERATOR_DATABASE_URL` (`commerce_operator_login` in `commerce_operator`) | root-`0600` host file | one-off `sales` / `eis` containers | sales switch + EIS filing | `/etc/mikluha-commerce/operator.env` (root `0600`) | yes | rotate in DB + rewrite the env file | **physical/PITR only:** reintroduces old password. **Logical:** no password carried (§4) | runs only in a one-off container, never `docker exec` into the service |
+| admin app / publish / operator — `ADMIN_DATABASE_URL`, `ADMIN_PUBLISH_DATABASE_URL`, `ADMIN_OPERATOR_DATABASE_URL` | **Coolify (Admin resource)** | Control Room / Admin API | isolated admin capabilities; must not carry commerce/media/operator creds | Admin resource env | — | rotate per login with its service restart | **physical/PITR only:** reintroduces old passwords. **Logical:** no password carried (§4) | `ADMIN_LOGIN_NOT_ISOLATED` / `FOREIGN_ENVIRONMENT` guards hold |
+| media — `MEDIA_DATABASE_URL` (`media_worker`) | Coolify (media worker) | media worker only | media rows only; isolated login | media worker env | — | rotate + restart media worker | **physical/PITR only:** reintroduces old password. **Logical:** no password carried (§4) | `MEDIA_LOGIN_NOT_ISOLATED` guard holds |
 
 ### 2.2 Application secrets, signing/service tokens
 
@@ -173,6 +173,13 @@ them.**
     and the object grants re-established (restore `pg_dumpall --roles-only` first, or create roles by
     hand, then restore the database) — otherwise ownership/`GRANT` restore fails on missing roles.
     Set the *current* credentials, never an old value; the dump never dictates a password.
+  - **`pg_dumpall --roles-only` carries stale password hashes.** A roles dump **does** include each
+    role's password hash as of the dump time, so restoring an older roles dump can overwrite the
+    current passwords with old ones. Therefore: after restoring roles from `pg_dumpall --roles-only`,
+    **explicitly set the current credentials from the authoritative store before connecting any
+    service** (or restore roles with `--no-role-passwords` and set passwords yourself). The roles
+    dump and its storage are **sensitive** — it must not enter Git, CI logs, PRs or Plane. This
+    matters most for the clean-slate isolated restore drill on a fresh cluster.
 - **Physical / PITR restore (full cluster: base backup + WAL).** This **does** restore the whole
   cluster including `pg_authid`, so it **reintroduces the role passwords as of the restore point**. If
   a password was rotated *after* that point, the restored cluster carries the pre-rotation password —
@@ -240,3 +247,13 @@ host/credential changes are owner-authorized, specific, and recorded through VPS
 - **P2 — TOTP key rotation / DB restore:** §2.2 row + TOTP note now require an explicit
   `admin-operator totp reset` before re-enrol (old seeds stop decrypting but stay confirmed → login
   breaks, re-enrol hits `TOTP_ALREADY_ENROLLED`); same sequence after an out-of-step DB restore.
+
+### Round 3 (PR #67, head after dd9c54f)
+
+- **P2 — DB-credentials table vs §4:** the five §2.1 restore-impact cells no longer say
+  "restore reintroduces old password" unconditionally — each now scopes that to **physical/PITR** and
+  points to §4 for the logical path (no password carried; role re-created + current credential set).
+- **`pg_dumpall --roles-only` stale hashes:** §4 adds that a roles dump *does* carry password hashes
+  as of dump time, so after restoring roles you must set current credentials from the authoritative
+  store before connecting any service (or use `--no-role-passwords`); the roles dump is sensitive and
+  must not enter Git/CI/PRs/Plane.
