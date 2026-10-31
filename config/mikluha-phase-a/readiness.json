@@ -1,0 +1,21 @@
+{
+  "format": "mikluha.phase-a/1",
+  "scope": "acceptance",
+  "missing": [
+    "database_generation:independent qualification",
+    "Coolify application identity",
+    "qualified Git Compose source/read-back",
+    "dedicated qualified backup bucket",
+    "independently enrolled bucket owner/policy",
+    "qualified provider-owned lifecycle configuration",
+    "off-host-qualified age public recipient",
+    "secret_authority:generation",
+    "secret_authority:independent offhost reference",
+    "restriction_authority:generation",
+    "restriction_authority:independent offhost reference"
+  ],
+  "installation": "NO_GO",
+  "host_mutation": false,
+  "archive_storage": "CLOUD_RU_ONLY",
+  "proposed_remote_days": 7
+}

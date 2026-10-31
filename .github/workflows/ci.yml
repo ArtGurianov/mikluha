@@ -19,6 +19,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Image publication contract and negative scenarios
         run: python3 scripts/test-phase-a-images.py -v
+      - name: Phase A operations failure contracts
+        run: python3 -m unittest discover -s tests/phase-a -v
 
   verify:
     runs-on: ubuntu-latest

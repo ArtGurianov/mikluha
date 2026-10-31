@@ -57,6 +57,25 @@ explicit CLOSED gates and their independently accepted prerequisites.
 Imported comments retain original author identities, including email addresses;
 review that provenance before any separately authorized public sharing.
 
+## Project operations and sensitive custody (2026-10-31)
+
+Mikluha owns portable deployment/backup/restore code, Compose templates, failure
+checks and runbooks in this repository. Shared VPS infrastructure keeps only its
+host resource index and references to the project contract.
+
+Credentials, private keys, application environments, actual installation
+identities/descriptors, private receipts and owner provenance stay outside Git,
+including encrypted copies and private repositories. Coolify owns application
+env; matching recovery generations belong in encrypted operator custody outside
+Git. Checked-in candidates are incomplete portable templates, not actual resource
+inventories. Local Docker identity policy is private operator configuration.
+No new Git deploy key is needed for this public project source.
+
+For Mikluha project credentials this supersedes generic infrastructure SOPS/Git
+recommendations. Unrelated shared host custody and other projects are outside
+this source move. Source relocation does not authorize shared history rewriting,
+live key rotation/revocation or deployment.
+
 ## Infrastructure custody (shared Adman VPS)
 
 This project runs on the shared Adman VPS. Host baseline, encrypted custody and

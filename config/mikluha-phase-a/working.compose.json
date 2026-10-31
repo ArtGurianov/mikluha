@@ -1,0 +1,369 @@
+{
+  "name": "mikluha-phase-a-working",
+  "services": {
+    "postgres": {
+      "image": "postgres@sha256:cbf42f0edc946c0bc1b8eeed62403734e1f25dc67a3491455d07a92fdb558b28",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "512m",
+      "cpus": 0.75,
+      "pids_limit": 128,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "read_only": false,
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777,noexec,nosuid,nodev",
+        "/var/run/postgresql:size=8m,mode=3775"
+      ],
+      "stop_grace_period": "180s",
+      "labels": {
+        "traefik.enable": "false",
+        "coolify.managed": "true",
+        "coolify.type": "application",
+        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope": "working",
+        "io.mikluha.component": "postgres",
+        "io.mikluha.database-generation": "${MAA_DATABASE_GENERATION:?stable DB generation required}"
+      },
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "networks": [
+        "db"
+      ],
+      "cap_add": [
+        "CHOWN",
+        "FOWNER",
+        "DAC_OVERRIDE",
+        "SETGID",
+        "SETUID"
+      ],
+      "environment": {
+        "POSTGRES_DB": "mikluha",
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": "${MAA_POSTGRES_PASSWORD:?Coolify secret required}",
+        "POSTGRES_INITDB_ARGS": "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      },
+      "volumes": [
+        "pg-data:/var/lib/postgresql/data"
+      ],
+      "command": [
+        "postgres",
+        "-c",
+        "max_connections=40",
+        "-c",
+        "shared_buffers=128MB",
+        "-c",
+        "log_statement=none",
+        "-c",
+        "log_min_error_statement=panic"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U postgres -d mikluha"
+        ],
+        "interval": "10s",
+        "timeout": "3s",
+        "retries": 10
+      }
+    },
+    "commerce": {
+      "image": "ghcr.io/artgurianov/mikluha-commerce@sha256:4d34bc21f58dc511ece420011ea4ef223e6c6e2d43d301fd1375bd5ffade7d10",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "256m",
+      "cpus": 0.25,
+      "pids_limit": 48,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777,noexec,nosuid,nodev"
+      ],
+      "stop_grace_period": "180s",
+      "labels": {
+        "traefik.enable": "false",
+        "coolify.managed": "true",
+        "coolify.type": "application",
+        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope": "working",
+        "io.mikluha.component": "commerce",
+        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
+      },
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "networks": [
+        "db",
+        "public"
+      ],
+      "environment": {
+        "DATABASE_URL": "${MAA_COMMERCE_DATABASE_URL:?Coolify secret required}",
+        "COMMERCE_ENVIRONMENT": "PRODUCTION",
+        "CONTENT_DIR": "/app/content",
+        "COMMERCE_ORIGIN": "https://book.mikluha-maklai.ru",
+        "SITE_ORIGIN": "https://mikluha-maklai.ru",
+        "NOTISEND_API_KEY": "phase-a-disabled",
+        "NOTISEND_FROM_EMAIL": "disabled@example.invalid",
+        "NOTISEND_FROM_NAME": "Phase A disabled mail"
+      },
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "admin-api": {
+      "image": "ghcr.io/artgurianov/mikluha-commerce@sha256:4d34bc21f58dc511ece420011ea4ef223e6c6e2d43d301fd1375bd5ffade7d10",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "256m",
+      "cpus": 0.25,
+      "pids_limit": 48,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777,noexec,nosuid,nodev"
+      ],
+      "stop_grace_period": "180s",
+      "labels": {
+        "traefik.enable": "false",
+        "coolify.managed": "true",
+        "coolify.type": "application",
+        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope": "working",
+        "io.mikluha.component": "admin-api",
+        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
+      },
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "networks": [
+        "db",
+        "admin"
+      ],
+      "environment": {
+        "ADMIN_DATABASE_URL": "${MAA_ADMIN_DATABASE_URL:?Coolify secret required}",
+        "ADMIN_PUBLISH_DATABASE_URL": "${MAA_ADMIN_PUBLISH_DATABASE_URL:?Coolify secret required}",
+        "ADMIN_TOTP_KEY": "${MAA_ADMIN_TOTP_KEY:?Coolify secret required}",
+        "ADMIN_AUDIT_KEY": "${MAA_ADMIN_AUDIT_KEY:?Coolify secret required}",
+        "ADMIN_AUDIT_KEY_ID": "${MAA_ADMIN_AUDIT_KEY_ID:?Coolify secret required}",
+        "ADMIN_AUDIT_PREVIOUS_KEYS": "${MAA_ADMIN_AUDIT_PREVIOUS_KEYS:?explicit key history required}",
+        "ADMIN_ORIGIN": "https://admin.working.mikluha.test"
+      },
+      "command": [
+        "node",
+        "dist/bin/admin-api.js"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "site": {
+      "image": "ghcr.io/artgurianov/mikluha-site-ssr@sha256:b003f6e6ac1b1cda23d1ef5bee0a3d1d820fadfc5d520fdd3227cefe50d63225",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "512m",
+      "cpus": 0.5,
+      "pids_limit": 64,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777,noexec,nosuid,nodev"
+      ],
+      "stop_grace_period": "180s",
+      "labels": {
+        "traefik.enable": "false",
+        "coolify.managed": "true",
+        "coolify.type": "application",
+        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope": "working",
+        "io.mikluha.component": "site",
+        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
+      },
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "networks": [
+        "public"
+      ],
+      "environment": {
+        "COMMERCE_PUBLIC_API_URL": "http://commerce:3000",
+        "MEDIA_DELIVERY": "direct"
+      }
+    },
+    "admin": {
+      "image": "ghcr.io/artgurianov/mikluha-control-room@sha256:4725d8e13e1879cbc3818c9e719c042371c1b68fc2986b178da70b91eec5a49c",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "128m",
+      "cpus": 0.25,
+      "pids_limit": 32,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "read_only": false,
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777,noexec,nosuid,nodev"
+      ],
+      "stop_grace_period": "180s",
+      "labels": {
+        "traefik.enable": "false",
+        "coolify.managed": "true",
+        "coolify.type": "application",
+        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope": "working",
+        "io.mikluha.component": "admin",
+        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
+      },
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "networks": [
+        "admin"
+      ],
+      "cap_add": [
+        "CHOWN",
+        "SETGID",
+        "SETUID",
+        "NET_BIND_SERVICE"
+      ],
+      "environment": {
+        "ADMIN_API_UPSTREAM": "admin-api:3000"
+      }
+    },
+    "gateway": {
+      "image": "nginx@sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "128m",
+      "cpus": 0.25,
+      "pids_limit": 32,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "read_only": true,
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777,noexec,nosuid,nodev",
+        "/var/cache/nginx:size=8m,mode=1777",
+        "/var/run:size=1m,mode=1777"
+      ],
+      "stop_grace_period": "180s",
+      "labels": {
+        "traefik.enable": "false",
+        "coolify.managed": "true",
+        "coolify.type": "application",
+        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope": "working",
+        "io.mikluha.component": "gateway",
+        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
+      },
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "networks": {
+        "admin": {},
+        "public": {},
+        "ingress": {
+          "gw_priority": 1
+        }
+      },
+      "cap_add": [
+        "CHOWN",
+        "SETGID",
+        "SETUID",
+        "NET_BIND_SERVICE"
+      ],
+      "ports": [
+        "127.0.0.1:18543:443"
+      ],
+      "volumes": [
+        "/etc/mikluha-native/working/gateway.conf:/etc/nginx/nginx.conf:ro",
+        "/etc/mikluha-native/working/tls:/run/tls:ro"
+      ],
+      "entrypoint": [
+        "nginx",
+        "-g",
+        "daemon off;"
+      ]
+    }
+  },
+  "networks": {
+    "db": {
+      "name": "mikluha-phase-a-working-db",
+      "internal": true
+    },
+    "public": {
+      "name": "mikluha-phase-a-working-public",
+      "internal": true
+    },
+    "admin": {
+      "name": "mikluha-phase-a-working-admin",
+      "internal": true
+    },
+    "ingress": {
+      "name": "mikluha-phase-a-working-ingress"
+    }
+  },
+  "volumes": {
+    "pg-data": {
+      "name": "mikluha-phase-a-working-pg-data"
+    }
+  }
+}

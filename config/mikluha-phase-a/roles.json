@@ -1,0 +1,8 @@
+{
+  "format": "mikluha.phase-a-roles/1",
+  "owner": "postgres",
+  "capabilities": ["commerce_app", "commerce_operator", "admin_app", "admin_publisher", "admin_operator", "media_worker"],
+  "logins": {"commerce_runtime": "commerce_app", "admin_runtime": "admin_app", "admin_publish_runtime": "admin_publisher", "admin_operator_login": "admin_operator", "media_runtime": "media_worker"},
+  "superuser_logins": [],
+  "password_authority": "separate off-host secret generation; never SQL/dump/argv"
+}

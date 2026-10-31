@@ -1,0 +1,62 @@
+{
+  "format": "mikluha.phase-a/1",
+  "scope": "acceptance",
+  "source_commit": "7d405bb51852370e851efb55510fabe86999cc27",
+  "source_main_verified": true,
+  "controller": "coolify-raw-compose",
+  "application_uuid": null,
+  "schema_head": 19,
+  "images": {
+    "postgres": "postgres@sha256:cbf42f0edc946c0bc1b8eeed62403734e1f25dc67a3491455d07a92fdb558b28",
+    "commerce": "ghcr.io/artgurianov/mikluha-commerce@sha256:4d34bc21f58dc511ece420011ea4ef223e6c6e2d43d301fd1375bd5ffade7d10",
+    "site": "ghcr.io/artgurianov/mikluha-site-ssr@sha256:b003f6e6ac1b1cda23d1ef5bee0a3d1d820fadfc5d520fdd3227cefe50d63225",
+    "admin": "ghcr.io/artgurianov/mikluha-control-room@sha256:4725d8e13e1879cbc3818c9e719c042371c1b68fc2986b178da70b91eec5a49c",
+    "worker": "ghcr.io/artgurianov/mikluha-media-worker@sha256:5b31289cfe40469f0e359396254443103023af2b81beb784d7f934eee6c671c7",
+    "decoder": "ghcr.io/artgurianov/mikluha-media-decoder@sha256:ac2504fac3da7f3ebe3f64b81a0aece399d121af9193b9d8bed189824740e3cb",
+    "gateway": "nginx@sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606",
+    "aws": "amazon/aws-cli@sha256:d5b61bcb558149739b6d17410bdff21ec66518f3c921f0b8fc8ffa725f3f1b00"
+  },
+  "ports": {
+    "admin": 18443,
+    "site": 18443
+  },
+  "backup": {
+    "endpoint": "https://s3.cloud.ru",
+    "region": "ru-central-1",
+    "bucket": null,
+    "prefix": "mikluha/native-phase-a/acceptance/v1/",
+    "recipient": null,
+    "hourly_minute": 37,
+    "remote_days": 7,
+    "max_age_seconds": 7200,
+    "max_dump_bytes": 67108864,
+    "owner_canonical_id": null,
+    "policy": null,
+    "policy_enrolled": false,
+    "retention_authority": "provider-lifecycle",
+    "allowed_principals": [],
+    "lifecycle": null,
+    "versioning": "Enabled",
+    "noncurrent_days": 7
+  },
+  "secret_authority": {
+    "generation": null,
+    "offhost_reference": null
+  },
+  "restriction_authority": {
+    "generation": null,
+    "offhost_reference": null
+  },
+  "admission": "NOT_READY",
+  "schema_journal_sha256": "9dc8f4de2fa5f97bff70cee55def862be39187420c50da765fefd3a259b0d344",
+  "privileges_sha256": "db359e1ae8dd8ece4de59dc3de5df27471afc71a2a89d4b0c36879c4bb57e626",
+  "database_generation": null,
+  "compose_source": {
+    "repository": "ArtGurianov/mikluha",
+    "path": "/config/mikluha-phase-a/acceptance.compose.json",
+    "commit": null,
+    "file_sha256": null,
+    "qualification": "NOT_RUN",
+    "evidence": null
+  }
+}
