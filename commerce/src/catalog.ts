@@ -89,6 +89,18 @@ function str(doc: Record<string, unknown>, key: string, where: string): string {
   return v;
 }
 
+/**
+ * An exact, canonically spelled IANA zone, or a refusal. Never substitutes a default: a missing or
+ * invalid site timezone stops the catalog instead of silently becoming Europe/Moscow or UTC.
+ */
+export function ianaTimezone(value: string, where: string): string {
+  let resolved: string;
+  try { resolved = new Intl.DateTimeFormat('en-US', { timeZone: value }).resolvedOptions().timeZone; }
+  catch { throw new Error(`CATALOG_INVALID: ${where} timezone`); }
+  if (resolved !== value || !value.includes('/')) throw new Error(`CATALOG_INVALID: ${where} timezone`);
+  return value;
+}
+
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 const lines = (v: unknown): string[] => (text(v) ?? '').split('\n').map((l) => l.trim()).filter((l) => l !== '');
 const record = (v: unknown): Record<string, unknown> =>
@@ -137,7 +149,7 @@ export function departureContract(raw: unknown): DepartureContract | null {
 
 export function loadSiteRelease(contentDir: string): Catalog {
   const settings = load(join(contentDir, 'site-settings.yml'));
-  const timezone = str(settings, 'timezone', 'site-settings');
+  const timezone = ianaTimezone(str(settings, 'timezone', 'site-settings'), 'site-settings');
   const departures = new Map<string, Departure>();
   const artifact = (slug: string): BookingTerms => {
     const page = load(join(contentDir, 'legal', `${slug}.yml`));
