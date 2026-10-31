@@ -63,43 +63,88 @@ no money migration. That is the structural reason the delta *can* be small.
 
 Everything below is work **not** already in TOUR-78/79.
 
-### 4.1 Schema delta (one forward migration on top of TOUR-78/79)
+### 4.1 Change, consent, seat and payment lifecycle (must be confirmed against TOUR-79)
+
+The command in §4.2 is **not** a single implicit "reserve + accept + bill" step. The acceptance
+review (P1) correctly flags that consent must bind to a *specific proposed* revision and that the
+moment the revision becomes accepted and the seat becomes contractually held must be explicit. The
+proposed lifecycle, mirroring the transfer offer (booking §9.2, policy §6) rather than inventing a
+new money model, is:
+
+1. **PROPOSED.** The operator opens an addition proposal carrying the candidate revision + its
+   immutable hash (added line price, participant, seat count). The added seat is placed on a
+   **bounded proposal hold only** — not a contractual booking — with its own TTL; the hold is
+   released on decline or TTL expiry. No money, no contractual seat yet.
+2. **CONSENTED.** The buyer consents through a secure single-use link bound to that exact revision
+   hash (a mail-robot scan is not consent). Until this, nothing is contractually added.
+3. **ACCEPTED + payable opened.** Default ordering = the **ordinary amendment** ordering of booking
+   §7.1: the revision becomes accepted first, then the new payable for the added line opens. The
+   added seat becomes a contractual booking only at acceptance. (The transfer-style "pay before
+   acceptance via a proposal-scoped operation" is a separate, heavier mode and is **not** proposed
+   here.)
+4. **NEEDS_RESOLUTION / release.** Decline, TTL expiry, lost target availability, or any
+   paid-but-uncommittable state resolves the proposal without ever touching the paid original: the
+   proposal hold releases, the original seat/money/contract are untouched, and no contractual
+   addition was made.
+
+This directly answers the dangerous case the review raised ("operator added a child, buyer did not
+consent, but the seat is already held"): under this lifecycle a non-consented proposal only ever held
+a **bounded proposal hold**, which releases — it never became a contractual seat and never opened a
+payable.
+
+**Open dependency (gates the "small" verdict):** TOUR-79 provides PROPOSED/consent/atomic-commit and
+a proposal hold on a *transfer target* departure. What must be **confirmed or added** is a proposal
+hold for an **additional seat on the same departure** and the consent-before-acceptance ordering for
+an addition. If TOUR-79 already yields these, the delta is small; if a same-departure additional-seat
+hold must be built, that extension is part of the TOUR-90 delta and is accounted in §4.2/§5, not
+assumed free. The verdict in §5 is explicitly conditional on this confirmation.
+
+### 4.2 Schema delta (one forward migration on top of TOUR-78/79)
 
 1. **One new revision basis** `PARTICIPANT_ADDITION` added to the `basis` CHECK, with its admission
    preconditions: same purchase, same departure, `new.seats = prev.seats + N` (N ≥ 1, result ≤ 6),
    every predecessor participant_ref carried unchanged, exactly N fresh refs appended. No other
    economic field of the carried lines may differ from the predecessor.
-2. **Guardian-presence invariant** for an added minor: at least one travelling adult
-   parent/guardian participant already present on this purchase/departure must remain for the whole
-   revision; the addition may not leave a child without a permitted guardian (policy §4). This is a
-   *new* check — TOUR-79's equivalent-category replacement never needed it.
+2. **Guardian invariant** for an added minor — three *distinct* conditions, not reducible to "an
+   adult is present" (P2): (a) a travelling participant of legal age remains on this
+   purchase/departure for the whole revision; (b) that participant is a **confirmed** parent or legal
+   guardian, with the qualified authority documents/consents the legal process requires (policy §4,
+   fiscal §5); (c) the **permissible relationship** to the specific child is established — age alone
+   proves none of this. The data/role/retention design and the exact authority documents are owned by
+   TOUR-35/80/84; §4.1 only enforces that the invariant holds across the addition and every later
+   supported change. This is a *new* check — TOUR-79's equivalent-category replacement never needed it.
 3. **Added-line money isolation:** the new revision opens a payable for the **added line only**; the
    carried lines keep their frozen allocations and any historical FULL (booking §5, §7 — adding a
    participant may re-open a buyer balance but never voids a prior FULL and never creates a second
    Refref commission; native is `NATIVE_NO_REFERRAL` so there is no commission at all). No automatic
    cancellation, no release of the paid original seat, no automatic money movement.
 
-### 4.2 Command delta (Admin, operator-scoped)
+### 4.3 Command delta (Admin, operator-scoped)
 
-- One new operator command `purchase add-participant <purchaseRef> --seats N --basis child|adult
-  --by <operator> --reason <...>` that, in one transaction after TOUR-79's capacity lock:
-  re-checks target availability on the **same** departure, validates the guardian invariant, appends
-  the revision + participant + line, and opens the new payable. On last-seat loss or any
-  paid-but-uncommittable state → `NEEDS_RESOLUTION` (reusing TOUR-79's path), never oversell.
+- One new operator command `purchase propose-participant <purchaseRef> --seats N --basis child|adult
+  --by <operator> --reason <...>` that opens the **PROPOSED** state of §4.1 (candidate revision +
+  hash + bounded same-departure proposal hold), and a `purchase commit-participant` path that, after
+  proven consent and under TOUR-79's capacity lock, re-checks same-departure availability, validates
+  the guardian invariant, appends the revision + participant + line, and opens the new payable in one
+  transaction. On decline, TTL expiry, last-seat loss or any paid-but-uncommittable state →
+  `NEEDS_RESOLUTION` / hold release (reusing TOUR-79's path), never oversell, original untouched.
 - It reuses TOUR-79's consent binding (secure link bound to the immutable candidate hash) and its
-  EIS material-revision "needs-update" trigger; it adds no new outbox or provider wire.
+  EIS material-revision "needs-update" trigger; it adds no new outbox or provider wire. Any
+  same-departure additional-seat hold not already provided by TOUR-79 is part of this delta (§4.1).
 
-### 4.3 UI delta (Control Room / Admin)
+### 4.4 UI delta (Control Room / Admin)
 
 - An "Add participant" affordance on a paid purchase that shows the carried (frozen) lines read-only,
   collects the added tourist's qualified identity fields + guardian link + the child tariff line
   price, renders the new payable and the preserved original, and requires explicit operator reason.
   No public-form change (public addition stays out of scope).
 
-### 4.4 Negative-test delta (new scenarios, synthetic data only)
+### 4.5 Negative-test delta (new scenarios, synthetic data only)
 
 - Addition at the last seat loses to a competing sale → `NEEDS_RESOLUTION`, no oversell, original
   seats and money untouched.
+- **Operator proposed, buyer never consented** → only the bounded proposal hold existed; on decline
+  or TTL it releases; no contractual seat and no payable were ever created (the §4.1 danger case).
 - The new payable going `UNKNOWN` does **not** release the added seat, does **not** touch paid
   lines, and fences a second overlapping instruction on the added scope (booking §4).
 - A concurrent amendment that would remove the only guardian is refused against an in-flight child
@@ -110,22 +155,45 @@ Everything below is work **not** already in TOUR-78/79.
 
 ## 5. Feasibility verdict
 
-**CONDITIONAL YES — small and non-substantial, *bounded strictly to the append-a-line model above*.**
+**CONDITIONAL — small and non-substantial *only if* the §4.1 lifecycle dependency is confirmed, and
+bounded strictly to the append-a-line model.** The "small" claim is **not yet proven**; it is proven
+once the §4.1 consent/seat/payment lifecycle is confirmed against TOUR-79 (see the measurable test
+below).
 
-- *Small, no substantial change* **if** addition = append one priced line + participant + seat under
-  one new revision basis, open a new payable, and freeze everything already paid. This rides entirely
-  on TOUR-78's per-line pricing and TOUR-79's additive immutable-revision + atomic-commit engine; the
-  genuinely new surface is one `basis` value, one guardian invariant, one Admin command, one UI panel
-  and ~5 negative tests.
-- **NOT small / substantial — out of this envelope** if OWNER requires *seamless conversion*:
-  automatically cancelling the original booking, moving the adult's already-received money onto a new
-  family purchase, or guaranteeing a protected migration of the old seat. That is transfer-class
-  atomic cross-purchase money movement; it re-opens refund/recollection, fiscal re-issue and the
-  "no automatic cancel / no promise of seamless conversion" prohibition (policy §4, TOUR-90). It fails
-  the OWNER condition and should stay out.
+### 5.1 Measurable "small" criterion (replaces the bare word "small")
 
-So the condition is satisfiable, but only for the additive model. The assessment does **not** itself
-turn the condition into a GO.
+Treat the OWNER condition ("small, no substantial change") as **met** only if *all* of the following
+hold; **not met** the moment any fails:
+
+- **Migrations:** exactly **one** forward-only migration, adding one `basis` value + its CHECK/guard
+  logic and the guardian invariant; it alters **no** existing table's accepted columns and touches
+  **no** 0017-or-earlier bytes.
+- **Schema:** **no new table** and **no change to the per-line/allocation shapes** delivered by
+  TOUR-78 (the added line reuses them); only an appended line + participant + seat.
+- **Lifecycle:** the §4.1 PROPOSED → CONSENTED → ACCEPTED+payable → NEEDS_RESOLUTION states are all
+  served by TOUR-79 primitives, **plus at most** a same-departure additional-seat proposal hold. If a
+  *new money ordering* (e.g. pay-before-acceptance) or a *cross-purchase money move* is required, the
+  condition is **not met**.
+- **Command/UI:** one operator propose/commit command pair and one Admin panel; **no public-form
+  change**.
+- **Tests:** on the order of the §4.5 scenarios (≈6), no change to TOUR-78/79's own suites.
+- **Money:** zero movement of already-received money; prior FULL preserved; no automatic
+  cancel/refund/seat-release of the original.
+
+Any requirement beyond this envelope (seamless conversion, auto-cancel, protected seat migration,
+pay-before-accept, a second table, or re-pricing paid lines) flips the verdict to **NOT small /
+substantial → out of scope**: that is transfer-class atomic cross-purchase money movement and
+collides with the "no automatic cancel / no promise of seamless conversion" prohibition (policy §4,
+TOUR-90).
+
+### 5.2 What must be confirmed before the verdict is firm
+
+The single open dependency is §4.1: that TOUR-79 actually provides (or cheaply extends to) the
+same-departure additional-seat proposal hold and the consent-before-acceptance ordering. Until that
+is confirmed against the delivered TOUR-79 source, the "small" verdict is a **well-founded candidate,
+not a proof**, and option A in §7 should not be adopted on this document alone.
+
+The assessment does **not** turn the condition into a GO.
 
 ## 6. Interim manager-assisted handling (allowed now, before any GO)
 
@@ -142,9 +210,11 @@ code and without breaking any invariant:
 
 ## 7. The remaining OWNER choice to obtain
 
-1. **Scope of any future feature:** (A) implement the **additive** Admin addition of §4 (low-cost,
-   non-substantial, recommended if the feature is wanted); or (B) keep **interim manual handling only**
-   (§6) with no in-place feature.
+1. **Scope of any future feature:** (A) implement the **additive** Admin addition of §4 — the
+   candidate low-cost path, but to be adopted **only after** the §4.1 lifecycle dependency is
+   confirmed against delivered TOUR-79 (§5.2) and the §5.1 criterion is met; or (B) keep **interim
+   manual handling only** (§6) with no in-place feature. Option A is not recommended for adoption on
+   this document alone until that confirmation exists.
 2. **Explicit boundary:** confirm that *seamless money conversion / automatic cancellation of the
    original* is **not** required. If it is required, the OWNER condition ("small, no substantial
    change") is **not** met and the feature stays out of scope (handled as a legally-qualified new
@@ -154,3 +224,19 @@ code and without breaking any invariant:
 
 No new feature, migration installation, bank movement, cancellation, deployment or public-sale
 authorization is created by this document.
+
+---
+
+## Review resolution (2026-10-31, PR #67)
+
+- **P1 — consent/seat/payment lifecycle:** added §4.1 with explicit PROPOSED → CONSENTED →
+  ACCEPTED+payable → NEEDS_RESOLUTION states, bounded same-departure proposal hold, and the
+  consent-before-acceptance ordering; the "operator proposed, buyer never consented" danger case is
+  resolved (hold only, no contractual seat/payable) and covered by a new negative test (§4.5).
+- **P2 — measurable "small":** §5.1 replaces the bare word with a pass/fail criterion
+  (one migration, no new table, no re-pricing, zero money movement, bounded test count, lifecycle
+  served by TOUR-79). The verdict (§5) is now explicitly conditional on confirming §4.1 against
+  delivered TOUR-79 (§5.2); option A is not recommended for adoption on this document alone (§7).
+- **P2 — guardian invariant:** §4.1(2) now separates legal age, confirmed parent/guardian with
+  authority documents, and permissible relationship to the specific child; design owned by
+  TOUR-35/80/84.

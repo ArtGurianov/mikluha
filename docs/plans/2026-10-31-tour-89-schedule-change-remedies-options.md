@@ -35,12 +35,18 @@ A change below the threshold = notice only; at/above = buyer consent right + rej
 | Option | Rule | Trade-off |
 |---|---|---|
 | A1 — any date/day change is material; time-only within the same day is minor | Simple, buyer-protective, easy to evidence | May over-trigger the consent/refund path for trivial shifts |
-| A2 — tiered by magnitude (**recommended starting point**) | *Minor:* departure-time shift ≤ a small bound, same calendar day, no lost connection/overnight/program element → notice only. *Material:* date/day change, time shift beyond the bound, or any change that breaks a connection, overnight, carrier or a priced program element | Needs an agreed bound and a defined list of "breaking" elements; matches the existing ≤6h transfer-proposal bound as a natural candidate value |
+| A2 — tiered by magnitude (**recommended starting point**) | *Minor:* departure-time shift ≤ a small bound, same calendar day, no lost connection/overnight/program element → notice only. *Material:* date/day change, time shift beyond the bound, or any change that breaks a connection, overnight, carrier or a priced program element | Needs an agreed bound and a defined list of "breaking" elements |
 | A3 — any organizer-initiated schedule change is material | Maximum buyer protection, minimum ambiguity | Highest operational/refund exposure; treats trivial shifts as full consent events |
 
+**On the numeric bound (P2):** the ≤6h transfer-proposal bound is an *offer TTL* for buyer-initiated
+transfers — it is **not** automatically a materiality threshold for an organizer-initiated schedule
+change, and must not be carried across by default. It is at most one candidate value to consider; the
+materiality bound is a separate OWNER/legal parameter to be set and justified on its own.
+
 Legal anchor to confirm the threshold against: PP RF №551 (eff. 01.09.2026) rules on changing
-essential contract terms and consumer rights (fiscal §6). The numeric bound and the "breaking
-elements" list are **OWNER/legal parameters**, not set here.
+essential contract terms and consumer rights (fiscal §6). Rospotrebnadzor confirms that a change to
+the travel *dates/timing* is among the material changes of circumstance. The numeric bound and the
+"breaking elements" list are **OWNER/legal parameters**, not set here.
 
 ## 3. (B) Notice and consent — options
 
@@ -78,7 +84,7 @@ All are **proposals requiring OWNER/legal qualification**; none authorizes a rea
 
 | Option | Remedy | Notes |
 |---|---|---|
-| D1 — full refund of money actually received (**proposed default**) | On buyer rejection of a material organizer-initiated change, offer a **full refund of confirmed receipts**, once each, via the qualified native Alfa refund scope, with fiscal/EIS correction and audit | Not a penalty, not a forfeited deposit; refund amount = proven receipts minus prior proven refunds (booking §8). Requires §551/ЗоЗПП qualification that an organizer-initiated material change grounds a full refund |
+| D1 — full refund of money actually received (**proposed commercial default**) | On buyer rejection of a material organizer-initiated change, offer a **full refund of confirmed receipts**, once each, via the qualified native Alfa refund scope, with fiscal/EIS correction and audit | Not a penalty, not a forfeited deposit; refund amount = proven receipts minus prior proven refunds (booking §8). D1 is a reasonable proposed commercial standard, but it **cannot yet be declared as automatically flowing from №551 for all Mikluha routes**: the consequences of changing/terminating the contract need separate civil-law qualification per offering (see §5 note) |
 | D2 — buyer's choice: accept new schedule, accept an offered alternative departure (transfer flow), or full refund | Most consumer-friendly; reuses the TOUR-79 transfer machinery for the "alternative departure" branch | Larger surface; the alternative-departure branch must obey the existing 6h/transfer rules |
 | D3 — refund minus independently-documented unavoidable costs | Lower organizer exposure | Highest legal risk for an **organizer-initiated** change; likely disfavoured by consumer law — include only if legal explicitly supports it |
 
@@ -86,14 +92,48 @@ Refund, service termination, retained documented expenses, fiscal action and EIS
 facts** and must be handled separately (booking §8, fiscal §3). A certificate/internal credit is not a
 bank refund.
 
-## 6. Unresolved buyers and no-response handling (options)
+**Legal applicability note (P1-adjacent):** the reference to PP RF №551 is apt, but its rules on
+*realisation of a tourist product* must be **separately confirmed to apply to Mikluha's specific
+bus-trip model** per offering (excursion-vs-tourist-product qualification, fiscal §5/§6). Rospotrebnadzor
+confirms a change of travel dates is among material changes of circumstance, yet the *consequences* of
+changing or terminating the contract are a separate civil-law qualification. So D1 is a sound proposed
+commercial standard but is **not** to be published as an automatic №551 consequence for every route
+until that per-offering legal qualification (TOUR-84) is done.
 
-- U1 — no consent, no rejection by the deadline → the buyer stays on the **old accepted revision**
-  with its old planned moment preserved as reproducible history; the organizer-initiated change does
-  not take effect for them, and the case escalates to the manager for individual resolution
-  (**recommended**, matches "no automatic cancellation / no retrospective default").
-- U2 — treat no-response as rejection → auto-offer the D-remedy. Only if legal confirms silence may
-  trigger a remedy without harming the buyer.
+## 6. Unresolved buyers and no-response handling
+
+The review (P1) is correct: "stays on the old accepted revision" alone does **not** close the
+scenario, because once the organizer has moved the only departure, the service at the old planned
+moment **cannot physically be performed**. Two facts must be kept separate:
+
+- **Legal history (preserve):** the old accepted revision, its documents, price and planned moment
+  stay immutable and reproducible. The unilateral change never silently overwrites them and the buyer
+  is never auto-defaulted. This part of the original U1 stands.
+- **Service performance (must be resolved):** preservation of the record is not performance of the
+  trip. For an organizer-initiated material change the organizer is the party that can no longer
+  perform the original, so a non-responder cannot be left in an undefined state **past the original
+  planned departure**.
+
+Proposed procedure (requires OWNER/legal qualification):
+
+1. **Resolve before the original planned departure.** For every non-responder the manager must reach
+   a resolution *before the original planned departure time*: repeated notice, direct manager
+   contact, and a clearly stated consequence if no choice is made.
+2. **If consent is still not obtained by the original planned moment,** the organizer's inability to
+   perform the original trip is the trigger: the case resolves into the §5 remedy the buyer is
+   entitled to for an organizer-initiated material change (default: the D1 full refund, or an offered
+   alternative departure), **not** a silent lapse and **not** a buyer default. The right to claim the
+   refund arises no later than the organizer's own failure to perform at the original moment, subject
+   to the civil-law qualification in §5.
+3. **Capacity allocation.** A non-responder's seat stays reserved against resolution and is **not**
+   resold until the case is resolved; equally, an unresolved seat is **not** counted as available on
+   the *new* departure, so consenters and non-responders cannot be double-counted and the new
+   departure is not oversold on the strength of seats that are still in limbo.
+
+Rejected alternative — **U-bad:** leaving a non-responder "on the old revision" indefinitely, past
+the original departure, with no resolution. This is the gap the review identified and is explicitly
+**not** proposed.
+
 - A material change can create **newly past-due** balances only against the *new* schedule; those are
   not retroactive defaults and must not trigger overdue notices for the old schedule.
 
@@ -110,8 +150,25 @@ bank refund.
 
 ## 8. Recommended default package (for OWNER/legal to accept, amend or reject)
 
-A2 (tiered materiality, bound = the existing 6h transfer bound unless legal sets another) · B1
-(explicit opt-in consent bound to the revision hash) · C as in §4 · D1 (full refund of receipts on
-rejection) with D2's alternative-departure branch offered where a suitable departure exists · U1 for
-unresolved buyers. Every numeric bound and the legal sufficiency of each remedy remain an
-OWNER/legal decision; this document proposes, it does not approve.
+A2 (tiered materiality, with the bound set and justified on its own — **not** defaulted to the 6h
+transfer TTL) · B1 (explicit opt-in consent bound to the revision hash) · C as in §4 · D1 (full refund
+of receipts on rejection, as a *commercial* default pending per-offering №551/civil-law qualification)
+with D2's alternative-departure branch offered where a suitable departure exists · the §6 procedure
+for unresolved buyers (resolve before the original departure; never an indefinite limbo). Every
+numeric bound and the legal sufficiency of each remedy remain an OWNER/legal decision; this document
+proposes, it does not approve.
+
+---
+
+## Review resolution (2026-10-31, PR #67)
+
+- **P1 — U1 left a contract on a non-existent old departure:** §6 rewritten to separate preservation
+  of the old accepted revision (legal history) from service performance; non-responders must be
+  resolved **before the original planned departure**, and the organizer's inability to perform the
+  original triggers the §5 remedy rather than an indefinite limbo; capacity rules keep unresolved
+  seats from being resold or counted as available on the new departure.
+- **P2 — 6h threshold:** §2 no longer carries the buyer-initiated transfer TTL across as a materiality
+  bound; the materiality bound is a separate OWNER/legal parameter, and §8 no longer defaults to 6h.
+- **Legal nuance:** §5 adds that PP RF №551's applicability to Mikluha's specific bus-trip model must
+  be confirmed per offering, and that D1 is a proposed commercial standard, not an automatic №551
+  consequence for all routes until the TOUR-84 qualification is done.
