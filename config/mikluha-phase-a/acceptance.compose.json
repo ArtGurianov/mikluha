@@ -20,15 +20,15 @@
         "/var/run/postgresql:size=8m,mode=3775"
       ],
       "stop_grace_period": "180s",
-      "labels": {
-        "traefik.enable": "false",
-        "coolify.managed": "true",
-        "coolify.type": "application",
-        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
-        "io.mikluha.scope": "acceptance",
-        "io.mikluha.component": "postgres",
-        "io.mikluha.database-generation": "${MAA_DATABASE_GENERATION:?stable DB generation required}"
-      },
+      "labels": [
+        "traefik.enable=false",
+        "coolify.managed=true",
+        "coolify.type=application",
+        "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope=acceptance",
+        "io.mikluha.component=postgres",
+        "io.mikluha.database-generation=${MAA_DATABASE_GENERATION:?stable DB generation required}"
+      ],
       "logging": {
         "driver": "local",
         "options": {
@@ -94,16 +94,16 @@
         "/tmp:size=16m,mode=1777,noexec,nosuid,nodev"
       ],
       "stop_grace_period": "180s",
-      "labels": {
-        "traefik.enable": "false",
-        "coolify.managed": "true",
-        "coolify.type": "application",
-        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
-        "io.mikluha.scope": "acceptance",
-        "io.mikluha.component": "commerce",
-        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
-        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
-      },
+      "labels": [
+        "traefik.enable=false",
+        "coolify.managed=true",
+        "coolify.type=application",
+        "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope=acceptance",
+        "io.mikluha.component=commerce",
+        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
+      ],
       "logging": {
         "driver": "local",
         "options": {
@@ -149,16 +149,16 @@
         "/tmp:size=16m,mode=1777,noexec,nosuid,nodev"
       ],
       "stop_grace_period": "180s",
-      "labels": {
-        "traefik.enable": "false",
-        "coolify.managed": "true",
-        "coolify.type": "application",
-        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
-        "io.mikluha.scope": "acceptance",
-        "io.mikluha.component": "admin-api",
-        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
-        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
-      },
+      "labels": [
+        "traefik.enable=false",
+        "coolify.managed=true",
+        "coolify.type=application",
+        "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope=acceptance",
+        "io.mikluha.component=admin-api",
+        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
+      ],
       "logging": {
         "driver": "local",
         "options": {
@@ -207,16 +207,16 @@
         "/tmp:size=16m,mode=1777,noexec,nosuid,nodev"
       ],
       "stop_grace_period": "180s",
-      "labels": {
-        "traefik.enable": "false",
-        "coolify.managed": "true",
-        "coolify.type": "application",
-        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
-        "io.mikluha.scope": "acceptance",
-        "io.mikluha.component": "site",
-        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
-        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
-      },
+      "labels": [
+        "traefik.enable=false",
+        "coolify.managed=true",
+        "coolify.type=application",
+        "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope=acceptance",
+        "io.mikluha.component=site",
+        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
+      ],
       "logging": {
         "driver": "local",
         "options": {
@@ -250,16 +250,16 @@
         "/tmp:size=16m,mode=1777,noexec,nosuid,nodev"
       ],
       "stop_grace_period": "180s",
-      "labels": {
-        "traefik.enable": "false",
-        "coolify.managed": "true",
-        "coolify.type": "application",
-        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
-        "io.mikluha.scope": "acceptance",
-        "io.mikluha.component": "admin",
-        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
-        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
-      },
+      "labels": [
+        "traefik.enable=false",
+        "coolify.managed=true",
+        "coolify.type=application",
+        "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope=acceptance",
+        "io.mikluha.component=admin",
+        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
+      ],
       "logging": {
         "driver": "local",
         "options": {
@@ -300,16 +300,16 @@
         "/var/run:size=1m,mode=1777"
       ],
       "stop_grace_period": "180s",
-      "labels": {
-        "traefik.enable": "false",
-        "coolify.managed": "true",
-        "coolify.type": "application",
-        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
-        "io.mikluha.scope": "acceptance",
-        "io.mikluha.component": "gateway",
-        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
-        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
-      },
+      "labels": [
+        "traefik.enable=false",
+        "coolify.managed=true",
+        "coolify.type=application",
+        "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope=acceptance",
+        "io.mikluha.component=gateway",
+        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
+      ],
       "logging": {
         "driver": "local",
         "options": {
@@ -361,16 +361,16 @@
         "/tmp:size=16m,mode=1777,noexec,nosuid,nodev"
       ],
       "stop_grace_period": "180s",
-      "labels": {
-        "traefik.enable": "false",
-        "coolify.managed": "true",
-        "coolify.type": "application",
-        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
-        "io.mikluha.scope": "acceptance",
-        "io.mikluha.component": "worker",
-        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
-        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
-      },
+      "labels": [
+        "traefik.enable=false",
+        "coolify.managed=true",
+        "coolify.type=application",
+        "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope=acceptance",
+        "io.mikluha.component=worker",
+        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
+      ],
       "logging": {
         "driver": "local",
         "options": {
@@ -425,16 +425,16 @@
         "/tmp:size=64m,mode=1777,noexec,nosuid,nodev"
       ],
       "stop_grace_period": "180s",
-      "labels": {
-        "traefik.enable": "false",
-        "coolify.managed": "true",
-        "coolify.type": "application",
-        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
-        "io.mikluha.scope": "acceptance",
-        "io.mikluha.component": "decoder",
-        "io.mikluha.source": "7d405bb51852370e851efb55510fabe86999cc27",
-        "io.mikluha.secret-generation": "${MAA_SECRET_GENERATION:?qualified generation required}"
-      },
+      "labels": [
+        "traefik.enable=false",
+        "coolify.managed=true",
+        "coolify.type=application",
+        "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope=acceptance",
+        "io.mikluha.component=decoder",
+        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
+      ],
       "logging": {
         "driver": "local",
         "options": {

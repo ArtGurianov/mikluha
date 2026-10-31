@@ -41,8 +41,9 @@ class ReviewContracts(unittest.TestCase):
         c=qualified();before=plan.compose(c)['services']['postgres']
         c['source_commit']='b'*40;c['secret_authority']['generation']='new-app-key-generation'
         self.assertEqual(before,plan.compose(c)['services']['postgres'])
-        self.assertNotIn('io.mikluha.source',before['labels'])
-        self.assertEqual(before['labels']['io.mikluha.database-generation'],c['database_generation'])
+        labels=dict(x.split('=',1) for x in before['labels'])
+        self.assertNotIn('io.mikluha.source',labels)
+        self.assertEqual(labels['io.mikluha.database-generation'],c['database_generation'])
         self.assertEqual(len(plan.compose(c)['services']['gateway']['ports']),1)
 
     def test_freshness_while_backup_holds_lock_does_not_fake_failure(self):

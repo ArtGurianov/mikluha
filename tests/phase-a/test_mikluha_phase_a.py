@@ -111,7 +111,7 @@ class Plans(unittest.TestCase):
         self.assertEqual(set(s['site']['environment']), {'COMMERCE_PUBLIC_API_URL', 'MEDIA_DELIVERY'})
         self.assertTrue(all(n.get('internal') for k, n in c['networks'].items() if k not in ('media-egress', 'ingress')))
         for key, service in s.items():
-            self.assertEqual(service['labels']['traefik.enable'], 'false')
+            self.assertEqual(dict(x.split('=', 1) for x in service['labels'])['traefik.enable'], 'false')
             self.assertNotIn('build', service)
             self.assertNotIn('privileged', service)
             self.assertNotIn('docker.sock', json.dumps(service))

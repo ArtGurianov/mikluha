@@ -195,6 +195,11 @@ def compose(c):
     if scope == 'acceptance':
         result['networks']['media-egress'] = {'name': name + '-media-egress'}
         result['volumes']['decoder-socket'] = {'name': name + '-decoder-socket'}
+    # Coolify4.5.3 oldRawParser appends list labels even when given a mapping.
+    # Emit the supported sequence form so its management labels cannot introduce
+    # integer keys into a mapping and make Docker Compose reject the definition.
+    for item in services.values():
+        item['labels'] = [key + '=' + str(value) for key, value in item['labels'].items()]
     return result
 
 
