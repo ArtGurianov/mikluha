@@ -32,11 +32,21 @@ test('the retired Sveltia CMS configuration cannot reintroduce its Moscow defaul
   assert.throws(() => readFileSync(join(repo, 'public', 'admin', 'config.yml')), { code: 'ENOENT' });
 });
 
-test('invalid, aliased or non-canonical site timezones stop the catalog; nothing is substituted', () => {
-  for (const bad of ['Mars/Olympus', 'asia/krasnoyarsk', 'Asia/Krasnoyarsk ', 'UTC', '+07:00', 'Krasnoyarsk']) {
-    assert.throws(() => ianaTimezone(bad, 'site-settings'), /CATALOG_INVALID: site-settings timezone/, bad);
+test('invalid or mis-spelled site timezones stop the catalog; nothing is substituted', () => {
+  for (const bad of ['Mars/Olympus', 'asia/krasnoyarsk', 'ASIA/KRASNOYARSK', 'Asia/krasnoyarsk', 'Asia/Krasnoyarsk ', ' Asia/Krasnoyarsk',
+    'UTC', '+07:00', 'Krasnoyarsk', 'europe/kyiv', 'Europe/KYIV', 'Asia/Krasnoyarsk/', '/Asia/Krasnoyarsk', '']) {
+    assert.throws(() => ianaTimezone(bad, 'site-settings'), /CATALOG_INVALID: site-settings timezone/, JSON.stringify(bad));
   }
-  for (const good of [CANONICAL, 'Europe/Moscow', 'Asia/Novosibirsk']) assert.equal(ianaTimezone(good, 'site-settings'), good);
+});
+
+test('valid IANA names are preserved as written, including current names ICU reports under older aliases', () => {
+  // Review of PR #69: Node 22 ICU resolves Europe/Kyiv to Europe/Kiev and Asia/Kolkata to Asia/Calcutta.
+  // These are valid explicit settings and must not stop Commerce. CI and the commerce image both run
+  // Node 22 (node:22-alpine); a future ICU that stopped accepting one of them fails here first.
+  for (const good of [CANONICAL, 'Europe/Moscow', 'Asia/Novosibirsk', 'Europe/Kyiv', 'Europe/Kiev', 'Asia/Kolkata', 'Asia/Calcutta',
+    'America/Nuuk', 'Asia/Ho_Chi_Minh', 'America/Argentina/Buenos_Aires', 'America/Port-au-Prince', 'Antarctica/DumontDUrville', 'Etc/GMT+5']) {
+    assert.equal(ianaTimezone(good, 'site-settings'), good, good);
+  }
 });
 
 test('loadSiteRelease preserves an explicit valid zone and refuses an invalid one', () => {
@@ -44,7 +54,7 @@ test('loadSiteRelease preserves an explicit valid zone and refuses an invalid on
   cpSync(sourceFixtureDir(), dir, { recursive: true });
   const path = join(dir, 'site-settings.yml');
   const original = yaml.load(readFileSync(path, 'utf8'), { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>;
-  for (const explicit of [CANONICAL, 'Asia/Novosibirsk']) {
+  for (const explicit of [CANONICAL, 'Asia/Novosibirsk', 'Europe/Kyiv']) {
     writeFileSync(path, yaml.dump({ ...original, timezone: explicit }));
     assert.equal(loadSiteRelease(dir).timezone, explicit);
   }
