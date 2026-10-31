@@ -20,15 +20,15 @@
         "/var/run/postgresql:size=8m,mode=3775"
       ],
       "stop_grace_period": "180s",
-      "labels": {
-        "traefik.enable": "false",
-        "coolify.managed": "true",
-        "coolify.type": "application",
-        "coolify.applicationId": "${MAA_APPLICATION_UUID:?Coolify UUID required}",
-        "io.mikluha.scope": "acceptance",
-        "io.mikluha.component": "postgres",
-        "io.mikluha.database-generation": "${MAA_DATABASE_GENERATION:?stable DB generation required}"
-      },
+      "labels": [
+        "traefik.enable=false",
+        "coolify.managed=true",
+        "coolify.type=application",
+        "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
+        "io.mikluha.scope=acceptance",
+        "io.mikluha.component=postgres",
+        "io.mikluha.database-generation=${MAA_DATABASE_GENERATION:?stable DB generation required}"
+      ],
       "logging": {
         "driver": "local",
         "options": {

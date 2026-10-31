@@ -31,6 +31,13 @@ not rebuild/publish images. Qualify the pinned Git file/hash and normalized
 rendered definition, then record `compose_source` in the private descriptor.
 A registered slot or a ready label cannot bypass missing source evidence.
 
+Coolify4.5.3 `oldRawParser` appends management labels even in raw mode. Compose
+labels therefore use the sequence (`key=value`) form. A mapping plus appended
+numeric entries is invalid and fails before container creation. Qualify the actual
+controller transformation plus Docker Compose parsing, in addition to parsing the
+original file; its injected management labels do not authorize public routing.
+
+
 ```sh
 python3 scripts/mikluha-phase-a/prepare.py report
 python3 scripts/mikluha-phase-a/prepare.py compose --stage database
