@@ -16,8 +16,21 @@ const action = "inline-flex min-h-12 items-center justify-center gap-3 rounded-x
  * Client composition port for a customer cancellation/refund request.
  * No fetch, refund execution, amount calculation, bank redirect or partner claim lives here:
  * the request is composed and handed to the integration's adapter; the refund itself is TOUR-27.
+ *
+ * The interactive lifecycle (status, notice, consumed proof, in-flight guard) belongs to one
+ * cancellation session for one order, so it is bound to a stable identity key: a genuine change of
+ * session/order remounts the form and resets that lifecycle rather than carrying a prior "received"
+ * or "unknown" state across to a different application.
  */
-export function CancellationRequest({ view: suppliedView, captcha, submit }: {
+export function CancellationRequest(props: {
+  view: CancellationPresentation;
+  captcha?: CaptchaWidget;
+  submit?: (draft: CancellationDraft) => Promise<CancellationOutcome>;
+}) {
+  return <CancellationForm key={`${props.view.session.clientRequestId}:${props.view.orderRef}`} {...props} />;
+}
+
+function CancellationForm({ view: suppliedView, captcha, submit }: {
   view: CancellationPresentation;
   captcha?: CaptchaWidget;
   submit?: (draft: CancellationDraft) => Promise<CancellationOutcome>;
@@ -34,9 +47,13 @@ export function CancellationRequest({ view: suppliedView, captcha, submit }: {
   const busy = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
-  // Adjust only this component's state before children render, preserving uncontrolled inputs.
+  // Same-identity refresh (updated money/participants). The key remount handles a changed session or
+  // order, so here we only pick up new server data and prune selections it no longer allows; status,
+  // notice and the consumed proof are intentionally preserved for the same application.
   if (sourceSnapshot !== suppliedSnapshot) {
-    setSourceSnapshot(suppliedSnapshot); setView(suppliedView); setSelected([]);
+    setSourceSnapshot(suppliedSnapshot);
+    setView(suppliedView);
+    setSelected((current) => current.filter((ref) => suppliedView.participants.some((p) => p.participantRef === ref && p.cancellable)));
   }
 
   const reportProof = useCallback((token: string | null) => {
@@ -143,12 +160,14 @@ export function CancellationRequest({ view: suppliedView, captcha, submit }: {
           </fieldset>
 
           <fieldset disabled={locked} className={`${card} space-y-4`}>
-            <legend className="px-2 text-lg font-semibold">Контакт для ответа</legend>
+            <legend className="px-2 text-lg font-semibold">Заказчик и контакт для ответа</legend>
+            <label className="block text-sm font-medium">ФИО заказчика<input className={input} name="customerName" autoComplete="name" required maxLength={300} /></label>
+            <p className="text-xs leading-relaxed text-muted-foreground">Укажите заказчика по договору. Если платить и ехать будут разные люди, организатор сверит заявление с договором отдельно.</p>
             <div className="grid gap-5 sm:grid-cols-2">
               <label className="text-sm font-medium">Email<input className={input} name="email" type="email" autoComplete="email" required maxLength={254} /></label>
               <label className="text-sm font-medium">Телефон<input className={input} name="phone" type="tel" autoComplete="tel" required maxLength={40} /></label>
             </div>
-            <p className="text-xs leading-relaxed text-muted-foreground">Организатор ответит на расчёт и дальнейшие действия не позднее пяти рабочих дней, не продлевая установленный законом срок возврата.</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">Организатор стремится сообщить расчёт и дальнейшие действия не позднее пяти рабочих дней; это не продлевает установленный законом срок возврата.</p>
           </fieldset>
 
           <fieldset disabled={locked || !available} className={`${card} space-y-4`}>

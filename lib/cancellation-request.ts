@@ -59,6 +59,8 @@ export interface CancellationPresentation {
 export interface CancellationDraft {
   clientRequestId: string;
   orderRef: string;
+  /** Customer (Заказчик) of record for the application, required by the published "Как отказаться". */
+  applicant: { fullName: string };
   /** Either the whole booking, or a whitelisted subset of still-cancellable participant references. */
   scope: { wholeBooking: boolean; participantRefs: string[] };
   reason: { category: CancellationReasonCategory; details: string };
@@ -92,6 +94,11 @@ export function canRequestCancellation(view: CancellationPresentation): boolean 
  * Explicit whitelist. Browser-side amounts, percentages, retained-cost figures, bank/card details,
  * promo, partner, query/autofill extras and profile are never forwarded. Returns null when the draft
  * is incomplete or the selected scope contains nothing the server reports as cancellable.
+ *
+ * The cancellation scope is never taken from arbitrary form input: a whole-booking request exists
+ * only where the server-supplied view permits it (`wholeBookingOnly`). Otherwise the request is
+ * composed strictly from the still-cancellable participants the customer selected, so a forged
+ * `scope` field cannot widen a per-tourist refusal into the whole booking.
  */
 export function cancellationDraft(
   form: FormData,
@@ -100,13 +107,15 @@ export function cancellationDraft(
   captchaToken: string,
 ): CancellationDraft | null {
   const value = (name: string) => String(form.get(name) ?? "").trim();
-  const wholeBooking = view.wholeBookingOnly || value("scope") === "whole";
+  const wholeBooking = view.wholeBookingOnly;
   const participantRefs = wholeBooking ? [] : selectedCancellableRefs(view, selectedParticipantRefs);
+  const fullName = value("customerName");
   const category = value("reasonCategory") as CancellationReasonCategory;
   const details = value("reasonDetails");
   if (
     !view.session.clientRequestId || view.session.recoveryRequired || !captchaToken ||
     value("policyAcknowledged") !== "yes" ||
+    fullName.length < 1 || fullName.length > 300 ||
     !view.reasonCategories.some((option) => option.value === category) ||
     details.length < 1 || details.length > 2000 ||
     !value("email") || !value("phone") ||
@@ -115,6 +124,7 @@ export function cancellationDraft(
   return {
     clientRequestId: view.session.clientRequestId,
     orderRef: view.orderRef,
+    applicant: { fullName },
     scope: { wholeBooking, participantRefs },
     reason: { category, details },
     contact: { email: value("email"), phone: value("phone") },
