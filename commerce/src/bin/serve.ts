@@ -11,11 +11,10 @@
 import pg from 'pg';
 
 import { PRODUCTION_BUILD_IDENTITY_FILE, readBuildIdentity } from '../build-identity.js';
-import { assertProductionContent, loadSiteRelease } from '../catalog.js';
+import { loadSiteRelease } from '../catalog.js';
 import { env, environment, MIGRATIONS_DIR, productionAddress } from '../config.js';
 import { NotisendClient, processEmailOutbox } from '../email.js';
 import { processExecutionNotices } from '../execution-notice.js';
-import { LiveSiteReleaseAdmission } from '../legal-admission.js';
 import { jsonLogger } from '../log.js';
 import { readMigrations } from '../migration-integrity.js';
 import { maintain } from '../orders.js';
@@ -28,15 +27,13 @@ import { createRetiredCheckoutHandler } from '../retired-checkout.js';
 const log = jsonLogger(SERVICE);
 const which = environment();
 const catalog = loadSiteRelease(env('CONTENT_DIR'));
-if (which === 'PRODUCTION') assertProductionContent(catalog);
 const identityPath = which === 'PRODUCTION' ? PRODUCTION_BUILD_IDENTITY_FILE
   : (process.env.BUILD_IDENTITY_FILE || PRODUCTION_BUILD_IDENTITY_FILE);
 const identity = await readBuildIdentity(identityPath);
 const commerceOrigin = productionAddress(which, 'COMMERCE_ORIGIN', env('COMMERCE_ORIGIN'));
 const siteOrigin = productionAddress(which, 'SITE_ORIGIN', env('SITE_ORIGIN'));
-const legalAdmission = which === 'PRODUCTION'
-  ? new LiveSiteReleaseAdmission(siteOrigin, { sourceCommit: identity.sourceCommit, catalog }) : undefined;
-if (legalAdmission !== undefined) await legalAdmission.verify();
+// Read-only SSR/Admin deployment is independent of sales admission and public site availability.
+// Native customer ingress remains retired; active legal identity is Commerce public_legal.
 const migrations = readMigrations(MIGRATIONS_DIR);
 const pool = new pg.Pool({ connectionString: env('DATABASE_URL'), max: 8 });
 const admission = new SchemaAdmission(() => schemaReadiness(pool, {
@@ -49,7 +46,7 @@ const email = new NotisendClient({
 });
 const server = createCommerceServer({
   pool, catalog, admission, schemaHead: migrations.length, migrations,
-  sourceCommit: identity.sourceCommit, startedAt: new Date(), ...(legalAdmission ? { legalAdmission } : {}),
+  sourceCommit: identity.sourceCommit, startedAt: new Date(), legalAuthority: 'commerce',
   onError: (e) => log('request_failed', { error: e instanceof Error ? e.name : 'unknown' }),
 }, routes(createPublicApiHandler(pool), createRetiredCheckoutHandler(siteOrigin)));
 const port = Number(process.env.PORT ?? 3000);

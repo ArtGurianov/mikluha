@@ -1,0 +1,31 @@
+{
+  "checkedAtUtc": "2026-10-30T14:33:16.598261+00:00",
+  "scope": "company names and RF storage location only; not publication or operational qualification",
+  "operator": {
+    "authority": "FNS EGRUL search by INN and generated extract, retrieved via read-only HTTPS from Adman VPS after local connection failures",
+    "url": "https://egrul.nalog.ru/index.html",
+    "inn": "4205435867",
+    "ogrn": "1264200007631",
+    "fullName": "ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ \"ООО МИКЛУХА МАКЛАЙ\"",
+    "shortName": "ООО \"ООО МИКЛУХА МАКЛАЙ\"",
+    "extractDate": "2026-10-30",
+    "extractSha256": "9dde2083d2022ff618225fd10ec01b7db6465033e7bbdb646dfe394d7a8476ae",
+    "retainedEvidence": "necessary company fields and digest only; raw extract/personal/address sections not committed"
+  },
+  "adman": {
+    "hostingLocationBasis": [
+      "owner-confirmed RF VPS placement",
+      "https://adman.com/tech_passport_adman.pdf"
+    ],
+    "accountPolicyScope": "https://adman.com/privacy_policy_admancom.pdf sections 1.7 and 7 are provider-customer account policy, not standalone proof for every hosted application processing flow"
+  },
+  "cloudRu": {
+    "mediaReceipt": "docs/evidence/2026-10-30-tour-63-cloudru-provider.json",
+    "mediaRegion": "ru-central-1",
+    "storageLocationSource": "https://cloud.ru/solutions/khraneniye-dannykh",
+    "sourceQuestion": "Где физически хранятся данные, размещенные в хранилище Evolution Object Storage?",
+    "sourceFinding": "RF data centres",
+    "qualificationLimit": "dedicated media remains synthetic-only at the referenced receipt; future new-DB encrypted/off-host backup target and isolated restore still require their own receipts before real use"
+  },
+  "custodyImpact": "NO: public-source/company verification and source evidence; no host state, credential or deployed data changes"
+}

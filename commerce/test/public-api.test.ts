@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 
 import type { Catalog } from '../src/catalog.js';
@@ -25,7 +25,7 @@ before(async () => {
   db = await freshDb();
   catalog = fixtureCatalog([{ slug: 'altai-fixture', startsOn: '2027-07-01', endsOn: '2027-07-04' }]);
   server = createCommerceServer({ pool: db.pool, catalog, schemaHead: readMigrations(MIGRATIONS_DIR).length, sourceCommit: null,
-    startedAt: new Date() }, createPublicApiHandler(db.pool));
+    startedAt: new Date(), legalAuthority: "commerce" }, createPublicApiHandler(db.pool));
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -104,5 +104,26 @@ test('effective legal publication reaches public HTTP without private approval m
   assert.equal(result.legalPages.find(p=>p.slug==='public-privacy')?.body,doc.content.body);
   assert.ok(!JSON.stringify(result).includes('private approval note'));
   assert.ok(!JSON.stringify(result).includes('approvedBy'));
+  const next = { ...doc, content: { body: 'Новая редакция\nс пробелами  \n' } };
+  await db.admin.query("SELECT fn_save_content_draft($1,1,$2,'editor')", [id,next]);
+  assert.equal((await readPublic()).legalPages.find(p=>p.slug==='public-privacy')?.body, doc.content.body);
+  await db.publisher.query("SELECT fn_admin_publish_legal($1,2,1,(clock_timestamp() AT TIME ZONE 'Europe/Moscow')::date,'new approval','owner')", [id]);
+  const active = (await readPublic()).legalPages.find(p=>p.slug==='public-privacy')!;
+  assert.equal(active.body, next.content.body);
+  assert.equal(active.textSha256, `sha256:${createHash('sha256').update(next.content.body).digest('hex')}`);
+  assert.equal(active.publishedVersion, 2);
+  await db.admin.query("SELECT fn_save_content_draft($1,2,$2,'editor')", [id,{...doc,content:{body:'Будущая редакция'}}]);
+  await db.publisher.query("SELECT fn_admin_publish_legal($1,3,2,(clock_timestamp() AT TIME ZONE 'Europe/Moscow')::date+1,'future approval','owner')", [id]);
+  assert.equal((await readPublic()).legalPages.find(p=>p.slug==='public-privacy')?.body, next.content.body);
+
 });
 async function readPublic(): Promise<PublicCatalog> { return await (await fetch(`${base}${PUBLIC_CATALOG_PATH}`)).json() as PublicCatalog; }
+
+
+test('Commerce identity names active authority instead of baked legal identity', async () => {
+  const body = await (await fetch(`${base}/identity`)).json() as Record<string, unknown>;
+  assert.equal(body.legalAuthority, 'commerce');
+  assert.equal(body.legalProjection, PUBLIC_CATALOG_PATH);
+  assert.equal('termsRef' in body, false);
+  assert.equal('pdConsentHash' in body, false);
+});

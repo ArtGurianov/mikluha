@@ -17,7 +17,7 @@ const contract = {
 };
 
 const catalog = (over: Partial<PublicCatalog["departures"][number]> = {}): PublicCatalog => ({
-  schema: PUBLIC_CATALOG_SCHEMA,
+  schema: PUBLIC_CATALOG_SCHEMA, legalPages: [],
   tours: [{ slug: "altai", title: "Алтай", content: { shortDescription: "Тур", coverImage: image } }],
   departures: [{ slug: "altai-2027", tourSlug: "altai", startsOn: "2027-06-01", endsOn: "2027-06-04", bookingStatus: "OPEN",
     priceKopecks: 3_400_000, capacity: 18, isDemo: false, content: {}, organizers: [], contract, ...over }],

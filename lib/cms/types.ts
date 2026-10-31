@@ -268,6 +268,7 @@ export interface OrganizerDTO<TImage = ImageAsset> {
 }
 
 export interface LegalPageDTO {
+  publication?: { version: number; documentSha256: string; textSha256: string };
   refundPolicy?: 'FULL_ONLY' | 'DOCUMENTED_EXPENSES' | null;
   id: string;
   slug: string;
@@ -298,7 +299,7 @@ export interface SiteSettingsDTO<TImage = ImageAsset> {
   launchReady: boolean;
 }
 
-/** `git`: everything from content/. `commerce`: the SSR catalog from Commerce, settings and legal from Git. */
+/** `git`: build input. `commerce`: request-time catalog and legal authority; settings from Git. */
 export type ContentSource = "git" | "commerce";
 
 export interface ContentSnapshot<TImage = ImageAsset> {

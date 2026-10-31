@@ -652,11 +652,14 @@ docker run -d --rm --name commerce-test-pg -e POSTGRES_PASSWORD=postgres -p 5543
 
 ## Legal-release deployment gate
 
-The site publishes `/release.json`; commerce `/identity` reports the corresponding source commit,
-`termsRef`, `termsHash`, `pdConsentRef` and `pdConsentHash`. In production, commerce compares all
-five immutable values with the live site at startup, readiness, reservation, and payment. Drift
-fails closed. The owner-run deploy, backup, logging, legal/content and first-sale gates are in
-[`runbooks/production-launch.md`](runbooks/production-launch.md).
+The SSR site publishes code identity at `/identity` / `/release.json` (schema 2).
+Legal authority is the effective OWNER-approved `public_legal` projection in Commerce,
+including version, exact body SHA-256, document SHA-256 and effective date. Public
+SSR renders those rows on request and fails closed without baked text on failure.
+Read-only service startup does not call the old static site's release descriptor or
+require `launchReady`; native customer ingress remains retired and sales CLOSED.
+Future native sales must independently validate accepted active legal identity under
+the reservation transaction; code readiness is not sales/legal admission.
 
 The four network addresses above remain configurable in staging. Production compares their
 normalized URLs against the fixed values and refuses startup on any host, port, path, credential,

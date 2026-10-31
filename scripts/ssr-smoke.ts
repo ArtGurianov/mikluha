@@ -11,6 +11,8 @@
  *   FIXTURE_URL=http://127.0.0.1:4010      optional: scripts/projection-fixture.ts,
  *                                          to prove render-on-request and the outage state
  */
+import { createHash } from "node:crypto";
+
 const BASE = (process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000").replace(/\/$/, "");
 const FIXTURE = process.env.FIXTURE_URL?.replace(/\/$/, "");
 const EXPECT_COMMIT = process.env.EXPECT_COMMIT ?? "";
@@ -60,7 +62,8 @@ async function main() {
     check((await page(path)).res.status === 404, `${path} is retired`);
   }
   const legal = await page("/oferta/");
-  check(legal.res.status === 200, "GET /oferta/ is 200");
+  check(legal.res.status === 200 && legal.html.includes("Проверочная редакция Commerce: oferta"), "GET /oferta/ renders Commerce legal bytes");
+  uncachedNoCookie(legal.res, "/oferta/");
 
   const sitemap = await page("/sitemap.xml");
   check(sitemap.res.status === 200 && (tourSlug === undefined || sitemap.html.includes(`/tours/${tourSlug}/`)),
@@ -84,6 +87,7 @@ async function main() {
     const catalog = await (await fetch(`${FIXTURE}/public/v1/catalog`)).json() as {
       tours: { slug: string; title: string }[];
       departures: { slug: string; tourSlug: string; priceKopecks: number | null }[];
+      legalPages: { slug: string; body: string; title: string; publishedVersion: number; textSha256: string }[];
     };
     const marker = `Проверка SSR ${Date.now()}`;
     await fixture("/__fixture/catalog", {
@@ -102,6 +106,26 @@ async function main() {
       await fixture("/__fixture/catalog", catalog);
     }
 
+    const legalBody = `Новая точная редакция ${Date.now()}`;
+    const changedLegal = { ...catalog, legalPages: catalog.legalPages.map((p) => p.slug === "oferta" ? {
+      ...p, body: legalBody, title: "Новая оферта Commerce", publishedVersion: p.publishedVersion + 1,
+      textSha256: `sha256:${createHash("sha256").update(legalBody).digest("hex")}`,
+    } : p) };
+    try {
+      await fixture("/__fixture/catalog", changedLegal);
+      const changed = await page("/oferta/");
+      check(changed.html.includes(legalBody) && !changed.html.includes("Проверочная редакция Commerce: oferta"), "legal publish changes next SSR request without a build");
+      check(changed.html.includes("Новая оферта Commerce"), "metadata and legal body use current publication");
+      await fixture("/__fixture/catalog", { ...changedLegal, legalPages: changedLegal.legalPages.filter((p) => p.slug !== "oferta") });
+      const absent = await page("/oferta/");
+      check(absent.html.includes("Документ временно недоступен") && !absent.html.includes(legalBody), "missing required publication never falls back to old text");
+      await fixture("/__fixture/catalog", { ...changedLegal, legalPages: changedLegal.legalPages.map((p) => ({ ...p, body: "Подменённые байты" })) });
+      const tampered = await page("/oferta/");
+      check(tampered.html.includes("Документ временно недоступен") && !tampered.html.includes("Подменённые байты"), "text/hash mismatch fails closed");
+    } finally {
+      await fixture("/__fixture/catalog", catalog);
+    }
+
     await fixture("/__fixture/down");
     try {
       const outage = await page("/");
@@ -115,7 +139,10 @@ async function main() {
         const result = await page(path);
         check(result.html.includes("Расписание временно недоступно") && !result.html.includes("₽"), `${path} outage visible without JS, no prices`);
       }
-      check((await page("/oferta/")).res.status === 200, "Commerce outage: GET /oferta/ is still 200");
+      const legalOutage = await page("/oferta/");
+      check(legalOutage.html.includes("Документ временно недоступен") && !legalOutage.html.includes("Проверочная редакция Commerce: oferta"), "Commerce outage: legal page is honest and contains no old text");
+      check(legalOutage.html.includes('name="robots" content="noindex, nofollow"'), "legal outage is noindex");
+      uncachedNoCookie(legalOutage.res, "legal outage");
     } finally {
       await fixture("/__fixture/up");
     }

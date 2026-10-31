@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-10-30T13:55:01.566511+00:00",
+  "scope": "proxy and running Mikluha logging metadata only; no log content/env/keys",
+  "containers": [
+    {
+      "name": "mikluha-maintenance",
+      "image": "nginx:1.31-alpine@sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606",
+      "logDriver": "json-file",
+      "rotation": {
+        "max-file": "3",
+        "max-size": "10m"
+      },
+      "nginxLogDirectives": [
+        "error_log /dev/stderr warn;",
+        "access_log off;"
+      ]
+    },
+    {
+      "name": "coolify-proxy",
+      "image": "traefik:v3.6",
+      "logDriver": "json-file",
+      "rotation": {
+        "max-file": "3",
+        "max-size": "10m"
+      },
+      "observabilityArgs": [],
+      "configFileArgs": []
+    }
+  ],
+  "traefikObservabilityEnv": {}
+}
