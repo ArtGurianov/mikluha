@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   trailingSlash: true,
   poweredByHeader: false,
+  // `page.preview.tsx` review labs (e.g. /checkout-preview, /cancellation-preview) are routable
+  // only in development: the `preview.tsx` leaf is added to pageExtensions for `next dev` and left
+  // out of the production build, so the routes never exist in a production/static or SSR output.
+  // The pages also guard with `notFound()` outside development as defence in depth.
+  pageExtensions: process.env.NODE_ENV === "development" ? ["preview.tsx", "tsx", "ts", "jsx", "js"] : ["tsx", "ts", "jsx", "js"],
   env: {
     DEPLOY_ENV: process.env.DEPLOY_ENV === "staging" ? "staging" : "production",
     SITE_URL: process.env.SITE_URL ?? "",

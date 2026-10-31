@@ -45,6 +45,17 @@ Same isolated-component pattern as TOUR-28/49 so the flow can be reviewed before
   key, so a genuine change of session/order remounts the form and resets that lifecycle instead of
   carrying a prior `received`/`unknown` state across to a different application; a same-identity
   refresh only picks up new money/participants and prunes selections the server no longer allows.
+  If that refresh changes the **confirmation basis** — whole-booking permission, the set of
+  cancellable seats, or the policy redaction (`policy.ref`/`policy.hash`) — the acknowledgement
+  checkbox is remounted (cleared) and the CAPTCHA proof is dropped, returning the form to `editing`
+  and requiring a fresh confirmation. This stops an update from promoting a per-tourist request to
+  the whole booking, or carrying an acknowledgement onto a new policy redaction, without the
+  customer confirming again.
+- The `page.preview.tsx` review labs are routable only in development: `next.config.ts` adds the
+  `preview.tsx` leaf to `pageExtensions` under `NODE_ENV=development` and omits it from the
+  production build, so `/checkout-preview` and `/cancellation-preview` resolve with `next dev` but
+  never exist in a production/SSR route table (verified both ways). The pages also guard with
+  `notFound()` as defence in depth.
 
 ### `received` contract
 
@@ -76,12 +87,12 @@ qualified payment chain within the statutory term.
 
 ## Validation
 
-- `pnpm run test` — 136 pass, including the cancellation suite: composer whitelist and the
+- `pnpm run test` — 138 pass, including the cancellation suite: composer whitelist and the
   forged-`scope` guard, cancellable-selection binding, whole-booking and nothing-cancellable
   states, fail-closed markup, indicative-vs-final framing, and jsdom interactive tests for a single
   in-flight submit, fenced `UNKNOWN` resubmission, a locked `received` state, rejection input
-  retention needing a fresh proof, `not_dispatched` retry, `refresh_required`, and the
-  session-remount reset.
+  retention needing a fresh proof, `not_dispatched` retry, `refresh_required`, the session-remount
+  reset, and mid-session invalidation when whole-booking permission or the policy redaction changes.
 - `pnpm run lint` — clean.
 - Staging `next build` — compiles, TypeScript passes, preview route excluded from production.
 

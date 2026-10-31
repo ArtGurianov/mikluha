@@ -197,6 +197,55 @@ test("not_dispatched allows a retry with a fresh proof; refresh_required and exp
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 
+test("a mid-session switch to whole-booking drops the prior confirmation before it can resend", async () => {
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  const partial = previewCancellationView("voluntary-early");
+  const drafts: Array<{ wholeBooking: boolean; participantRefs: string[] }> = [];
+  const submit = async (draft: { scope: { wholeBooking: boolean; participantRefs: string[] } }): Promise<CancellationOutcome> => { drafts.push(draft.scope); return { kind: "received", reference: "REF" }; };
+  const dispatch = () => host.querySelector("form")!.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
+  const reconfirm = async () => { await act(async () => { host.querySelector<HTMLInputElement>('input[name="policyAcknowledged"]')!.click(); [...host.querySelectorAll("button")].find((b) => b.textContent === "Solve synthetic captcha")!.click(); }); };
+  try {
+    await act(async () => root.render(createElement(CancellationRequest, { view: partial, captcha: SyntheticWidget, submit })));
+    await prepare(host);
+    assert.equal(host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, false);
+    // Server now permits only whole-booking cancellation for the same session/order.
+    const whole: CancellationPresentation = { ...partial, wholeBookingOnly: true };
+    await act(async () => root.render(createElement(CancellationRequest, { view: whole, captcha: SyntheticWidget, submit })));
+    assert.equal(host.querySelector<HTMLInputElement>('input[name="policyAcknowledged"]')!.checked, false);
+    assert.equal(host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled, true);
+    assert.match(host.textContent ?? "", /Состав заказа или правила возврата обновились/);
+    await act(async () => { dispatch(); });
+    assert.equal(drafts.length, 0);
+    // Only after an explicit fresh confirmation does the whole-booking request go through.
+    await reconfirm();
+    await act(async () => { dispatch(); });
+    assert.deepEqual(drafts, [{ wholeBooking: true, participantRefs: [] }]);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+test("a new policy redaction clears the acknowledgement and binds the fresh hash", async () => {
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  const first = previewCancellationView("voluntary-early");
+  const drafts: Array<{ ref: string; hash: string }> = [];
+  const submit = async (draft: { policy: { ref: string; hash: string } }): Promise<CancellationOutcome> => { drafts.push(draft.policy); return { kind: "received", reference: "REF" }; };
+  const dispatch = () => host.querySelector("form")!.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
+  const reconfirm = async () => { await act(async () => { host.querySelector<HTMLInputElement>('input[name="policyAcknowledged"]')!.click(); [...host.querySelectorAll("button")].find((b) => b.textContent === "Solve synthetic captcha")!.click(); }); };
+  try {
+    await act(async () => root.render(createElement(CancellationRequest, { view: first, captcha: SyntheticWidget, submit })));
+    await prepare(host);
+    const updated: CancellationPresentation = { ...first, policy: { ...first.policy, hash: "SYNTHETIC-POLICY-HASH-v2", updatedAtLabel: "31.10.2026" } };
+    await act(async () => root.render(createElement(CancellationRequest, { view: updated, captcha: SyntheticWidget, submit })));
+    assert.equal(host.querySelector<HTMLInputElement>('input[name="policyAcknowledged"]')!.checked, false);
+    await act(async () => { dispatch(); });
+    assert.equal(drafts.length, 0);
+    await reconfirm();
+    await act(async () => { dispatch(); });
+    assert.deepEqual(drafts, [{ ref: "otkaz-i-vozvrat", hash: "SYNTHETIC-POLICY-HASH-v2" }]);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
 test("a changed session/order remounts the form and clears a prior received state", async () => {
   const host = document.createElement("div"); document.body.append(host);
   const root = createRoot(host);

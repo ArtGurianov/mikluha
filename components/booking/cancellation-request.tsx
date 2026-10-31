@@ -22,6 +22,11 @@ const action = "inline-flex min-h-12 items-center justify-center gap-3 rounded-x
  * session/order remounts the form and resets that lifecycle rather than carrying a prior "received"
  * or "unknown" state across to a different application.
  */
+/** The basis the customer confirms against: whole-booking permission, cancellable seats, policy redaction. */
+function confirmationBasis(view: CancellationPresentation): string {
+  return JSON.stringify([view.wholeBookingOnly, view.participants.filter((p) => p.cancellable).map((p) => p.participantRef), view.policy.ref, view.policy.hash]);
+}
+
 export function CancellationRequest(props: {
   view: CancellationPresentation;
   captcha?: CaptchaWidget;
@@ -47,13 +52,26 @@ function CancellationForm({ view: suppliedView, captcha, submit }: {
   const busy = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
-  // Same-identity refresh (updated money/participants). The key remount handles a changed session or
-  // order, so here we only pick up new server data and prune selections it no longer allows; status,
-  // notice and the consumed proof are intentionally preserved for the same application.
+  // Same-identity refresh (updated money/participants/policy). The key remount handles a changed
+  // session or order; here we pick up new server data and prune selections it no longer allows. If
+  // the basis the customer confirmed against changed — whole-booking permission, the set of
+  // cancellable seats, or the policy redaction — the prior acknowledgement and CAPTCHA proof no
+  // longer apply: we return to editing, drop the proof and require a fresh confirmation, so an
+  // update can never promote a per-tourist request to the whole booking, or carry an acknowledgement
+  // onto a new policy redaction, without the customer confirming again.
   if (sourceSnapshot !== suppliedSnapshot) {
+    const confirmationChanged = confirmationBasis(view) !== confirmationBasis(suppliedView);
     setSourceSnapshot(suppliedSnapshot);
     setView(suppliedView);
     setSelected((current) => current.filter((ref) => suppliedView.participants.some((p) => p.participantRef === ref && p.cancellable)));
+    if (confirmationChanged && (status === "editing" || status === "refresh_required")) {
+      // Drop the prior proof: `send` is gated on hasProof, and the bumped key remounts a fresh
+      // CAPTCHA, so the consumed token cannot be reused against the new confirmation basis.
+      setStatus("editing");
+      setHasProof(false);
+      setCaptchaRevision((revision) => revision + 1);
+      setNotice("Состав заказа или правила возврата обновились. Проверьте выбор, подтвердите ознакомление и пройдите проверку заново.");
+    }
   }
 
   const reportProof = useCallback((token: string | null) => {
@@ -76,7 +94,7 @@ function CancellationForm({ view: suppliedView, captcha, submit }: {
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy.current || status !== "editing" || view.session.recoveryRequired || !submit || !proof.current || !scopeReady) return;
+    if (busy.current || status !== "editing" || view.session.recoveryRequired || !submit || !hasProof || !proof.current || !scopeReady) return;
     const draft = cancellationDraft(new FormData(event.currentTarget), view, chosenRefs, proof.current);
     if (!draft) return;
     busy.current = true;
@@ -170,7 +188,7 @@ function CancellationForm({ view: suppliedView, captcha, submit }: {
             <p className="text-xs leading-relaxed text-muted-foreground">Организатор стремится сообщить расчёт и дальнейшие действия не позднее пяти рабочих дней; это не продлевает установленный законом срок возврата.</p>
           </fieldset>
 
-          <fieldset disabled={locked || !available} className={`${card} space-y-4`}>
+          <fieldset key={confirmationBasis(view)} disabled={locked || !available} className={`${card} space-y-4`}>
             <legend className="px-2 text-lg font-semibold">Перед отправкой</legend>
             <label className="flex items-start gap-3 text-sm leading-relaxed"><input className="mt-1 size-4 shrink-0 accent-secondary" type="checkbox" name="policyAcknowledged" value="yes" required /><span>Я ознакомлен(а) с <a className="text-secondary underline underline-offset-4" href={view.policy.href} target="_blank" rel="noreferrer">Правилами отказа и возврата</a> (ред. {view.policy.updatedAtLabel}) и понимаю, что показанные суммы ориентировочные: законный размер возврата определяется отдельно по документально подтверждённым расходам, относящимся к моему заказу.</span></label>
           </fieldset>
