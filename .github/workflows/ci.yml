@@ -12,6 +12,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  phase-a-publisher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image publication contract and negative scenarios
+        run: python3 scripts/test-phase-a-images.py -v
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20

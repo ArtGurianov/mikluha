@@ -1,0 +1,150 @@
+name: phase-a-images
+
+# Manual main-only BUILD/PUBLISH. No Coolify, SSH, application/provider secret or deployment.
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_env:
+        type: choice
+        options: [staging, production]
+        default: staging
+        required: true
+      site_url:
+        description: 'HTTPS site origin baked into the SSR build; does not create a route'
+        type: string
+        default: 'https://mikluha-maklai.ru'
+        required: true
+
+permissions: {}
+concurrency:
+  group: phase-a-images
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main' && github.repository == 'ArtGurianov/mikluha'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    env:
+      SOURCE: ${{ github.sha }}
+      DEPLOY_ENV: ${{ inputs.deploy_env }}
+      SITE_URL: ${{ inputs.site_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: plan
+        name: Fixed roles and exact main checkout
+        run: |
+          set -euo pipefail
+          python3 scripts/phase-a-images.py plan --source "$SOURCE" --deploy-env "$DEPLOY_ENV" --site-url "$SITE_URL" \
+            --ref "$GITHUB_REF" --repository "$GITHUB_REPOSITORY" --output "$RUNNER_TEMP/plan.json"
+          python3 scripts/phase-a-images.py source-check --source "$SOURCE" --deploy-env "$DEPLOY_ENV" --site-url "$SITE_URL"
+          echo "matrix=$(jq -c .matrix "$RUNNER_TEMP/plan.json")" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      SOURCE: ${{ github.sha }}
+      DEPLOY_ENV: ${{ inputs.deploy_env }}
+      SITE_URL: ${{ inputs.site_url }}
+      ROLE: ${{ matrix.role }}
+      DOCKER_BUILD_SUMMARY: 'false'
+      DOCKER_BUILD_RECORD_UPLOAD: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish one linux/amd64 image
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          push: true
+          tags: ${{ matrix.image }}:phase-a-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/ArtGurianov/mikluha
+          build-args: |
+            SOURCE_COMMIT=${{ github.sha }}
+            DEPLOY_ENV=${{ inputs.deploy_env }}
+            SITE_URL=${{ inputs.site_url }}
+      - name: Pull exact digest and verify platform, command and baked identity
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python3 scripts/phase-a-images.py verify --source "$SOURCE" --deploy-env "$DEPLOY_ENV" --site-url "$SITE_URL" \
+            --role "$ROLE" --digest "$DIGEST" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
+            --output "image-receipts/$ROLE.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase-a-image-${{ matrix.role }}-${{ github.run_attempt }}
+          path: image-receipts/${{ matrix.role }}.json
+          if-no-files-found: error
+          retention-days: 30
+
+  bundle:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      SOURCE: ${{ github.sha }}
+      DEPLOY_ENV: ${{ inputs.deploy_env }}
+      SITE_URL: ${{ inputs.site_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: phase-a-image-*-${{ github.run_attempt }}
+          path: image-receipts
+          merge-multiple: true
+      - name: Require five consistent publication receipts
+        run: |
+          set -euo pipefail
+          python3 scripts/phase-a-images.py assemble --source "$SOURCE" --deploy-env "$DEPLOY_ENV" --site-url "$SITE_URL" \
+            --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --receipts image-receipts \
+            --output phase-a-image-bundle.json
+          {
+            echo '### Five published image identities verified; deployment and DB recovery NOT RUN'
+            echo '```json'
+            cat phase-a-image-bundle.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase-a-image-bundle-${{ github.sha }}-${{ github.run_attempt }}
+          path: phase-a-image-bundle.json
+          if-no-files-found: error
+          retention-days: 90

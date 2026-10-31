@@ -106,6 +106,12 @@ HEAD `ddd7f893915a7892ee62f7a6537feb5eca784848` допустима только 
 digests прямо названы в отдельной OWNER-авторизации. Любое обновление кандидата
 требует повторной квалификации; факт установки здесь не утверждается.
 
+Для пяти registry digests используется отдельная
+[build-only публикация образов](phase-a-image-publication.md), после её review,
+merge и отдельно разрешённого dispatch на main. Итоговый bundle подтверждает
+публикацию и identity образов; он не выполняет Coolify deployment и не заменяет
+DB/schema/ACL/backup/restore или OWNER допуск к установке.
+
 В конкретном GO перечислить новые credentials/ключи, сети/volumes, backup units,
 одноразовый и рабочий контуры, isolated restore, **создание и удаление точного
 набора синтетических Cloud.ru объектов** и очистку точных одноразовых DB/volumes.
