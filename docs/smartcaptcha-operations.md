@@ -86,7 +86,17 @@ reservation/deposit model stay with TOUR-77/78, so no second reservation model i
 | Privacy | the verdict and the `onResult` reason are fixed codes; token, server key, client IP and provider message never leave the module. Forwarding the client IP is **off** by default until TOUR-80/84 qualifies that PD transfer |
 | Configuration | missing key/hosts, wildcard/uppercase/URL/IP host, non-HTTPS or credentialed/query endpoint → construction error. Absent configuration is never "verification off" |
 
-`DEFAULT_SMARTCAPTCHA_ENDPOINT` and the provider response shape are taken from the Yandex
-validation contract but were **not re-read from provider documentation in this session** and
-no provider traffic occurred. Real widget solve, allowed-domain configuration, actual provider
+`DEFAULT_SMARTCAPTCHA_ENDPOINT` is the documented validation URL
+`https://smartcaptcha.cloud.yandex.ru/validate` ([Yandex Cloud: validation](https://yandex.cloud/ru/docs/smartcaptcha/concepts/validation)),
+pinned by a test. Review of PR #70 confirmed it against the official documentation; this session
+itself could not reach yandex.cloud. Yandex's example passes the user through when validation
+fails with an HTTP error. This policy deliberately keeps **fail closed**: for automated seat holds
+an outage must not admit unverified requests.
+
+Replay memory is per verifier instance (one process). It is not a distributed guard across
+workers or restarts; there the provider's one-time token check is authoritative and the TOUR-77
+hold path must keep its own idempotency and seat guards. `timeoutMs` (100 ms–30 s),
+`replayWindowMs` (1 s–24 h) and `maxRememberedTokens` (1–1 000 000) are validated at construction.
+
+No provider traffic occurred. Real widget solve, allowed-domain configuration, actual provider
 responses, CSP and native booking E2E remain NOT_RUN; synthetic tests do not qualify them.

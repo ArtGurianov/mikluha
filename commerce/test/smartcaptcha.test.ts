@@ -183,7 +183,7 @@ describe('provider outage fails closed: CAPTCHA_UNAVAILABLE, never acceptance', 
     const hung = (async (_u: string | URL, init: RequestInit = {}) => new Promise<Response>((_, reject) => {
       init.signal?.addEventListener('abort', () => reject(init.signal!.reason));
     })) as typeof fetch;
-    const { v, reasons } = verifier(hung, { timeoutMs: 30 });
+    const { v, reasons } = verifier(hung, { timeoutMs: 100 });
     const started = Date.now();
     assert.deepEqual(await v.verify('tok-hung', null), { ok: false, code: 'CAPTCHA_UNAVAILABLE' });
     assert.ok(Date.now() - started < 2_000);
@@ -196,7 +196,7 @@ describe('slow body', () => {
     const slow = (async (_u: string | URL, init: RequestInit = {}) => new Response(new ReadableStream({
       start(c) { init.signal?.addEventListener('abort', () => c.error(init.signal!.reason)); },
     }), { status: 200 })) as typeof fetch;
-    const { v, reasons } = verifier(slow, { timeoutMs: 30 });
+    const { v, reasons } = verifier(slow, { timeoutMs: 100 });
     assert.deepEqual(await v.verify('tok-slow-body', null), { ok: false, code: 'CAPTCHA_UNAVAILABLE' });
     assert.deepEqual(reasons, ['PROVIDER_TIMEOUT']);
   });
@@ -220,14 +220,27 @@ describe('configuration fails closed', () => {
     ['no hosts', { allowedHosts: [] }], ['wildcard host', { allowedHosts: ['*.mikluha-maklai.ru'] }],
     ['leading-dot host', { allowedHosts: ['.mikluha-maklai.ru'] }], ['uppercase host', { allowedHosts: ['Mikluha-Maklai.ru'] }],
     ['URL instead of host', { allowedHosts: ['https://mikluha-maklai.ru'] }], ['IP host', { allowedHosts: ['203.0.113.1'] }],
-    ['http endpoint', { endpoint: 'http://smartcaptcha.yandexcloud.net/validate' }],
-    ['endpoint with credentials', { endpoint: 'https://u:p@smartcaptcha.yandexcloud.net/validate' }],
-    ['endpoint with query', { endpoint: 'https://smartcaptcha.yandexcloud.net/validate?secret=x' }],
+    ['http endpoint', { endpoint: 'http://smartcaptcha.cloud.yandex.ru/validate' }],
+    ['endpoint with credentials', { endpoint: 'https://u:p@smartcaptcha.cloud.yandex.ru/validate' }],
+    ['endpoint with query', { endpoint: 'https://smartcaptcha.cloud.yandex.ru/validate?secret=x' }],
+    ['zero timeout', { timeoutMs: 0 }], ['negative timeout', { timeoutMs: -1 }], ['fractional timeout', { timeoutMs: 1.5 }],
+    ['excessive timeout', { timeoutMs: 600_000 }], ['NaN timeout', { timeoutMs: Number.NaN }],
+    ['zero replay window', { replayWindowMs: 0 }], ['negative replay window', { replayWindowMs: -1000 }],
+    ['zero remembered tokens', { maxRememberedTokens: 0 }], ['infinite remembered tokens', { maxRememberedTokens: Number.POSITIVE_INFINITY }],
   ] as const) {
     test(label, () => {
       assert.throws(() => new SmartCaptchaVerifier({ ...base, ...override } as SmartCaptchaOptions), SmartCaptchaConfigError);
     });
   }
+
+  test('the default endpoint is exactly the documented Yandex Cloud validation URL', () => {
+    assert.equal(DEFAULT_SMARTCAPTCHA_ENDPOINT, 'https://smartcaptcha.cloud.yandex.ru/validate');
+  });
+
+  test('valid bounded options are accepted', () => {
+    assert.doesNotThrow(() => new SmartCaptchaVerifier({ ...base, timeoutMs: 100, replayWindowMs: 1_000, maxRememberedTokens: 1 }));
+    assert.doesNotThrow(() => new SmartCaptchaVerifier({ ...base, timeoutMs: 30_000, replayWindowMs: 86_400_000, maxRememberedTokens: 1_000_000 }));
+  });
 
   test('absent environment is a refusal, never "verification off"', () => {
     assert.throws(() => smartCaptchaOptionsFromEnv({}), /SMARTCAPTCHA_SERVER_KEY_INVALID/);

@@ -40,8 +40,14 @@ export interface SmartCaptchaOptions {
   readonly onResult?: (reason: CaptchaReason) => void;
 }
 
-/** Yandex Cloud SmartCaptcha validation endpoint. Must be re-qualified against provider docs before activation. */
-export const DEFAULT_SMARTCAPTCHA_ENDPOINT = 'https://smartcaptcha.yandexcloud.net/validate';
+/**
+ * Documented Yandex Cloud SmartCaptcha validation endpoint:
+ * https://yandex.cloud/ru/docs/smartcaptcha/concepts/validation (POST, form fields secret/token[/ip]).
+ * Yandex's example lets the user through when the endpoint fails; this policy deliberately does NOT:
+ * any provider failure is CAPTCHA_UNAVAILABLE so an outage cannot become an automated seat hold.
+ */
+export const DEFAULT_SMARTCAPTCHA_ENDPOINT = 'https://smartcaptcha.cloud.yandex.ru/validate';
+const LIMITS = { timeoutMs: [100, 30_000], replayWindowMs: [1_000, 24 * 60 * 60_000], maxRememberedTokens: [1, 1_000_000] } as const;
 const TOKEN_RE = /^[\x21-\x7e]{1,4096}$/;
 const HOST_RE = /^(?=.{1,253}(?::\d{1,5})?$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?::\d{1,5})?$/;
 
@@ -75,6 +81,10 @@ export class SmartCaptchaVerifier {
     if (endpoint.protocol !== 'https:' || endpoint.username !== '' || endpoint.password !== '' || endpoint.search !== '' || endpoint.hash !== '') {
       throw new SmartCaptchaConfigError('SMARTCAPTCHA_ENDPOINT_INVALID');
     }
+    for (const [name, [min, max]] of Object.entries(LIMITS)) {
+      const v = options[name as keyof typeof LIMITS];
+      if (v !== undefined && (!Number.isSafeInteger(v) || v < min || v > max)) throw new SmartCaptchaConfigError(`SMARTCAPTCHA_${name.toUpperCase()}_INVALID`);
+    }
     this.#key = options.serverKey;
     this.#hosts = new Set(options.allowedHosts);
     this.#endpoint = endpoint.href;
@@ -88,8 +98,10 @@ export class SmartCaptchaVerifier {
   }
 
   /**
-   * Consumes the proof locally BEFORE any await, so concurrent submissions of the same token can
-   * reach the provider at most once. A refused or failed check never "un-consumes" it: the client
+   * Consumes the proof locally BEFORE any await, so concurrent submissions of the same token to THIS
+   * instance reach the provider at most once. The memory is per process: it is not a distributed
+   * replay guard across workers or restarts. Across them the provider's one-time token check is the
+   * authority, and the integrating hold path (TOUR-77) must keep its own idempotency/seat guards. A refused or failed check never "un-consumes" it: the client
    * must obtain a fresh proof (the booking form remounts the widget on refusal).
    */
   async verify(token: unknown, clientIp: string | null): Promise<CaptchaVerdict> {
