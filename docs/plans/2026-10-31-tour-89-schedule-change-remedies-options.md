@@ -111,21 +111,31 @@ moment **cannot physically be performed**. Two facts must be kept separate:
   is never auto-defaulted. This part of the original U1 stands.
 - **Service performance (must be resolved):** preservation of the record is not performance of the
   trip. For an organizer-initiated material change the organizer is the party that can no longer
-  perform the original, so a non-responder cannot be left in an undefined state **past the original
-  planned departure**.
+  perform the original, so a non-responder cannot be left in an undefined state past the point where
+  a trip actually departs.
 
 Proposed procedure (requires OWNER/legal qualification):
 
-1. **Resolve before the original planned departure.** For every non-responder the manager must reach
-   a resolution *before the original planned departure time*: repeated notice, direct manager
-   contact, and a clearly stated consequence if no choice is made.
-2. **If consent is still not obtained by the original planned moment,** the organizer's inability to
-   perform the original trip is the trigger: the case resolves into the §5 remedy the buyer is
-   entitled to for an organizer-initiated material change (default: the D1 full refund, or an offered
-   alternative departure), **not** a silent lapse and **not** a buyer default. The right to claim the
-   refund arises no later than the organizer's own failure to perform at the original moment, subject
-   to the civil-law qualification in §5.
-3. **Capacity allocation.** A non-responder's seat stays reserved against resolution and is **not**
+1. **Resolution deadline = the earlier of the original and the new planned departure.** A schedule
+   change can move a trip *earlier* (e.g. 12 → 10 November), so "resolve before the original
+   departure" is wrong — by the original moment the new, earlier departure has already left. The
+   binding deadline for reaching a non-responder's decision is **min(original planned departure, new
+   planned departure)**, bounded by both exactly as the transfer offer is bounded by both the source
+   and target departures (booking §9.2, policy §6). Before that moment: repeated notice, direct
+   manager contact, and a clearly stated consequence if no choice is made.
+2. **Change proposed too late to resolve before that deadline.** If the organizer proposes the change
+   so late that there is not enough time to obtain consent before min(original, new) departure, the
+   addition/earlier departure is **not admitted for that buyer**: the buyer is **not** moved onto a
+   departure they did not accept, and the organizer's inability to perform the original on its own
+   terms triggers the §5 remedy (default D1 full refund, or an alternative departure the buyer can
+   still accept in time). A too-late proposal never silently places a buyer on the new schedule.
+3. **If consent is still not obtained by the deadline,** the organizer's inability to perform as
+   originally agreed is the trigger: the case resolves into the §5 remedy the buyer is entitled to for
+   an organizer-initiated material change (default: the D1 full refund, or an offered alternative
+   departure), **not** a silent lapse and **not** a buyer default. The right to claim the refund
+   arises no later than the organizer's own failure to perform at the agreed moment, subject to the
+   civil-law qualification in §5.
+4. **Capacity allocation.** A non-responder's seat stays reserved against resolution and is **not**
    resold until the case is resolved; equally, an unresolved seat is **not** counted as available on
    the *new* departure, so consenters and non-responders cannot be double-counted and the new
    departure is not oversold on the strength of seats that are still in limbo.
@@ -172,3 +182,9 @@ proposes, it does not approve.
 - **Legal nuance:** §5 adds that PP RF №551's applicability to Mikluha's specific bus-trip model must
   be confirmed per offering, and that D1 is a proposed commercial standard, not an automatic №551
   consequence for all routes until the TOUR-84 qualification is done.
+
+### Round 2 (PR #67, head after e6b34e9)
+
+- **P2 — earlier-date transfer:** §6 resolution deadline is now **min(original, new planned
+  departure)**, bounded by both; added an explicit path for a change proposed too late to resolve
+  before that deadline (buyer is not silently moved; §5 remedy applies).

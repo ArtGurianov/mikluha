@@ -81,9 +81,25 @@ owner connection (production-launch §3) and must stay mutually non-membered and
 | Secret (env) | Custodian | Consumer | Scope | Owner-only | Rotation overlap | Restore impact | Verify |
 |---|---|---|---|---|---|---|---|
 | `NOTISEND_API_KEY` (+ non-secret `NOTISEND_FROM_EMAIL/NAME/REPLY_TO`) | Coolify | confirmation email | send transactional mail | — | Notisend has **no idempotency key** — never resend an unknown-outcome message; rotate by issuing a new key, proving one staging send, then revoking the old (production-launch §2) | key not in DB | one staging confirmation arrives with no provider footer/unsub |
-| `ADMIN_TOTP_KEY` | Coolify (Admin resource) | Admin TOTP enrolment/verify | operator second factor | — | rotating invalidates existing enrolments → re-enrol operators in a planned window | not in DB; enrolment state is | TOTP verify works post-rotation; `ADMIN_TOTP_REPLAY` guard intact |
+| `ADMIN_TOTP_KEY` | Coolify (Admin resource) | Admin TOTP enrolment/verify | operator second factor | — | **re-enrol is not enough — see the TOTP note below:** rotation requires a per-operator `admin-operator totp reset` first, then re-enrol in a planned window | key not in DB; the **confirmed enrolment state is** (seed stored encrypted under the key) | after reset + re-enrol, TOTP verify works; `ADMIN_TOTP_REPLAY` guard intact |
 | `ADMIN_AUDIT_KEY` (+ `ADMIN_AUDIT_KEY_ID`, `ADMIN_AUDIT_PREVIOUS_KEYS`) | Coolify (Admin resource) | append-only audit signing | sign/verify audit chain | — | **key rollover by design:** new key + id, old key moves to `ADMIN_AUDIT_PREVIOUS_KEYS` so old entries still verify; never drop a previous key still covering retained audit | audit chain is in DB; a restore must still verify under the key id each entry was signed with | new entries verify under the new id; historical entries verify under previous ids |
 | `GITHUB_TOKEN` | the **CI secret store** for CI image flows; a deployed content-publish service that ever consumes it → **Coolify** of that service — one per actual consumer, never both | content publish / CI image flows | repo/publish scope only | — | rotate in GitHub; least-scope PAT or App token | not in DB | **absent** from runtime/admin/media env (`FOREIGN_ENVIRONMENT`, `MEDIA_FOREIGN_CREDENTIAL`) |
+
+**TOTP note — rotating `ADMIN_TOTP_KEY` or restoring an old DB needs an explicit reset (P2).** The
+TOTP seed is stored **encrypted under `ADMIN_TOTP_KEY`**, while the *confirmed-enrolment* flag lives
+in the DB. If the key changes (rotation) or the DB and key fall out of step (an old-DB restore under a
+newer key, or vice-versa), old seeds **stop decrypting but the account stays `confirmed`** — so login
+breaks and a plain re-enrol is refused with `TOTP_ALREADY_ENROLLED` (409). The required step is an
+explicit per-operator reset over the separate operator access, which clears the stale enrolment and
+revokes sessions, after which the operator re-enrols within the 24-hour window:
+
+```text
+admin-operator totp reset <login> --by <who> --reason "<why>"   # fn_admin_reset_totp; revokes sessions
+```
+
+Apply the same reset-then-re-enrol sequence after any restore that leaves the stored seeds and the
+live `ADMIN_TOTP_KEY` out of step. (A decryption-failure case was reproduced synthetically; no real
+seed or key value is used or recorded.)
 
 ### 2.3 Object storage (media) and age identities
 
@@ -142,16 +158,32 @@ until none remain. A rotation that strands an unresolved UNKNOWN operation is no
 
 ## 4. Key / DB divergence after restore
 
-A logical/PITR restore reintroduces the DB-role passwords and any DB-stored state **as of the restore
-point**. If a password or key was rotated *after* that point:
+**Logical and physical/PITR restores behave differently for roles and passwords (P2); do not conflate
+them.**
 
-- DB-role passwords: the restored copy expects the pre-rotation password — re-apply the current
-  rotation on the restored copy before repointing live consumers; never install a recovery private
-  key into runtime/VPS where it does not belong.
-- age recovery identity: the restored bundle is decryptable only by the identity matching the
-  recipient it was encrypted to — keep every still-relevant private identity in offsite escrow.
-- audit key: entries verify under the key id they were signed with; keep previous keys in
-  `ADMIN_AUDIT_PREVIOUS_KEYS` for as long as those entries are retained.
+- **Logical restore (`pg_dump` of the database — the clean-slate primary backup).** A `pg_dump` dump
+  restores schema + data **only**; it does **not** carry roles, their passwords, or role-level grants
+  (those are cluster-global, in `pg_authid` / `pg_dumpall --roles-only`, not in a per-database dump —
+  [PostgreSQL docs](https://www.postgresql.org/docs/current/app-pg-dumpall.html)). Consequences:
+  - restoring onto the **existing** cluster: the roles and their **current** passwords stay as they
+    are — there is **no** reintroduction of old passwords, so no password divergence from this path;
+  - restoring onto a **fresh/empty** cluster (e.g. the clean-slate isolated restore drill): the login
+    roles (`commerce_runtime`, `commerce_operator_login`, the admin logins, `media_worker`) and the
+    group roles do **not** exist yet and must be **re-created**, their **current** credentials set,
+    and the object grants re-established (restore `pg_dumpall --roles-only` first, or create roles by
+    hand, then restore the database) — otherwise ownership/`GRANT` restore fails on missing roles.
+    Set the *current* credentials, never an old value; the dump never dictates a password.
+- **Physical / PITR restore (full cluster: base backup + WAL).** This **does** restore the whole
+  cluster including `pg_authid`, so it **reintroduces the role passwords as of the restore point**. If
+  a password was rotated *after* that point, the restored cluster carries the pre-rotation password —
+  re-apply the current rotation on the restored cluster before repointing live consumers. Never
+  install a recovery private key into runtime/VPS where it does not belong.
+- **age recovery identity (both paths):** the restored encrypted bundle is decryptable only by the
+  identity matching the recipient it was encrypted to — keep every still-relevant private identity in
+  offsite escrow.
+- **audit key (both paths):** entries verify under the key id they were signed with; keep previous
+  keys in `ADMIN_AUDIT_PREVIOUS_KEYS` for as long as those entries are retained. See the TOTP note in
+  §2.2 for the matching enrolment-state divergence after a DB restore (reset-then-re-enrol required).
 
 Clean-slate scope: for the new DB, automatic encrypted/off-host logical backup + **one successful
 isolated restore** before real Admin/content/legal data entry is sufficient; full PITR and
@@ -198,3 +230,13 @@ host/credential changes are owner-authorized, specific, and recorded through VPS
   record (transient bootstrap files marked as materialisations, not second custodians).
 - **P2 — tests only listed:** §5 now distinguishes planned checks (all NOT_RUN — source-only) from
   performed ones, and forbids relabeling a planned check as passed without its own redacted evidence.
+
+### Round 2 (PR #67, head after e6b34e9)
+
+- **P2 — logical vs physical restore:** §4 now separates `pg_dump` logical restore (no roles/
+  passwords/grants carried; re-create login roles + set current credentials + re-grant on a fresh
+  cluster; current passwords unchanged on an existing one) from physical/PITR (restores `pg_authid`,
+  reintroduces old passwords → re-apply current rotation).
+- **P2 — TOTP key rotation / DB restore:** §2.2 row + TOTP note now require an explicit
+  `admin-operator totp reset` before re-enrol (old seeds stop decrypting but stay confirmed → login
+  breaks, re-enrol hits `TOTP_ALREADY_ENROLLED`); same sequence after an out-of-step DB restore.
