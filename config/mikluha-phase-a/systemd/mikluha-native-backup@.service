@@ -1,0 +1,22 @@
+[Unit]
+Description=Mikluha Phase A %i encrypted logical backup (owner opt-in)
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+RuntimeDirectory=mikluha-native-backup-%i
+RuntimeDirectoryMode=0700
+ExecStart=/usr/bin/python3 /usr/local/libexec/mikluha-phase-a/backup-job.py capture --scope %i
+TimeoutStartSec=15min
+MemoryMax=768M
+CPUQuota=50%
+TasksMax=64
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mikluha-native-backup/%i /run/mikluha-native-backup-%i
+# Docker socket is deliberately root authority of this narrowly scoped backup job.

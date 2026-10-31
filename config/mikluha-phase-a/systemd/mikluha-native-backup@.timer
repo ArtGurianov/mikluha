@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly Mikluha Phase A %i dump
+
+[Timer]
+OnCalendar=*-*-* *:37:00 UTC
+RandomizedDelaySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

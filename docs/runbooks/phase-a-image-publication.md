@@ -9,6 +9,8 @@ It does not contact Coolify, SSH, Cloud.ru or a running application.
 VPS path or provider resource is provisioned. A future dispatch writes GHCR
 packages, not infrastructure runtime. Existing deployment workflows are unchanged.
 
+Project-owned runtime, Compose, backup and manual recovery instructions: [Phase A operations](phase-a-operations.md). Sensitive installation data stays outside Git; these sources do not authorize deployment.
+
 ## Before dispatch
 
 Use the [Phase A operational runbook](2026-10-30-ssr-admin-operational-acceptance.md).

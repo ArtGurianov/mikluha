@@ -1,0 +1,15 @@
+[Unit]
+Description=Mikluha Phase A %i backup freshness / latest-failure check
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/bin/python3 /usr/local/libexec/mikluha-phase-a/backup-job.py check --scope %i
+TimeoutStartSec=30
+MemoryMax=64M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mikluha-native-backup/%i
