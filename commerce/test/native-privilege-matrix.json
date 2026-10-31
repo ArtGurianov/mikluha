@@ -1,0 +1,177 @@
+{
+  "relations": {
+    "purchase": {
+      "commerce_app": "S(*)"
+    },
+    "purchase_revision": {
+      "commerce_app": "S(*)"
+    },
+    "purchase_revision_participant": {
+      "commerce_app": "S(*)"
+    },
+    "purchase_current": {
+      "commerce_app": "S(*)"
+    },
+    "order_purchase_profile": {
+      "commerce_app": "S(*)"
+    },
+    "orders": {
+      "commerce_app": "S(*) I(*) U(*)",
+      "commerce_operator": "S(*)"
+    },
+    "order_contact": {
+      "commerce_app": "D S(*) I(*)",
+      "commerce_operator": "S(*)"
+    },
+    "order_passenger": {
+      "commerce_app": "D S(*) I(*)",
+      "commerce_operator": "S(*)"
+    },
+    "order_document": {
+      "commerce_app": "S(*) I(*) U(*)",
+      "commerce_operator": "S(*)"
+    },
+    "order_eis": {
+      "commerce_operator": "S(*)"
+    },
+    "order_eis_event": {
+      "commerce_operator": "S(*)"
+    },
+    "order_event": {
+      "commerce_app": "S(*) I(*)"
+    },
+    "email_outbox": {
+      "commerce_app": "S(*) I(*) U(*)"
+    },
+    "processing_instruction": {
+      "commerce_app": "S(*)",
+      "commerce_operator": "S(*)"
+    },
+    "sales_switch": {
+      "commerce_app": "S(*)",
+      "commerce_operator": "S(*)"
+    },
+    "sales_switch_event": {
+      "commerce_app": "S(*)",
+      "commerce_operator": "S(*)"
+    },
+    "admin_user": {
+      "admin_app": "S(*)",
+      "admin_operator": "S(id,login,role,password_changed_at,totp_enrollment_until,created_at,disabled_at)",
+      "admin_publisher": "S(id,login,role,disabled_at)"
+    },
+    "admin_totp": {
+      "admin_app": "S(*)",
+      "admin_operator": "S(admin_id,last_accepted_step,enrolled_at,confirmed_at)"
+    },
+    "admin_session": {
+      "admin_app": "S(*) U(last_seen_at,idle_expires_at,revoked_at,revoked_reason)",
+      "admin_operator": "S(id,admin_id,created_at,last_seen_at,idle_expires_at,absolute_expires_at,rotated_from,auth_audit_id,revoked_at,revoked_reason)",
+      "admin_publisher": "S(*) U(last_seen_at,idle_expires_at)"
+    },
+    "admin_audit": {
+      "admin_app": "S(*) I(admin_id,actor,action,outcome,entity_type,entity_id,details,event_id,key_id,attestation)",
+      "admin_operator": "S(*)",
+      "admin_publisher": "I(admin_id,actor,action,outcome,entity_type,entity_id,details,event_id,key_id,attestation)"
+    },
+    "admin_login_throttle": {
+      "admin_app": "D S(*) I(*) U(attempts)"
+    },
+    "media_asset": {},
+    "media_event": {},
+    "legal_publication": {
+      "admin_app": "S(*)"
+    },
+    "editorial_audit": {
+      "admin_app": "S(*)"
+    },
+    "content_item_revision": {
+      "admin_app": "S(*)"
+    }
+  },
+  "sequences": {
+    "admin_audit_id_seq": {},
+    "departure_cancellation_event_id_seq": {},
+    "editorial_audit_id_seq": {},
+    "media_event_id_seq": {},
+    "order_eis_event_id_seq": {},
+    "order_event_id_seq": {},
+    "sales_switch_event_id_seq": {}
+  },
+  "securityDefinerExecute": {
+    "commerce_app": [
+      "fn_departure_taken_seats(text,timestamp with time zone)",
+      "fn_lock_checkout_departure(text)",
+      "fn_lock_departure_initiation(text)",
+      "fn_open_native_purchase(uuid)",
+      "fn_purchase_pd_retention_due(uuid)",
+      "fn_sales_open_for_sale()"
+    ],
+    "commerce_operator": [
+      "fn_complete_departure_cancellation(text,text,text)",
+      "fn_eis_mark_needs_update(text,text,text)",
+      "fn_eis_record_submitted(text,text,text,bigint)",
+      "fn_request_departure_cancellation(text,text,text)",
+      "fn_set_sales_open(boolean,text,text)"
+    ],
+    "admin_app": [
+      "fn_admin_lock_account(uuid)",
+      "fn_admin_login(uuid,uuid,bigint,boolean,text,timestamp with time zone,integer,text,uuid,text)",
+      "fn_admin_session_rotate(text,text,timestamp with time zone,integer)",
+      "fn_admin_totp_begin(uuid,text)",
+      "fn_create_content_item(text,text,text)",
+      "fn_create_departure(uuid,text,text)",
+      "fn_create_tour(text,text)",
+      "fn_departure_affected_orders(uuid)",
+      "fn_media_enqueue(uuid,text,bytea,text,text,text,text,text,boolean)",
+      "fn_save_content_draft(uuid,integer,jsonb,text)",
+      "fn_save_departure_draft(uuid,integer,jsonb,text)",
+      "fn_save_tour_draft(uuid,integer,jsonb,text)"
+    ],
+    "admin_operator": [
+      "fn_admin_clear_throttle(text,text)",
+      "fn_admin_create_user(text,text,text,text)",
+      "fn_admin_reset_totp(text,text,text)",
+      "fn_admin_revoke_sessions(text,text,text)",
+      "fn_admin_set_disabled(text,boolean,text,text)",
+      "fn_admin_set_password(text,text,text)"
+    ],
+    "admin_publisher": [
+      "fn_admin_departure_controls(uuid,integer,text,integer,boolean,text)",
+      "fn_admin_lock_account(uuid)",
+      "fn_admin_pause_all(text)",
+      "fn_admin_publish_legal(uuid,integer,integer,date,text,text)",
+      "fn_admin_resume_batch(uuid,text)",
+      "fn_media_request(uuid,text,text)",
+      "fn_publish_content_item(uuid,integer,integer,text)",
+      "fn_publish_departure(uuid,integer,integer,text)",
+      "fn_publish_departure_change(uuid,integer,integer,text,text,text)",
+      "fn_publish_departure_stage_a(uuid,integer,integer,text)",
+      "fn_publish_tour(uuid,integer,integer,text)"
+    ],
+    "media_worker": [
+      "fn_media_claim()",
+      "fn_media_complete(uuid,text,jsonb)",
+      "fn_media_quarantine(uuid)",
+      "fn_media_retry(uuid)"
+    ],
+    "public": []
+  },
+  "schemaPublic": {
+    "commerce_app": "USAGE",
+    "commerce_operator": "USAGE",
+    "admin_app": "USAGE",
+    "admin_operator": "USAGE",
+    "admin_publisher": "USAGE",
+    "media_worker": "USAGE",
+    "public": "USAGE"
+  },
+  "groupRoleMemberships": {
+    "commerce_app": [],
+    "commerce_operator": [],
+    "admin_app": [],
+    "admin_operator": [],
+    "admin_publisher": [],
+    "media_worker": []
+  }
+}
