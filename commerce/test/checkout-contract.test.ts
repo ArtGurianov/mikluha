@@ -19,6 +19,9 @@ let slug: string;
 let sequence = 0;
 const start = new Date();
 const minute = 60_000;
+// Non-cutoff scenarios must stay bookable when CI runs after the old demo date.
+const startsOn = new Date(start.getTime() + 14 * 86_400_000).toISOString().slice(0, 10);
+const endsOn = new Date(start.getTime() + 17 * 86_400_000).toISOString().slice(0, 10);
 before(async () => {
   db = await freshDb();
   fake = new FakeRefref('3f1c2a5e-8b4d-4c7e-9a10-2b6d8e4f1a90');
@@ -28,7 +31,7 @@ after(async () => { await fake.stop(); await db.drop(); });
 beforeEach(async () => {
   await resetOrders(db.owner);
   fake.reset(); clock = new Date(start); slug = `contract-${++sequence}`;
-  const catalog = fixtureCatalog([{ slug, startsOn: '2026-11-01', endsOn: '2026-11-04', capacity: 2 }]);
+  const catalog = fixtureCatalog([{ slug, startsOn, endsOn, capacity: 2 }]);
   await seedCatalog(db, catalog);
   await setSalesOpen(db.operator, true, 'test', 'isolated checkout');
   audit=captureLog();
