@@ -70,3 +70,23 @@ retry. Unconsumed proofs survive ordinary quote/passenger edits; submit consumes
 await, including UNKNOWN. Session, refresh and origin requirements are recorded in
 `docs/plans/2026-10-30-checkout-review-resolution.md` and TOUR-49; legal/PD qualification stays
 with TOUR-80/84.
+
+## Server verifier source — TOUR-49 (2026-10-31)
+
+`commerce/src/smartcaptcha.ts` implements the server policy above as a standalone boundary.
+It is **not wired into any route**: hold admission, TTL, idempotency, outstanding-hold caps and the
+reservation/deposit model stay with TOUR-77/78, so no second reservation model is introduced.
+
+| Rule | Behavior |
+| --- | --- |
+| Acceptance | provider HTTP 200, `status=ok` **and** `host` exactly in `SMARTCAPTCHA_ALLOWED_HOSTS` (DNS case-insensitive). No suffix/wildcard, no request `Host` reflection; empty/foreign/unlisted-port host → `CAPTCHA_INVALID` |
+| Invalid/expired proof | provider `status=failed` → `CAPTCHA_INVALID` |
+| Replay | token hash consumed locally **before** the provider call; concurrent or later reuse → `CAPTCHA_INVALID` without a provider call. A failed check also consumes the proof. Bounded TTL memory; an evicted token still meets the provider's one-time check |
+| Provider down | non-200, redirect, network error, timeout (request **and** body), malformed JSON or unknown status → `CAPTCHA_UNAVAILABLE`: fail closed, no hold. Seat inventory protection must not depend on CAPTCHA availability |
+| Privacy | the verdict and the `onResult` reason are fixed codes; token, server key, client IP and provider message never leave the module. Forwarding the client IP is **off** by default until TOUR-80/84 qualifies that PD transfer |
+| Configuration | missing key/hosts, wildcard/uppercase/URL/IP host, non-HTTPS or credentialed/query endpoint → construction error. Absent configuration is never "verification off" |
+
+`DEFAULT_SMARTCAPTCHA_ENDPOINT` and the provider response shape are taken from the Yandex
+validation contract but were **not re-read from provider documentation in this session** and
+no provider traffic occurred. Real widget solve, allowed-domain configuration, actual provider
+responses, CSP and native booking E2E remain NOT_RUN; synthetic tests do not qualify them.

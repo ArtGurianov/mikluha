@@ -37,3 +37,30 @@ test('normalized email is an independent boundary', () => {
   assert.equal(limiter.checkEmail('person@example.ru', 1_001).allowed, true);
   assert.equal(limiter.checkEmail('PERSON@example.ru', 1_002).allowed, false);
 });
+
+// TOUR-49 abuse scenarios: rotating addresses must not multiply capacity beyond the bounded store.
+test('IP rotation cannot bypass the per-email boundary', () => {
+  const limiter = new BookingRateLimiter({ ipLimit: 10, emailLimit: 3, windowMs: 60_000 });
+  const results = Array.from({ length: 6 }, (_, i) => {
+    const ip = limiter.checkIp({ 'x-forwarded-for': `198.51.100.${i + 1}` }, 1_000 + i).allowed;
+    return ip && limiter.checkEmail('Flood@Example.RU', 1_000 + i).allowed;
+  });
+  assert.deepEqual(results, [true, true, true, false, false, false]);
+});
+
+test('a rotating-address flood beyond the keyed bound shares one limited overflow bucket', () => {
+  const limiter = new BookingRateLimiter({ ipLimit: 2, windowMs: 60_000, maxKeyedBuckets: 3 });
+  let allowed = 0;
+  for (let i = 0; i < 200; i += 1) if (limiter.checkIp({ 'x-forwarded-for': `203.0.113.${(i % 250) + 1}` }, 1_000 + i).allowed) allowed += 1;
+  // three keyed addresses get their first request; then every new address shares the 2-request overflow
+  assert.equal(allowed, 3 + 2);
+  assert.equal(limiter.keyedBucketCount, 3);
+});
+
+test('spoofed forwarding chains cannot mint fresh identities', () => {
+  const limiter = new BookingRateLimiter({ ipLimit: 1, windowMs: 60_000 });
+  const outcomes = ['198.51.100.1, 10.0.0.1', '198.51.100.2, 10.0.0.1', ' , ', 'not-an-ip', '1.2.3.4.5']
+    .map((v, i) => limiter.checkIp({ 'x-forwarded-for': v }, 1_000 + i).allowed);
+  assert.deepEqual(outcomes, [true, false, false, false, false]);
+  assert.equal(limiter.keyedBucketCount, 0);
+});
