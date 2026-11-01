@@ -1,7 +1,11 @@
 node_modules
 **/node_modules
 commerce/dist
-control-room
+# The only shared client-safe calendar module is needed by the SSR build.
+control-room/*
+!control-room/lib/
+control-room/lib/*
+!control-room/lib/local-calendar.ts
 .next
 out
 .cms-cache

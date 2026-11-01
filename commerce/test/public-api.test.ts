@@ -99,7 +99,7 @@ test('effective legal publication reaches public HTTP without private approval m
   const doc = {slug:'public-privacy',title:'Политика',content:{body:'Approved synthetic text'}};
   await db.admin.query("SELECT fn_save_content_draft($1,0,$2,'editor')",[id,doc]);
   assert.ok(!(await readPublic()).legalPages.some(p=>p.slug==='public-privacy'));
-  await db.publisher.query("SELECT fn_admin_publish_legal($1,1,0,(clock_timestamp() AT TIME ZONE 'Europe/Moscow')::date,'private approval note','owner')",[id]);
+  await db.publisher.query("SELECT fn_admin_publish_legal($1,1,0,(clock_timestamp() AT TIME ZONE 'Asia/Krasnoyarsk')::date,'private approval note','owner')",[id]);
   const result = await readPublic();
   assert.equal(result.legalPages.find(p=>p.slug==='public-privacy')?.body,doc.content.body);
   assert.ok(!JSON.stringify(result).includes('private approval note'));
@@ -107,13 +107,13 @@ test('effective legal publication reaches public HTTP without private approval m
   const next = { ...doc, content: { body: 'Новая редакция\nс пробелами  \n' } };
   await db.admin.query("SELECT fn_save_content_draft($1,1,$2,'editor')", [id,next]);
   assert.equal((await readPublic()).legalPages.find(p=>p.slug==='public-privacy')?.body, doc.content.body);
-  await db.publisher.query("SELECT fn_admin_publish_legal($1,2,1,(clock_timestamp() AT TIME ZONE 'Europe/Moscow')::date,'new approval','owner')", [id]);
+  await db.publisher.query("SELECT fn_admin_publish_legal($1,2,1,(clock_timestamp() AT TIME ZONE 'Asia/Krasnoyarsk')::date,'new approval','owner')", [id]);
   const active = (await readPublic()).legalPages.find(p=>p.slug==='public-privacy')!;
   assert.equal(active.body, next.content.body);
   assert.equal(active.textSha256, `sha256:${createHash('sha256').update(next.content.body).digest('hex')}`);
   assert.equal(active.publishedVersion, 2);
   await db.admin.query("SELECT fn_save_content_draft($1,2,$2,'editor')", [id,{...doc,content:{body:'Будущая редакция'}}]);
-  await db.publisher.query("SELECT fn_admin_publish_legal($1,3,2,(clock_timestamp() AT TIME ZONE 'Europe/Moscow')::date+1,'future approval','owner')", [id]);
+  await db.publisher.query("SELECT fn_admin_publish_legal($1,3,2,(clock_timestamp() AT TIME ZONE 'Asia/Krasnoyarsk')::date+1,'future approval','owner')", [id]);
   assert.equal((await readPublic()).legalPages.find(p=>p.slug==='public-privacy')?.body, next.content.body);
 
 });

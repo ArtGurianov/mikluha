@@ -110,7 +110,8 @@ const totp=parseTotpKey(supplied.ADMIN_TOTP_KEY);
 await pool.query('INSERT INTO admin_totp(admin_id,seed_ciphertext,enrolled_at) VALUES($1,$2,now())',[id,encryptSeed(totp,id,Buffer.alloc(20,9))]);
 const keys=adminKeys(totp,parseAuditKeys(supplied));
 await audit(pool,keys,{adminId:id,actor:'synthetic-owner',action:'TEST.SYNTHETIC',outcome:'OK',entityType:'synthetic',entityId:id,details:{}});
-console.log(JSON.stringify({schema_head:19,sales_open:false}));await pool.end();
+const schemaHead=Number((await pool.query('SELECT max(version) AS v FROM schema_migrations')).rows[0].v);
+console.log(JSON.stringify({schema_head:schemaHead,sales_open:false}));await pool.end();
 """
             meta = json.loads(d('run', '--rm', '-i', '--network', 'container:' + name,
                 '--mount', f'type=bind,source={key_path},target=/run/keys.json,readonly',

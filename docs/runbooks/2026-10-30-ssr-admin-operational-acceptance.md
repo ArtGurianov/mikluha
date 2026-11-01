@@ -83,7 +83,7 @@ EDITOR-доступ в рабочей БД не выдавать в Phase A. Е�
 
 | Ресурс | Граница и authority |
 | --- | --- |
-| Две независимые PostgreSQL 16 БД/volumes | Одноразовая acceptance БД и создаваемая после PASS чистая рабочая БД; отдельные credentials/backup prefixes; полный журнал выбранного image, baseline 0001–0019; никакого demo/legacy import |
+| Две независимые PostgreSQL 16 БД/volumes | Одноразовая acceptance БД и создаваемая после PASS чистая рабочая БД; отдельные credentials/backup prefixes; полный журнал выбранного image, baseline 0001–0019; для нового Красноярского legal-календаря также forward 0020 и согласованные SSR/Admin images; никакого demo/legacy import |
 | Commerce public API и SSR | Отдельные digest-pinned images, внутренний API; SSR без DB/Admin/provider credentials |
 | Admin API и Control Room | Изолированные capabilities, TOTP, приватный TLS-вход через SSH; API без собственного публичного маршрута |
 | Media worker и decoder | Отдельный media DB login/S3 principal; decoder без IP-сети и credentials; direct S3, без VPS-17 |
@@ -345,8 +345,8 @@ private receipt/reference; исходные chat/message IDs в публичны
 После неопределённого ответа сначала прочитать history, а не создавать новую
 публикацию повторно. Существующую immutable историю не удалять/переписывать.
 
-`effectiveOn` — московская календарная дата **фактической** публикации.
-Вычислить непосредственно перед операцией в `Europe/Moscow`; при переходе даты
+`effectiveOn` — календарная дата в `Asia/Krasnoyarsk` **фактической** публикации.
+Вычислить непосредственно перед операцией в `Asia/Krasnoyarsk`; при переходе даты
 перепроверить. Дата runbook/GO не подставляется; прошлую дату БД отвергает.
 
 После каждой операции прочитать immutable history, version/effectiveOn,

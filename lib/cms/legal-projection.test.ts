@@ -28,3 +28,11 @@ test("missing, duplicate, tampered, future or invalid legal rows fail closed", (
     assert.throws(() => parsePublicLegalPages(value));
   }
 });
+
+test("legal visibility changes at Krasnoyarsk midnight, independently of the host clock zone", () => {
+  const nextDay = { ...row(), effectiveOn: "2026-11-02" };
+  assert.throws(() => parsePublicLegalPages([nextDay], new Date("2026-11-01T16:59:59.999Z")));
+  assert.equal(parsePublicLegalPages([nextDay], new Date("2026-11-01T17:00:00.000Z"))[0]!.updatedAt, "2026-11-02");
+  assert.throws(() => parsePublicLegalPages([{ ...row(), effectiveOn: "2027-01-01" }], new Date("2026-12-31T16:59:59.999Z")));
+  assert.equal(parsePublicLegalPages([{ ...row(), effectiveOn: "2027-01-01" }], new Date("2026-12-31T17:00:00Z"))[0]!.updatedAt, "2027-01-01");
+});

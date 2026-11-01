@@ -1,5 +1,7 @@
 # Phase A project operations
 
+Новые локальные даты используют **Asia/Krasnoyarsk**: [OWNER 2026-11-01](../decisions/2026-11-01-local-calendar-and-cdn.md). Installed schema 19 и старые images пока сохраняют прежний legal-календарь. До отдельной legal publication требуются согласованные images/forward 0020 и backup/restore новой схемы; действующие UTC backup timers не переносить.
+
 CUSTODY_IMPACT: YES — the scoped backup notification add-on changes host files
 and credential consumers when installed. Actual installations, credentials
 and custody changes have separate resource-specific OWNER authority and private
