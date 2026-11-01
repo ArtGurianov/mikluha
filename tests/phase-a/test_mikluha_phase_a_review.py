@@ -49,7 +49,7 @@ class ReviewContracts(unittest.TestCase):
     def test_freshness_while_backup_holds_lock_does_not_fake_failure(self):
         with tempfile.TemporaryDirectory() as d:
             state=pathlib.Path(d).resolve();c=qualified()
-            db={'scope':c['scope'],'source_commit':c['source_commit'],'schema_head':19,'sales_open':False,'role_contract':'PASS','privileges_sha256':c['privileges_sha256'],'database_generation':c['database_generation']}
+            db={'scope':c['scope'],'source_commit':c['source_commit'],'schema_head':c['schema_head'],'sales_open':False,'role_contract':'PASS','privileges_sha256':c['privileges_sha256'],'database_generation':c['database_generation']}
             clear,meta=b.capture(c,lambda:db,lambda:b'PGDMPfixture')
             b.publish(c,Provider(),b'age-encryption.org/v1\nfixture',meta,state)
             with (state/'lock').open('a') as held,(state/'lock').open('a') as checking:

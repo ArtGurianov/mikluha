@@ -77,7 +77,7 @@
       }
     },
     "commerce": {
-      "image": "ghcr.io/artgurianov/mikluha-commerce@sha256:4d34bc21f58dc511ece420011ea4ef223e6c6e2d43d301fd1375bd5ffade7d10",
+      "image": "ghcr.io/artgurianov/mikluha-commerce@sha256:18e188afc78b884f5043de41454479a264a4382af56ca8db231490c8bc631d27",
       "restart": "unless-stopped",
       "init": true,
       "mem_limit": "256m",
@@ -101,7 +101,7 @@
         "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
         "io.mikluha.scope=acceptance",
         "io.mikluha.component=commerce",
-        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.source=e4b110bda43ea4b5656f31cd4bbad47fea63307d",
         "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
       ],
       "logging": {
@@ -132,7 +132,7 @@
       }
     },
     "admin-api": {
-      "image": "ghcr.io/artgurianov/mikluha-commerce@sha256:4d34bc21f58dc511ece420011ea4ef223e6c6e2d43d301fd1375bd5ffade7d10",
+      "image": "ghcr.io/artgurianov/mikluha-commerce@sha256:18e188afc78b884f5043de41454479a264a4382af56ca8db231490c8bc631d27",
       "restart": "unless-stopped",
       "init": true,
       "mem_limit": "256m",
@@ -156,7 +156,7 @@
         "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
         "io.mikluha.scope=acceptance",
         "io.mikluha.component=admin-api",
-        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.source=e4b110bda43ea4b5656f31cd4bbad47fea63307d",
         "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
       ],
       "logging": {
@@ -190,7 +190,7 @@
       }
     },
     "site": {
-      "image": "ghcr.io/artgurianov/mikluha-site-ssr@sha256:b003f6e6ac1b1cda23d1ef5bee0a3d1d820fadfc5d520fdd3227cefe50d63225",
+      "image": "ghcr.io/artgurianov/mikluha-site-ssr@sha256:a500a8611bcecc867583912d6f43b742cf09ff8d63998a3c2a26cded1b01120f",
       "restart": "unless-stopped",
       "init": true,
       "mem_limit": "512m",
@@ -214,7 +214,7 @@
         "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
         "io.mikluha.scope=acceptance",
         "io.mikluha.component=site",
-        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.source=e4b110bda43ea4b5656f31cd4bbad47fea63307d",
         "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
       ],
       "logging": {
@@ -233,7 +233,7 @@
       }
     },
     "admin": {
-      "image": "ghcr.io/artgurianov/mikluha-control-room@sha256:4725d8e13e1879cbc3818c9e719c042371c1b68fc2986b178da70b91eec5a49c",
+      "image": "ghcr.io/artgurianov/mikluha-control-room@sha256:48bca1adcb7d1094eae930bf7c96fb15f9ec1e372c203e39657fb2dd23cb1b3b",
       "restart": "unless-stopped",
       "init": true,
       "mem_limit": "128m",
@@ -257,7 +257,7 @@
         "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
         "io.mikluha.scope=acceptance",
         "io.mikluha.component=admin",
-        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.source=e4b110bda43ea4b5656f31cd4bbad47fea63307d",
         "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
       ],
       "logging": {
@@ -307,7 +307,7 @@
         "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
         "io.mikluha.scope=acceptance",
         "io.mikluha.component=gateway",
-        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.source=e4b110bda43ea4b5656f31cd4bbad47fea63307d",
         "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
       ],
       "logging": {
@@ -344,7 +344,7 @@
       ]
     },
     "worker": {
-      "image": "ghcr.io/artgurianov/mikluha-media-worker@sha256:5b31289cfe40469f0e359396254443103023af2b81beb784d7f934eee6c671c7",
+      "image": "ghcr.io/artgurianov/mikluha-media-worker@sha256:6b297c4c9b1a8e2a121b23e4f748a5fc0c4357e455d48931864e0eebb14f04df",
       "restart": "unless-stopped",
       "init": true,
       "mem_limit": "256m",
@@ -368,7 +368,7 @@
         "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
         "io.mikluha.scope=acceptance",
         "io.mikluha.component=worker",
-        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.source=e4b110bda43ea4b5656f31cd4bbad47fea63307d",
         "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
       ],
       "logging": {
@@ -408,7 +408,7 @@
       }
     },
     "decoder": {
-      "image": "ghcr.io/artgurianov/mikluha-media-decoder@sha256:ac2504fac3da7f3ebe3f64b81a0aece399d121af9193b9d8bed189824740e3cb",
+      "image": "ghcr.io/artgurianov/mikluha-media-decoder@sha256:f58b7183d6f899a3f3c11f34829dfcade624a0c1dbe11bca931d5a97b47c150c",
       "restart": "unless-stopped",
       "init": true,
       "mem_limit": "512m",
@@ -432,7 +432,7 @@
         "coolify.applicationId=${MAA_APPLICATION_UUID:?Coolify UUID required}",
         "io.mikluha.scope=acceptance",
         "io.mikluha.component=decoder",
-        "io.mikluha.source=7d405bb51852370e851efb55510fabe86999cc27",
+        "io.mikluha.source=e4b110bda43ea4b5656f31cd4bbad47fea63307d",
         "io.mikluha.secret-generation=${MAA_SECRET_GENERATION:?qualified generation required}"
       ],
       "logging": {
