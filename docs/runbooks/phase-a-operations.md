@@ -1,6 +1,7 @@
 # Phase A project operations
 
-CUSTODY_IMPACT: NO — undeployed portable source. Actual installations, credentials
+CUSTODY_IMPACT: YES — the scoped backup notification add-on changes host files
+and credential consumers when installed. Actual installations, credentials
 and custody changes have separate resource-specific OWNER authority and private
 operator receipts. [TOUR-67](https://app.plane.so/art-workspace/browse/TOUR-67/) and
 [VPS-19](https://app.plane.so/art-workspace/browse/VPS-19/) track acceptance.

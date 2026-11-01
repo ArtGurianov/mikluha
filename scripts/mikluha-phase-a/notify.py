@@ -9,6 +9,7 @@ import re
 import stat
 import sys
 import urllib.request
+import urllib.error
 import uuid
 
 URL = 'https://telebuzzy.xyz/api/notify'
@@ -95,6 +96,9 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except urllib.error.HTTPError as error:
+        print('MIKLUHA_BACKUP_ALERT=REFUSED http_status=' + str(error.code), file=sys.stderr)
+        sys.exit(1)
     except Exception:
         print('MIKLUHA_BACKUP_ALERT=FAIL; diagnostic values suppressed', file=sys.stderr)
         sys.exit(1)
