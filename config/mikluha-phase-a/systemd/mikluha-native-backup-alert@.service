@@ -1,0 +1,19 @@
+[Unit]
+Description=Mikluha scoped backup failure notification (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/bin/python3 /usr/local/libexec/mikluha-phase-a/notify.py %i
+TimeoutStartSec=20
+MemoryMax=64M
+TasksMax=8
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mikluha-native-backup
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
