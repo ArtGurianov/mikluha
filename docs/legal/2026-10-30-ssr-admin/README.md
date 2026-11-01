@@ -1,11 +1,13 @@
 # SSR/Admin legal candidate — 2026-10-30
 
 Approved text revision: `2026-10-30.ssr-admin.review.3`.
-Status: APPROVED BY OWNER on 2026-10-30, NOT PUBLISHED. Exact-byte approval:
+Status: APPROVED BY OWNER on 2026-10-30; PUBLISHED in private working Commerce
+on 2026-11-01, both version 1, effectiveOn 2026-11-01 (Asia/Krasnoyarsk).
+[Execution receipt](../../evidence/2026-11-01-working-schema20-legal-publication.json).
+The public domain remains maintenance; this is not public-domain activation. Exact-byte approval:
 [`docs/decisions/2026-10-30-ssr-admin-legal-owner-approval.md`](../../decisions/2026-10-30-ssr-admin-legal-owner-approval.md).
 This directory
-is not imported or activated automatically. Effective date is intentionally not
-invented: OWNER chooses it at legal publication (Asia/Krasnoyarsk date, no backdating).
+is not imported or activated automatically. The effective date above is the actual publication date, without backdating.
 
 - `privacy-policy.md`: minimal actual SSR/Admin/direct Cloud.ru disclosure.
 - `cookies.md`: actual Admin cookie; removes retired booking-cookie claims.
@@ -20,9 +22,9 @@ now separately approved in the OWNER decision above; that approval does not
 qualify an installed erasure process, provider account or future sales processing.
 
 The old `content/legal/*.yml` is retained without rewriting historical legal
-bytes. TOUR-59 removes its runtime fallback. OWNER must enter/publish these
-candidate bodies through the existing Admin legal publication operation after
-review; code merge alone must not activate them. Preserve prior publications.
+bytes. TOUR-59 removes its runtime fallback. These two exact bodies were entered and published through the existing OWNER-only
+Admin API after schema20 backup/restore; code merge did not activate them.
+The other five sales-related legal routes remain unpublished. Preserve prior publications.
 
 Before exposure: qualify actual proxy/log/access settings and applicable
 provider operations, new DB backup and isolated restore under existing phase-A

@@ -13,7 +13,7 @@ OWNER подтвердил: новые локальные календарные
 ## Source и фактическая установка
 
 - TOUR-96: migration 0020 добавляет общий DB local-date helper, обновляет
-  legal publish guard и public_legal; рабочая legal-история пуста, поэтому
+  legal publish guard и public_legal; до миграции подтверждена пустая legal-история, поэтому
   дополнительная колонка зоны не нужна. При любой существующей legal-публикации
   migration отказывает с LEGAL_CALENDAR_HISTORY_REQUIRES_REVIEW. Helper STABLE
   учитывает зависимость именованной зоны от tzdata. SSR projection и Admin date input следуют
@@ -21,9 +21,10 @@ OWNER подтвердил: новые локальные календарные
 - Каталог: отдельный PR #69 / TOUR-78 исправляет defaults/validation. Эта работа
   не дублирует его изменения и не объявляет его merged.
 - На read-back 2026-11-01 VPS сообщает **Etc/UTC**. Это намеренное и целевое состояние хоста (VPS-25), а не незавершённый rollout.
-  Установленные application images/schema 19 ещё используют Moscow legal rules.
-  Подготовленный source не является deployment/migration receipt.
-- До legal publication нужны согласованные новые Commerce/SSR/Admin images,
+  После отдельного OWNER GO установлены новые Commerce/SSR/Admin images и schema20;
+  приложение использует Asia/Krasnoyarsk. [Фактическое свидетельство](../evidence/2026-11-01-working-schema20-legal-publication.json)
+  отдельно от source approval подтверждает runtime и cloud restore.
+- Перед выполненной legal publication квалифицированы согласованные новые Commerce/SSR/Admin images,
   forward migration 0020, новые privileges_sha256 и schema_journal_sha256 в descriptor,
   backup/restore новой схемы 20 с проверкой реальных TOTP/audit и ключей из внешней копии.
   Произвольный старый image не является совместимым rollback; safe state — maintenance.
@@ -56,3 +57,8 @@ Direct S3 остаётся текущим режимом TOUR-63. TurboFlare и�
 
 CUSTODY_IMPACT: NO — source/документация и read-only проверки; host, DB,
 provider policies/objects, env и действующая маршрутизация не менялись.
+
+
+Исполнение 01.11.2026: CUSTODY_IMPACT:YES — только working project refs, schema20,
+backup module/descriptor/status и encrypted custody (VPS-15). Host timezone, shared
+proxy и provider permissions не менялись; source-only NO выше относится к подготовке.
