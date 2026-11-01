@@ -112,3 +112,30 @@ real third-party content, including drafts, is gated separately by Phase B.
 Source CI, registry checks, provider checks, install, private browser acceptance,
 new-DB restore, legal publication, domain and sales are separate facts. Keep sales
 CLOSED and legal NOT PUBLISHED until their own accepted operations.
+
+## Backup failures and real OWNER recovery gate
+
+The optional project-owned `notify.py` and alert unit send fixed operational facts
+through the existing operator Telebuzzy channel. Install only the intended scope's
+OnFailure drop-ins; the working files are in `systemd/*.service.d/notify.conf`.
+Enroll its root0600 `notify.credentials` outside Git as JSON with only `apiKey`,
+with matching encrypted project custody. Never include customer data, exception
+text, DB dumps, logs, URLs from configuration, or credentials in notification fields.
+Unknown/refused delivery fails closed; only provider acceptance acknowledges an
+incident locally. A2xx response is not independent confirmation of Telegram receipt.
+The capture and freshness handlers deduplicate a shared incident. Inspect their
+own failed units if the notification provider is unavailable.
+
+Qualification uses a bounded runtime-only inaccessible-credential override on the
+selected capture service, with its timer paused and restored. The actual capture
+must fail before dump/upload and invoke OnFailure. Remove the override, daemon
+reload, recover normal encrypted capture/freshness and verify original timer state.
+No valid credential, other project unit or live data is changed for this probe.
+
+Independently compare external recovery keys with Coolify and actual Admin runtime
+bytes without printing values or hashes. After the sole real OWNER confirms2FA,
+perform a new actual Cloud.ru capture and isolated restore using external keys.
+Require at least one decrypted TOTP row, attested audit, FORGED0 and UNVERIFIABLE0.
+The earlier empty working restore remains valid structural evidence, but is not
+this populated-crypto proof. No third-party content, legal publication, domain or
+sales activation follows automatically from OWNER enrollment or a successful test.
