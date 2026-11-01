@@ -26,6 +26,29 @@ bytes. TOUR-59 removes its runtime fallback. These two exact bodies were entered
 Admin API after schema20 backup/restore; code merge did not activate them.
 The other five sales-related legal routes remain unpublished. Preserve prior publications.
 
+## Later revisions and pre-sales documents
+
+Published privacy version1 is immutable. Its next changed text is version2 via the
+same OWNER-only Commerce procedure, with fresh approval, text/document hashes and
+actual effective date; later changes increment the current version again. Preserve
+these review.3 Markdown bodies and the version1 publication evidence.
+
+CDN/TOUR-97 changes the disclosed direct Cloud.ru delivery and requires a new
+approved privacy revision before activation. Phase B/TOUR-94 requires a review of
+the real purposes/data flows and any needed new publication before entering
+third-party content, even drafts; its erasure/admission gate remains independent.
+
+`content/legal/oferta.yml`, `turoperator.yml`, `soglasie-pd.yml`,
+`pravila-oplaty.yml` and `otkaz-i-vozvrat.yml` are historical source material,
+not accepted current sales publications. Review each against the actual sales
+flow, obtain separate OWNER approval and publish the qualified documents through
+Commerce before opening sales. Do not auto-import or restore a YAML runtime fallback.
+Approval of privacy/cookies does not approve these five documents.
+
+The version1 effective date does not prove public accessibility. Apply the
+[separate domain cutover checklist](../../runbooks/phase-a-operations.md#domain-cutover-checklist--separate-owner-go)
+before admitting public collection; the private working receipt is not that gate.
+
 Before exposure: qualify actual proxy/log/access settings and applicable
 provider operations, new DB backup and isolated restore under existing phase-A
 requirements, and the concrete supported process for restriction/termination
@@ -110,5 +133,7 @@ quarterly retention review on 2026-10-30. The internal execution procedure is
 `docs/runbooks/ssr-admin-retention-review.md`. Appointment is not evidence of a
 completed review or an implemented deletion operation. Initial review precedes
 real SSR/Admin processing; the first dated successor is anchored to that actual
-review/admission, never an invented launch date. This source directory remains
-NOT PUBLISHED; domain cutover and sales stay outside this approval.
+review/admission, never an invented launch date. The source directory is not a
+runtime publication mechanism; its two exact review.3 bodies were separately
+published in private working Commerce as recorded above. Domain cutover and sales
+remain outside this approval.

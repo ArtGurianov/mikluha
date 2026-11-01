@@ -1,6 +1,11 @@
 # Phase A project operations
 
-Новые локальные даты используют **Asia/Krasnoyarsk**: [OWNER 2026-11-01](../decisions/2026-11-01-local-calendar-and-cdn.md). Installed schema 19 и старые images пока сохраняют прежний legal-календарь. До отдельной legal publication требуются согласованные images/forward 0020 и backup/restore новой схемы; действующие UTC backup timers не переносить.
+Новые локальные даты используют **Asia/Krasnoyarsk**: [OWNER 2026-11-01](../decisions/2026-11-01-local-calendar-and-cdn.md).
+Working обновлён до schema20; две точные review.3 редакции опубликованы в приватном
+Commerce как version1/effectiveOn2026-11-01 после actual Cloud.ru backup/restore.
+См. [свидетельство исполнения](../evidence/2026-11-01-working-schema20-legal-publication.json).
+Сохранённый acceptance остаётся на schema19. Хост намеренно Etc/UTC;
+действующие UTC backup timers не переносить. Приватная публикация не открывает домен.
 
 CUSTODY_IMPACT: YES — the scoped backup notification add-on changes host files
 and credential consumers when installed. Actual installations, credentials
@@ -115,6 +120,62 @@ real third-party content, including drafts, is gated separately by Phase B.
 Source CI, registry checks, provider checks, install, private browser acceptance,
 new-DB restore, legal publication, domain and sales are separate facts. Keep sales
 CLOSED and legal NOT PUBLISHED until their own accepted operations.
+
+### Retained acceptance and schema20
+
+The stopped schema19 acceptance contains synthetic legal publications. Migration0020
+refuses any existing `legal_publication` history with
+`LEGAL_CALENDAR_HISTORY_REQUIRES_REVIEW`; do not restart that retained database
+with schema20 images or remove/bypass the guard. Its old DB, evidence and compatible
+schema19 source remain historical recovery material.
+
+For new schema20 acceptance, provision a separate disposable database/volume from
+the qualified schema20 release, without importing old synthetic legal history.
+Provisioning, any new keys and eventual deletion of retained resources require their
+specific OWNER authority; this runbook grants none. Do not clear or reuse the old volume.
+
+### Domain cutover checklist — separate OWNER GO
+
+Private publication on2026-11-01 is not evidence that a visitor can access the policy.
+Before admitting the public SSR site/data-collection flows:
+
+- Confirm the current approved Commerce versions, full body hashes and effective
+  dates in Asia/Krasnoyarsk; match the actual intended data flows to those versions.
+- Prepare the target HTTPS ingress so `/privacy-policy/` and `/cookies/` are
+  available from the start. Open and verify those public legal URLs before
+  admitting the remaining public site/data-collection flows, within the separately
+  authorized cutover. Never plan to publish the pages after opening collection.
+- From an external network, without Admin login, tunnel, VPN requirement or a
+  cookie-consent wall, require HTTPS200 and the full current texts, visible version,
+  effective date, body hash and working policy links on collection pages/footer.
+  A private Host/SNI probe is preparation, not this public-access receipt.
+- Read back the public pages against Commerce authority: no unavailable placeholder,
+  old YAML/static fallback, stale revision or private approval note. If the checks
+  fail, do not admit collection; keep the remaining site in maintenance and repair
+  policy access. Record the domain/TLS/version/hash/time evidence separately.
+- Sales, Phase B and CDN admission retain their own gates. The other five legal
+  routes may remain unpublished for a sales-CLOSED release; they must be separately
+  reviewed, OWNER-approved and published before sales.
+
+This makes public policy access an explicit cutover condition under
+[152-FZ article18.1 part2](https://www.consultant.ru/document/cons_doc_LAW_61801/eeeebe22bf738fd65bb66b95cc278911ae2525ee/).
+Maintenance or a closed domain is not proof of zero personal-data processing:
+Admin identities and any HTTP/IP logs remain subject to the actual-flow review.
+This checklist is not an assertion of complete legal compliance or cutover execution.
+
+### Later privacy revisions
+
+The current privacy publication is version1; the next changed privacy text must be
+version2, then subsequent versions, through the same OWNER-only draft/approval/
+`publish-legal` procedure. Read the actual current revision/version before publishing;
+never overwrite version1 or silently replace the approved review.3 source bodies.
+Record the new text/document hashes and the actual local effective date.
+
+CDN/TOUR-97 requires a newly approved privacy revision before changing direct Cloud.ru
+delivery to `assets.refref.ru`. Phase B/TOUR-94 requires an actual-flow privacy review
+and publication of any required new revision before third-party content, including
+drafts, is entered. Neither a privacy revision nor this checklist alone opens Phase B.
+See the [legal source and pre-sales boundaries](../legal/2026-10-30-ssr-admin/README.md).
 
 ## Backup failures and real OWNER recovery gate
 
