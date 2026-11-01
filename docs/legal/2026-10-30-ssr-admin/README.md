@@ -5,7 +5,7 @@ Status: APPROVED BY OWNER on 2026-10-30, NOT PUBLISHED. Exact-byte approval:
 [`docs/decisions/2026-10-30-ssr-admin-legal-owner-approval.md`](../../decisions/2026-10-30-ssr-admin-legal-owner-approval.md).
 This directory
 is not imported or activated automatically. Effective date is intentionally not
-invented: OWNER chooses it at legal publication (Moscow date, no backdating).
+invented: OWNER chooses it at legal publication (Asia/Krasnoyarsk date, no backdating).
 
 - `privacy-policy.md`: minimal actual SSR/Admin/direct Cloud.ru disclosure.
 - `cookies.md`: actual Admin cookie; removes retired booking-cookie claims.

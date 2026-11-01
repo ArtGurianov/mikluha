@@ -24,7 +24,7 @@ def validate(c, ready=False):
     if c.get('format') != 'mikluha.phase-a/1' or c.get('scope') not in ('acceptance', 'working'):
         raise ValueError('invalid scope/format')
     scope = c['scope']
-    if not re.fullmatch(r'[0-9a-f]{40}', c.get('source_commit', '')) or c.get('schema_head') != 19:
+    if not re.fullmatch(r'[0-9a-f]{40}', c.get('source_commit', '')) or type(c.get('schema_head')) is not int or c['schema_head'] not in (19, 20):
         raise ValueError('source/schema must be qualified')
     if c.get('controller') != 'coolify-raw-compose' or set(c.get('images', {})) != IMAGES:
         raise ValueError('controller/image contract')

@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
+import { localCalendarDate } from "../../control-room/lib/local-calendar";
 
 import { RESERVED_SLUGS, SLUG_RE } from "../legal";
 import type { LegalPageDTO } from "./types";
 
 /** The active, OWNER-approved rows of Commerce public_legal, never Git text. */
-export function parsePublicLegalPages(value: unknown): LegalPageDTO[] {
+export function parsePublicLegalPages(value: unknown, now = new Date()): LegalPageDTO[] {
   if (!Array.isArray(value)) throw new Error("PUBLIC_LEGAL_INVALID");
+  const today = localCalendarDate(now);
   const slugs = new Set<string>();
   return value.map((row) => {
     const p = row as Record<string, unknown> | null;
@@ -16,7 +18,7 @@ export function parsePublicLegalPages(value: unknown): LegalPageDTO[] {
       || typeof p.documentSha256 !== "string" || !/^sha256:[a-f0-9]{64}$/.test(p.documentSha256)
       || typeof p.effectiveOn !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(p.effectiveOn)
       || new Date(`${p.effectiveOn}T00:00:00Z`).toISOString().slice(0, 10) !== p.effectiveOn
-      || p.effectiveOn > new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow" }).format(new Date())
+      || p.effectiveOn > today
       || p.textSha256 !== `sha256:${createHash("sha256").update(p.body, "utf8").digest("hex")}`) {
       throw new Error("PUBLIC_LEGAL_INVALID");
     }

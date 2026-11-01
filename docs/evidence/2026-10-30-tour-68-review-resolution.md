@@ -1,5 +1,8 @@
 # TOUR-68 — GPT/OPUS review resolution, review.2
 
+> Historical receipt: the Moscow-date checks below describe the 2026-10-30 source.
+> New local dates follow [OWNER 2026-11-01](../decisions/2026-11-01-local-calendar-and-cdn.md); this is not a fresh runtime receipt.
+
 2026-10-30. Baseline: PR #62 at `9bba470`. Inputs: owner-provided GPT and
 OPUS reviews plus the owner's correction quoting Adman policy section 7.
 These are review inputs, not exact-byte OWNER approval or a lawyer's opinion.

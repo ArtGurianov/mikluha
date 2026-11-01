@@ -127,6 +127,15 @@
         "runtimeCommits": [],
         "evidence": "TOUR-64 Stage A / TOUR-65 Admin controls and legal publication. Exact bundled-head runtime only; no sales activation. See docs/plans/2026-10-30-tour-64-65-control-room-design.md."
       }
+    },
+    {
+      "version": 20,
+      "file": "0020_krasnoyarsk_local_calendar.sql",
+      "checksum": "e2fa640ce063e0543dc8a05204a942820ee01310caba13bf4bd323135ff3e69d",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "TOUR-96: empty-publication-history-only Krasnoyarsk legal calendar; exact bundled-head runtime only. Existing legal history refuses upgrade. See docs/decisions/2026-11-01-local-calendar-and-cdn.md."
+      }
     }
   ]
 }

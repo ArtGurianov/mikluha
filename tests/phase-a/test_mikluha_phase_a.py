@@ -77,6 +77,13 @@ class Plans(unittest.TestCase):
         with self.assertRaises(ValueError): p.validate(qualified() | {'admission': 'NO_GO'}, ready=True)
         self.assertEqual(p.validate(qualified(), ready=True), [])
 
+    def test_only_supported_schema_heads_and_exact_backup_schema_are_admitted(self):
+        for head in (19, 20):
+            self.assertEqual(p.validate(qualified() | {'schema_head': head}, ready=True), [])
+        for head in (None, 18, 21, '20', True):
+            with self.assertRaises(ValueError):
+                p.validate(qualified() | {'schema_head': head}, ready=True)
+
     def test_enrollment_or_ready_label_cannot_admit_missing_git_compose(self):
         for source in [None, {'qualification': 'NOT_RUN'},
                        qualified()['compose_source'] | {'path': '/config/mikluha-phase-a/working.compose.json'},
