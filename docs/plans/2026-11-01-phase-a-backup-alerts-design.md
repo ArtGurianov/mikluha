@@ -8,7 +8,9 @@ notifications (does not cover these host jobs) or another monitor/scheduler
 The sender accepts only known scope/event pairs, reads one root-owned project
 credential and status metadata, sends a fixed HTTPS payload with no DB/content,
 keys, bucket paths or logs, rejects redirects and bounds response/timeout. Serialize
-and deduplicate the same incident locally. Keep failed/unknown sends nonzero and
+and deduplicate one failure episode locally, anchored to the latest successful
+capture. Send the first alert and then at most one reminder per6hours. A successful
+capture resets the episode; failed sends keep their idempotency reference. Keep failed/unknown sends nonzero and
 unacknowledged; provider acceptance and independent delivery confirmation are
 separate facts. Notify-handler status cannot turn a failed backup into success.
 

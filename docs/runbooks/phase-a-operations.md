@@ -124,7 +124,12 @@ with matching encrypted project custody. Never include customer data, exception
 text, DB dumps, logs, URLs from configuration, or credentials in notification fields.
 Unknown/refused delivery fails closed; only provider acceptance acknowledges an
 incident locally. A2xx response is not independent confirmation of Telegram receipt.
-The capture and freshness handlers deduplicate a shared incident. Inspect their
+The capture and freshness handlers share one episode anchored to the last
+successful backup, not each failed attempt timestamp. Send on the first failure,
+then at most one reminder every6hours; a new successful capture resets the episode
+so a later new outage alerts immediately. Refused/unknown sends do not advance
+acknowledgment or reminder sequence. Existing legacy acknowledgments without an
+episode migrate on the next actual failure. Inspect their
 own failed units if the notification provider is unavailable.
 
 Qualification uses a bounded runtime-only inaccessible-credential override on the

@@ -14,6 +14,7 @@ import uuid
 
 URL = 'https://telebuzzy.xyz/api/notify'
 EVENTS = {s + '-' + e for s in ('acceptance', 'working') for e in ('capture', 'freshness')}
+REMINDER_SECONDS = 6 * 60 * 60
 
 
 def private(path, mode=0o600):
@@ -59,24 +60,34 @@ def notify(event, credentials, state, sender=send, now=None):
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return {'result': 'BUSY', 'notification_in_progress': True}
-        failure = state / 'last-failure.json';success = state / 'last-success.json'
-        if failure.exists() and (not success.exists() or failure.stat().st_mtime_ns >= success.stat().st_mtime_ns):
-            incident = 'failed:' + private(failure)['at']
-        elif success.exists():
-            incident = 'stale:' + private(success)['created_at']
-        else:
-            incident = 'missing-success'
-        ref = str(uuid.uuid5(uuid.NAMESPACE_URL, 'mikluha-backup/' + scope + '/' + incident))
+        # A successful capture ends the failure episode. Individual failed attempts
+        # and capture/freshness events must share its stable recovery anchor.
+        success = state / 'last-success.json'
+        anchor = 'since-success:' + private(success)['created_at'] if success.exists() else 'missing-success'
+        episode = str(uuid.uuid5(uuid.NAMESPACE_URL, 'mikluha-backup/' + scope + '/' + anchor))
         ack = state / 'last-alert.json'
-        if ack.exists() and private(ack).get('reference') == ref:
-            return {'result': 'DEDUPLICATED', 'reference': ref}
+        sequence = 0
+        if ack.exists():
+            previous = private(ack)
+            if previous.get('episode') == episode:
+                elapsed = (now - dt.datetime.fromisoformat(previous['at'])).total_seconds()
+                if elapsed < 0:
+                    raise ValueError('alert clock moved backwards')
+                if elapsed < REMINDER_SECONDS:
+                    return {'result': 'DEDUPLICATED', 'reference': previous['reference']}
+                if type(previous.get('sequence')) is not int or previous['sequence'] < 0:
+                    raise ValueError('invalid alert reminder sequence')
+                sequence = previous['sequence'] + 1
+        # Failed/ambiguous sends keep the same idempotency reference on retry.
+        ref = str(uuid.uuid5(uuid.NAMESPACE_URL, episode + '/' + str(sequence)))
         body = {'apiKey': key['apiKey'], 'title': '[P1][' + scope.upper() + '] Mikluha backup failure',
                 'app': 'mikluha-native-backup', 'event': kind, 'action': 'Check backup and freshness units',
                 'timestamp': now.isoformat(), 'reference': ref}
         outcome = sender(body, ref)
         if outcome.get('provider_acceptance') != 'ACCEPTED':
             raise ValueError('unconfirmed provider acceptance')
-        report = dict(result='PASS', reference=ref, at=now.isoformat(), event=event, **outcome)
+        report = dict(result='PASS', reference=ref, episode=episode, sequence=sequence,
+                      at=now.isoformat(), event=event, **outcome)
         tmp = state / ('.alert-' + uuid.uuid4().hex)
         fd = os.open(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         with os.fdopen(fd, 'w') as h:
