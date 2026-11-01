@@ -11,7 +11,18 @@ CUSTODY_IMPACT: NO — подготовка исходного runbook и read-o
 CUSTODY_IMPACT: YES с перечислением ресурсов и authority в инфраструктурном PR
 и [VPS-15](https://app.plane.so/art-workspace/browse/VPS-15/).
 
-## Проверенные исходные факты
+## Фактическое исполнение Phase A · 01.11.2026
+
+По отдельному OWNER GO рабочий контур обновлён до schema20, backup/restore
+с внешними ключами прошёл до публикации; две точные review.3 редакции опубликованы
+через OWNER API и проверены в приватном SSR. [Свидетельство исполнения](../evidence/2026-11-01-working-schema20-legal-publication.json).
+CUSTODY_IMPACT: YES для этого исполнения: working Compose/image refs, миграция
+БД, installed maa_plan.py/release descriptor, backup status и две encrypted custody
+копии; authority — Coolify/project backup, VPS-15. Ключи не менялись.
+Ниже сохранён исходный план подготовки; его исходные снимки не являются
+текущим runtime-статусом. Public domain/sales/Phase B/CDN остаются закрыты.
+
+## Проверенные исходные факты (снимок подготовки 30.10.2026)
 
 - PR #62 открыт как draft на `ddd7f893915a7892ee62f7a6537feb5eca784848`.
   Hosted CI для этого полного HEAD: SUCCESS, run `41076288369`.
@@ -29,7 +40,8 @@ CUSTODY_IMPACT: YES с перечислением ресурсов и authority 
 - Обе полные UTF-8 редакции сверены с OWNER-решением, SHA256SUMS и PR #62:
   privacy `359615e732329e3f85a0807d153ff3a153bbe53a55105ae9e7610c308a5cc0e4`;
   cookies `71d4e6fbbca71d707d904fe2f370d2245a4e4faa16ecdd998f7cd0d980e2252c`.
-  Статус: APPROVED BY OWNER / NOT PUBLISHED. Тела не редактируются.
+  Статус на дату подготовки: APPROVED BY OWNER / NOT PUBLISHED.
+  Фактическая публикация 01.11.2026 указана выше. Тела не редактируются.
 - Первичное OWNER-подтверждение проверено непосредственно в исходном сообщении.
   Репозиторий Mikluha **PUBLIC**, поэтому идентификаторы чата/сообщения и его
   цитата сюда не копируются. Receipt хранится в PRIVATE инфраструктурном

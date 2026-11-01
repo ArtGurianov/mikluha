@@ -1,0 +1,184 @@
+{
+  "format": "mikluha-private-working-publication/1",
+  "observed_at": "2026-11-01T06:28:50.163459+00:00",
+  "proof_origin": "OPERATOR_EXECUTION; private encrypted receipts retained off Git; not independent hosted runtime attestation",
+  "tasks": [
+    "TOUR-96",
+    "TOUR-67",
+    "TOUR-59",
+    "TOUR-68",
+    "VPS-19",
+    "VPS-15"
+  ],
+  "source": {
+    "application_commit": "e4b110bda43ea4b5656f31cd4bbad47fea63307d",
+    "compose_commit": "73f7cfae1b72c7d75c180615ed70390a213c6e70",
+    "merged_PRs": [
+      78,
+      79
+    ],
+    "image_build_run": 41279371333,
+    "hosted_CI": "6/6 PASS on both merged PR heads"
+  },
+  "runtime": {
+    "controller_deployment": "FINISHED",
+    "six_private_services": "PASS; normalized Compose/digests/amd64/limits",
+    "schema_head": 20,
+    "migrations_1_to_19_unchanged": true,
+    "calendar_timezone_column_added": false,
+    "local_calendar_helper_volatility": "STABLE",
+    "business_calendar": "Asia/Krasnoyarsk",
+    "host_timezone": "Etc/UTC; unchanged",
+    "database_volume_and_owner_TOTP_preserved": true,
+    "schema_journal_sha256": "2f1f2e1f484a209d924b504513b58f81a9253f14096de601baafd1d873c3848b",
+    "privileges_sha256": "0eaa50e84844e4533aeee3ad3e8e4c8c787d1b7fa07c13b303f47de002d00568"
+  },
+  "before_publication": {
+    "actual_Cloud_ru_backup_and_verifier_restore": "PASS",
+    "schema_head": 20,
+    "external_custody_keys": "PASS",
+    "TOTP_decryption": "PASS",
+    "forged_audit": 0,
+    "current_Phase_A_restrictions": "PASS; no intervening revocations/withdrawals"
+  },
+  "publications": [
+    {
+      "slug": "privacy-policy",
+      "actor": "OWNER",
+      "via": "authenticated same-origin browser API",
+      "password_totp_cookie_exported": false,
+      "result": "PASS",
+      "operation": "PUBLISHED",
+      "publication": {
+        "version": 1,
+        "textSha256": "sha256:359615e732329e3f85a0807d153ff3a153bbe53a55105ae9e7610c308a5cc0e4",
+        "documentSha256": "sha256:fd8214f3ec6a9a84641efeb7678997d46895a9cc5c10347dab378c9e4f845d2d",
+        "effectiveOn": "2026-11-01",
+        "publishedAt": "2026-11-01T06:22:10.814Z"
+      }
+    },
+    {
+      "slug": "cookies",
+      "actor": "OWNER",
+      "via": "authenticated same-origin browser API",
+      "password_totp_cookie_exported": false,
+      "result": "PASS",
+      "operation": "PUBLISHED",
+      "publication": {
+        "version": 1,
+        "textSha256": "sha256:71d4e6fbbca71d707d904fe2f370d2245a4e4faa16ecdd998f7cd0d980e2252c",
+        "documentSha256": "sha256:f5f4e61d269bfaf77690a51d14ace59d7b71e8a543b05c171c1eac392b2a7e30",
+        "effectiveOn": "2026-11-01",
+        "publishedAt": "2026-11-01T06:22:34.559Z"
+      }
+    }
+  ],
+  "served": {
+    "result": "PASS",
+    "at": "2026-11-01T06:25:04.038316+00:00",
+    "scope": "Actual private working SSR plus Commerce public projection",
+    "schema_head": 20,
+    "business_calendar": "Asia/Krasnoyarsk",
+    "host_timezone_changed": false,
+    "public_projection_exact_approved_bodies": "PASS",
+    "pages": [
+      {
+        "slug": "privacy-policy",
+        "status": 200,
+        "version": 1,
+        "textSha256": "sha256:359615e732329e3f85a0807d153ff3a153bbe53a55105ae9e7610c308a5cc0e4",
+        "effectiveOn": "2026-11-01",
+        "single_H1": true,
+        "tables": 2,
+        "approval_metadata_exposed": false
+      },
+      {
+        "slug": "cookies",
+        "status": 200,
+        "version": 1,
+        "textSha256": "sha256:71d4e6fbbca71d707d904fe2f370d2245a4e4faa16ecdd998f7cd0d980e2252c",
+        "effectiveOn": "2026-11-01",
+        "single_H1": true,
+        "tables": 0,
+        "approval_metadata_exposed": false
+      },
+      {
+        "slug": "oferta",
+        "status": 200,
+        "publication": "NOT_PUBLISHED",
+        "unavailable": true,
+        "noindex": true,
+        "no_store": true
+      },
+      {
+        "slug": "turoperator",
+        "status": 200,
+        "publication": "NOT_PUBLISHED",
+        "unavailable": true,
+        "noindex": true,
+        "no_store": true
+      },
+      {
+        "slug": "soglasie-pd",
+        "status": 200,
+        "publication": "NOT_PUBLISHED",
+        "unavailable": true,
+        "noindex": true,
+        "no_store": true
+      },
+      {
+        "slug": "pravila-oplaty",
+        "status": 200,
+        "publication": "NOT_PUBLISHED",
+        "unavailable": true,
+        "noindex": true,
+        "no_store": true
+      },
+      {
+        "slug": "otkaz-i-vozvrat",
+        "status": 200,
+        "publication": "NOT_PUBLISHED",
+        "unavailable": true,
+        "noindex": true,
+        "no_store": true
+      }
+    ],
+    "footer": "Only two published legal links",
+    "thirdparty_content_counts": {
+      "tours": 0,
+      "organizers": 0,
+      "reports": 0,
+      "reviews": 0
+    },
+    "private_tls_CA_hostname": "PASS",
+    "public_domain": "NOT_SWITCHED",
+    "sales": "CLOSED",
+    "Phase_B": "NO_GO",
+    "cdn": "NOT_CONNECTED"
+  },
+  "after_publication": {
+    "actual_Cloud_ru_backup_and_verifier_restore": "PASS",
+    "schema_head": 20,
+    "restored_legal_publications": 2,
+    "admin_crypto": "PASS",
+    "totp_rows": 1,
+    "audit": {
+      "ATTESTED": 10,
+      "FORGED": 0,
+      "UNVERIFIABLE": 0,
+      "OPERATOR": 1
+    },
+    "restore_network": "none",
+    "temporary_plaintext_removed": true,
+    "hourly_backup_and_freshness": "enabled/PASS",
+    "two_encrypted_custody_copies": "Mac and ArtGurianov_APFS; byte-equal and decrypt-tested"
+  },
+  "gates": {
+    "public_domain": "MAINTENANCE HTTP503; NOT_SWITCHED",
+    "sales": "CLOSED",
+    "Phase_B": "NO_GO / TOUR-94",
+    "new_CDN_consumer": "NOT_CONNECTED / TOUR-97",
+    "acceptance": "STOPPED_RETAINED; timers disabled",
+    "whole_host_custody": "NOT_CLAIMED"
+  }
+}
