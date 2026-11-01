@@ -144,7 +144,7 @@ class Backup(unittest.TestCase):
     def setUp(self):
         self.c = qualified()
         self.db = {'scope': 'acceptance', 'source_commit': self.c['source_commit'],
-                   'schema_head': 19, 'sales_open': False, 'role_contract': 'PASS', 'privileges_sha256':self.c['privileges_sha256'], 'database_generation':self.c['database_generation'], 'container_id': 'a' * 64}
+                   'schema_head': self.c['schema_head'], 'sales_open': False, 'role_contract': 'PASS', 'privileges_sha256':self.c['privileges_sha256'], 'database_generation':self.c['database_generation'], 'container_id': 'a' * 64}
         self.clear, self.meta = b.capture(self.c, lambda: self.db, lambda: b'PGDMPsynthetic')
         self.cipher = b'age-encryption.org/v1\nfixture-not-real-encryption'
 
@@ -250,7 +250,7 @@ class HostContracts(unittest.TestCase):
     def test_real_authority_change_is_compared_in_memory_not_recorded(self):
         from maa_host import Database
         c = qualified()
-        migrations = [{'v': n, 'f': str(n), 'c': 'f'*64} for n in range(1,20)]
+        migrations = [{'v': n, 'f': str(n), 'c': 'f'*64} for n in range(1,c['schema_head']+1)]
         c['schema_journal_sha256'] = hashlib.sha256(json.dumps(migrations, sort_keys=True).encode()).hexdigest()
         labels = {'io.mikluha.source': c['source_commit'], 'coolify.applicationId': c['application_uuid'],
                   'io.mikluha.secret-generation': c['secret_authority']['generation']}

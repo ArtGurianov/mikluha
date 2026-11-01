@@ -20,7 +20,7 @@ from maa_provider import AwsProvider
 class CloudRecovery(unittest.TestCase):
     def setUp(self):
         self.c=qualified();self.provider=Provider()
-        db={'scope':self.c['scope'],'source_commit':self.c['source_commit'],'schema_head':19,
+        db={'scope':self.c['scope'],'source_commit':self.c['source_commit'],'schema_head':self.c['schema_head'],
             'sales_open':False,'role_contract':'PASS','privileges_sha256':self.c['privileges_sha256'],
             'database_generation':self.c['database_generation']}
         self.clear,self.meta=b.capture(self.c,lambda:db,lambda:b'PGDMPsynthetic')
