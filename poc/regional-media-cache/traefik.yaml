@@ -1,0 +1,26 @@
+# Test CA only; never ACME, production DNS or shared-VPS configuration.
+http:
+  routers:
+    media:
+      rule: Host(`media.localhost`)
+      entryPoints: [websecure]
+      service: cache
+      tls: {}
+  services:
+    cache:
+      loadBalancer:
+        servers:
+          - url: http://cache:8080
+        passHostHeader: true
+tls:
+  certificates:
+    - certFile: /certs/cert.pem
+      keyFile: /certs/key.pem
+  options:
+    default:
+      minVersion: VersionTLS12
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/cert.pem
+        keyFile: /certs/key.pem

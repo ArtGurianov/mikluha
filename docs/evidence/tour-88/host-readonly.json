@@ -1,0 +1,30 @@
+{
+  "capturedAt": "2026-10-29T11:39:02.653329+00:00",
+  "scope": "READ_ONLY_NO_VPS_INSTALL_OR_MUTATION",
+  "cpuCount": 6,
+  "loadAverage": [
+    0.3896484375,
+    0.44287109375,
+    0.40673828125
+  ],
+  "memoryAvailable": "5107364 kB",
+  "memoryTotal": "8126784 kB",
+  "rootDisk": "Filesystem       1B-blocks        Used   Available Use% Mounted on\n/dev/sda2      83871420416 51932635136 27655319552  66% /",
+  "site": {
+    "image": "pxetekoyzceundmfpuapik4q:349098bcceb8c8c010c07b0ced528c9ea12c6c7a",
+    "memoryLimit": 0,
+    "nanoCpus": 0
+  },
+  "siteNginxConfig": "server {\n    location / {\n        root /usr/share/nginx/html;\n        index index.html index.htm;\n        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ =404;\n    }\n\n    # Handle 404 errors\n    error_page 404 /404.html;\n    location = /404.html {\n        root /usr/share/nginx/html;\n        internal;\n    }\n\n    # Handle server errors (50x)\n    error_page 500 502 503 504 /50x.html;\n    location = /50x.html {\n        root /usr/share/nginx/html;\n        internal;\n    }\n}",
+  "s3IPv4": [
+    "176.109.98.30",
+    "176.109.98.31"
+  ],
+  "proxyImage": "traefik:v3.6",
+  "siteStats": "0.00% | 12.19MiB / 7.75GiB | 152MB / 443MB | 37.4MB / 8.19kB",
+  "qualification": {
+    "vpsExactPhysicalLocation": "NOT_CONFIRMED_BY_ACCOUNT_RECEIPT",
+    "s3ExactPhysicalLocation": "NOT_CONFIRMED_BY_BUCKET_ACCOUNT_RECEIPT",
+    "commercialRegression": "NOT_RUN_NO_LOAD_ON_SHARED_VPS"
+  }
+}

@@ -1,0 +1,1196 @@
+{
+  "schema": "tour88-manual-probe-v1",
+  "probeSha256": "e4c1927ce14cbe47c9c0c86bb46c27e8d668414a7e05e4d09f2701bb9ec65fae",
+  "curlVersion": "curl 8.7.1 (x86_64-apple-darwin25.0) libcurl/8.7.1 (SecureTransport) LibreSSL/3.3.6 zlib/1.2.12 nghttp2/1.68.1",
+  "requestedSamplesPerPath": 30,
+  "startedAt": "2026-10-29T12:05:16.626261+00:00",
+  "operatorDeclared": {
+    "city": "Кемерово",
+    "network": "home",
+    "vpn": "off"
+  },
+  "scope": "REGIONAL_DIRECT_BASELINE",
+  "cacheBase": null,
+  "coldCacheControlled": false,
+  "samplePolicy": "fresh curl process and TLS per request; randomized image/mode order; OS DNS cache may be warm",
+  "proxyPolicy": "curl config ignored, explicit/system HTTP proxies bypassed; VPN declaration not independently verified",
+  "proxyEnvironmentNamesPresent": [],
+  "limitations": [
+    "HTTP timings only; no browser/mobile LCP",
+    "MISS/HIT uses observed header only; first request is not assumed cold",
+    "No regional VPS-cache comparison without an actual test cache endpoint",
+    "Do not use a localhost cache result as Kemerovo-to-VPS performance"
+  ],
+  "objects": [
+    {
+      "name": "thumbnail",
+      "originUrl": "https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp",
+      "direct": [
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.778,
+          "connectMs": 80.445,
+          "tlsMs": 169.231,
+          "ttfbMs": 297.673,
+          "totalMs": 693.542
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.286,
+          "connectMs": 90.94,
+          "tlsMs": 191.631,
+          "ttfbMs": 597.233,
+          "totalMs": 1045.186
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.352,
+          "connectMs": 94.281,
+          "tlsMs": 189.546,
+          "ttfbMs": 519.244,
+          "totalMs": 992.609
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 1.838,
+          "connectMs": 73.558,
+          "tlsMs": 171.622,
+          "ttfbMs": 766.007,
+          "totalMs": 1153.912
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.728,
+          "connectMs": 81.775,
+          "tlsMs": 169.339,
+          "ttfbMs": 280.234,
+          "totalMs": 747.734
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.49,
+          "connectMs": 82.657,
+          "tlsMs": 169.885,
+          "ttfbMs": 381.655,
+          "totalMs": 696.43
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.378,
+          "connectMs": 91.791,
+          "tlsMs": 212.45,
+          "ttfbMs": 344.639,
+          "totalMs": 995.211
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.056,
+          "connectMs": 74.607,
+          "tlsMs": 183.107,
+          "ttfbMs": 353.868,
+          "totalMs": 663.799
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.224,
+          "connectMs": 83.007,
+          "tlsMs": 170.743,
+          "ttfbMs": 345.019,
+          "totalMs": 1199.262
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.942,
+          "connectMs": 77.538,
+          "tlsMs": 177.127,
+          "ttfbMs": 320.064,
+          "totalMs": 2639.984
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.001,
+          "connectMs": 76.096,
+          "tlsMs": 164.463,
+          "ttfbMs": 311.236,
+          "totalMs": 878.322
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.059,
+          "connectMs": 86.171,
+          "tlsMs": 173.319,
+          "ttfbMs": 318.208,
+          "totalMs": 637.655
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 13.356,
+          "connectMs": 86.732,
+          "tlsMs": 183.343,
+          "ttfbMs": 350.058,
+          "totalMs": 824.71
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.363,
+          "connectMs": 82.364,
+          "tlsMs": 174.236,
+          "ttfbMs": 339.765,
+          "totalMs": 931.945
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.473,
+          "connectMs": 111.551,
+          "tlsMs": 235.773,
+          "ttfbMs": 499.186,
+          "totalMs": 895.242
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.327,
+          "connectMs": 372.695,
+          "tlsMs": 471.996,
+          "ttfbMs": 762.117,
+          "totalMs": 3526.237
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.865,
+          "connectMs": 75.281,
+          "tlsMs": 233.71,
+          "ttfbMs": 611.948,
+          "totalMs": 1828.629
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.119,
+          "connectMs": 85.265,
+          "tlsMs": 185.144,
+          "ttfbMs": 764.476,
+          "totalMs": 1331.207
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.584,
+          "connectMs": 75.958,
+          "tlsMs": 164.291,
+          "ttfbMs": 585.537,
+          "totalMs": 1185.678
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.329,
+          "connectMs": 90.038,
+          "tlsMs": 189.655,
+          "ttfbMs": 473.478,
+          "totalMs": 845.064
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.175,
+          "connectMs": 80.192,
+          "tlsMs": 175.751,
+          "ttfbMs": 286.311,
+          "totalMs": 734.592
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.195,
+          "connectMs": 81.31,
+          "tlsMs": 189.004,
+          "ttfbMs": 303.684,
+          "totalMs": 1425.684
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.78,
+          "connectMs": 72.286,
+          "tlsMs": 191.663,
+          "ttfbMs": 704.69,
+          "totalMs": 1352.636
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.843,
+          "connectMs": 78.268,
+          "tlsMs": 188.069,
+          "ttfbMs": 420.751,
+          "totalMs": 905.833
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.051,
+          "connectMs": 92.534,
+          "tlsMs": 206.526,
+          "ttfbMs": 659.213,
+          "totalMs": 1148.507
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.755,
+          "connectMs": 82.682,
+          "tlsMs": 160.058,
+          "ttfbMs": 307.964,
+          "totalMs": 594.274
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.869,
+          "connectMs": 82.475,
+          "tlsMs": 167.83,
+          "ttfbMs": 479.323,
+          "totalMs": 1042.253
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 4.317,
+          "connectMs": 81.389,
+          "tlsMs": 180.197,
+          "ttfbMs": 548.882,
+          "totalMs": 1054.803
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.318,
+          "connectMs": 82.573,
+          "tlsMs": 183.203,
+          "ttfbMs": 310.223,
+          "totalMs": 895.344
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "181750",
+            "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+            "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+          },
+          "bytes": 181750,
+          "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+          "ok": true,
+          "dnsMs": 3.413,
+          "connectMs": 79.438,
+          "tlsMs": 204.745,
+          "ttfbMs": 469.841,
+          "totalMs": 1088.275
+        }
+      ],
+      "cache": [],
+      "reference": {
+        "status": 200,
+        "curlExit": 0,
+        "headers": {
+          "content-type": "image/webp",
+          "content-length": "181750",
+          "etag": "\"203e7e921baa2a5fedf1c2a4013979f0\"",
+          "last-modified": "Wed, 19 Aug 2026 03:31:56 GMT"
+        },
+        "bytes": 181750,
+        "sha256": "898d6e6ffae8043ff0bd4b2558db692825f072a75617dc8511464a305e26ff17",
+        "ok": true,
+        "dnsMs": 86.452,
+        "connectMs": 174.118,
+        "tlsMs": 270.019,
+        "ttfbMs": 769.387,
+        "totalMs": 1113.033
+      },
+      "directSummary": {
+        "requests": 30,
+        "ok": 30,
+        "errors": 0,
+        "ttfbMs": {
+          "p50": 381.655,
+          "p75": 585.537,
+          "p95": 764.476
+        },
+        "totalMs": {
+          "p50": 992.609,
+          "p75": 1185.678,
+          "p95": 2639.984
+        },
+        "downloadedBytes": 5452500,
+        "cacheStates": {
+          "UNKNOWN": 30
+        }
+      }
+    },
+    {
+      "name": "gallery",
+      "originUrl": "https://mikluha-maklai.s3.cloud.ru/cms/organized.webp",
+      "direct": [
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.412,
+          "connectMs": 70.097,
+          "tlsMs": 157.389,
+          "ttfbMs": 294.168,
+          "totalMs": 893.876
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.432,
+          "connectMs": 77.0,
+          "tlsMs": 210.454,
+          "ttfbMs": 544.148,
+          "totalMs": 1618.193
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.064,
+          "connectMs": 84.919,
+          "tlsMs": 178.96,
+          "ttfbMs": 514.032,
+          "totalMs": 1843.925
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.898,
+          "connectMs": 80.95,
+          "tlsMs": 175.514,
+          "ttfbMs": 612.788,
+          "totalMs": 2200.477
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.944,
+          "connectMs": 77.356,
+          "tlsMs": 176.859,
+          "ttfbMs": 417.547,
+          "totalMs": 1927.284
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.09,
+          "connectMs": 73.887,
+          "tlsMs": 156.092,
+          "ttfbMs": 341.105,
+          "totalMs": 1245.327
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.286,
+          "connectMs": 76.463,
+          "tlsMs": 159.47,
+          "ttfbMs": 267.694,
+          "totalMs": 1641.638
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.436,
+          "connectMs": 81.953,
+          "tlsMs": 185.617,
+          "ttfbMs": 277.423,
+          "totalMs": 1157.564
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.729,
+          "connectMs": 78.698,
+          "tlsMs": 165.649,
+          "ttfbMs": 264.85,
+          "totalMs": 914.521
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.17,
+          "connectMs": 96.701,
+          "tlsMs": 193.04,
+          "ttfbMs": 345.052,
+          "totalMs": 1451.086
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.897,
+          "connectMs": 83.465,
+          "tlsMs": 161.787,
+          "ttfbMs": 390.774,
+          "totalMs": 1312.543
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.26,
+          "connectMs": 90.811,
+          "tlsMs": 180.846,
+          "ttfbMs": 321.124,
+          "totalMs": 1434.294
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.956,
+          "connectMs": 67.219,
+          "tlsMs": 157.871,
+          "ttfbMs": 274.196,
+          "totalMs": 1626.416
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.187,
+          "connectMs": 85.188,
+          "tlsMs": 178.542,
+          "ttfbMs": 303.503,
+          "totalMs": 927.335
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.687,
+          "connectMs": 92.882,
+          "tlsMs": 179.567,
+          "ttfbMs": 346.938,
+          "totalMs": 2414.385
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 5.891,
+          "connectMs": 77.992,
+          "tlsMs": 181.871,
+          "ttfbMs": 337.731,
+          "totalMs": 1295.579
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.517,
+          "connectMs": 75.442,
+          "tlsMs": 166.491,
+          "ttfbMs": 291.636,
+          "totalMs": 1849.653
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.964,
+          "connectMs": 79.965,
+          "tlsMs": 182.238,
+          "ttfbMs": 395.298,
+          "totalMs": 2745.396
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.522,
+          "connectMs": 90.231,
+          "tlsMs": 206.391,
+          "ttfbMs": 336.267,
+          "totalMs": 2088.038
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.063,
+          "connectMs": 95.005,
+          "tlsMs": 211.129,
+          "ttfbMs": 499.116,
+          "totalMs": 3914.272
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.529,
+          "connectMs": 79.986,
+          "tlsMs": 189.508,
+          "ttfbMs": 519.202,
+          "totalMs": 2372.339
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.049,
+          "connectMs": 75.372,
+          "tlsMs": 156.208,
+          "ttfbMs": 396.184,
+          "totalMs": 1520.346
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.109,
+          "connectMs": 86.38,
+          "tlsMs": 194.845,
+          "ttfbMs": 322.937,
+          "totalMs": 1024.887
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 2.804,
+          "connectMs": 74.799,
+          "tlsMs": 183.752,
+          "ttfbMs": 405.123,
+          "totalMs": 1605.349
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.329,
+          "connectMs": 85.108,
+          "tlsMs": 208.11,
+          "ttfbMs": 342.44,
+          "totalMs": 882.525
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.629,
+          "connectMs": 78.437,
+          "tlsMs": 156.134,
+          "ttfbMs": 291.566,
+          "totalMs": 1315.101
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 3.815,
+          "connectMs": 87.49,
+          "tlsMs": 167.252,
+          "ttfbMs": 431.731,
+          "totalMs": 1078.053
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.021,
+          "connectMs": 83.606,
+          "tlsMs": 174.857,
+          "ttfbMs": 332.066,
+          "totalMs": 1227.846
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.407,
+          "connectMs": 77.39,
+          "tlsMs": 165.324,
+          "ttfbMs": 355.642,
+          "totalMs": 991.725
+        },
+        {
+          "status": 200,
+          "curlExit": 0,
+          "headers": {
+            "content-type": "image/webp",
+            "content-length": "470636",
+            "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+            "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+          },
+          "bytes": 470636,
+          "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+          "ok": true,
+          "dnsMs": 4.146,
+          "connectMs": 84.888,
+          "tlsMs": 169.569,
+          "ttfbMs": 305.169,
+          "totalMs": 1039.031
+        }
+      ],
+      "cache": [],
+      "reference": {
+        "status": 200,
+        "curlExit": 0,
+        "headers": {
+          "content-type": "image/webp",
+          "content-length": "470636",
+          "etag": "\"34604844a6ba2380aa45fc6c058728f0\"",
+          "last-modified": "Thu, 20 Aug 2026 15:21:25 GMT"
+        },
+        "bytes": 470636,
+        "sha256": "3ddfb359718ed786e566c19aa3775a5215ccdca680135c50f1cac869841f0b4c",
+        "ok": true,
+        "dnsMs": 4.509,
+        "connectMs": 81.975,
+        "tlsMs": 171.105,
+        "ttfbMs": 367.462,
+        "totalMs": 1202.394
+      },
+      "directSummary": {
+        "requests": 30,
+        "ok": 30,
+        "errors": 0,
+        "ttfbMs": {
+          "p50": 341.105,
+          "p75": 405.123,
+          "p95": 544.148
+        },
+        "totalMs": {
+          "p50": 1434.294,
+          "p75": 1849.653,
+          "p95": 2745.396
+        },
+        "downloadedBytes": 14119080,
+        "cacheStates": {
+          "UNKNOWN": 30
+        }
+      }
+    }
+  ],
+  "result": "PASS_HTTP_OBSERVATIONS",
+  "finishedAt": "2026-10-29T12:06:48.563018+00:00"
+}

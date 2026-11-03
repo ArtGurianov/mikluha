@@ -1,0 +1,50 @@
+import pathlib,subprocess,shlex,json,hashlib,time
+BASE=pathlib.Path(__file__).resolve().parent
+SHA='e46d6a217dcce6e78bfe42d2f894ffcc49422454'
+SSH=['ssh','-o','BatchMode=yes','-o','ConnectTimeout=6','adman-vps']
+def ssh(command,**kw): return subprocess.check_output(SSH+[command],timeout=20,**kw)
+archive=subprocess.check_output(['git','archive',SHA,'poc/regional-media-cache/'],cwd='/Users/artguranov/Documents/Projects/mikluha')
+remote=ssh('mktemp -d /tmp/mikluha-tour88-e46d6a2.XXXXXXXX',text=True).strip()
+assert remote.startswith('/tmp/mikluha-tour88-e46d6a2.') and len(remote.split('/'))==3
+subprocess.run(SSH+['tar -xf - -C '+shlex.quote(remote)],input=archive,check=True)
+script=(BASE/'remote-stage.py').read_bytes()
+subprocess.run(SSH+['cat > '+shlex.quote(remote+'/remote-stage.py')],input=script,check=True)
+meta={'candidate':SHA,'remoteRoot':remote,'archiveSha256':hashlib.sha256(archive).hexdigest(),'controllerSha256':hashlib.sha256(script).hexdigest()}
+(BASE/'launch.json').write_text(json.dumps(meta,indent=2)+'\n')
+bootstrap="import subprocess; f=open("+repr(remote+'/stage-events.jsonl')+",'w'); p=subprocess.Popen(['python3','-u',"+repr(remote+'/remote-stage.py')+","+repr(remote)+"],stdin=subprocess.DEVNULL,stdout=f,stderr=subprocess.STDOUT,start_new_session=True); print(p.pid)"
+pid=ssh('python3 -c '+shlex.quote(bootstrap),text=True).strip()
+print('BOUNDED_STAGE_STARTED '+pid+' '+remote,flush=True)
+seen=0;started=time.monotonic();ready=False
+while time.monotonic()-started<640:
+ try:
+  raw=ssh('cat '+shlex.quote(remote+'/stage-events.jsonl'),text=True)
+  (BASE/'events.jsonl').write_text(raw)
+  lines=raw.splitlines()
+  for line in lines[seen:]:
+   try:
+    item=json.loads(line)
+   except ValueError:
+    print(line,flush=True);continue
+   print(json.dumps(item,ensure_ascii=False),flush=True)
+   if item.get('event')=='CLIENT_WINDOW_READY':
+    (BASE/'client-ready.json').write_text(json.dumps(item,indent=2)+'\n')
+    (BASE/'test-ca.pem').write_bytes(ssh('cat '+shlex.quote(remote+'/poc/regional-media-cache/.runtime/certs/cert.pem')))
+    ready=True
+   if item.get('event')=='FINAL_REPORT_READY':
+    result=json.loads(ssh('cat '+shlex.quote(remote+'/final-report.json'),text=True))
+    (BASE/'vps-stage-result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
+    ssh('touch '+shlex.quote(remote+'/collected'))
+    for _ in range(20):
+     time.sleep(.5)
+     absent=ssh('test ! -e '+shlex.quote(remote)+' && echo absent',text=True).strip()
+     if absent=='absent':
+      (BASE/'collector-receipt.json').write_text(json.dumps({'remoteRoot':remote,'temporaryRootAbsent':True,'candidate':SHA,'verifiedAfterCollection':True},indent=2)+'\n')
+      print('CLEANUP_ROOT_ABSENT',flush=True);raise SystemExit(0)
+    raise RuntimeError('temporary root still present after collection')
+  seen=len(lines)
+ except subprocess.CalledProcessError:
+  print('Collector reconnecting; remote stage has independent deadline',flush=True)
+ except subprocess.TimeoutExpired:
+  print('Collector connection timeout; retrying',flush=True)
+ time.sleep(3)
+raise SystemExit('Collector deadline exceeded; verify project/root cleanup independently')
