@@ -9,7 +9,7 @@
  * Non-production objects only; it reads, never writes. Run protocol:
  * docs/plans/2026-10-29-tour-56-turboflare-poc.md.
  *
- *   PROBE_ORIGIN_BASE=https://mikluha-maklai.s3.cloud.ru/cms/   direct public variant base (virtual-hosted bucket)
+ *   PROBE_ORIGIN_BASE=https://origin.example.test/cms/   direct public variant base (virtual-hosted bucket)
  *   PROBE_CDN_BASE=https://<turboflare custom host>/cms/         the same bucket via TurboFlare, same path
  *   PROBE_VARIANT=probe/turboflare-probe.webp                     relative to both bases
  *   PROBE_PRIVATE_KEY=originals/probe.jpg                         a private original's key in that bucket

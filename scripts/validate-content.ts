@@ -14,12 +14,7 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
 
-import {
-  type AssetSourcePolicy,
-  SITE_MEDIA_POLICY,
-  assertImageSource,
-  assertVideoSource,
-} from "../lib/cms/asset-source";
+import { assertImageSource, assertVideoSource } from "../lib/cms/asset-source";
 import type { ContentSnapshot, ImageAsset } from "../lib/cms/types";
 import { hasQualifiedRefundPolicy } from "../lib/contract-readiness";
 import { demoCatalogBlockers, openDepartureContractBlockers } from "../lib/launch-gate";
@@ -90,10 +85,10 @@ function validateMarkdown(markdown: string, documentField: string) {
   }
 }
 
-function validateImage(image: ImageAsset | undefined, documentField: string, policy: AssetSourcePolicy) {
+function validateImage(image: ImageAsset | undefined, documentField: string) {
   if (!image) return;
   try {
-    assertImageSource(image.src, policy);
+    assertImageSource(image.src);
     if (image.src.startsWith("/")) localMediaRefs.add(image.src);
   } catch (error) {
     fail(`${documentField}: ${(error as Error).message}`);
@@ -109,7 +104,6 @@ async function main() {
   const content: ContentSnapshot = process.argv.includes("--baked")
     ? { ...snapshot, tours: [], departures: [], reports: [], reviews: [], organizers: [] }
     : snapshot;
-  const mediaPolicy = SITE_MEDIA_POLICY;
 
   const tourIds = new Set(content.tours.map((t) => t.id));
   const departureById = new Map(content.departures.map((d) => [d.id, d]));
@@ -125,11 +119,11 @@ async function main() {
     validateMarkdown(page.content, `LegalPage ${page.id} content`);
   }
 
-  validateImage(content.siteSettings.logo, "siteSettings.logo", mediaPolicy);
-  validateImage(content.siteSettings.hero.image, "siteSettings.hero.image", mediaPolicy);
-  validateImage(content.siteSettings.seo.ogImage, "siteSettings.seo.ogImage", mediaPolicy);
+  validateImage(content.siteSettings.logo, "siteSettings.logo");
+  validateImage(content.siteSettings.hero.image, "siteSettings.hero.image");
+  validateImage(content.siteSettings.seo.ogImage, "siteSettings.seo.ogImage");
   try {
-    assertVideoSource(content.siteSettings.hero.video.src, mediaPolicy);
+    assertVideoSource(content.siteSettings.hero.video.src);
     if (content.siteSettings.hero.video.src.startsWith("/")) {
       localMediaRefs.add(content.siteSettings.hero.video.src);
     }
@@ -137,19 +131,19 @@ async function main() {
     fail(`siteSettings.hero.video: ${(error as Error).message}`);
   }
   for (const tour of content.tours) {
-    validateImage(tour.coverImage, `Tour ${tour.id} coverImage`, mediaPolicy);
-    validateImage(tour.seo?.image, `Tour ${tour.id} seo.image`, mediaPolicy);
-    tour.gallery.forEach((image, index) => validateImage(image, `Tour ${tour.id} gallery[${index}]`, mediaPolicy));
+    validateImage(tour.coverImage, `Tour ${tour.id} coverImage`);
+    validateImage(tour.seo?.image, `Tour ${tour.id} seo.image`);
+    tour.gallery.forEach((image, index) => validateImage(image, `Tour ${tour.id} gallery[${index}]`));
     if (tour.gallery.length > 10) fail(`Tour ${tour.id} gallery has ${tour.gallery.length} images; maximum is 10`);
   }
   for (const report of content.reports) {
-    validateImage(report.coverImage, `Report ${report.id} coverImage`, mediaPolicy);
-    report.gallery.forEach((image, index) => validateImage(image, `Report ${report.id} gallery[${index}]`, mediaPolicy));
+    validateImage(report.coverImage, `Report ${report.id} coverImage`);
+    report.gallery.forEach((image, index) => validateImage(image, `Report ${report.id} gallery[${index}]`));
     if (report.gallery.length > 10) fail(`Report ${report.id} gallery has ${report.gallery.length} images; maximum is 10`);
   }
-  for (const review of content.reviews) validateImage(review.image, `Review ${review.id} image`, mediaPolicy);
+  for (const review of content.reviews) validateImage(review.image, `Review ${review.id} image`);
   for (const organizer of content.organizers) {
-    validateImage(organizer.photo, `Organizer ${organizer.id} photo`, mediaPolicy);
+    validateImage(organizer.photo, `Organizer ${organizer.id} photo`);
   }
   await Promise.all(
     [...localMediaRefs].map(async (mediaRef) => {

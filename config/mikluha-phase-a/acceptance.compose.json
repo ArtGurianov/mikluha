@@ -228,8 +228,7 @@
         "public"
       ],
       "environment": {
-        "COMMERCE_PUBLIC_API_URL": "http://commerce:3000",
-        "MEDIA_DELIVERY": "direct"
+        "COMMERCE_PUBLIC_API_URL": "http://commerce:3000"
       }
     },
     "admin": {

@@ -1,0 +1,9 @@
+image:
+  image: /media/demo/hero.webp
+  alt: Тестовое изображение
+authorName: Тестовый автор 14
+tour: krasnoyarsk
+description: Синтетический отзыв для проверки каталога.
+sortOrder: 5
+isListed: true
+isDemo: true

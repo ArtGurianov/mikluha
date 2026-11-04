@@ -5,7 +5,7 @@ import { normalizeCatalog } from "./cms/normalize";
 import { projectionToRaw, PUBLIC_CATALOG_SCHEMA, type PublicCatalog } from "./cms/projection";
 import { assertCatalogLaunchReady } from "./launch-gate";
 
-const image = { image: "https://mikluha-maklai.s3.cloud.ru/cms/a.webp", alt: "" };
+const image = { image: "https://media.example.test/cms/a.webp", alt: "" };
 const contract = {
   tour: { destination: "Алтай", route: "Кемерово — Ая", program: [{ title: "День 1", items: ["Сростки"] }],
     included: ["Проезд"], excluded: [], insurance: null, risks: "Горы" },

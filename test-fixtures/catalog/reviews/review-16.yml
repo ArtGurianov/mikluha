@@ -1,0 +1,9 @@
+image:
+  image: /media/demo/hero.webp
+  alt: Тестовое изображение
+authorName: Тестовый автор 16
+tour: altai
+description: Синтетический отзыв для проверки каталога.
+sortOrder: 0
+isListed: true
+isDemo: true

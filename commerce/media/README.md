@@ -32,8 +32,7 @@ comes from the media record. References do not leak private paths or rights evid
 withdrawn required images resolve to the tracked local neutral `image-unavailable.svg`, so one
 withdrawal cannot break normalization of every tour. Text fields are never rewritten. The SSR
 site already uses native `<img>`; no Next optimizer, browser credential or HTML rebuild is needed.
-The processed URL is a fixed S3 HTTPS URL. Keep `MEDIA_DELIVERY=direct` for stage 1; the historical
-CDN prefix mode does not qualify VPS-17. Stage 2 is explicitly outside TOUR-63 acceptance.
+The site serves the published S3 HTTPS URL directly. The optional VPS-17 integration is tracked separately in TOUR-97.
 
 ## Worker / storage / limits
 
