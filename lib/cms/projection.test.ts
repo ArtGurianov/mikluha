@@ -4,7 +4,7 @@ import test from "node:test";
 import { normalizeCatalog } from "./normalize";
 import { parsePublicCatalog, projectionToRaw, PUBLIC_CATALOG_SCHEMA, type PublicCatalog } from "./projection";
 
-const image = (name: string) => ({ image: `https://mikluha-maklai.s3.cloud.ru/cms/${name}.webp`, alt: name });
+const image = (name: string) => ({ image: `https://media.example.test/cms/${name}.webp`, alt: name });
 
 const catalog = (): PublicCatalog => ({
   schema: PUBLIC_CATALOG_SCHEMA,

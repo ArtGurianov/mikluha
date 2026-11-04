@@ -1,13 +1,10 @@
 #!/usr/bin/env tsx
 /**
- * Smoke test of a running SSR site (TOUR-60, ADR v2.3 §9 item 8) and of the
- * media delivery switch (TOUR-56). Run against a candidate container, never
+ * Smoke test of a running SSR site (TOUR-60, ADR v2.3 §9 item 8). Run against a candidate container, never
  * against production:
  *
  *   SMOKE_BASE_URL=http://127.0.0.1:3000   the SSR site
  *   EXPECT_COMMIT=<40 hex>                 what /identity must report
- *   EXPECT_MEDIA=direct|cdn                the delivery mode the site must render
- *   MEDIA_ORIGIN_BASE, MEDIA_CDN_BASE      the bases lib/cms/media-delivery.ts uses
  *   FIXTURE_URL=http://127.0.0.1:4010      optional: scripts/projection-fixture.ts,
  *                                          to prove render-on-request and the outage state
  */
@@ -16,9 +13,6 @@ import { createHash } from "node:crypto";
 const BASE = (process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000").replace(/\/$/, "");
 const FIXTURE = process.env.FIXTURE_URL?.replace(/\/$/, "");
 const EXPECT_COMMIT = process.env.EXPECT_COMMIT ?? "";
-const EXPECT_MEDIA = process.env.EXPECT_MEDIA ?? "direct";
-const ORIGIN_BASE = process.env.MEDIA_ORIGIN_BASE ?? "";
-const CDN_BASE = process.env.MEDIA_CDN_BASE ?? "";
 
 const failures: string[] = [];
 const check = (ok: boolean, what: string) => {
@@ -35,10 +29,6 @@ function uncachedNoCookie(res: Response, path: string) {
   check(/\bno-store\b/.test(res.headers.get("cache-control") ?? ""), `${path} Cache-Control has no-store`);
   check(res.headers.get("set-cookie") === null, `${path} sets no cookie`);
 }
-
-/** Absolute media URLs the HTML points browsers at (img src, video poster/src). */
-const mediaUrls = (html: string) =>
-  [...html.matchAll(/\s(?:src|poster)="(https:\/\/[^"]+)"/g)].map((m) => m[1]!.replaceAll("&amp;", "&"));
 
 async function fixture(path: string, body?: unknown) {
   const res = await fetch(`${FIXTURE}${path}`, { method: "PUT", body: body === undefined ? undefined : JSON.stringify(body) });
@@ -74,13 +64,14 @@ async function main() {
   check(id.service === "mikluha-site" && id.sourceCommit === EXPECT_COMMIT,
     `/identity reports mikluha-site ${EXPECT_COMMIT} (got ${id.service} ${id.sourceCommit})`);
 
-  const media = mediaUrls(home.html);
-  const viaCdn = CDN_BASE ? media.filter((u) => u.startsWith(CDN_BASE)) : [];
-  const viaOrigin = ORIGIN_BASE ? media.filter((u) => u.startsWith(ORIGIN_BASE)) : [];
-  if (EXPECT_MEDIA === "cdn") {
-    check(viaCdn.length > 0 && viaOrigin.length === 0, `media via CDN only (${viaCdn.length} CDN, ${viaOrigin.length} origin)`);
-  } else {
-    check(viaOrigin.length > 0 && viaCdn.length === 0, `media direct only (${viaOrigin.length} origin, ${viaCdn.length} CDN)`);
+  for (const [path, type] of [
+    ["/media/site/mikluha-thumbnail.webp", "image/webp"],
+    ["/media/site/mikluha.webm", "video/webm"],
+    ["/media/demo/brand-logo.webp", "image/webp"],
+  ]) {
+    check(home.html.includes(path), `home page references ${path}`);
+    const asset = await fetch(`${BASE}${path}`, { method: "HEAD" });
+    check(asset.ok && asset.headers.get("content-type") === type, `same-origin ${path} serves ${type}`);
   }
 
   if (FIXTURE && tourSlug) {

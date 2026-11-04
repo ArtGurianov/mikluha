@@ -6,7 +6,6 @@ import { cache } from "react";
 
 import { assertCatalogLaunchReady } from "../launch-gate";
 import { parsePublicLegalPages } from "./legal-projection";
-import { mediaDeliveryFromEnv, withMediaDelivery } from "./media-delivery";
 import { normalizeCatalog } from "./normalize";
 import { fetchPublicCatalog, projectionToRaw } from "./projection";
 import type { ContentSnapshot } from "./types";
@@ -53,7 +52,7 @@ export const loadSiteContent = cache(async (): Promise<SiteContent> => {
   await connection();
   const { siteSettings } = getBakedContent();
   const legalPages = await loadLegalPages();
-  return withMediaDelivery({ siteSettings, legalPages: legalPages ?? [], legalAvailable: legalPages !== null }, mediaDeliveryFromEnv());
+  return { siteSettings, legalPages: legalPages ?? [], legalAvailable: legalPages !== null };
 });
 
 /**
@@ -71,10 +70,7 @@ export const loadContent = cache(async (): Promise<ContentSnapshot> => {
   const catalog = normalizeCatalog(projectionToRaw(projection));
   const legalPages = parsePublicLegalPages(projection.legalPages);
   if (baked.siteSettings.launchReady) assertCatalogLaunchReady(catalog);
-  return withMediaDelivery(
-    { ...baked, ...catalog, legalPages, source: "commerce", generatedAt: new Date().toISOString() },
-    mediaDeliveryFromEnv(),
-  );
+  return { ...baked, ...catalog, legalPages, source: "commerce", generatedAt: new Date().toISOString() };
 });
 
 /** Only catalog pages degrade to a visible server-rendered state. No stale fallback. */

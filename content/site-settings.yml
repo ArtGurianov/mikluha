@@ -9,10 +9,10 @@ hero:
   title: Автобусные туры из Кемерово на Алтай и в Красноярск
   subtitle: Автобусные туры с экскурсиями, активным отдыхом и дружескими вечерами — от Телецкого озера и Чемальского тракта до Енисея и Красноярских Столбов.
   image:
-    image: https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp
+    image: /media/site/mikluha-thumbnail.webp
     alt: Катунь в Горном Алтае
   video:
-    file: https://mikluha-maklai.s3.cloud.ru/cms/mikluha.webm
+    file: /media/site/mikluha.webm
 socials:
   maxChannelUrl: https://max.ru/join/Ur79GmrtXjmTwzOtHf1i0yVn7snxvpZTV1XWwFoBY04
 company:
@@ -27,6 +27,6 @@ seo:
   title: Автобусные туры из Кемерово на Алтай и в Красноярск — Миклуха Маклай
   description: 'Туры из Кемерово на Горный Алтай и в Красноярск: Телецкое озеро, Чемальский тракт, Столбы, экскурсии и активный отдых.'
   ogImage:
-    image: https://mikluha-maklai.s3.cloud.ru/cms/mikluha-thumbnail.webp
+    image: /media/site/mikluha-thumbnail.webp
     alt: Путешествия с компанией «Миклуха Маклай»
 launchReady: false

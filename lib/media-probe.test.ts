@@ -5,9 +5,9 @@ import {
   cacheStatus, evaluate, expectedMime, matrixMarkdown, maxAge, probeTargets, technicalResult, type ProbeRun,
 } from "./media-probe";
 
-const ORIGIN = "https://mikluha-maklai.s3.cloud.ru/cms/probe/v.webp";
+const ORIGIN = "https://origin.example.test/cms/probe/v.webp";
 const CDN = "https://media.example.test/cms/probe/v.webp";
-const PRIVATE = "https://mikluha-maklai.s3.cloud.ru/originals/p.jpg";
+const PRIVATE = "https://origin.example.test/originals/p.jpg";
 const CDN_PRIVATE = "https://media.example.test/originals/p.jpg";
 const webp = { "content-type": "image/webp", "cache-control": "public, max-age=31536000, immutable" };
 
@@ -85,12 +85,12 @@ test("any other required failure fails the technical result", () => {
 });
 
 test("every URL comes from the two bases and one key", () => {
-  const input = { originBase: "https://mikluha-maklai.s3.cloud.ru/cms/", cdnBase: "https://media.example.test/cms/",
+  const input = { originBase: "https://origin.example.test/cms/", cdnBase: "https://media.example.test/cms/",
     variant: "probe/v.webp", privateKey: "originals/p.jpg" };
   assert.deepEqual(probeTargets(input),
     { originVariant: ORIGIN, cdnVariant: CDN, originPrivate: PRIVATE, cdnPrivate: CDN_PRIVATE });
   assert.throws(() => probeTargets({ ...input, cdnBase: "https://media.example.test/" }), /by host only/);
-  assert.throws(() => probeTargets({ ...input, originBase: "http://mikluha-maklai.s3.cloud.ru/cms/" }), /https base/);
+  assert.throws(() => probeTargets({ ...input, originBase: "http://origin.example.test/cms/" }), /https base/);
   for (const privateKey of ["originals/../cms/p.jpg", "originals/%2E%2E/p.jpg", "originals//p.jpg", "p.jpg?x=1", ""]) {
     assert.throws(() => probeTargets({ ...input, privateKey }), /PROBE_PRIVATE_KEY/, privateKey);
   }

@@ -158,7 +158,7 @@ def compose(c):
             s['command'] = ['node', 'dist/bin/admin-api.js']
         s['depends_on'] = {'postgres': {'condition': 'service_healthy'}}
     site = service('site', 'site', ['public'])
-    site['environment'] = {'COMMERCE_PUBLIC_API_URL': 'http://commerce:3000', 'MEDIA_DELIVERY': 'direct'}
+    site['environment'] = {'COMMERCE_PUBLIC_API_URL': 'http://commerce:3000'}
     admin = service('admin', 'admin', ['admin'])
     admin['cap_add'] = ['CHOWN', 'SETGID', 'SETUID', 'NET_BIND_SERVICE']
     admin['read_only'] = False  # upstream nginx envsubst writes the rendered config

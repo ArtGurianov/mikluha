@@ -115,7 +115,7 @@ class Plans(unittest.TestCase):
         self.assertNotIn('environment', s['gateway'])
         self.assertEqual(s['gateway']['networks']['ingress'], {'gw_priority': 1})
         self.assertTrue(all('ingress' not in v.get('networks', {}) for k,v in s.items() if k != 'gateway'))
-        self.assertEqual(set(s['site']['environment']), {'COMMERCE_PUBLIC_API_URL', 'MEDIA_DELIVERY'})
+        self.assertEqual(set(s['site']['environment']), {'COMMERCE_PUBLIC_API_URL'})
         self.assertTrue(all(n.get('internal') for k, n in c['networks'].items() if k not in ('media-egress', 'ingress')))
         for key, service in s.items():
             self.assertEqual(dict(x.split('=', 1) for x in service['labels'])['traefik.enable'], 'false')
