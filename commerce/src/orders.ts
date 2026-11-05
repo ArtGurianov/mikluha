@@ -23,7 +23,12 @@ import type { Logger } from './log.js';
 import { bookablePublished } from './public-content.js';
 import type { LegalReleaseAdmission } from './legal-admission.js';
 
-export const MAX_SEATS_PER_ORDER = 6;
+/**
+ * Technical bound of one request (payload size and load), not a product limit: OWNER v1.8.2 §2.1 п.5
+ * and v1.9.0 G-13 removed the limit of six seats; the departure's online quota bounds a purchase.
+ * Migration 0021 holds the database to the same bound.
+ */
+export const MAX_SEATS_PER_REQUEST = 500;
 export const RESERVATION_MINUTES = 30;
 export const UNPAID_PD_RETENTION_HOURS = 24;
 export const TRIP_PD_RETENTION_DAYS = 90;
@@ -116,6 +121,13 @@ const name = (s: string): string | null => {
   const t = s.normalize('NFC').trim().replace(/\s+/g, ' ');
   return NAME.test(t) ? t : null;
 };
+/** A person's full name, normalised, or null. */
+export const normalizePersonName = name;
+/** A lower-cased email address, or null. */
+export function normalizeEmail(s: string): string | null {
+  const e = s.trim().toLowerCase();
+  return EMAIL.test(e) && e.length <= 254 ? e : null;
+}
 
 /** A Russian mobile or landline number as +7XXXXXXXXXX; anything else is refused. */
 export function normalizePhone(s: string): string | null {
@@ -137,7 +149,7 @@ export function ageOn(dateOfBirth: string, on: string): number {
   return y - by - (m < bm || (m === bm && d < bd) ? 1 : 0);
 }
 
-const newOrderRef = () => {
+export const newOrderRef = () => {
   const alphabet = '0123456789abcdefghijklmnopqrstuvwxyz';
   return `mk-${[...randomBytes(12)].map((b) => alphabet[b % 36]).join('')}`;
 };
@@ -183,7 +195,7 @@ export async function reserveOrder(deps: OrderDeps, req: BookingRequest, native:
   if (req.pdConsentConfirmed !== true) return refuse('PD_CONSENT_NOT_CONFIRMED');
   if (req.adultsOnlyConfirmed !== true) return refuse('ADULTS_ONLY_NOT_CONFIRMED');
   const seats = req.passengers.length;
-  if (seats < 1 || seats > MAX_SEATS_PER_ORDER) return refuse('SEATS_INVALID');
+  if (seats < 1 || seats > MAX_SEATS_PER_REQUEST) return refuse('SEATS_INVALID');
 
   const phone = normalizePhone(req.contact.phone);
   if (phone === null) return refuse('CONTACT_PHONE_INVALID');
@@ -302,6 +314,9 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
   try {
     await client.query('BEGIN');
     // A crashed read-only resolve can be retried with the same handoff identity (Refref docs/28 §5).
+    // PRICED_SLOTS seats (migration 0021): an unfenced hold past its time closes LAPSED and its seats
+    // are released; a fenced one (attempt in flight or UNKNOWN) waits for the attempt's outcome.
+    const released = (await client.query<{ n: number }>('SELECT fn_seat_holds_close_lapsed($1) AS n', [now])).rows[0]!.n;
     const stale = await client.query<{ id: string }>(`UPDATE orders SET resolution_operation_id=NULL, resolution_started_at=NULL
       WHERE status='RESERVED' AND snapshot IS NULL AND checkout_attempt_id IS NULL AND payment_pending_since IS NULL
         AND resolution_operation_id IS NOT NULL AND (resolution_started_at IS NULL OR resolution_started_at <= $1::timestamptz - interval '2 minutes')
@@ -313,7 +328,10 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
     const expired = await client.query<{ id: string }>(
       `UPDATE orders SET status = 'EXPIRED', closed_at = $1, resolution_operation_id = NULL, resolution_started_at = NULL
         WHERE status = 'RESERVED' AND reserved_until <= $1 AND snapshot IS NULL
-          AND checkout_attempt_id IS NULL AND payment_pending_since IS NULL RETURNING id`, [now]);
+          AND checkout_attempt_id IS NULL AND payment_pending_since IS NULL
+          -- A PRICED_SLOTS document order ends only when every seat is released, no hold is open and the
+          -- retry window of a new payment cycle has passed (migration 0021).
+          AND (seat_model = 'UNIFORM' OR fn_priced_document_order_closable(id, $1)) RETURNING id`, [now]);
     for (const r of expired.rows) {
       await client.query(`INSERT INTO order_event (order_id, at, event) VALUES ($1, $2, 'EXPIRED')`, [r.id, now]);
     }
@@ -351,8 +369,8 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
     }
     await client.query('COMMIT');
     const contractsErased = contracts.rowCount ?? 0;
-    if (expired.rowCount || erasable.rowCount || contractsErased) {
-      log('maintenance', { expired: expired.rowCount ?? 0, erased: erasable.rowCount ?? 0, contractsErased });
+    if (expired.rowCount || erasable.rowCount || contractsErased || released) {
+      log('maintenance', { expired: expired.rowCount ?? 0, erased: erasable.rowCount ?? 0, contractsErased, seatsReleased: released });
     }
     return { expired: expired.rowCount ?? 0, erased: erasable.rowCount ?? 0, contractsErased };
   } catch (e) {

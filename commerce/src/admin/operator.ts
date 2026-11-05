@@ -4,9 +4,10 @@
 
 import type pg from 'pg';
 
+import type { Role } from './auth.js';
 import { hashPassword } from './password.js';
 
-export async function createUser(pool: pg.Pool, login: string, role: 'OWNER' | 'EDITOR', password: string, by: string): Promise<string> {
+export async function createUser(pool: pg.Pool, login: string, role: Role, password: string, by: string): Promise<string> {
   const { rows } = await pool.query<{ id: string }>('SELECT fn_admin_create_user($1, $2, $3, $4) AS id',
     [login, role, await hashPassword(password), by]);
   return rows[0]!.id;
@@ -27,6 +28,19 @@ export async function setDisabled(pool: pg.Pool, login: string, disabled: boolea
 
 export async function revokeSessions(pool: pg.Pool, login: string, by: string, reason: string): Promise<number> {
   return (await pool.query<{ n: number }>('SELECT fn_admin_revoke_sessions($1, $2, $3) AS n', [login, by, reason])).rows[0]!.n;
+}
+
+export type Capability = 'MODERATOR_CABINET' | 'LEGAL_HOLD';
+export const CAPABILITIES: readonly Capability[] = ['MODERATOR_CABINET', 'LEGAL_HOLD'];
+
+/** Grant a capability (migration 0021): MODERATOR_CABINET gives documents.read and documents.verify. */
+export async function grantCapability(pool: pg.Pool, login: string, capability: Capability, by: string, reason: string): Promise<string> {
+  return (await pool.query<{ id: string }>('SELECT fn_admin_grant_capability($1, $2, $3, $4) AS id', [login, capability, by, reason])).rows[0]!.id;
+}
+
+/** Revoking a capability ends every permission it gave, at the account's next request. */
+export async function revokeCapability(pool: pg.Pool, login: string, capability: Capability, by: string, reason: string): Promise<boolean> {
+  return (await pool.query<{ ok: boolean }>('SELECT fn_admin_revoke_capability($1, $2, $3, $4) AS ok', [login, capability, by, reason])).rows[0]!.ok;
 }
 
 export async function clearThrottle(pool: pg.Pool, by: string, reason: string): Promise<number> {

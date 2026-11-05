@@ -8,21 +8,64 @@ import type pg from 'pg';
 
 import { attest, tokenMac, type AdminKeys, type DetailValue } from './attestation.js';
 
-export type Role = 'OWNER' | 'EDITOR';
+export type Role = 'OWNER' | 'MANAGER' | 'EDITOR';
+export const ROLES: readonly Role[] = ['OWNER', 'MANAGER', 'EDITOR'];
 type Queryable = pg.Pool | pg.PoolClient;
 
-/** Who may do what. Publishing anything public or legal is the OWNER's alone (ADR v2.3 §6–§7). */
+/**
+ * Who may do what by role (Track A contract §7, migration 0021 fn_staff_role_permits, tested equal).
+ * Publishing anything public or legal is the OWNER's alone (ADR v2.3 §6–§7). MANAGER is the operator:
+ * purchases, readiness, corrections, links, companions and the insurance export, no publishing.
+ */
 export const PERMISSIONS = {
-  'editorial.read': ['OWNER', 'EDITOR'],
+  'editorial.read': ['OWNER', 'MANAGER', 'EDITOR'],
   'editorial.draft': ['OWNER', 'EDITOR'],
   'editorial.publish': ['OWNER'],
   // Offer terms, privacy, refund/payment policy and PD consent releases (ART-358 adds their rows).
   'legal.publish': ['OWNER'],
   'departure.controls': ['OWNER'],
   'audit.read': ['OWNER'],
+  'departure.quota.exception': ['OWNER'],
+  'departure.minor_settings': ['OWNER'],
+  // PROPOSED rows (contract §7) stay OWNER-only until the OWNER decides to widen them.
+  'minor_sales.pause': ['OWNER'],
+  'minor_sales.resume': ['OWNER'],
+  'departure.change.classify': ['OWNER'],
+  'transfer.discount': ['OWNER'],
+  'purchases.read': ['OWNER', 'MANAGER'],
+  'readiness.view': ['OWNER', 'MANAGER'],
+  'participants.pd.read': ['OWNER', 'MANAGER'],
+  'participants.pd.correct': ['OWNER', 'MANAGER'],
+  'amendment.record': ['OWNER', 'MANAGER'],
+  'settlement.request': ['OWNER', 'MANAGER'],
+  'refund.execute': ['OWNER'],
+  'paid_no_seat.resolve': ['OWNER'],
+  'group_link.issue': ['OWNER', 'MANAGER'],
+  'group_link.revoke': ['OWNER', 'MANAGER'],
+  'companion.assign': ['OWNER', 'MANAGER'],
+  'invitations.support_reissue': ['OWNER', 'MANAGER'],
+  'insurance.export': ['OWNER', 'MANAGER'],
 } as const satisfies Record<string, readonly Role[]>;
 export type Permission = keyof typeof PERMISSIONS;
 export const allowed = (role: Role, permission: Permission) => (PERMISSIONS[permission] as readonly Role[]).includes(role);
+
+/**
+ * Permissions that follow a separately granted capability, never a role (OWNER included): every
+ * moderator-cabinet member reads and verifies documents (OWNER 03.11.2026, TOUR-101); legal holds
+ * are their own authority. Only the database can answer them, per request: staffPermitted().
+ */
+export const CAPABILITY_PERMISSIONS = {
+  'documents.read': 'MODERATOR_CABINET',
+  'documents.verify': 'MODERATOR_CABINET',
+  'legal_hold.manage': 'LEGAL_HOLD',
+} as const;
+export type CapabilityPermission = keyof typeof CAPABILITY_PERMISSIONS;
+
+/** The database's answer for this account now: disabled accounts and revoked grants have nothing. */
+export async function staffPermitted(db: Queryable, adminId: string, permission: Permission | CapabilityPermission): Promise<boolean> {
+  const { rows } = await db.query<{ ok: boolean }>('SELECT fn_staff_permitted($1, $2) AS ok', [adminId, permission]);
+  return rows[0]?.ok === true;
+}
 
 export const SESSION_IDLE_MS = 30 * 60_000;
 export const SESSION_ABSOLUTE_MS = 12 * 60 * 60_000;

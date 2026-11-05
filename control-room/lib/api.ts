@@ -2,7 +2,7 @@
 // HttpOnly session cookie the browser attaches by itself. The bundle holds no credential, token or
 // key; it never reads the cookie and never stores anything in localStorage.
 
-export type Role = "OWNER" | "EDITOR";
+export type Role = "OWNER" | "MANAGER" | "EDITOR";
 
 export interface SessionInfo {
   login: string;
