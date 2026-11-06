@@ -14,6 +14,7 @@ import type { Catalog } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { schemaHead } from '../src/migrate.js';
 import { recordBankEvidence } from '../src/bank-operations.js';
+import { issueCheckoutIntent, openCheckoutSession, tokenSha256 } from '../src/checkout-session.js';
 import { maintain, MAX_SEATS_PER_REQUEST, setSalesOpen, type OrderDeps } from '../src/orders.js';
 import { reserveNativePurchase, reserveUniformNativePurchase, retryNativePurchasePayment, SEAT_HOLD_MINUTES,
   type NativePurchaseRequest } from '../src/purchases.js';
@@ -31,16 +32,28 @@ let departureId: string;
 const staff: Record<'owner' | 'manager' | 'editor', string> = { owner: '', manager: '', editor: '' };
 
 const deps = (now = new Date()): OrderDeps => ({ pool: db.pool, catalog, log: () => undefined, allowDemo: false, now: () => now });
-const request = (over: Partial<NativePurchaseRequest> = {}): NativePurchaseRequest => ({
+/** sessionOf(purchaseRef): the browser session that created the purchase (migration 0023). */
+const sessions = new Map<string, string>();
+const sessionOf = (purchaseRef: string) => sessions.get(purchaseRef) ?? 'x'.repeat(43);
+/** A checkout request of a fresh browser session with its own server-issued checkout intent (A2b-11/12). */
+const request = async (over: Partial<NativePurchaseRequest> = {}): Promise<NativePurchaseRequest> => {
+  const s = await openCheckoutSession(db.pool);
+  const intent = await issueCheckoutIntent(db.pool, s.token);
+  assert.ok(intent.ok);
+  return { session: { token: s.token }, checkoutIntent: { key: intent.key }, ...base(), ...over };
+};
+const base = () => ({
   departureSlug: SLUG, buyer: { fullName: 'Анна Покупатель', phone: '+7 903 907-55-47', email: 'Buyer@Example.ru' },
   tickets: { adults: 1, teens: 0, children: 0 }, ageTermsConfirmed: true,
   termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
-  pdConsentConfirmed: true, pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash, ...over,
+  pdConsentConfirmed: true, pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash,
 });
 async function buy(over: Partial<NativePurchaseRequest> = {}, now?: Date) {
-  const r = await reserveNativePurchase(deps(now), request(over));
+  const req = await request(over);
+  const r = await reserveNativePurchase(deps(now), req);
   assert.ok(r.ok, JSON.stringify(r));
-  return r as Extract<typeof r, { ok: true }>;
+  sessions.set(r.purchaseRef, req.session.token);
+  return { ...(r as Extract<typeof r, { ok: true }>), session: req.session.token };
 }
 const slots = async (purchaseRef: string) => (await db.owner.query(
   'SELECT * FROM seat_slot_current WHERE purchase_ref = $1 ORDER BY position', [purchaseRef])).rows;
@@ -51,7 +64,8 @@ const ACCOUNT = 'mikluha-test';
  * before registration; the attempt is that operation's reference. r = the hold, att = the operation.
  */
 const fence = (purchaseRef: string, provider = PROVIDER) => db.pool.query(
-  'SELECT hold_ref AS r, bank_operation_ref AS att FROM fn_bank_operation_open($1, $2, $3)', [purchaseRef, provider, ACCOUNT]);
+  'SELECT hold_ref AS r, bank_operation_ref AS att FROM fn_bank_operation_open_owned($1, $2, $3, $4)',
+  [purchaseRef, tokenSha256(sessionOf(purchaseRef)), provider, ACCOUNT]);
 let payloads = 0;
 /** The bank's authenticated answer about an operation, matching it (as TOUR-77 would record it). */
 async function bankSays(att: string, observed: 'SUCCEEDED' | 'FAILED', payload = `payload-${++payloads}`) {
@@ -193,12 +207,12 @@ describe('migration 0021 and the limit of six', () => {
 
   test('twelve seats pass in one purchase; 501 and 0 are refused; the quota bounds the rest', async () => {
     await buy({ tickets: { adults: 12, teens: 0, children: 0 } });
-    assert.deepEqual(await reserveNativePurchase(deps(), request()), { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
+    assert.deepEqual(await reserveNativePurchase(deps(), await request()), { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
     for (const tickets of [{ adults: 501, teens: 0, children: 0 }, { adults: 0, teens: 0, children: 0 }, { adults: -1, teens: 2, children: 0 },
       { adults: 1.5, teens: 0, children: 0 }]) {
-      assert.deepEqual(await reserveNativePurchase(deps(), request({ tickets })), { ok: false, refusal: 'SEATS_INVALID' });
+      assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets })), { ok: false, refusal: 'SEATS_INVALID' });
     }
-    assert.deepEqual(await reserveNativePurchase(deps(), request({ ageTermsConfirmed: false })), { ok: false, refusal: 'AGE_TERMS_NOT_CONFIRMED' });
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ ageTermsConfirmed: false })), { ok: false, refusal: 'AGE_TERMS_NOT_CONFIRMED' });
   });
 
   test('a PRICED_SLOTS order takes no tourist rows and its seat model is fixed', async () => {
@@ -214,15 +228,15 @@ describe('migration 0021 and the limit of six', () => {
 describe('minors on checkout', () => {
   test('minors need permission, no pause, the minimum age and an adult in the purchase', async () => {
     await minorSettings(false, null);
-    assert.deepEqual(await reserveNativePurchase(deps(), request({ tickets: { adults: 1, teens: 1, children: 0 } })),
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets: { adults: 1, teens: 1, children: 0 } })),
       { ok: false, refusal: 'MINORS_NOT_ALLOWED' });
     await buy(); // adults are not affected
     await minorSettings(true, 14);
-    assert.deepEqual(await reserveNativePurchase(deps(), request({ tickets: { adults: 1, teens: 0, children: 1 } })),
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets: { adults: 1, teens: 0, children: 1 } })),
       { ok: false, refusal: 'TICKET_TYPE_NOT_ALLOWED' });
     await buy({ tickets: { adults: 1, teens: 1, children: 0 } });
     await minorSettings(true, null);
-    assert.deepEqual(await reserveNativePurchase(deps(), request({ tickets: { adults: 0, teens: 1, children: 1 } })),
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets: { adults: 0, teens: 1, children: 1 } })),
       { ok: false, refusal: 'MINORS_WITHOUT_ADULT' });
     assert.equal(await taken(), 3);
   });
@@ -230,7 +244,7 @@ describe('minors on checkout', () => {
   test('OWNER 3A: a manager or the owner pauses, only the owner resumes; null child price means the adult price', async () => {
     await assert.rejects(pause(staff.editor, true), /STAFF_FORBIDDEN/);
     await pause(staff.manager, true);
-    assert.deepEqual(await reserveNativePurchase(deps(), request({ tickets: { adults: 1, teens: 0, children: 1 } })),
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets: { adults: 1, teens: 0, children: 1 } })),
       { ok: false, refusal: 'MINOR_SALES_PAUSED' });
     await assert.rejects(pause(staff.manager, false), /STAFF_FORBIDDEN: minor_sales.resume/);
     await pause(staff.owner, false);
@@ -258,7 +272,7 @@ describe('groups and manager links (TOUR-90 / v1.9.0 §2–§3)', () => {
     const group = await groupOf(a.purchaseRef);
     const t = await issueLink(group, { adults: 0, teens: 0, children: 1 });
     const childOnly = { tickets: { adults: 0, teens: 0, children: 1 }, groupLink: { token: t, idempotencyKey: 'attempt-0001' } };
-    assert.deepEqual(await reserveNativePurchase(deps(), request(childOnly)), { ok: false, refusal: 'MINORS_WITHOUT_ADULT' });
+    assert.deepEqual(await reserveNativePurchase(deps(), await request(childOnly)), { ok: false, refusal: 'MINORS_WITHOUT_ADULT' });
     // A paid-no-seat exception is no adult either: A's attempt fails, the departure fills, A's bank success comes late.
     const lateA = await fail(a.purchaseRef);
     const full = await buy({ tickets: { adults: 12, teens: 0, children: 0 } });
@@ -267,7 +281,7 @@ describe('groups and manager links (TOUR-90 / v1.9.0 §2–§3)', () => {
     const s = await slots(full.purchaseRef);
     await cancelByAmendment(s[0].seat_slot_ref);
     await cancelByAmendment(s[1].seat_slot_ref);
-    assert.deepEqual(await reserveNativePurchase(deps(), request(childOnly)), { ok: false, refusal: 'MINORS_WITHOUT_ADULT' });
+    assert.deepEqual(await reserveNativePurchase(deps(), await request(childOnly)), { ok: false, refusal: 'MINORS_WITHOUT_ADULT' });
     await db.admin.query('SELECT fn_seat_slot_assign_no_seat($1, $2, $3)', [staff.owner, (await slots(a.purchaseRef))[0].seat_slot_ref, 'seat freed']);
     const b = await buy(childOnly);
     assert.equal(b.purchaseGroupRef, group);
@@ -287,23 +301,23 @@ describe('groups and manager links (TOUR-90 / v1.9.0 §2–§3)', () => {
     const link = { token: t, idempotencyKey: 'attempt-0001' };
     for (const tickets of [{ adults: 0, teens: 0, children: 2 }, { adults: 1, teens: 0, children: 0 }, { adults: 2, teens: 0, children: 1 },
       { adults: 1, teens: 1, children: 0 }]) {
-      assert.deepEqual(await reserveNativePurchase(deps(), request({ tickets, groupLink: link })), { ok: false, refusal: 'GROUP_LINK_TICKETS_MISMATCH' });
+      assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets, groupLink: link })), { ok: false, refusal: 'GROUP_LINK_TICKETS_MISMATCH' });
     }
     const b = await buy({ tickets: { adults: 1, teens: 0, children: 1 }, groupLink: link });
     // Lost response: the same attempt replays, also with sales closed; no new seats are created.
     await setSalesOpen(db.operator, false, 'test', 'closed during the replay');
     try {
-      assert.deepEqual(await reserveNativePurchase(deps(), request()), { ok: false, refusal: 'SALES_CLOSED' });
+      assert.deepEqual(await reserveNativePurchase(deps(), await request()), { ok: false, refusal: 'SALES_CLOSED' });
       const again = await buy({ tickets: { adults: 1, teens: 0, children: 1 }, groupLink: link });
       assert.deepEqual([again.replayed, again.purchaseRef, again.orderRef, again.amountKopecks], [true, b.purchaseRef, b.orderRef, b.amountKopecks]);
       // The same key with another request is a conflict, not a replay.
-      assert.deepEqual(await reserveNativePurchase(deps(), request({ tickets: { adults: 0, teens: 0, children: 2 }, groupLink: link })),
+      assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets: { adults: 0, teens: 0, children: 2 }, groupLink: link })),
         { ok: false, refusal: 'IDEMPOTENCY_CONFLICT' });
-      assert.deepEqual(await reserveNativePurchase(deps(), request({ departureSlug: OTHER, tickets: { adults: 1, teens: 0, children: 1 }, groupLink: link })),
+      assert.deepEqual(await reserveNativePurchase(deps(), await request({ departureSlug: OTHER, tickets: { adults: 1, teens: 0, children: 1 }, groupLink: link })),
         { ok: false, refusal: 'IDEMPOTENCY_CONFLICT' });
     } finally { await setSalesOpen(db.operator, true, 'test', 'reopen'); }
     // Another key on the consumed link cannot buy again.
-    assert.deepEqual(await reserveNativePurchase(deps(), request({ tickets: { adults: 1, teens: 0, children: 1 },
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets: { adults: 1, teens: 0, children: 1 },
       groupLink: { token: t, idempotencyKey: 'attempt-0002' } })), { ok: false, refusal: 'GROUP_LINK_INVALID' });
     assert.equal(Number((await db.owner.query('SELECT count(*) AS n FROM purchase')).rows[0].n), 2);
     await assert.rejects(db.admin.query('SELECT fn_group_link_issue($1, $2, $3, 0, 0, 0)', [staff.manager, await groupOf(a.purchaseRef), sha(token())]),
@@ -317,12 +331,12 @@ describe('groups and manager links (TOUR-90 / v1.9.0 §2–§3)', () => {
     const ref = (await db.owner.query('SELECT group_link_ref FROM purchase_group_link WHERE token_sha256 = $1', [sha(t)])).rows[0].group_link_ref;
     await db.admin.query('SELECT fn_group_link_revoke($1, $2, $3)', [staff.manager, ref, 'reissued']);
     await assert.rejects(db.admin.query('SELECT fn_group_link_revoke($1, $2, $3)', [staff.manager, ref, 'again']), /GROUP_LINK_ALREADY_FINAL/);
-    assert.deepEqual(await reserveNativePurchase(deps(), request({ groupLink: { token: t, idempotencyKey: 'attempt-0001' } })),
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ groupLink: { token: t, idempotencyKey: 'attempt-0001' } })),
       { ok: false, refusal: 'GROUP_LINK_INVALID' });
-    assert.deepEqual(await reserveNativePurchase(deps(), request({ groupLink: { token: token(), idempotencyKey: 'attempt-0001' } })),
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ groupLink: { token: token(), idempotencyKey: 'attempt-0001' } })),
       { ok: false, refusal: 'GROUP_LINK_INVALID' });
     const other = await issueLink(group);
-    assert.deepEqual(await reserveNativePurchase(deps(), request({ departureSlug: OTHER, groupLink: { token: other, idempotencyKey: 'attempt-0003' } })),
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ departureSlug: OTHER, groupLink: { token: other, idempotencyKey: 'attempt-0003' } })),
       { ok: false, refusal: 'GROUP_LINK_DEPARTURE_MISMATCH' });
     await assert.rejects(issueLink(group, undefined, staff.editor), /STAFF_FORBIDDEN: group_link.issue/);
     await assert.rejects(db.pool.query('SELECT fn_group_link_issue($1, $2, $3, 1, 0, 0)', [staff.owner, group, sha(token())]), /permission denied/);
@@ -348,7 +362,7 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
     assert.equal(m.expired, 1);
     const statuses = (await db.owner.query('SELECT status FROM orders ORDER BY created_at')).rows.map((o) => o.status);
     assert.deepEqual(statuses, ['EXPIRED', 'RESERVED']);
-    assert.deepEqual((await retryNativePurchasePayment(deps(), a.purchaseRef)), { ok: false, refusal: 'PURCHASE_CLOSED' });
+    assert.deepEqual((await retryNativePurchasePayment(deps(), a.purchaseRef, sessionOf(a.purchaseRef))), { ok: false, refusal: 'PURCHASE_CLOSED' });
     await assert.rejects(fence(b.purchaseRef, 'ALFA!'), /BANK_OPERATION_INVALID/);
   });
 
@@ -422,11 +436,11 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
     const a = await buy({ tickets: { adults: 2, teens: 0, children: 0 } });
     const first = await fail(a.purchaseRef);
     assert.deepEqual((await slots(a.purchaseRef)).map((s) => s.state), ['RELEASED', 'RELEASED']);
-    const r = await retryNativePurchasePayment(deps(), a.purchaseRef);
+    const r = await retryNativePurchasePayment(deps(), a.purchaseRef, sessionOf(a.purchaseRef));
     assert.ok(r.ok, JSON.stringify(r));
     assert.deepEqual((await slots(a.purchaseRef)).map((s) => [s.state, s.hold_ref, Number(s.price_kopecks)]),
       [['HELD', r.holdRef, adult], ['HELD', r.holdRef, adult]]);
-    assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef), { ok: false, refusal: 'REHOLD_NOT_ALLOWED' });
+    assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef, sessionOf(a.purchaseRef)), { ok: false, refusal: 'REHOLD_NOT_ALLOWED' });
     const second = await pay(a.purchaseRef);
     assert.notEqual(second, first);
     assert.deepEqual((await slots(a.purchaseRef)).map((s) => s.state), ['CONFIRMED', 'CONFIRMED']);
@@ -442,19 +456,19 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
     const b = await buy({ tickets: { adults: 2, teens: 0, children: 0 } });
     await fail(b.purchaseRef);
     const c = await buy({ tickets: { adults: 9, teens: 0, children: 0 } });
-    assert.deepEqual(await retryNativePurchasePayment(deps(), b.purchaseRef), { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
+    assert.deepEqual(await retryNativePurchasePayment(deps(), b.purchaseRef, sessionOf(b.purchaseRef)), { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
     await fail(c.purchaseRef);
     await setSalesOpen(db.operator, false, 'test', 'closed');
-    try { assert.deepEqual(await retryNativePurchasePayment(deps(), b.purchaseRef), { ok: false, refusal: 'SALES_CLOSED' }); }
+    try { assert.deepEqual(await retryNativePurchasePayment(deps(), b.purchaseRef, sessionOf(b.purchaseRef)), { ok: false, refusal: 'SALES_CLOSED' }); }
     finally { await setSalesOpen(db.operator, true, 'test', 'reopen'); }
-    assert.equal((await retryNativePurchasePayment(deps(), b.purchaseRef)).ok, true);
+    assert.equal((await retryNativePurchasePayment(deps(), b.purchaseRef, sessionOf(b.purchaseRef))).ok, true);
     // A hold that lapsed before any attempt may be retried too.
     const d = await buy();
     await lapse(d.purchaseRef);
     await maintain(db.pool, () => undefined);
     assert.equal((await slots(d.purchaseRef))[0].state, 'RELEASED');
-    assert.equal((await retryNativePurchasePayment(deps(), d.purchaseRef)).ok, true);
-    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold($1)', [d.purchaseRef]), /REHOLD_NOT_ALLOWED/);
+    assert.equal((await retryNativePurchasePayment(deps(), d.purchaseRef, sessionOf(d.purchaseRef))).ok, true);
+    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [d.purchaseRef, tokenSha256(sessionOf(d.purchaseRef))]), /REHOLD_NOT_ALLOWED/);
   });
 
   test('31/30: a late success with no room is a claim, not occupancy; the database decides, the owner assigns a freed seat', async () => {
@@ -503,7 +517,7 @@ describe('review 2: the database, not the caller, decides admission and time', (
   test('a direct SQL retry as commerce_app cannot pass a closed switch, a closed departure, T−24 or the retry window', async () => {
     const a = await buy({ tickets: { adults: 2, teens: 0, children: 0 } });
     await fail(a.purchaseRef);
-    const rehold = () => db.pool.query('SELECT * FROM fn_purchase_rehold($1)', [a.purchaseRef]);
+    const rehold = () => db.pool.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [a.purchaseRef, tokenSha256(sessionOf(a.purchaseRef))]);
     await setSalesOpen(db.operator, false, 'test', 'closed');
     try { await assert.rejects(rehold(), /SALES_CLOSED/); }
     finally { await setSalesOpen(db.operator, true, 'test', 'reopen'); }
@@ -521,7 +535,7 @@ describe('review 2: the database, not the caller, decides admission and time', (
     } finally { await asOwnerWithoutTriggers('UPDATE departure SET starts_on = $2::date WHERE id = $1', [departureId, startsOn]); }
     await ageRetryWindow(a.purchaseRef);
     await assert.rejects(rehold(), /RETRY_WINDOW_CLOSED/);
-    assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef), { ok: false, refusal: 'RETRY_WINDOW_CLOSED' });
+    assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef, sessionOf(a.purchaseRef)), { ok: false, refusal: 'RETRY_WINDOW_CLOSED' });
     // The window is absolute: retries never extend it, and the order then closes.
     assert.equal((await maintain(db.pool, () => undefined)).expired, 1);
     assert.equal(await orderStatus(a.orderRef), 'EXPIRED');
@@ -532,7 +546,7 @@ describe('review 2: the database, not the caller, decides admission and time', (
     await buy({ tickets: { adults: 12, teens: 0, children: 0 } });
     const farFuture = new Date(Date.now() + 2 * 3_600_000);
     assert.equal(await taken(farFuture), 0);
-    assert.deepEqual(await reserveNativePurchase(deps(farFuture), request()), { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
+    assert.deepEqual(await reserveNativePurchase(deps(farFuture), await request()), { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
     await resetOrders(db.owner);
     // The hold's end is the database's, whatever the application's clock says.
     const r = await buy({}, new Date(Date.now() + 3_600_000));
@@ -545,7 +559,7 @@ describe('review 2: the database, not the caller, decides admission and time', (
     await resetOrders(db.owner);
     await asOwnerWithoutTriggers("UPDATE departure SET starts_on = (clock_timestamp() AT TIME ZONE timezone)::date WHERE id = $1", [departureId]);
     try {
-      assert.deepEqual(await reserveNativePurchase(deps(new Date(Date.now() - 3 * 86_400_000)), request()),
+      assert.deepEqual(await reserveNativePurchase(deps(new Date(Date.now() - 3 * 86_400_000)), await request()),
         { ok: false, refusal: 'BOOKING_CUTOFF_REACHED' });
     } finally { await asOwnerWithoutTriggers('UPDATE departure SET starts_on = $2::date WHERE id = $1', [departureId, startsOn]); }
     // No caller time ends a live hold: the lapse function takes none, and maintain(+1 day) keeps it.
@@ -569,7 +583,7 @@ describe('review 2: the database, not the caller, decides admission and time', (
       await closer.query('BEGIN');
       assert.equal((await closer.query('SELECT id FROM fn_priced_document_orders_close() AS id')).rows.length, 1);
       let settled = false;
-      const retry = db.pool.query('SELECT * FROM fn_purchase_rehold($1)', [a.purchaseRef]).finally(() => { settled = true; });
+      const retry = db.pool.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [a.purchaseRef, tokenSha256(sessionOf(a.purchaseRef))]).finally(() => { settled = true; });
       await new Promise((r) => setTimeout(r, 300));
       assert.equal(settled, false, 'the retry waits for the closure');
       await closer.query('COMMIT');
@@ -582,7 +596,7 @@ describe('review 2: the database, not the caller, decides admission and time', (
     const retrier = await db.pool.connect();
     try {
       await retrier.query('BEGIN');
-      await retrier.query('SELECT * FROM fn_purchase_rehold($1)', [b.purchaseRef]);
+      await retrier.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [b.purchaseRef, tokenSha256(sessionOf(b.purchaseRef))]);
       await ageRetryWindow(b.purchaseRef);
       assert.equal((await maintain(db.pool, () => undefined)).expired, 0, 'the closure skips the order the retry holds');
       await retrier.query('COMMIT');
@@ -606,13 +620,13 @@ describe('review 2: the database, not the caller, decides admission and time', (
     for (const buyer of [{ fullName: 'Ольга Другая', phone: '+7 903 907-55-47', email: 'Buyer@Example.ru' },
       { fullName: 'Анна Покупатель', phone: '+7 903 000-00-00', email: 'Buyer@Example.ru' },
       { fullName: 'Анна Покупатель', phone: '+7 903 907-55-47', email: 'other@example.ru' }]) {
-      assert.deepEqual(await reserveNativePurchase(deps(), request({ buyer, groupLink: link })), { ok: false, refusal: 'IDEMPOTENCY_CONFLICT' });
+      assert.deepEqual(await reserveNativePurchase(deps(), await request({ buyer, groupLink: link })), { ok: false, refusal: 'IDEMPOTENCY_CONFLICT' });
     }
     // New terms published: the old attempt still replays from its accepted history; nothing new is sold on old terms.
     const published = { ...catalog, terms: { ...catalog.terms, ref: 'oferta@2', hash: `sha256:${'1'.repeat(64)}` } };
-    const replay = await reserveNativePurchase({ ...deps(), catalog: published }, request({ groupLink: link }));
+    const replay = await reserveNativePurchase({ ...deps(), catalog: published }, await request({ groupLink: link }));
     assert.ok(replay.ok && replay.replayed && replay.purchaseRef === b.purchaseRef, JSON.stringify(replay));
-    assert.deepEqual(await reserveNativePurchase({ ...deps(), catalog: published }, request()), { ok: false, refusal: 'TERMS_NOT_CURRENT' });
+    assert.deepEqual(await reserveNativePurchase({ ...deps(), catalog: published }, await request()), { ok: false, refusal: 'TERMS_NOT_CURRENT' });
   });
 });
 
@@ -690,7 +704,7 @@ describe('review 3: concurrency of companions and of a double click', () => {
     await pay(a.purchaseRef);
     for (let round = 0; round < 5; round += 1) {
       const t = await issueLink(await groupOf(a.purchaseRef), { adults: 1, teens: 0, children: 1 });
-      const same = request({ tickets: { adults: 1, teens: 0, children: 1 }, groupLink: { token: t, idempotencyKey: `double-click-${round}` } });
+      const same = await request({ tickets: { adults: 1, teens: 0, children: 1 }, groupLink: { token: t, idempotencyKey: `double-click-${round}` } });
       const [x, y] = await Promise.all([reserveNativePurchase(deps(), same), reserveNativePurchase(deps(), same)]);
       assert.ok(x.ok && y.ok, JSON.stringify([x, y]));
       assert.equal(x.purchaseRef, y.purchaseRef);
@@ -765,18 +779,18 @@ describe('OWNER decisions of 06.11.2026', () => {
       SELECT r.departure_id, r.version + 1, r.draft_revision, r.document, r.document_sha256, r.published_by, r.login_role, now()
         FROM departure_revision r JOIN departure d ON d.id = r.departure_id AND r.version = d.published_version WHERE d.id = $1`, [departureId]);
     await asOwnerWithoutTriggers('UPDATE departure SET published_version = published_version + 1 WHERE id = $1', [departureId]);
-    assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef), { ok: false, refusal: 'DEPARTURE_CHANGED' });
-    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold($1)', [a.purchaseRef]), /DEPARTURE_CHANGED/);
+    assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef, sessionOf(a.purchaseRef)), { ok: false, refusal: 'DEPARTURE_CHANGED' });
+    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [a.purchaseRef, tokenSha256(sessionOf(a.purchaseRef))]), /DEPARTURE_CHANGED/);
     // The attempt registered before the change completes on the terms it was registered under.
     assert.deepEqual(await confirmed(b.purchaseRef, registered), { confirmed: 1, no_seat: 0 });
     // New legal terms published: a purchase accepted under the old offer cannot start a new attempt.
     const c = await buy();
     await fail(c.purchaseRef);
     const published = { ...catalog, terms: { ...catalog.terms, ref: 'oferta@2', hash: `sha256:${'2'.repeat(64)}` } };
-    assert.deepEqual(await retryNativePurchasePayment({ ...deps(), catalog: published }, c.purchaseRef), { ok: false, refusal: 'LEGAL_TERMS_CHANGED' });
+    assert.deepEqual(await retryNativePurchasePayment({ ...deps(), catalog: published }, c.purchaseRef, sessionOf(c.purchaseRef)), { ok: false, refusal: 'LEGAL_TERMS_CHANGED' });
     const consent = { ...catalog, pdConsent: { ...catalog.pdConsent, hash: `sha256:${'3'.repeat(64)}` } };
-    assert.deepEqual(await retryNativePurchasePayment({ ...deps(), catalog: consent }, c.purchaseRef), { ok: false, refusal: 'LEGAL_TERMS_CHANGED' });
-    assert.equal((await retryNativePurchasePayment(deps(), c.purchaseRef)).ok, true);
+    assert.deepEqual(await retryNativePurchasePayment({ ...deps(), catalog: consent }, c.purchaseRef, sessionOf(c.purchaseRef)), { ok: false, refusal: 'LEGAL_TERMS_CHANGED' });
+    assert.equal((await retryNativePurchasePayment(deps(), c.purchaseRef, sessionOf(c.purchaseRef))).ok, true);
   });
 });
 
