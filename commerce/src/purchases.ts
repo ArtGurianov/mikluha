@@ -323,8 +323,27 @@ const RETRY_REFUSALS = ['NOT_ENOUGH_SEATS', 'MINORS_NOT_ALLOWED', 'MINOR_SALES_P
  */
 export async function retryNativePurchasePayment(deps: OrderDeps, purchaseRef: string, sessionToken: string):
   Promise<{ readonly ok: true; readonly holdRef: string; readonly reservedUntil: Date } | { readonly ok: false; readonly refusal: RetryRefusal }> {
+  return retryOrPreview(deps, purchaseRef, sessionToken, true);
+}
+
+/**
+ * The final answer to «can this session start a new payment cycle now?» (review 4 of PR #88): the very
+ * path of retryNativePurchasePayment — ownership, sales switch, departure, T−24, legal terms, then
+ * fn_purchase_rehold_owned with its quota, pause, minors, group, revision and window checks — run in a
+ * transaction that is rolled back, so nothing is held or changed. ResumeView.cycleStateEligible is only
+ * the cycle-state precondition; the interface offers «Повторить оплату» on this answer. It may still
+ * change before the buyer clicks (quota, sales switch); the real retry decides again.
+ */
+export async function previewNativePurchaseRetry(deps: OrderDeps, purchaseRef: string, sessionToken: string):
+  Promise<{ readonly ok: true } | { readonly ok: false; readonly refusal: RetryRefusal }> {
+  const r = await retryOrPreview(deps, purchaseRef, sessionToken, false);
+  return r.ok ? { ok: true } : r;
+}
+
+async function retryOrPreview(deps: OrderDeps, purchaseRef: string, sessionToken: string, commit: boolean):
+  Promise<{ readonly ok: true; readonly holdRef: string; readonly reservedUntil: Date } | { readonly ok: false; readonly refusal: RetryRefusal }> {
   const refuse = (refusal: RetryRefusal) => {
-    deps.log('payment_retry_refused', { purchaseRef, refusal });
+    deps.log(commit ? 'payment_retry_refused' : 'payment_retry_preview_refused', { purchaseRef, refusal });
     return { ok: false as const, refusal };
   };
   const client = await deps.pool.connect();
@@ -367,6 +386,7 @@ export async function retryNativePurchasePayment(deps: OrderDeps, purchaseRef: s
       if (code === undefined) throw e;
       return refuse(code);
     }
+    if (!commit) return { ok: true, holdRef, reservedUntil }; // rolled back in finally: nothing held
     await client.query('COMMIT');
     deps.log('payment_retry_held', { purchaseRef, holdRef });
     return { ok: true, holdRef, reservedUntil };

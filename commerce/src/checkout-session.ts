@@ -85,11 +85,20 @@ export interface ResumeView {
   /** The window above has not passed and the purchase is open. A hold created just before the window
    *  ends keeps the seats past it: state stays HOLD_ACTIVE meanwhile. */
   readonly retryWindowOpen: boolean;
-  /** «Оплатить»: a bank operation may be registered on the live hold now (HOLD_ACTIVE only). */
+  /**
+   * «Оплатить»: a bank operation may be registered on the live hold now (HOLD_ACTIVE only). OWNER
+   * clarification of 06.11.2026: an attempt starts when its hold is created within the window, so a hold
+   * created before the 24-hour limit may be paid for its five minutes even after the limit (T−24 stays
+   * strict: no hold outlives it).
+   */
   readonly canPayCurrentHold: boolean;
-  /** «Повторить оплату»: a new payment cycle may start now (RELEASED within the window). Never while a
-   *  payment is in progress. The command still checks sales, quota, T−24 and terms and may refuse. */
-  readonly canStartNewCycle: boolean;
+  /**
+   * Precondition only (review 4 of PR #88): by the cycle's state a new payment cycle could start
+   * (RELEASED within the window; never while a payment is in progress). It does not check the sales
+   * switch, the departure, its revision, the quota, the minors' pause or the group: whether to offer
+   * «Повторить оплату» is previewNativePurchaseRetry's answer (purchases.ts), and the retry decides again.
+   */
+  readonly cycleStateEligible: boolean;
   readonly promptDue: boolean;
 }
 
@@ -103,7 +112,7 @@ export async function resumeView(pool: pg.Pool | pg.PoolClient, purchaseRef: str
     return { purchaseRef: r.purchase_ref, documentOrderRef: r.document_order_ref, departureSlug: r.departure_slug,
       tickets: { adults: r.adults, teens: r.teens, children: r.children }, totalKopecks: Number(r.total_kopecks), state: r.state,
       holdExpiresAt: r.hold_expires_at, retryUntil: r.retry_until, retryWindowOpen: r.retry_window_open,
-      canPayCurrentHold: r.pay_current_hold_allowed, canStartNewCycle: r.new_cycle_allowed, promptDue: r.prompt_due };
+      canPayCurrentHold: r.pay_current_hold_allowed, cycleStateEligible: r.new_cycle_allowed, promptDue: r.prompt_due };
   } catch (e) {
     if ((e as Error).message === 'PURCHASE_NOT_OWNED') return null;
     throw e;
