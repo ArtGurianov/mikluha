@@ -21,6 +21,7 @@ import { createHash } from 'node:crypto';
 import type pg from 'pg';
 
 import { bookingCutoff } from './booking-window.js';
+import { tokenSha256 } from './checkout-session.js';
 import { buildContractSnapshot, contractSnapshotHash } from './contract-snapshot.js';
 import {
   MAX_SEATS_PER_REQUEST, newOrderRef, normalizeEmail, normalizePersonName, normalizePhone, reserveOrder,
@@ -59,13 +60,24 @@ export interface NativePurchaseRequest {
    * The tickets must be exactly the ones the manager put on the link.
    */
   readonly groupLink?: { readonly token: string; readonly idempotencyKey: string };
+  /**
+   * The browser checkout session (its `__Host-` cookie token, migration 0023): the purchase is bound to
+   * it, and only a bound session may resume or pay it later (A2b-12, G-RESUME-02).
+   */
+  readonly session: { readonly token: string };
+  /**
+   * The server-issued checkout intent of this attempt (A2b-11): required for an ordinary purchase. A
+   * repeat with the same key returns the purchase it created; another request is IDEMPOTENCY_CONFLICT.
+   */
+  readonly checkoutIntent?: { readonly key: string };
 }
 
 export type NativePurchaseRefusal = Exclude<BookingRefusal, 'ADULTS_ONLY_NOT_CONFIRMED' | 'PASSENGER_NAME_INVALID'
   | 'DATE_OF_BIRTH_INVALID' | 'PASSENGER_NOT_ADULT' | 'CITIZENSHIP_INVALID' | 'DOCUMENT_INVALID' | 'REPLACEMENT_NOT_AVAILABLE'>
   | 'AGE_TERMS_NOT_CONFIRMED' | 'BUYER_NAME_INVALID' | 'BOOKING_CUTOFF_REACHED' | 'MINORS_NOT_ALLOWED' | 'MINOR_SALES_PAUSED'
   | 'TICKET_TYPE_NOT_ALLOWED' | 'MINORS_WITHOUT_ADULT' | 'GROUP_LINK_INVALID' | 'GROUP_LINK_DEPARTURE_MISMATCH'
-  | 'GROUP_LINK_TICKETS_MISMATCH' | 'IDEMPOTENCY_CONFLICT';
+  | 'GROUP_LINK_TICKETS_MISMATCH' | 'IDEMPOTENCY_CONFLICT' | 'CHECKOUT_SESSION_INVALID' | 'CHECKOUT_INTENT_INVALID'
+  | 'CHECKOUT_INTENT_REQUIRED';
 
 export type NativePurchaseResult =
   | { readonly ok: true; readonly replayed: boolean; readonly orderRef: string; readonly purchaseRef: string;
@@ -75,15 +87,17 @@ export type NativePurchaseResult =
 /** Refusals the database decides (migration 0021), mapped from their exception codes. */
 const DATABASE_REFUSALS = ['MINORS_NOT_ALLOWED', 'MINOR_SALES_PAUSED', 'TICKET_TYPE_NOT_ALLOWED', 'MINORS_WITHOUT_ADULT',
   'GROUP_LINK_INVALID', 'GROUP_LINK_DEPARTURE_MISMATCH', 'GROUP_LINK_TICKETS_MISMATCH', 'SALES_CLOSED', 'NOT_ENOUGH_SEATS',
-  'BOOKING_CUTOFF_REACHED', 'DEPARTURE_NOT_OPEN', 'DEPARTURE_NOT_LISTED'] as const satisfies readonly NativePurchaseRefusal[];
+  'BOOKING_CUTOFF_REACHED', 'DEPARTURE_NOT_OPEN', 'DEPARTURE_NOT_LISTED', 'CHECKOUT_SESSION_INVALID',
+  'CHECKOUT_INTENT_INVALID'] as const satisfies readonly NativePurchaseRefusal[];
 
 const sha256 = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
 const count = (n: unknown) => (Number.isSafeInteger(n) && (n as number) >= 0 ? (n as number) : null);
 
 /**
  * Reserve priced seats and open a native purchase in one transaction, before any payment
- * opportunity. A group link joins the manager's group; a repeat with the same idempotency key
- * returns the purchase it created instead of a second one (v1.9.0 §2 п.1).
+ * opportunity. An ordinary purchase consumes its checkout intent; a group link joins the manager's
+ * group. A repeat with the same intent or link key returns the purchase it created instead of a
+ * second one (v1.9.0 §2 п.1, v1.9.1 §9 п.7). The purchase is bound to the browser session.
  */
 export async function reserveNativePurchase(deps: OrderDeps, req: NativePurchaseRequest): Promise<NativePurchaseResult> {
   const refuse = (refusal: NativePurchaseRefusal): NativePurchaseResult => {
@@ -102,14 +116,25 @@ export async function reserveNativePurchase(deps: OrderDeps, req: NativePurchase
   if (phone === null) return refuse('CONTACT_PHONE_INVALID');
   const email = normalizeEmail(req.buyer.email);
   if (email === null) return refuse('CONTACT_EMAIL_INVALID');
+  if (typeof req.session?.token !== 'string' || req.session.token.length < 32 || req.session.token.length > 200) {
+    return refuse('CHECKOUT_SESSION_INVALID');
+  }
+  const sessionSha256 = tokenSha256(req.session.token);
+  // The accepted request, without personal data: a repeat of the key with another request is a conflict.
+  const requestSha256 = sha256(JSON.stringify([req.departureSlug, adults, teens, children, req.termsHash, req.pdConsentHash]));
   let link: { tokenSha256: string; keySha256: string; requestSha256: string } | null = null;
+  let intentKeySha256: string | null = null;
   if (req.groupLink !== undefined) {
     const { token, idempotencyKey } = req.groupLink;
     if (typeof token !== 'string' || token.length < 16 || token.length > 200
         || typeof idempotencyKey !== 'string' || idempotencyKey.length < 8 || idempotencyKey.length > 200) return refuse('GROUP_LINK_INVALID');
-    // The accepted request, without personal data: a repeat of the key with another request is a conflict.
-    const requestSha256 = sha256(JSON.stringify([req.departureSlug, adults, teens, children, req.termsHash, req.pdConsentHash]));
     link = { tokenSha256: sha256(token), keySha256: sha256(idempotencyKey), requestSha256 };
+  } else {
+    // A2b-11: an ordinary checkout is idempotent by its server-issued intent, not by a cookie.
+    const key = req.checkoutIntent?.key;
+    if (key === undefined) return refuse('CHECKOUT_INTENT_REQUIRED');
+    if (typeof key !== 'string' || key.length < 32 || key.length > 200) return refuse('CHECKOUT_INTENT_INVALID');
+    intentKeySha256 = tokenSha256(key);
   }
   const client = await deps.pool.connect();
   try {
@@ -118,25 +143,49 @@ export async function reserveNativePurchase(deps: OrderDeps, req: NativePurchase
     // seats, so it is answered even after sales closed (v1.9.0 §2 п.1, lost response). It is looked up
     // twice: now, and again after the departure lock, under which a concurrent identical request (a
     // double click) creates the purchase; the second then answers with it instead of a refusal.
-    const replayed = async (): Promise<NativePurchaseResult | null> => {
-      if (link === null) return null;
-      const replay = (await client.query<{ purchase_ref: string; document_order_ref: string; same_request: boolean;
+    // The answer to a repeat of an attempt that created `purchaseRef` (same request and same buyer).
+    const replayOf = async (purchaseRef: string, sameRequest: boolean): Promise<NativePurchaseResult> => {
+      const replay = (await client.query<{ purchase_ref: string; document_order_ref: string;
         amount_kopecks: string; reserved_until: Date; purchase_group_ref: string; same_buyer: boolean }>(
-        `SELECT r.purchase_ref, r.document_order_ref, r.same_request, o.amount_kopecks, h.expires_at AS reserved_until, g.purchase_group_ref,
-                c.full_name IS NOT DISTINCT FROM $4 AND c.phone IS NOT DISTINCT FROM $5 AND c.email IS NOT DISTINCT FROM $6 AS same_buyer
-           FROM fn_group_link_replay($1, $2, $3) r JOIN orders o ON o.order_ref = r.document_order_ref
+        // The same buyer: compared with the order's contact inside the database. After decision 8B erased
+        // that contact at closure, the repeat is recognised by the browser session bound to the purchase
+        // (the intent is that session's; a link replay must come from it too), with the same request.
+        `SELECT p.purchase_ref, o.order_ref AS document_order_ref, o.amount_kopecks, h.expires_at AS reserved_until, g.purchase_group_ref,
+                CASE WHEN c.order_id IS NOT NULL
+                       THEN c.full_name IS NOT DISTINCT FROM $2 AND c.phone IS NOT DISTINCT FROM $3 AND c.email IS NOT DISTINCT FROM $4
+                     ELSE o.pd_erased_at IS NOT NULL AND coalesce(fn_purchase_session_owns(p.purchase_ref, $5), false) END AS same_buyer
+           FROM purchase p JOIN orders o ON o.id = p.origin_order_id
            LEFT JOIN order_contact c ON c.order_id = o.id
-           JOIN purchase p ON p.purchase_ref = r.purchase_ref JOIN purchase_group_member m ON m.purchase_id = p.id
-           JOIN purchase_group g ON g.id = m.group_id JOIN seat_hold h ON h.purchase_id = p.id AND h.cycle = 1`,
-        [link.tokenSha256, link.keySha256, link.requestSha256, buyerName, phone, email])).rows[0];
-      if (replay === undefined) return null;
+           JOIN purchase_group_member m ON m.purchase_id = p.id
+           JOIN purchase_group g ON g.id = m.group_id JOIN seat_hold h ON h.purchase_id = p.id AND h.cycle = 1
+          WHERE p.purchase_ref = $1`, [purchaseRef, buyerName, phone, email, sessionSha256])).rows[0]!;
       // The same attempt is the same request by the same buyer: the buyer is compared with the order's
       // own contact inside the trusted database, so no personal data enters the fingerprint.
-      if (!replay.same_request || !replay.same_buyer) return refuse('IDEMPOTENCY_CONFLICT');
+      if (!sameRequest || !replay.same_buyer) return refuse('IDEMPOTENCY_CONFLICT');
       await client.query('COMMIT');
       return { ok: true, replayed: true, orderRef: replay.document_order_ref, purchaseRef: replay.purchase_ref,
         purchaseGroupRef: replay.purchase_group_ref, amountKopecks: Number(replay.amount_kopecks), reservedUntil: replay.reserved_until };
     };
+    const replayed = async (): Promise<NativePurchaseResult | null> => {
+      if (link === null) return null;
+      const r = (await client.query<{ purchase_ref: string; same_request: boolean }>(
+        'SELECT purchase_ref, same_request FROM fn_group_link_replay($1, $2, $3)', [link.tokenSha256, link.keySha256, link.requestSha256])).rows[0];
+      return r === undefined ? null : replayOf(r.purchase_ref, r.same_request);
+    };
+    if (intentKeySha256 !== null) {
+      // The intent's row lock: a concurrent repeat (double click, lost response) waits here until this
+      // attempt commits or rolls back, then answers with the same purchase.
+      let claim: { purchase_ref: string | null; request_sha256: string | null } | undefined;
+      try {
+        claim = (await client.query<{ purchase_ref: string | null; request_sha256: string | null }>(
+          'SELECT purchase_ref, request_sha256 FROM fn_checkout_intent_claim($1, $2)', [intentKeySha256, sessionSha256])).rows[0];
+      } catch (e) {
+        const m = (e as Error).message;
+        if (m === 'CHECKOUT_SESSION_INVALID' || m === 'CHECKOUT_INTENT_INVALID') return refuse(m);
+        throw e;
+      }
+      if (claim?.purchase_ref) return await replayOf(claim.purchase_ref, claim.request_sha256 === requestSha256);
+    }
     const early = await replayed();
     if (early !== null) return early;
     // A new purchase accepts only the current terms and consent, under the live legal release. A
@@ -184,6 +233,12 @@ export async function reserveNativePurchase(deps: OrderDeps, req: NativePurchase
       opened = (await client.query<{ purchase_ref: string; purchase_group_ref: string; hold_expires_at: Date }>(
         'SELECT purchase_ref, purchase_group_ref, hold_expires_at FROM fn_open_slotted_purchase($1, $2, $3, $4, $5, $6, $7)',
         [id, adults, teens, children, link?.tokenSha256 ?? null, link?.keySha256 ?? null, link?.requestSha256 ?? null])).rows[0]!;
+      // Consume the intent and bind the creating session; checked again at commit (migration 0023).
+      if (intentKeySha256 !== null) {
+        await client.query('SELECT fn_checkout_intent_consume($1, $2, $3)', [intentKeySha256, opened.purchase_ref, requestSha256]);
+      } else {
+        await client.query('SELECT fn_purchase_session_bind_new($1, $2)', [opened.purchase_ref, sessionSha256]);
+      }
     } catch (e) {
       const code = DATABASE_REFUSALS.find((c) => (e as Error).message === c);
       if (code === undefined) throw e;
@@ -252,28 +307,52 @@ export async function currentPurchase(pool: pg.Pool | pg.PoolClient, purchaseRef
 
 export type RetryRefusal = 'SALES_CLOSED' | 'BOOKING_CUTOFF_REACHED' | 'NOT_ENOUGH_SEATS' | 'MINORS_NOT_ALLOWED' | 'MINOR_SALES_PAUSED'
   | 'TICKET_TYPE_NOT_ALLOWED' | 'MINORS_WITHOUT_ADULT' | 'REHOLD_NOT_ALLOWED' | 'PURCHASE_CLOSED' | 'RETRY_WINDOW_CLOSED'
-  | 'DEPARTURE_CHANGED' | 'LEGAL_TERMS_CHANGED' | NotBookable;
+  | 'DEPARTURE_CHANGED' | 'LEGAL_TERMS_CHANGED' | 'PURCHASE_NOT_OWNED' | NotBookable;
 /** The database enforces every one of these itself (fn_purchase_rehold); the checks above only answer earlier. */
 const RETRY_REFUSALS = ['NOT_ENOUGH_SEATS', 'MINORS_NOT_ALLOWED', 'MINOR_SALES_PAUSED', 'TICKET_TYPE_NOT_ALLOWED',
   'MINORS_WITHOUT_ADULT', 'REHOLD_NOT_ALLOWED', 'PURCHASE_CLOSED', 'RETRY_WINDOW_CLOSED', 'SALES_CLOSED', 'BOOKING_CUTOFF_REACHED',
-  'DEPARTURE_NOT_OPEN', 'DEPARTURE_NOT_LISTED', 'DEPARTURE_CHANGED'] as const satisfies readonly RetryRefusal[];
+  'DEPARTURE_NOT_OPEN', 'DEPARTURE_NOT_LISTED', 'DEPARTURE_CHANGED', 'PURCHASE_NOT_OWNED'] as const satisfies readonly RetryRefusal[];
 
 /**
  * A new payment cycle of the same purchase after the bank proved the previous attempt unpaid, or the
  * hold lapsed before any attempt (v1.9.0 §2 п.1): a new five-minute hold of the same seats at their
  * frozen prices, under the general rules (sales switch, T−24, quota, minors), until the earlier of 24
  * hours after the purchase and T−24. No new purchase, no new group link. The database enforces all of
- * it; the caller has verified that the requester owns the purchase.
+ * it, including that the browser session owns the purchase (a purchaseRef alone is not enough,
+ * G-RESUME-02, migration 0023).
  */
-export async function retryNativePurchasePayment(deps: OrderDeps, purchaseRef: string):
+export async function retryNativePurchasePayment(deps: OrderDeps, purchaseRef: string, sessionToken: string):
+  Promise<{ readonly ok: true; readonly holdRef: string; readonly reservedUntil: Date } | { readonly ok: false; readonly refusal: RetryRefusal }> {
+  return retryOrPreview(deps, purchaseRef, sessionToken, true);
+}
+
+/**
+ * The final answer to «can this session start a new payment cycle now?» (review 4 of PR #88): the very
+ * path of retryNativePurchasePayment — ownership, sales switch, departure, T−24, legal terms, then
+ * fn_purchase_rehold_owned with its quota, pause, minors, group, revision and window checks — run in a
+ * transaction that is rolled back, so nothing is held or changed. ResumeView.cycleStateEligible is only
+ * the cycle-state precondition; the interface offers «Повторить оплату» on this answer. It may still
+ * change before the buyer clicks (quota, sales switch); the real retry decides again.
+ */
+export async function previewNativePurchaseRetry(deps: OrderDeps, purchaseRef: string, sessionToken: string):
+  Promise<{ readonly ok: true } | { readonly ok: false; readonly refusal: RetryRefusal }> {
+  const r = await retryOrPreview(deps, purchaseRef, sessionToken, false);
+  return r.ok ? { ok: true } : r;
+}
+
+async function retryOrPreview(deps: OrderDeps, purchaseRef: string, sessionToken: string, commit: boolean):
   Promise<{ readonly ok: true; readonly holdRef: string; readonly reservedUntil: Date } | { readonly ok: false; readonly refusal: RetryRefusal }> {
   const refuse = (refusal: RetryRefusal) => {
-    deps.log('payment_retry_refused', { purchaseRef, refusal });
+    deps.log(commit ? 'payment_retry_refused' : 'payment_retry_preview_refused', { purchaseRef, refusal });
     return { ok: false as const, refusal };
   };
   const client = await deps.pool.connect();
   try {
     await client.query('BEGIN');
+    // Ownership first: a stranger learns nothing else about the purchase.
+    const owns = (await client.query<{ owns: boolean }>('SELECT fn_purchase_session_owns($1, $2) AS owns',
+      [purchaseRef, tokenSha256(String(sessionToken))])).rows[0]?.owns;
+    if (owns !== true) return refuse('PURCHASE_NOT_OWNED');
     if ((await client.query<{ open: boolean }>('SELECT fn_sales_open_for_sale() AS open')).rows[0]?.open !== true) return refuse('SALES_CLOSED');
     const slug = (await client.query<{ slug: string }>(
       'SELECT d.slug FROM purchase_current c JOIN departure d ON d.id = c.departure_id WHERE c.purchase_ref = $1', [purchaseRef])).rows[0]?.slug;
@@ -298,8 +377,8 @@ export async function retryNativePurchasePayment(deps: OrderDeps, purchaseRef: s
     let holdRef: string;
     let reservedUntil: Date;
     try {
-      const held = (await client.query<{ hold_ref: string; expires_at: Date }>('SELECT hold_ref, expires_at FROM fn_purchase_rehold($1)',
-        [purchaseRef])).rows[0]!;
+      const held = (await client.query<{ hold_ref: string; expires_at: Date }>('SELECT hold_ref, expires_at FROM fn_purchase_rehold_owned($1, $2)',
+        [purchaseRef, tokenSha256(sessionToken)])).rows[0]!;
       holdRef = held.hold_ref;
       reservedUntil = held.expires_at;
     } catch (e) {
@@ -307,6 +386,7 @@ export async function retryNativePurchasePayment(deps: OrderDeps, purchaseRef: s
       if (code === undefined) throw e;
       return refuse(code);
     }
+    if (!commit) return { ok: true, holdRef, reservedUntil }; // rolled back in finally: nothing held
     await client.query('COMMIT');
     deps.log('payment_retry_held', { purchaseRef, holdRef });
     return { ok: true, holdRef, reservedUntil };

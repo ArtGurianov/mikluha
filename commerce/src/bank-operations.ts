@@ -15,6 +15,8 @@ import { createHash } from 'node:crypto';
 
 import type pg from 'pg';
 
+import { tokenSha256 } from './checkout-session.js';
+
 export type EvidenceSource = 'REGISTRATION_RESPONSE' | 'CALLBACK' | 'READ_BACK' | 'DISPATCH_ERROR';
 export type BankStatus = 'INTENDED' | 'REGISTERED' | 'UNKNOWN' | 'SUCCEEDED' | 'FAILED';
 export type SeatEffect = 'SEATS_CONFIRMED' | 'SEATS_RELEASED' | 'LATE_CONFIRMED' | 'PAID_NO_SEAT'
@@ -47,21 +49,24 @@ export interface RecordedEvidence {
   readonly applicationPending: boolean;
 }
 
-export type OpenRefusal = 'HOLD_NOT_OPEN' | 'HOLD_EXPIRED' | 'HOLD_ALREADY_FENCED' | 'PURCHASE_CLOSED' | 'PURCHASE_UNKNOWN';
-const OPEN_REFUSALS = ['HOLD_NOT_OPEN', 'HOLD_EXPIRED', 'HOLD_ALREADY_FENCED', 'PURCHASE_CLOSED', 'PURCHASE_UNKNOWN'] as const satisfies readonly OpenRefusal[];
+export type OpenRefusal = 'HOLD_NOT_OPEN' | 'HOLD_EXPIRED' | 'HOLD_ALREADY_FENCED' | 'PURCHASE_CLOSED' | 'PURCHASE_UNKNOWN' | 'PURCHASE_NOT_OWNED';
+const OPEN_REFUSALS = ['HOLD_NOT_OPEN', 'HOLD_EXPIRED', 'HOLD_ALREADY_FENCED', 'PURCHASE_CLOSED', 'PURCHASE_UNKNOWN',
+  'PURCHASE_NOT_OWNED'] as const satisfies readonly OpenRefusal[];
 
 export const payloadSha256 = (payload: string | Uint8Array) => createHash('sha256').update(payload).digest('hex');
 
 /**
  * Record the collection of the purchase's open payment cycle, before the bank registration. The
- * returned reference is the operation's identity towards the bank (its order number).
+ * returned reference is the operation's identity towards the bank (its order number). Only a browser
+ * session bound to the purchase may start it (migration 0023, G-RESUME-02).
  */
-export async function openCollection(pool: pg.Pool | pg.PoolClient, purchaseRef: string, provider: string, merchantAccount: string):
+export async function openCollection(pool: pg.Pool | pg.PoolClient, purchaseRef: string, sessionToken: string, provider: string,
+  merchantAccount: string):
   Promise<{ readonly ok: true; readonly bankOperationRef: string; readonly holdRef: string; readonly amountKopecks: number;
             readonly currency: string; readonly replayed: boolean } | { readonly ok: false; readonly refusal: OpenRefusal }> {
   try {
     const r = (await pool.query<{ bank_operation_ref: string; hold_ref: string; amount_kopecks: string; currency: string; replayed: boolean }>(
-      'SELECT * FROM fn_bank_operation_open($1, $2, $3)', [purchaseRef, provider, merchantAccount])).rows[0]!;
+      'SELECT * FROM fn_bank_operation_open_owned($1, $2, $3, $4)', [purchaseRef, tokenSha256(sessionToken), provider, merchantAccount])).rows[0]!;
     return { ok: true, bankOperationRef: r.bank_operation_ref, holdRef: r.hold_ref, amountKopecks: Number(r.amount_kopecks),
       currency: r.currency, replayed: r.replayed };
   } catch (e) {
