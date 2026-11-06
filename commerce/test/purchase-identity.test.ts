@@ -12,7 +12,7 @@ import { issueState, onReturn, pay, reconcileOrder, type CheckoutDeps } from './
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { schemaHead } from '../src/migrate.js';
 import { maintain, reserve, setSalesOpen, type BookingRequest, type OrderDeps } from '../src/orders.js';
-import { currentPurchase, purchaseProfileOf, reserveNativePurchase } from '../src/purchases.js';
+import { currentPurchase, purchaseProfileOf, reserveUniformNativePurchase } from '../src/purchases.js';
 import { BookingRateLimiter } from '../src/rate-limit.js';
 import { RefrefClient } from './retired/refref.js';
 import { createCommerceServer } from '../src/server.js';
@@ -45,7 +45,7 @@ const deps = (over: Partial<OrderDeps> = {}): OrderDeps =>
   ({ pool: db.pool, catalog, log: () => undefined, allowDemo: false, now: () => NOW, ...over });
 
 async function native(over: Partial<BookingRequest> = {}, d: Partial<OrderDeps> = {}) {
-  const r = await reserveNativePurchase(deps(d), booking(over));
+  const r = await reserveUniformNativePurchase(deps(d), booking(over));
   assert.ok(r.ok, JSON.stringify(r));
   return r as Extract<typeof r, { ok: true }>;
 }
@@ -261,7 +261,7 @@ describe('orders outside a purchase', () => {
     for (const set of ["state_hash = repeat('a', 64)", "attribution_source = 'LINK'"]) {
       const pool = interceptAfter(db.pool, (sql) => sql.includes("'RESERVED'") && sql.includes('INSERT INTO order_event'),
         (c) => c.query(`UPDATE orders SET ${set} WHERE id = (SELECT order_id FROM order_event ORDER BY id DESC LIMIT 1)`));
-      await assert.rejects(reserveNativePurchase(deps({ pool }), booking()), /PURCHASE_ORDER_NOT_PRISTINE/);
+      await assert.rejects(reserveUniformNativePurchase(deps({ pool }), booking()), /PURCHASE_ORDER_NOT_PRISTINE/);
       assert.equal(await count('orders'), 0);
       assert.equal(await count('purchase'), 0);
     }
@@ -414,7 +414,7 @@ describe('continuation and capacity', () => {
       revision: 1, lifecycleProfile: 'NATIVE_NO_REFERRAL', paymentOwner: 'MIKLUHA_NATIVE' });
     assert.equal(Number((await db.pool.query('SELECT fn_departure_taken_seats($1, $2) AS n', [SLUG, NOW])).rows[0].n), 2);
     // Only the current document order continues the purchase.
-    const stale = await reserveNativePurchase(deps(), booking({ replacementOrderRef: first.orderRef }));
+    const stale = await reserveUniformNativePurchase(deps(), booking({ replacementOrderRef: first.orderRef }));
     assert.deepEqual(stale, { ok: false, refusal: 'REPLACEMENT_NOT_AVAILABLE' });
   });
 
@@ -423,7 +423,7 @@ describe('continuation and capacity', () => {
     const old = await legacy({ passengers: [tourist(2)] });
     assert.deepEqual(await reserve(deps(), booking({ replacementOrderRef: purchase.orderRef, passengers: [tourist(3)] })),
       { ok: false, refusal: 'REPLACEMENT_NOT_AVAILABLE' });
-    assert.deepEqual(await reserveNativePurchase(deps(), booking({ replacementOrderRef: old.orderRef, passengers: [tourist(3)] })),
+    assert.deepEqual(await reserveUniformNativePurchase(deps(), booking({ replacementOrderRef: old.orderRef, passengers: [tourist(3)] })),
       { ok: false, refusal: 'REPLACEMENT_NOT_AVAILABLE' });
     // A legacy replacement that skipped the check fails at commit: the purchase cannot be left.
     const pool = interceptAfter(db.pool, () => false, async () => undefined,
@@ -440,7 +440,7 @@ describe('continuation and capacity', () => {
     await native({ passengers: [tourist(1), tourist(2), tourist(3)] });
     assert.equal(Number((await db.pool.query('SELECT fn_departure_taken_seats($1, $2) AS n', [SLUG, NOW])).rows[0].n), 3);
     assert.deepEqual(await reserve(deps(), booking()), { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
-    assert.deepEqual(await reserveNativePurchase(deps(), booking()), { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
+    assert.deepEqual(await reserveUniformNativePurchase(deps(), booking()), { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
     await legacy({ passengers: [tourist(4)] });
     // A lapsed unpaid hold no longer counts, for either kind.
     assert.equal(Number((await db.pool.query('SELECT fn_departure_taken_seats($1, $2) AS n', [SLUG, new Date(NOW.getTime() + 31 * 60_000)])).rows[0].n), 0);
@@ -450,7 +450,7 @@ describe('continuation and capacity', () => {
 describe('concurrency', () => {
   test('concurrent purchases for the last seats never oversell', async () => {
     const results = await Promise.all(Array.from({ length: 6 }, (_, i) =>
-      reserveNativePurchase(deps(), booking({ passengers: [tourist(i + 1)] }))));
+      reserveUniformNativePurchase(deps(), booking({ passengers: [tourist(i + 1)] }))));
     assert.equal(results.filter(r => r.ok).length, 4);
     assert.deepEqual(results.filter(r => !r.ok), [{ ok: false, refusal: 'NOT_ENOUGH_SEATS' }, { ok: false, refusal: 'NOT_ENOUGH_SEATS' }]);
     assert.equal(await count('purchase'), 4);
@@ -460,7 +460,7 @@ describe('concurrency', () => {
   test('concurrent replacements of one purchase order append exactly one revision', async () => {
     const first = await native();
     const results = await Promise.all(Array.from({ length: 4 }, () =>
-      reserveNativePurchase(deps(), booking({ replacementOrderRef: first.orderRef }))));
+      reserveUniformNativePurchase(deps(), booking({ replacementOrderRef: first.orderRef }))));
     const ok = results.filter(r => r.ok);
     assert.equal(ok.length, 1);
     assert.ok(results.filter(r => !r.ok).every(r => !r.ok && r.refusal === 'REPLACEMENT_NOT_AVAILABLE'));
@@ -509,11 +509,11 @@ describe('integrity backstops (PR #51 review)', () => {
   });
   after(async () => { await ownerPool.end(); });
 
-  /** reserveNativePurchase as the owner, with the opening call replaced by test_partial_purchase(mode). */
+  /** reserveUniformNativePurchase as the owner, with the opening call replaced by test_partial_purchase(mode). */
   const partial = (mode: string, over: Partial<BookingRequest> = {}) => {
     const pool = interceptAfter(ownerPool, () => false, async () => undefined,
       (sql) => sql.replace('fn_open_native_purchase($1)', `test_partial_purchase($1, '${mode}')`));
-    return reserveNativePurchase(deps({ pool }), booking(over));
+    return reserveUniformNativePurchase(deps({ pool }), booking(over));
   };
   const taken = async () => Number((await db.pool.query('SELECT fn_departure_taken_seats($1, $2) AS n', [SLUG, NOW])).rows[0].n);
 
@@ -530,7 +530,7 @@ describe('integrity backstops (PR #51 review)', () => {
       /NATIVE_PURCHASE_TERMS_IMMUTABLE/);
     }
     assert.equal(await taken(), 3);
-    assert.deepEqual(await reserveNativePurchase(deps(), booking({ passengers: [tourist(4), tourist(1), tourist(2)] })),
+    assert.deepEqual(await reserveUniformNativePurchase(deps(), booking({ passengers: [tourist(4), tourist(1), tourist(2)] })),
       { ok: false, refusal: 'NOT_ENOUGH_SEATS' });
     assert.equal((await order(r.orderRef)).seats, 3);
   });
@@ -604,8 +604,9 @@ describe('integrity backstops (PR #51 review)', () => {
     const r = await native();
     for (const sql of ['TRUNCATE purchase_revision_participant, purchase_revision, purchase', 'TRUNCATE purchase CASCADE',
       'TRUNCATE purchase_revision CASCADE', 'TRUNCATE purchase_revision_participant', 'TRUNCATE orders CASCADE']) {
-      // TRUNCATE orders CASCADE reaches the tourist guard or the purchase guard first; both refuse.
-      await assert.rejects(db.owner.query(sql), /PURCHASE_HISTORY_IMMUTABLE|NATIVE_PURCHASE_PD_RETENTION_ONLY/, sql);
+      // TRUNCATE orders CASCADE reaches the tourist guard or the purchase guard first; both refuse. Since 0021
+      // the seat tables also reference purchase, so a TRUNCATE without them is refused by the foreign keys.
+      await assert.rejects(db.owner.query(sql), /PURCHASE_HISTORY_IMMUTABLE|NATIVE_PURCHASE_PD_RETENTION_ONLY|referenced in a foreign key constraint/, sql);
     }
     assert.equal((await purchaseProfileOf(db.pool, r.orderRef))!.provenance, 'PURCHASE');
     await assert.rejects(db.pool.query("UPDATE orders SET attribution_source = 'LINK' WHERE order_ref = $1", [r.orderRef]), /NATIVE_PURCHASE_NO_REFERRAL/);

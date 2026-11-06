@@ -56,7 +56,9 @@ test('forward upgrade refuses any prior legal publication without changing its d
     writeFileSync(join(dir, 'migration.lock'), JSON.stringify(lock));
     const empty = await freshDb(dir);
     try {
-      assert.deepEqual(await migrate(empty.owner, MIGRATIONS_DIR), [20]);
+      // 0020 and every later migration (0021+) apply on top of the schema19 history.
+      assert.deepEqual(await migrate(empty.owner, MIGRATIONS_DIR),
+        JSON.parse(readFileSync(join(MIGRATIONS_DIR, 'journal.json'), 'utf8')).map((r: { version: number }) => r.version).filter((v: number) => v > 19));
       assert.deepEqual(await migrate(empty.owner, MIGRATIONS_DIR), []);
       assert.equal((await empty.owner.query("SELECT count(*)::int AS n FROM legal_publication")).rows[0].n, 0);
     } finally { await empty.drop(); }

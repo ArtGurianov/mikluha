@@ -78,5 +78,9 @@
   {
     "version": 20,
     "file": "0020_krasnoyarsk_local_calendar.sql"
+  },
+  {
+    "version": 21,
+    "file": "0021_priced_seat_slots_groups_and_staff_roles.sql"
   }
 ]
