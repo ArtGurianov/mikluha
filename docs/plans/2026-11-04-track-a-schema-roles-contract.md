@@ -43,6 +43,7 @@ TOUR-76 (In Progress), TOUR-78/79 (Backlog), эпик TOUR-98 «треки A–G
 | `groupLinkRef` | `purchase_group_link` | `gl-` + 20 hex; токен хранится только как `sha256` | менеджер (`group_link.issue`) | одноразовая: `consumed_*` или `revoked_*` один раз |
 | `pricingBasisRef` | `pricing_basis` | `pb-` + 20 hex | при создании мест | полностью неизменяема |
 | `seatSlotRef` | `seat_slot` + журнал `seat_slot_event` | `ss-` + 20 hex | при создании покупки | меняются только `state`, защита hold — через функции |
+| `holdRef`, `attemptRef` | `seat_hold` | `sh-` + 20 hex; попытка — идентификатор TOUR-77 | цикл 1 — при создании покупки, следующие — `fn_purchase_rehold` | `fenced_at`/`attempt_ref` один раз, закрытие (`PAID`/`PAYMENT_FAILED`/`LAPSED`) один раз |
 | (строка ревизии) | `purchase_revision_line` | (`purchaseRef`, ревизия, `seatSlotRef`) | вместе с ревизией | append-only, входит в `revision_hash` через `lines_sha256` |
 | `participantRef` | `seat_participant` | uuid | TOUR-100 при отправке анкеты | `ended_*` один раз (замена/выбытие) |
 | `companionRef` | `companion_assignment` | `ca-` + 20 hex | покупатель внутри покупки / сотрудник между покупками | `confirmed_at`, `revoked_*` один раз |
@@ -54,27 +55,74 @@ TOUR-76 (In Progress), TOUR-78/79 (Backlog), эпик TOUR-98 «треки A–G
 Ни одна таблица 0021 не содержит ПД туристов. ПД анкет — отдельная таблица A2b по запросу TOUR-100
 после правовой карты TOUR-35/84.
 
-## 3. Состояния места (`seat_slot.state`)
+## 3. Места и платёжные циклы (`seat_slot`, `seat_hold`)
+
+Идентичность места (`seat_slot`) отделена от платёжного цикла (`seat_hold`) и от попытки оплаты
+(`attempt_ref`, будущий `bankOperationRef` TOUR-77). У покупки в каждый момент не больше одного
+открытого цикла; новый цикл возможен только после закрытия предыдущего без оплаты.
 
 ```
-HELD ──(bank proof достаточен по месту)──────────────► CONFIRMED ──(TOUR-79)──► CANCELLED
- │  └─(bank proof, места нет)──► PAID_NO_SEAT_EXCEPTION ──(место назначено)──► CONFIRMED
- │                                    └──(возврат TOUR-27 исполнен)──────────► REFUND_SETTLED
- └─(hold истёк без fence / доказанный отказ банка)──► RELEASED
-RELEASED ──(поздний bank proof)──► CONFIRMED (если есть место) | PAID_NO_SEAT_EXCEPTION
+seat_hold:  OPEN ──(попытка записана до истечения 5 мин)──► FENCED ──► PAID | PAYMENT_FAILED
+              └──(истёк без попытки, maintain)──────────────────────────► LAPSED
+            после PAYMENT_FAILED или LAPSED → новый цикл той же покупки (fn_purchase_rehold)
+
+seat_slot:  HELD ──(цикл закрыт PAID)──────────────────► CONFIRMED ──(только ревизия TOUR-79)──► CANCELLED
+              └──(цикл закрыт PAYMENT_FAILED/LAPSED)──► RELEASED ──(новый открытый цикл)──► HELD
+            RELEASED ──(поздний успех той же попытки)──► CONFIRMED, если есть место | PAID_NO_SEAT_EXCEPTION
+            PAID_NO_SEAT_EXCEPTION ──(OWNER назначил место)──► CONFIRMED | ──(возврат TOUR-27)──► REFUND_SETTLED
 ```
 
-| Переход | Команда | Кто (DB login) | Условия, проверяемые БД |
-|---|---|---|---|
-| создание `HELD` | `fn_open_slotted_purchase` | `commerce_app` | свежий документ-заказ, `PRICED_SLOTS`, сумма строк = `amount`, правила несовершеннолетних (раздел 5) |
-| fence hold | `fn_seat_slots_fence(purchaseRef)` | `commerce_app` (TOUR-77) | только `HELD`, до `hold_expires_at` (2A: попытка зафиксирована до 5 минут); после fence место не освобождается таймером |
-| `HELD`/`RELEASED` → `CONFIRMED`/`PAID_NO_SEAT_EXCEPTION` | `fn_seat_slot_transition` | `commerce_app` (TOUR-77) | обязательный `bankOperationRef`; из `RELEASED` в `CONFIRMED` — только при свободном месте под lock выезда |
-| → `RELEASED` | `fn_seat_slots_release_lapsed(now)` (maintain) или `fn_seat_slot_transition` с доказанным отказом | `commerce_app` | не fenced и hold истёк; либо явный отказ с `bankOperationRef` |
-| `PAID_NO_SEAT_EXCEPTION` → `CONFIRMED` | `fn_seat_slot_assign_no_seat` | `admin_app` | право `paid_no_seat.resolve`, причина, свободное место под lock, нет учтённого дефицита |
-| → `REFUND_SETTLED`, `CONFIRMED` → `CANCELLED` | `fn_seat_slot_transition` | `commerce_app`/`admin_app` (TOUR-27/79) | обязательная причина; для `CANCELLED` — ревизия TOUR-79 (A2b), пока разрешено только с `actor`+`reason` |
+| Команда | Кто (DB login) | Что проверяет БД |
+|---|---|---|
+| `fn_open_slotted_purchase` | `commerce_app` | свежий документ-заказ `PRICED_SLOTS`; сумма строк = `amount`; правила несовершеннолетних (раздел 6). Сама БД, по своим часам и под lock выезда: продажи открыты, выезд `OPEN` и опубликован, до T−24, есть места в квоте. Цикл 1 со сроком, который назначает БД: 5 минут, не позже T−24 |
+| `fn_purchase_hold_fence(purchaseRef, attemptRef)` | `commerce_app` (TOUR-77) | открытый цикл не истёк по часам БД (2A); одна попытка на цикл; повтор той же попытки идемпотентен |
+| `fn_purchase_payment_confirmed(purchaseRef, attemptRef)` | `commerce_app` (TOUR-77) | попытка записана на цикле этой покупки. Открытый цикл → `PAID`, места `CONFIRMED` (они были защищены). Цикл уже `PAYMENT_FAILED` (поздний успех) → под lock выезда каждое место `CONFIRMED` при наличии места, иначе `PAID_NO_SEAT_EXCEPTION`; решает БД, а не вызывающий. Есть более новый цикл → `NEWER_CYCLE_EXISTS` (двойное списание, ручная сверка). Повтор ничего не меняет |
+| `fn_purchase_payment_failed(purchaseRef, attemptRef)` | `commerce_app` (TOUR-77) | только исход записанной попытки открытого цикла; места `RELEASED` |
+| `fn_seat_holds_close_lapsed()` (maintain) | `commerce_app` | только нефенсированные циклы, истёкшие **по часам БД** (параметра времени нет: вызывающий не может досрочно закрыть живой hold); fenced (UNKNOWN) не истекает |
+| `fn_purchase_rehold(purchaseRef)` через `retryNativePurchasePayment` | `commerce_app` | всё в БД, кто бы ни вызвал SQL: продажи открыты; выезд `OPEN` и опубликован; до T−24; окно повторной оплаты не истекло; строка документа-заказа заблокирована, заказ не закрыт; прошлый цикл закрыт без оплаты (нет UNKNOWN); все места `RELEASED`; квота, пауза, допуск несовершеннолетних, взрослый группы для детской покупки; срок нового hold назначает БД. TS повторяет проверки ради понятного ответа |
+| `fn_priced_document_orders_close()` (maintain) | `commerce_app` | по одному документу-заказу под его строковой блокировкой (`SKIP LOCKED`) с повторной проверкой после блокировки: все места `RELEASED`, нет открытого цикла, окно повторной оплаты истекло по часам БД. Повторная оплата и закрытие заказа сериализуются на строке заказа |
+| `fn_seat_slot_assign_no_seat` | `admin_app` | право `paid_no_seat.resolve` (сейчас только OWNER), причина, свободное место под lock выезда |
+| `fn_seat_slot_refund_settled(slotRef, refundRef)` | `commerce_app` (TOUR-27) | только `PAID_NO_SEAT_EXCEPTION` |
+| `CONFIRMED → CANCELLED` | — | функции нет ни у одного сервисного логина: только будущая ревизия поправки TOUR-79 (A2b-3) |
 
-Каждый переход пишет `seat_slot_event` (append-only: прежнее/новое состояние, actor, reason,
-`bankOperationRef`, время БД). Запрещённые переходы — `SEAT_SLOT_TRANSITION_INVALID`.
+Триггер `seat_slot` проверяет те же правила для DML любого логина: `HELD → CONFIRMED` только при цикле
+`PAID`; `HELD → RELEASED` только после закрытия цикла без оплаты; `RELEASED → HELD` только при новом
+открытом цикле. Каждый переход пишет `seat_slot_event` с циклом и попыткой.
+
+**Граница с TOUR-77.** БД связывает каждый денежный исход с попыткой, записанной на цикле, и сама
+решает между `CONFIRMED` и `PAID_NO_SEAT_EXCEPTION`. Подлинность ответа банка (провайдер, сумма,
+валюта, read-back) проверяет `bank_operation` TOUR-77 (A2b-1). До его интеграции эти функции —
+исходники и синтетика, не квалифицированы для реальных денег.
+
+**Время — только по часам БД.** Срок hold (5 минут, не позже T−24), истечение hold и окно повторной
+оплаты вычисляются БД. Время приложения влияет только на ранний понятный отказ. В тестах время
+сдвигает только суперпользователь одноразовой БД, приостанавливая триггеры; у сервисных логинов такого
+механизма нет.
+
+**Решения OWNER 06.11.2026 (1A, 2A, 2, 8B).**
+
+- **Три срока не смешиваются.** Удержание мест — 5 минут до регистрации оплаты в банке. Банковское окно одной
+  зарегистрированной попытки — 30 минут. Возобновление неоплаченной покупки — до более ранней из двух
+  границ: 24 часа от создания покупки или T−24. Это окно абсолютное, попытки его не продлевают, и оно не
+  является бронью мест.
+- **Срок 24 часа ограничивает только начало новой попытки.** Уже зарегистрированная операция (в том числе
+  UNKNOWN) обрабатывается до окончательного исхода и после этого срока и после T−24. Подтверждённый платёж
+  из разрешённого окна сохраняет права покупателя. Пока операция не завершена или деньги подтверждены,
+  покупка не закрывается.
+- **Цена при повторной оплате — первоначальная** (`pricingBasisRef` покупки). Это не означает сохранения
+  прежних условий выезда.
+- **Повторная оплата не обходит изменённые условия (Stage A).** Если после принятия условий опубликована
+  новая редакция выезда, новая попытка отклоняется (`DEPARTURE_CHANGED`, проверяет БД). То же при новой
+  редакции оферты или согласия на ПД (`LEGAL_TERMS_CHANGED`). Эту проверку пока делает приложение:
+  правовой релиз хранится в коде до TOUR-59. Уже зарегистрированная попытка завершается на условиях своей
+  регистрации. Сохранение первоначальной цены при повторном принятии изменённых условий — обязательное
+  решение до продаж (A2b-10). До него покупателю не обещается безусловное сохранение цены при любом
+  изменении выезда. Интерфейс должен объяснять причину отказа и следующий шаг, а не показывать голый код.
+- **8B — удаление при закрытии.** ПД покупателя закрытой неоплаченной покупки удаляются при закрытии, без
+  дополнительных суток: контакт, адрес в очереди писем, байты документов. Остаются покупка, места, цены,
+  циклы, попытки, события и аудит. Закрытие невозможно при незавершённой или UNKNOWN операции,
+  подтверждённой оплате или «оплате без места». legalHold останавливает удаление. Окончательная правовая
+  квалификация исключений — TOUR-35/84.
 
 ## 4. Проекция занятости и счётчики (одна для TOUR-28/64/65/78/102)
 
@@ -106,25 +154,25 @@ RELEASED ──(поздний bank proof)──► CONFIRMED (если есть
 | API (владелец) | DB-команда | Отказы |
 |---|---|---|
 | Native checkout — первичная покупка (C/TOUR-28) | `reserveNativePurchase` (читает `departure.child_price_kopecks` под lock выезда) → `fn_open_slotted_purchase` | `TERMS_NOT_CURRENT`, `PD_CONSENT_*`, `AGE_TERMS_NOT_CONFIRMED`, `SEATS_INVALID` (0 или > 500, неизвестный тип), `CONTACT_*`, `NOT_ENOUGH_SEATS`, `BOOKING_CUTOFF_REACHED`, `MINORS_NOT_ALLOWED`, `MINOR_SALES_PAUSED`, `TICKET_TYPE_NOT_ALLOWED` (минимальный возраст ≥ 14 исключает `0–13`), `MINORS_WITHOUT_ADULT`, `SALES_CLOSED` |
-| Привязанная покупка по ссылке менеджера (C/TOUR-90) | тот же вход + `groupLink {token, idempotencyKey}`; `fn_group_link_replay` до создания заказа | `GROUP_LINK_INVALID` (нет/отозвана/израсходована другим ключом), `GROUP_LINK_DEPARTURE_MISMATCH`, `MINORS_WITHOUT_ADULT` (нет `CONFIRMED` 18+ в группе); повтор тем же ключом возвращает ту же покупку |
-| Выдать/отозвать ссылку группы (E/TOUR-90 CR) | `fn_group_link_issue`, `fn_group_link_revoke` | `STAFF_FORBIDDEN`, `PURCHASE_GROUP_UNKNOWN`, `GROUP_LINK_ALREADY_FINAL` |
-| Fence/подтверждение/исключение (B/TOUR-77/78) | `fn_seat_slots_fence`, `fn_seat_slot_transition` | `SEAT_SLOT_TRANSITION_INVALID`, `BANK_OPERATION_REQUIRED`, `NO_SEAT_AVAILABLE` |
+| Привязанная покупка по ссылке менеджера (C/TOUR-90) | тот же вход + `groupLink {token, idempotencyKey}`; `fn_group_link_replay` до создания заказа | `GROUP_LINK_INVALID` (нет/отозвана/израсходована другим ключом), `GROUP_LINK_DEPARTURE_MISMATCH`, `GROUP_LINK_TICKETS_MISMATCH` (не тот состав, что выбрал менеджер), `MINORS_WITHOUT_ADULT` (нет `CONFIRMED` 18+ в группе); повтор тем же ключом и тем же запросом возвращает ту же покупку, в том числе после закрытия продаж; тот же ключ с другим запросом — `IDEMPOTENCY_CONFLICT` |
+| Выдать/отозвать ссылку группы (E/TOUR-90 CR) | `fn_group_link_issue(admin, group, tokenSha256, adults, teens, children)` — ссылка хранит выбранный менеджером состав, `fn_group_link_revoke` | `STAFF_FORBIDDEN`, `PURCHASE_GROUP_UNKNOWN`, `SEATS_INVALID`, `GROUP_LINK_ALREADY_FINAL` |
+| Попытка, исходы оплаты, повторный цикл (B/TOUR-77/78) | раздел 3 | `HOLD_EXPIRED`, `HOLD_ALREADY_FENCED`, `ATTEMPT_UNKNOWN`, `NEWER_CYCLE_EXISTS`, `REHOLD_NOT_ALLOWED`, `PURCHASE_CLOSED`, `NOT_ENOUGH_SEATS` |
 | Назначить место исключению (E/TOUR-65) | `fn_seat_slot_assign_no_seat` | `STAFF_FORBIDDEN`, `NO_SEAT_AVAILABLE` |
 | Персонализация (D/TOUR-100) | `fn_seat_participant_open`, `fn_seat_participant_end` | `SEAT_SLOT_NOT_CONFIRMED`, `PARTICIPANT_ALREADY_ACTIVE` |
 | Привязка ребёнка к 18+ своей покупки (C/TOUR-99) | `fn_companion_assign_in_purchase` | `COMPANION_INVALID` (не 18+, не та покупка, не `CONFIRMED`), `MINOR_SLOT_INVALID` |
 | Назначить сопровождающего из другой покупки (E/TOUR-100 CR) | `fn_companion_assign_staff` | `STAFF_FORBIDDEN`, `COMPANION_INVALID` (не участник 18+ той же группы и того же текущего выезда), `MINOR_SLOT_INVALID` |
 | Сопровождающий подтверждает назначение (D) | `fn_companion_confirm` | `COMPANION_NOT_ACTIVE` |
 | Снять назначение | `fn_companion_revoke` (покупатель — только свои `BUYER`), `fn_companion_revoke_staff` (`companion.assign`) | `COMPANION_NOT_ACTIVE` |
-| Настройки несовершеннолетних / пауза (E/TOUR-65) | `fn_admin_departure_minor_settings`, `fn_admin_minor_sales_pause` (CAS `minor_settings_version`, причина, журнал `departure_minor_event`) | `STAFF_FORBIDDEN`, `DEPARTURE_MINOR_CONFLICT` |
+| Пауза детских продаж (E/TOUR-65) | `fn_admin_minor_sales_pause` (CAS `minor_settings_version`, причина, журнал `departure_minor_event`). Детскую цену, разрешение и минимальный возраст пишет только публикация выезда (решение OWNER 3, A2b-8) | `STAFF_FORBIDDEN`, `DEPARTURE_MINOR_CONFLICT` |
 | Выдать приглашение (C/TOUR-99) | `fn_seat_invitation_issue` | `SEAT_SLOT_NOT_CONFIRMED`, `INVITATION_PURPOSE_INVALID`, `INVITATION_ACTIVE` |
 | Отозвать/перевыпустить (C/D) | `fn_seat_invitation_revoke` | `INVITATION_NOT_ACTIVE` |
 | Атомарный claim (C/TOUR-99) | `fn_seat_invitation_claim(tokenSha256)` | `INVITATION_NOT_ACTIVE` (повторный claim) |
-| Проверка гостевого доступа на каждый запрос (C/D) | `fn_seat_invitation_active(tokenSha256)` | нет строки — нет доступа |
+| Гостевой доступ (C/D) | `fn_seat_invitation_claimable(tokenSha256)` — bearer-токен находит только ещё не принятое приглашение; после claim сессия OTP (TOUR-99) проверяет `fn_seat_invitation_live(invitationRef)` на каждый запрос | нет строки / `false` — нет доступа |
 | Право сотрудника на каждый запрос (все CR-команды) | `fn_staff_permitted(adminId, permission)` | `false` → `STAFF_FORBIDDEN` |
 
 Автоматика выбытия (v1.9 §3 п.5, G-GROUP-03): если место сопровождающего уходит из `CONFIRMED`
 или его `participant` завершён, БД в той же транзакции отзывает назначения и приглашения
-`MINOR_VIA_COMPANION`; `fn_seat_invitation_active` по ним сразу ничего не возвращает. Покупка ребёнка
+`MINOR_VIA_COMPANION`; `fn_seat_invitation_live` по ним сразу возвращает `false`. Покупка ребёнка
 не отменяется; задачу менеджеру (TOUR-102) строит проекция готовности.
 
 ## 6. Правила несовершеннолетних на checkout (v1.8.2 §2.1, v1.9 §3)
@@ -136,7 +184,9 @@ RELEASED ──(поздний bank proof)──► CONFIRMED (если есть
    на том же текущем выезде (не `PAID_NO_SEAT_EXCEPTION`, не `CANCELLED`, не `HELD`).
 5. Цена: `18+` и `14–17` — взрослая цена ревизии; `0–13` — `child_price_kopecks`, если задана, иначе
    взрослая. Цена фиксируется в `pricing_basis` при создании hold и далее не пересчитывается (G-09a,
-   G-AGE-04: дата цены — `price_departure_on`, исходная локальная дата начала).
+   G-AGE-04: дата цены — `price_departure_on`, исходная локальная дата начала). `pricing_basis`
+   хранит `minor_settings_version` — версию аудируемого события `departure_minor_event`, чью детскую
+   цену он заморозил; БД проверяет её при создании.
 
 ## 7. Матрица ролей Control Room
 
@@ -152,10 +202,10 @@ CR-команде БД; TS-карта `PERMISSIONS` равна SQL-матриц�
 | `editorial.draft` | ✔ | | ✔ | | 0011 |
 | `editorial.publish`, `legal.publish`, `audit.read` | ✔ | | | | 0011 |
 | `departure.controls` (квота штатно, статус) | ✔ | | | | 0019, v1.8.2 §1 |
-| `departure.quota.exception` | ✔ | | | | v1.9 §9 — **PROPOSED**: «уполномоченный сотрудник» = OWNER |
-| `departure.minor_settings` (minorsAllowed, мин. возраст, детская цена) | ✔ | | | | v1.8.2 §1 (администратор редактирует выезды) |
-| `minor_sales.pause` | ✔ | ✔ | | | **PROPOSED**: защитное действие доступно дежурному менеджеру |
-| `minor_sales.resume` | ✔ | | | | **PROPOSED** |
+| `departure.quota.exception` | ✔ | | | | v1.9 §9; решение OWNER 4A (06.11) |
+| `departure.minor_settings` (minorsAllowed, мин. возраст, детская цена — через публикацию выезда, A2b-8) | ✔ | | | | v1.8.2 §1; решение OWNER 3/6A (06.11) |
+| `minor_sales.pause` | ✔ | ✔ | | | решение OWNER 3A (06.11): защитное действие доступно дежурному менеджеру |
+| `minor_sales.resume` | ✔ | | | | решение OWNER 3A (06.11) |
 | `departure.change.classify` (TOUR-89: поля, уведомления, несущественность) | ✔ | | | | v1.8.2 §1, §7 |
 | `transfer.discount` | ✔ | | | | v1.8.2 §1, §7 п.9 |
 | `purchases.read` (покупки, статусы, деньги, без ПД) | ✔ | ✔ | | | v1.8.2 §1 |
@@ -164,8 +214,8 @@ CR-команде БД; TS-карта `PERMISSIONS` равна SQL-матриц�
 | `participants.pd.correct` (с основанием и аудитом) | ✔ | ✔ | | | v1.8.2 §1, §2.3 |
 | `amendment.record` (TOUR-79: исправление категории, частичная/полная отмена) | ✔ | ✔ | | | v1.8.2 §2.3 |
 | `settlement.request` (заявка на расчёт/возврат) | ✔ | ✔ | | | v1.8.2 §2.3 |
-| `refund.execute` (TOUR-27) | ✔ | | | | **PROPOSED** |
-| `paid_no_seat.resolve` (назначить место исключению) | ✔ | ✔ | | | **PROPOSED** (v1.9 §5 п.4 — ручное урегулирование) |
+| `refund.execute` (TOUR-27) | ✔ | | | | решение OWNER 4A (06.11) |
+| `paid_no_seat.resolve` (назначить место исключению) | ✔ | | | | v1.9 §5 п.4; решение OWNER 4A (06.11) |
 | `group_link.issue` / `group_link.revoke` | ✔ | ✔ | | | v1.9 §2 п.1 («менеджер») |
 | `companion.assign` (между покупками) | ✔ | ✔ | | | v1.9 §3 п.3 («уполномоченный сотрудник CR») |
 | `invitations.support_reissue` (после отправки анкеты) | ✔ | ✔ | | | v1.8.2 §3 п.6 |
@@ -175,8 +225,11 @@ CR-команде БД; TS-карта `PERMISSIONS` равна SQL-матриц�
 
 `documents.verify` не даёт `legal_hold.manage`, `participants.pd.correct` и финансовых прав;
 `OWNER` не получает `MODERATOR_CABINET`/`LEGAL_HOLD` автоматически — только явной выдачей.
-Строки **PROPOSED** не являются решением OWNER: до подтверждения OWNER они действуют только в
-синтетических тестах; изменение — одна правка SQL-матрицы и TS-карты в новой миграции.
+Решение OWNER 5A (06.11): `MODERATOR_CABINET` и `LEGAL_HOLD` выдаются явно, в том числе OWNER, с аудитом.
+Матрица утверждена OWNER 06.11.2026 (решения 3A, 4A, 5A). Передать менеджеру другие права можно позже —
+одной правкой SQL-матрицы и TS-карты в новой миграции. `fn_staff_require` берёт строку аккаунта `FOR SHARE`:
+отзыв возможности или отключение аккаунта (они берут её `FOR UPDATE`) либо фиксируются до проверки
+права и тогда видны ей, либо ждут завершения команды.
 
 Сверка фактических привилегий DB-логинов — TOUR-51 и PR #74 (матрица `native-privilege-matrix.json`
 должна быть обновлена этим или следующим PR после merge #74).
@@ -198,14 +251,17 @@ CR-команде БД; TS-карта `PERMISSIONS` равна SQL-матриц�
 
 | ID | Для | Содержание |
 |---|---|---|
-| A2b-1 | B / TOUR-77 | `bank_operation` (идентичность операции, fence, UNKNOWN, read-back), FK из `seat_slot_event.bank_operation_ref` |
+| A2b-1 | B / TOUR-77 | `bank_operation` (идентичность операции, fence, UNKNOWN, read-back), FK из `seat_hold.attempt_ref` и `seat_slot_event.bank_operation_ref`; поступление сохраняется как факт и тогда, когда места менять нельзя (например, `NEWER_CYCLE_EXISTS` — двойное списание на ручную сверку) |
 | A2b-2 | B / TOUR-78 | реестр распределений поступлений/возвратов по строкам места; депозит ≤ цена места; график по `pricingBasisRef`; без двойного учёта при replay |
 | A2b-3 | E / TOUR-79 | ревизии поправок: базисы `TICKET_TYPE_CORRECTION`, `PARTIAL_CANCELLATION`, `FULL_TERMINATION`, `PARTICIPANT_REPLACEMENT`, `DEPARTURE_TRANSFER`; документ поправки и согласие по хэшу; CAS по текущей ревизии; детерминированный порядок блокировок выездов |
 | A2b-4 | E / TOUR-65 | исключительное снижение квоты: причина, аудит, CAS, «учтённый дефицит», блок новых продаж |
 | A2b-5 | D / TOUR-100 | ПД анкеты (после TOUR-35/84), флаг «18+ оказался несовершеннолетним» для счётчика |
 | A2b-6 | D / TOUR-101 | `document_proof` (версии, `verification_result`, `DELETED_BY_RETENTION`/`MISSING`, legalHold) |
 | A2b-7 | F / TOUR-103 | журнал выгрузок страховщику — только после TOUR-104 |
-| A2b-8 | C / TOUR-28/35 | `contract_snapshot` v2 с полной ценовой сеткой (взрослая/детская) |
+| A2b-8 | C/E / TOUR-28/35/65 | Решение OWNER 3/6A: детская цена, разрешение на детские места и минимальный возраст входят в опубликованную редакцию выезда (черновик → проверка → публикация) и в `contract_snapshot` v2. Это единственный путь записи; пауза остаётся отдельным переключателем. До продаж |
+| A2b-10 | A/C/E / TOUR-79/89/28 | Повторное принятие изменённых условий выезда или оферты в той же покупке и правило сохранения первоначальной цены при этом. Обязательное решение OWNER и реализация до продаж; до него — отказ `DEPARTURE_CHANGED`/`LEGAL_TERMS_CHANGED` с понятным объяснением в интерфейсе |
+| A2b-11 | A для C / TOUR-28 | Идемпотентность обычного checkout: серверный `checkoutIntentRef` до оформления, устойчивый ключ, отпечаток параметров, уникальное ограничение БД, атомарное создание (конкурентный повтор получает ту же покупку), `IDEMPOTENCY_CONFLICT` при других параметрах. Cookie связывает браузер с намерением, но не заменяет защиту в БД. Конкурентные тесты. До подключения публичного checkout |
+| A2b-12 | A для C / TOUR-28/99 | Возобновление покупки: HttpOnly cookie `__Host-` и серверная сессия (в БД только хэш), выдаётся до запроса на создание покупки; восстановление на другом устройстве — одноразовый код на email покупателя (механика OTP TOUR-99). В localStorage — только черновик без ПД. Диалог «Продолжить / Не сейчас» один раз при возвращении; отказ покупку не отменяет; «Места не забронированы» |
 | A2b-9 | A | удаление путей `UNIFORM` (`reserve()`, `fn_open_native_purchase`) из кода после переключения B/C; физическое удаление customer-таблиц — только `CUSTODY_IMPACT: YES` и точечный GO OWNER |
 
 ## 10. Приёмка A2 (синтетика)
@@ -226,18 +282,87 @@ CR-команде БД; TS-карта `PERMISSIONS` равна SQL-матриц�
 - Роли: TS = SQL-матрица; `documents.verify` только при `MODERATOR_CABINET`; отзыв возможности и
   отключение аккаунта сразу снимают права.
 - Неизменяемость: `pricing_basis`, строки ревизий, журналы — UPDATE/DELETE/TRUNCATE отклоняются.
+- Ревью PR #86: истёкший hold не подтверждается; новый платёжный цикл той же покупки; состав ссылки;
+  исход оплаты только для записанной попытки, UNKNOWN не освобождается; отмены нет у сервисов;
+  конфликт ключа идемпотентности; replay после закрытия продаж; одноразовый bearer-токен; сериализация
+  отзыва права и staff-команды (раздел 12).
 
 ## 11. Свидетельства A2 (исходники, синтетика; не deploy)
 
-Локально, PostgreSQL 16, ветка `claude/track-a-tour-76-schema-roles`:
+Локально, PostgreSQL 16, ветка `claude/track-a-tour-76-schema-roles`, после исправлений по ревью PR #86:
 
-- `commerce`: `tsc --noEmit` PASS; `pnpm test` **437/437** (включая новый `test/seat-slots.test.ts` 16/16);
-  `test:sabotage` **28/28** (ART-327); `check-migration-history` PASS; Control Room `tsc` и тест PASS.
+- `commerce`: `tsc --noEmit` PASS; `pnpm test` **452/452** (включая `test/seat-slots.test.ts` 31/31, стабильно
+  в повторных прогонах); `test:sabotage` **28/28** (ART-327); `check-migration-history` PASS;
+  Control Room `tsc` PASS.
 - Согласованные «снимки» привилегий: `admin_app` получает только staff-команды с проверкой
   `fn_staff_permitted` (список в `admin-privileges.test.ts`); `fn_departure_taken_seats` по-прежнему
   не исполняется `admin_app` — счётчик для CR считается в `departure_seat_projection` и сверяется с
   функцией тестом. `TRUNCATE` истории покупок по-прежнему отклоняется (триггер или FK).
-- **NOT_RUN:** образная квалификация `qualify-schema-image.ts` (Docker; обновлён probe: bundled=21,
-  forward=22, native-вход с ценой места) — выполняется CI; новые sabotage-мутанты для 0021 —
-  предложено TOUR-51; обновление `native-privilege-matrix.json` — после merge PR #74.
+- GitHub Actions run #230 на `f0763b1` (предыдущая версия): 6/6 SUCCESS, включая `commerce-image`
+  (точный HEAD, чистая схема, совместимая будущая схема). Для новой версии CI запускается заново.
+- **NOT_RUN:** новые sabotage-мутанты для 0021 — TOUR-51; обновление `native-privilege-matrix.json` —
+  после merge PR #74 (его снимок снят на схеме 0019).
 - Миграция 0021 не применена ни к одной рабочей БД; продажи CLOSED; `CUSTODY_IMPACT: NO`.
+
+## 12. Разбор ревью PR #86 (GPT, на `411218c`)
+
+`411218c` не был слит и не применялся ни к одной БД. Поэтому исправленная 0021 заменяет его в ветке
+(CI проверяет append-only на каждом промежуточном коммите, а правка 0021 новым коммитом поверх
+`411218c` эту проверку бы нарушила). Ревью-SHA `411218c` остаётся в истории PR.
+
+| Замечание | Вердикт | Что сделано | Тест (`seat-slots.test.ts`) |
+|---|---|---|---|
+| P1-1 истёкший `HELD` → `CONFIRMED` без вместимости | верно | Подтверждение только через цикл `PAID`, а цикл можно оплатить лишь после попытки, записанной до истечения hold по часам БД. Триггер запрещает `HELD → CONFIRMED` без такого цикла для DML любого логина | «an expired, unfenced hold is never confirmed…» |
+| P1-2 нет нового платёжного цикла | верно | `seat_hold` отделён от места; `fn_purchase_rehold` / `retryNativePurchasePayment` — новый цикл той же покупки по общим правилам; история циклов сохраняется | «after a proven failure the same purchase starts a new payment cycle» |
+| P1-3 ссылка не фиксирует состав | верно | `purchase_group_link.adults/teens/children`; точное совпадение при погашении (`GROUP_LINK_TICKETS_MISMATCH`) | «the link fixes the manager's tickets…» |
+| P1-4 произвольный `bankOperationRef` | верно частично | Исправлено то, что БД может обеспечить: исход принимается только для попытки, записанной на цикле; fenced (UNKNOWN) нельзя освободить без её исхода; `PAID_NO_SEAT_EXCEPTION` выбирает БД по вместимости, а не вызывающий. Подлинность ответа банка — `bank_operation` TOUR-77 (A2b-1); до интеграции функции помечены как неквалифицированные | «outcomes bind to the recorded attempt…» |
+| P1-5 отмена без поправки | верно | Функции отмены нет ни у одного сервисного логина (проверено перебором исполняемых SECURITY DEFINER) | «a confirmed seat cannot be cancelled…» |
+| PROPOSED-права уже действуют | верно | До решения OWNER все PROPOSED-строки — только OWNER | матрица ролей |
+| P2 fingerprint повтора | верно | `consumed_request_sha256` (выезд, состав, хэши условий; без ПД); тот же ключ с другим запросом → `IDEMPOTENCY_CONFLICT` | «…a repeated key replays only the same request…» |
+| P2 `SALES_CLOSED` до replay | верно | Replay читает результат до проверки продаж и не создаёт мест | там же |
+| P2 детская цена из изменяемой колонки | верно частично | Ложно, что оплачиваемая цена изменяема: цена каждого места замораживается при hold в `pricing_basis` и строках, которые входят в `revision_hash`; изменения детской цены — CAS и журнал, а basis теперь хранит `minor_settings_version`, и БД его проверяет. Верно, что в принятых байтах договора (`contract_snapshot`) детской цены нет: это A2b-8, условие до продаж, а не дефект схемы A2 | «the pause and resume are the owner's…» |
+| P2 токен действует после claim | верно | Bearer-токен одноразовый (`fn_seat_invitation_claimable`); далее — `fn_seat_invitation_live(invitationRef)` для OTP-сессии TOUR-99 | «invitations open only on confirmed seats…» |
+| P2 заголовок/описание PR | верно | Обновлены | — |
+| Отзыв права во время операции | добавлено | `fn_staff_require` блокирует строку аккаунта `FOR SHARE`, так что отзыв и команда сериализуются | «a staff command and a revocation are serialized…» |
+| PR #74 / матрица привилегий | порядок работ | Снимок #74 снят на схеме 0019; пересобрать после merge одного из PR | — |
+| `fn_purchase_revision_slot_model` только `INITIAL` | принято, не дефект | Поправки TOUR-79 — отдельная миграция A2b-3 | — |
+
+Тесты нашли и одну собственную ошибку переработки: при отсутствии цикла условие триггера места
+давало `NULL` и пропускало переход. Исправлено (`IS NOT TRUE`).
+
+### 12.2. Повторное ревью (GPT, на `f0763b1`)
+
+| Замечание | Вердикт | Что сделано | Тест (`seat-slots.test.ts`, «review 2») |
+|---|---|---|---|
+| P1-1 повторный hold обходит T−24 и `SALES_CLOSED` прямым SQL | верно | `fn_purchase_rehold` сам берёт переключатель продаж, затем lock выезда и проверяет выезд `OPEN`/опубликован и T−24 по часам БД. Тот же класс дыры закрыт и в `fn_open_slotted_purchase`: продажи, допуск выезда, T−24 и квота проверяются в БД, а не только в TS | «a direct SQL retry as commerce_app cannot pass…», «a checkout whose application clock is wrong…» |
+| P1-2 гонка повторного hold и закрытия заказа | верно | Обе стороны конкурируют за строку документа-заказа. Повторная оплата берёт её `FOR UPDATE` до проверок; закрытие (`fn_priced_document_orders_close`) берёт её `FOR UPDATE SKIP LOCKED` и перепроверяет условия после блокировки | «…serialize on the order row, in both orders» (двухтранзакционный тест в обе стороны) |
+| P1-3 время hold контролирует вызывающий | верно | Срок каждого цикла назначает и ограничивает БД (`HOLD_WINDOW_INVALID` для любого логина, включая владельца). У `fn_seat_holds_close_lapsed` нет параметра времени. `maintain(now)` с будущим временем живой hold не закрывает | «…held to the database clock…» |
+| P2 отпечаток без покупателя | верно | При повторе БД сравнивает ФИО, телефон и email запроса с контактом заказа. ПД в отпечаток не попадают | «a replay is the same attempt by the same buyer…» |
+| P2 повтор зависит от текущей редакции условий | верно | Проверки `TERMS_NOT_CURRENT`/`PD_CONSENT_NOT_CURRENT`/правового допуска выполняются после поиска повтора: повтор отвечает по принятой истории, новая покупка по старой редакции отклоняется | там же |
+| P2 поздний успех после нового цикла не сохраняется как факт | верно, вне A2 | `NEWER_CYCLE_EXISTS` не меняет места. Запись самого банковского поступления — `bank_operation` TOUR-77 (A2b-1), добавлено в его обязательства | — |
+| Окно 24 часа скользящее | верно | Заменено абсолютным: min(создание + 24 ч, T−24), раздел 3. PROPOSED до решения OWNER | «…or the retry window» |
+| P1 назначение сопровождающего конкурирует с его выбытием (на `2bfa879`; в тексте ревью на `f0763b1`, который дошёл до разработчика, его не было, поэтому в первой версии §12.2 он отсутствовал) | верно | `fn_companion_lock`: оба места блокируются в порядке id, затем участник-сопровождающий `FOR SHARE` с повторной проверкой. Это тот же порядок, что при выбытии (место → участник). Выдача приглашения сопровождающему блокирует так же и сверяет назначение. `fn_companion_current` (назначение не отозвано, место сопровождающего `CONFIRMED`, участник не завершён) проверяется при выдаче приглашения и в `fn_seat_invitation_live` | «review 3»: два соединения в обоих порядках; приглашение выбывшего сопровождающего не действует даже без каскада. Без исправления оба конкурентных теста падают |
+| P2 одновременный replay (двойной клик) возвращал ошибку (на `2bfa879`, по той же причине не было в первой версии §12.2) | верно | Результат той же попытки ищется ещё раз после блокировки выезда, под которой первый запрос создаёт покупку. Второй запрос получает ту же покупку | «review 3»: «a double click…», 5 раундов параллельных пар: обе ответа успешны, одна покупка, места созданы один раз. Без исправления тест падает |
+| Роли | рекомендация | Рекомендация ревью для OWNER: `minor_sales.pause` — OWNER и MANAGER (экстренная остановка); `minor_sales.resume`, `departure.quota.exception`, `paid_no_seat.resolve`, `refund.execute` — только OWNER. До решения действует OWNER-only | — |
+
+Поправка к итогу второго раунда: формулировка «все замечания исправлены» на `2bfa879` была неточной.
+Гонка сопровождающего и двойной клик оставались открытыми; они закрыты в следующей версии (строки выше).
+
+## 13. Решения OWNER 06.11.2026 по треку A
+
+OWNER принял решения 1–8 с уточнениями GPT; разработчик с ними согласен.
+
+| № | Решение | Где в схеме | Тест |
+|---|---|---|---|
+| 1A | Окно возобновления: min(создание + 24 ч, T−24), абсолютное; оно не ограничивает уже зарегистрированные операции | `fn_purchase_rehold`, `fn_priced_document_order_closable` | «review 2», «OWNER decisions…» |
+| 2A | Цена при повторной оплате — первоначальная; изменения условий выезда регулирует TOUR-89 | `pricing_basis`; отказ `DEPARTURE_CHANGED` | «2: no new attempt after…» |
+| 2 (Stage A) | Новая попытка отклоняется при новой редакции выезда, оферты или согласия; начатая попытка завершается; сохранение цены при повторном принятии — A2b-10 до продаж | `fn_purchase_rehold`, `retryNativePurchasePayment` | там же |
+| 3A | Паузу детских продаж ставят OWNER и MANAGER, снимает OWNER | `fn_staff_role_permits`, `PERMISSIONS` | «OWNER 3A…», матрица |
+| 3/6A | Отдельной команды детской цены нет; цена и возрастные условия — в публикации выезда и договоре v2 (A2b-8) | 0021 §3, §10 | «OWNER 3A…» |
+| 4A | Исключительное снижение квоты, назначение места при «оплате без места», возврат денег — только OWNER | матрица | матрица |
+| 5A | `MODERATOR_CABINET`/`LEGAL_HOLD` — явная выдача, в том числе OWNER | `admin_capability_grant` | «documents.* follow…» |
+| 7A | Технический предел — 500 мест на запрос; продуктовый предел — онлайн-квота; частота запросов, размер тела и конкурентная проверка квоты — отдельно | `MAX_SEATS_PER_REQUEST`, CHECK | «twelve seats…» |
+| 8B | ПД покупателя удаляются при закрытии неоплаченной покупки, с исключениями | `fn_purchase_pd_retention_due` (0021), `maintain()` | «8B: …» |
+| UX | Возобновление через HttpOnly cookie и серверную сессию; на другом устройстве — код на email; плюс обязательная серверная идемпотентность с уникальным ограничением БД | A2b-11, A2b-12 | будущие тесты TOUR-28 |
+
+Ни одно решение не даёт GO на merge, миграцию рабочей БД, банковские операции или продажи.

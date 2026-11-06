@@ -7,6 +7,13 @@ Refref credentials are no longer required or read. Sales remain CLOSED pending n
 qualification. Settings and legal release remain code-owned read-only inputs pending TOUR-59;
 Git/YAML tours/departures do not ship in the image. Native purchase/database/Admin contracts remain.
 
+Migration 0021 (Track A / TOUR-76 A2, [contract](../docs/plans/2026-11-04-track-a-schema-roles-contract.md)): the native
+checkout entry `reserveNativePurchase` buys priced seats of three ticket types without tourist data, in a purchase
+group; no limit of six (technical request bound 500); seat states, payment cycles (`seat_hold`, retry of the same
+purchase), occupancy and the 31/30 counters; companions,
+invitations and participants as identities without PD; roles OWNER/MANAGER/EDITOR plus MODERATOR_CABINET/LEGAL_HOLD
+grants (`admin-operator capability grant|revoke`). Not wired to a public route; not applied to any database.
+
 Build context is the repository root: `docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=<40-hex> .`.
 `pnpm build` clears old output before compiling. The runtime includes `src/` output only;
 `test/retired` and `test-fixtures/catalog` preserve historical evidence outside the image.

@@ -3,28 +3,32 @@
 // image, never `docker exec` into the Admin API (commerce/README.md, "Admin API"):
 //
 //   admin-operator status
-//   admin-operator user add <login> --role OWNER|EDITOR --by <who>    password on stdin
+//   admin-operator user add <login> --role OWNER|MANAGER|EDITOR --by <who>    password on stdin
 //   admin-operator user password <login> --by <who>                  password on stdin; revokes sessions
 //   admin-operator user disable|enable <login> --by <who> --reason "<why>"
 //   admin-operator totp reset <login> --by <who> --reason "<why>"     lost device: re-enrolment within 24 h
 //   admin-operator sessions revoke <login> --by <who> --reason "<why>"
 //   admin-operator throttle clear --by <who> --reason "<why>"
+//   admin-operator capability grant|revoke <login> --capability MODERATOR_CABINET|LEGAL_HOLD --by <who> --reason "<why>"
 //
 // A password is read from stdin, never from argv (it would land in shell history and `ps`).
 import { parseArgs } from 'node:util';
 
 import pg from 'pg';
 
-import { clearThrottle, createUser, resetTotp, revokeSessions, setDisabled, setPassword, status } from '../admin/operator.js';
+import { ROLES, type Role } from '../admin/auth.js';
+import { CAPABILITIES, clearThrottle, createUser, grantCapability, resetTotp, revokeCapability, revokeSessions, setDisabled, setPassword, status,
+  type Capability } from '../admin/operator.js';
 import { MIN_PASSWORD_LENGTH } from '../admin/password.js';
 import { env } from '../config.js';
 
-const USAGE = 'usage: admin-operator status | user add <login> --role OWNER|EDITOR --by <who> | user password <login> --by <who>'
+const USAGE = 'usage: admin-operator status | user add <login> --role OWNER|MANAGER|EDITOR --by <who> | user password <login> --by <who>'
   + ' | user disable|enable <login> --by <who> --reason <why> | totp reset <login> --by <who> --reason <why>'
-  + ' | sessions revoke <login> --by <who> --reason <why> | throttle clear --by <who> --reason <why>';
+  + ' | sessions revoke <login> --by <who> --reason <why> | throttle clear --by <who> --reason <why>'
+  + ' | capability grant|revoke <login> --capability MODERATOR_CABINET|LEGAL_HOLD --by <who> --reason <why>';
 
 const { positionals, values } = parseArgs({ allowPositionals: true,
-  options: { by: { type: 'string' }, reason: { type: 'string' }, role: { type: 'string' } } });
+  options: { by: { type: 'string' }, reason: { type: 'string' }, role: { type: 'string' }, capability: { type: 'string' } } });
 const [group, command, login] = positionals;
 
 async function stdinPassword(): Promise<string> {
@@ -38,7 +42,7 @@ async function stdinPassword(): Promise<string> {
   return password;
 }
 
-const need = (...names: ('by' | 'reason' | 'role')[]) => {
+const need = (...names: ('by' | 'reason' | 'role' | 'capability')[]) => {
   for (const n of names) if (!values[n]) throw new Error(`--${n} is required\n${USAGE}`);
 };
 
@@ -51,8 +55,8 @@ try {
     }
   } else if (group === 'user' && command === 'add' && login) {
     need('by', 'role');
-    if (values.role !== 'OWNER' && values.role !== 'EDITOR') throw new Error('--role is OWNER or EDITOR');
-    await createUser(pool, login, values.role, await stdinPassword(), values.by!);
+    if (!(ROLES as readonly string[]).includes(values.role!)) throw new Error('--role is OWNER, MANAGER or EDITOR');
+    await createUser(pool, login, values.role as Role, await stdinPassword(), values.by!);
     console.log(`${login} created; enrol the authenticator in the Control Room within 24 hours`);
   } else if (group === 'user' && command === 'password' && login) {
     need('by');
@@ -66,6 +70,16 @@ try {
   } else if (group === 'sessions' && command === 'revoke' && login) {
     need('by', 'reason');
     console.log(`${await revokeSessions(pool, login, values.by!, values.reason!)} session(s) revoked`);
+  } else if (group === 'capability' && (command === 'grant' || command === 'revoke') && login) {
+    need('by', 'reason', 'capability');
+    if (!(CAPABILITIES as readonly string[]).includes(values.capability!)) throw new Error('--capability is MODERATOR_CABINET or LEGAL_HOLD');
+    const capability = values.capability as Capability;
+    if (command === 'grant') {
+      await grantCapability(pool, login, capability, values.by!, values.reason!);
+      console.log(`${login}: ${capability} granted`);
+    } else {
+      console.log(`${login}: ${capability} ${await revokeCapability(pool, login, capability, values.by!, values.reason!) ? 'revoked' : 'was not active'}`);
+    }
   } else if (group === 'throttle' && command === 'clear') {
     need('by', 'reason');
     console.log(`${await clearThrottle(pool, values.by!, values.reason!)} throttle bucket(s) cleared`);

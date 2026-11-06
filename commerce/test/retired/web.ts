@@ -25,8 +25,11 @@ import { arrivalTarget } from './arrival.js';
 import type { Json } from '../../src/snapshot.js';
 import { bookablePublished } from '../../src/public-content.js';
 import { orderBookingCutoff, paymentDeadline, handoffUrl, issueState, onReturn, ownsOrder, pay, reconcileOrder, zayavkaOf, type CheckoutDeps } from './checkout.js';
-import { countryName, MAX_SEATS_PER_ORDER, reserve, type BookingRequest, type TouristInput } from '../../src/orders.js';
+import { countryName, reserve, type BookingRequest, type TouristInput } from '../../src/orders.js';
 import { BookingRateLimiter } from '../../src/rate-limit.js';
+
+/** The retired legacy form's fixed number of tourist fieldsets (historical evidence, not a product limit). */
+const RETIRED_FORM_SEATS = 6;
 
 /** Citizenships offered in the form, Russia first. Any country code is accepted by the service. */
 const CITIZENSHIPS = ['RU', 'BY', 'KZ', 'KG', 'AM', 'AZ', 'UZ', 'TJ', 'TM', 'MD', 'GE', 'MN', 'CN'];
@@ -170,7 +173,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
     const consent = deps.catalog.pdConsent;
     const site = deps.merchant.siteOrigin;
     const countries = CITIZENSHIPS.map((c) => `<option value="${c}">${esc(countryName(c) ?? c)}</option>`).join('');
-    const tourists = Array.from({ length: MAX_SEATS_PER_ORDER }, (_, i) => {
+    const tourists = Array.from({ length: RETIRED_FORM_SEATS }, (_, i) => {
       const k = `t${i + 1}`;
       const req = i === 0 ? 'required' : '';
       return `<fieldset><legend>Турист ${i + 1}${i === 0 ? ' — Заказчик (вы)' : ' (если едет)'}</legend>
@@ -218,7 +221,7 @@ export function createWebHandler(deps: CheckoutDeps, allowDemo: boolean, limiter
     const form = await readForm(req);
     if (form === null) { page(res, 400, 'Бронирование', `<p>${message('FORM_INVALID')}</p>`); return; }
     const tourists: TouristInput[] = [];
-    for (let i = 1; i <= MAX_SEATS_PER_ORDER; i += 1) {
+    for (let i = 1; i <= RETIRED_FORM_SEATS; i += 1) {
       const f = (k: string) => (form.get(`t${i}${k}`) ?? '').trim();
       if (f('Name') === '') continue;
       tourists.push({ fullName: f('Name'), dateOfBirth: f('Dob'), citizenship: f('Citizenship'),

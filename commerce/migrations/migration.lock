@@ -136,6 +136,15 @@
         "runtimeCommits": [],
         "evidence": "TOUR-96: empty-publication-history-only Krasnoyarsk legal calendar; exact bundled-head runtime only. Existing legal history refuses upgrade. See docs/decisions/2026-11-01-local-calendar-and-cdn.md."
       }
+    },
+    {
+      "version": 21,
+      "file": "0021_priced_seat_slots_groups_and_staff_roles.sql",
+      "checksum": "1b396edc1463a513026ab7acf2ad37438dbc51471767f48746feca3fe669cfab",
+      "compatibility": {
+        "runtimeCommits": [],
+        "evidence": "Track A / TOUR-76 A2: priced seat slots, purchase groups, personalization identities, staff role matrix, no limit of six. Exact bundled-head runtime only; no sales activation. See docs/plans/2026-11-04-track-a-schema-roles-contract.md."
+      }
     }
   ]
 }

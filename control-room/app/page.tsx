@@ -72,7 +72,7 @@ export default function Dashboard() {
     <>
       <div className="row">
         <h1>Control Room</h1>
-        <span className="muted">{me.login} · {me.role === "OWNER" ? "владелец" : "редактор"}</span>
+        <span className="muted">{me.login} · {me.role === "OWNER" ? "владелец" : me.role === "MANAGER" ? "менеджер" : "редактор"}</span>
         <button className="secondary" onClick={logout}>Выйти</button>
       </div>
       <p className="muted">Сессия до {time(me.idleExpiresAt)} без активности, не позже {time(me.absoluteExpiresAt)}.</p>
