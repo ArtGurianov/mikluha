@@ -22,7 +22,7 @@ import type pg from 'pg';
 
 import { bookingCutoff } from './booking-window.js';
 import { tokenSha256 } from './checkout-session.js';
-import { buildContractSnapshot, contractSnapshotHash } from './contract-snapshot.js';
+import { buildPricedContractSnapshot, contractSnapshotHash } from './contract-snapshot.js';
 import {
   MAX_SEATS_PER_REQUEST, newOrderRef, normalizeEmail, normalizePersonName, normalizePhone, reserveOrder,
   type BookingRefusal, type BookingRequest, type NativeBookingResult, type OrderDeps,
@@ -77,7 +77,7 @@ export type NativePurchaseRefusal = Exclude<BookingRefusal, 'ADULTS_ONLY_NOT_CON
   | 'AGE_TERMS_NOT_CONFIRMED' | 'BUYER_NAME_INVALID' | 'BOOKING_CUTOFF_REACHED' | 'MINORS_NOT_ALLOWED' | 'MINOR_SALES_PAUSED'
   | 'TICKET_TYPE_NOT_ALLOWED' | 'MINORS_WITHOUT_ADULT' | 'GROUP_LINK_INVALID' | 'GROUP_LINK_DEPARTURE_MISMATCH'
   | 'GROUP_LINK_TICKETS_MISMATCH' | 'IDEMPOTENCY_CONFLICT' | 'CHECKOUT_SESSION_INVALID' | 'CHECKOUT_INTENT_INVALID'
-  | 'CHECKOUT_INTENT_REQUIRED';
+  | 'CHECKOUT_INTENT_REQUIRED' | 'MINOR_TERMS_NOT_PUBLISHED';
 
 export type NativePurchaseResult =
   | { readonly ok: true; readonly replayed: boolean; readonly orderRef: string; readonly purchaseRef: string;
@@ -207,12 +207,24 @@ export async function reserveNativePurchase(deps: OrderDeps, req: NativePurchase
     now = (deps.now ?? (() => new Date()))();
     const cutoff = bookingCutoff(departure.startsOn, departure.contract.departure.departureTime, departure.timezone);
     if (cutoff <= now) return refuse('BOOKING_CUTOFF_REACHED');
-    const childPrice = (await client.query<{ child_price_kopecks: string | null }>(
-      'SELECT child_price_kopecks FROM departure WHERE id = $1', [departureId])).rows[0]?.child_price_kopecks;
+    // The published minor terms (migration 0024: written only by the departure's publication), read
+    // under the departure lock: the contract snapshot v2 accepts them and the pricing basis freezes them.
+    const terms = (await client.query<{ minors_allowed: boolean; minor_min_age: number | null; child_price_kopecks: string | null }>(
+      'SELECT minors_allowed, minor_min_age, child_price_kopecks FROM departure WHERE id = $1', [departureId])).rows[0]!;
+    const childPrice = terms.child_price_kopecks;
+    // The published terms are whole (migration 0024): a departure whose columns predate its publication
+    // with minorTerms, e.g. 0–13 seats allowed without an explicit child price, sells nothing until it is
+    // republished, instead of falling back to the adult price (OWNER 6A, review of PR #89).
+    const youngest = terms.minors_allowed && (terms.minor_min_age === null || terms.minor_min_age < 14);
+    if ((!terms.minors_allowed && (terms.minor_min_age !== null || childPrice !== null))
+        || (youngest && childPrice === null) || (terms.minors_allowed && !youngest && childPrice !== null)) {
+      return refuse('MINOR_TERMS_NOT_PUBLISHED');
+    }
     const amount = (adults + teens) * departure.priceKopecks + children * (childPrice == null ? departure.priceKopecks : Number(childPrice));
     const reservedUntil = new Date(Math.min(now.getTime() + SEAT_HOLD_MINUTES * 60_000, cutoff.getTime()));
     const orderRef = newOrderRef();
-    const contract = buildContractSnapshot(departure, departure.timezone);
+    const contract = buildPricedContractSnapshot(departure, departure.timezone, { allowed: terms.minors_allowed,
+      minAge: terms.minor_min_age, childPriceKopecks: childPrice == null ? null : Number(childPrice) });
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO orders (order_ref, departure_slug, trip_starts_on, trip_ends_on, seats, unit_price_kopecks, amount_kopecks, status,
                            reserved_until, legal_release_ref, legal_release_hash, legal_release_content, pd_consent_ref, pd_consent_hash,

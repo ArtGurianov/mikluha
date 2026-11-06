@@ -90,5 +90,9 @@
   {
     "version": 23,
     "file": "0023_checkout_intents_and_resume_sessions.sql"
+  },
+  {
+    "version": 24,
+    "file": "0024_minor_terms_in_departure_publication.sql"
   }
 ]
