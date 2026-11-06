@@ -123,13 +123,18 @@ const taken = async (now = new Date(), slug = SLUG) =>
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const token = () => randomBytes(24).toString('base64url');
 /**
- * The departure's minors' terms (child price, permission, minimum age). In production only the
- * departure's publication writes them (OWNER decision 3, A2b-8); until that exists the fixture sets
- * them as this disposable database's owner, bumping the version the pricing basis records.
+ * The departure's minors' terms (child price, permission, minimum age). Only the departure's
+ * publication writes them (OWNER decision 3, A2b-8, migration 0024; tested in minor-terms.test.ts).
+ * A publication is also a new departure version, which these tests must not see; so the fixture sets
+ * the columns as this disposable database's superuser with triggers suspended, bumping the version
+ * the pricing basis records, as a publication would.
  */
 const minorSettings = async (allowed: boolean, minAge: number | null = null, childPrice: number | null = CHILD_PRICE, id = departureId) => {
-  await db.owner.query(`UPDATE departure SET minors_allowed = $2, minor_min_age = $3, child_price_kopecks = $4,
-    minor_settings_version = minor_settings_version + 1 WHERE id = $1`, [id, allowed, minAge, childPrice]);
+  await asOwnerWithoutTriggers(`UPDATE departure SET minors_allowed = $2, minor_min_age = $3, child_price_kopecks = $4,
+    minor_settings_version = minor_settings_version + 1 WHERE id = $1`,
+    // As a publication would allow (0024): no minimum age or child price when minors are not sold, and a
+    // child price exactly when 0–13 seats can be sold (no minimum age, or one below 14).
+    [id, allowed, allowed ? minAge : null, allowed && (minAge === null || minAge < 14) ? childPrice : null]);
 };
 const pause = async (who: string, paused: boolean) => {
   const v = (await db.owner.query('SELECT minor_settings_version AS v FROM departure WHERE id = $1', [departureId])).rows[0].v;
@@ -241,14 +246,19 @@ describe('minors on checkout', () => {
     assert.equal(await taken(), 3);
   });
 
-  test('OWNER 3A: a manager or the owner pauses, only the owner resumes; null child price means the adult price', async () => {
+  test('OWNER 3A: a manager or the owner pauses, only the owner resumes; a child price equal to the adult one is published explicitly', async () => {
     await assert.rejects(pause(staff.editor, true), /STAFF_FORBIDDEN/);
     await pause(staff.manager, true);
     assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets: { adults: 1, teens: 0, children: 1 } })),
       { ok: false, refusal: 'MINOR_SALES_PAUSED' });
     await assert.rejects(pause(staff.manager, false), /STAFF_FORBIDDEN: minor_sales.resume/);
     await pause(staff.owner, false);
-    await minorSettings(true, null, null);
+    // Review of PR #89: 0–13 seats with no published child price are not sold at the adult price by default.
+    await asOwnerWithoutTriggers(`UPDATE departure SET child_price_kopecks = NULL, minor_settings_version = minor_settings_version + 1
+      WHERE id = $1`, [departureId]);
+    assert.deepEqual(await reserveNativePurchase(deps(), await request({ tickets: { adults: 1, teens: 0, children: 1 } })),
+      { ok: false, refusal: 'MINOR_TERMS_NOT_PUBLISHED' });
+    await minorSettings(true, null, adult);
     const r = await buy({ tickets: { adults: 1, teens: 0, children: 1 } });
     assert.equal(r.amountKopecks, 2 * adult);
     const events = (await db.owner.query('SELECT action, actor FROM departure_minor_event WHERE departure_id = $1 ORDER BY id', [departureId])).rows;
@@ -257,7 +267,7 @@ describe('minors on checkout', () => {
     const basis = (await db.owner.query(`SELECT b.minor_settings_version, b.child_price_kopecks FROM pricing_basis b
       JOIN orders o ON o.id = b.document_order_id WHERE o.order_ref = $1`, [r.orderRef])).rows[0];
     const version = (await db.owner.query('SELECT minor_settings_version AS v FROM departure WHERE id = $1', [departureId])).rows[0].v;
-    assert.deepEqual([basis.minor_settings_version, basis.child_price_kopecks], [version, null]);
+    assert.deepEqual([basis.minor_settings_version, Number(basis.child_price_kopecks)], [version, adult]);
     await assert.rejects(db.admin.query('SELECT fn_admin_minor_sales_pause($1, $2, $3, $4, $5)', [staff.owner, departureId, 0, true, 'stale']),
       /DEPARTURE_MINOR_CONFLICT/);
     // OWNER decision 3: no separate command writes the child price or the minors' terms.
