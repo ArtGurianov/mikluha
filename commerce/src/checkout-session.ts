@@ -89,7 +89,9 @@ export interface ResumeView {
    * «Оплатить»: a bank operation may be registered on the live hold now (HOLD_ACTIVE only). OWNER
    * clarification of 06.11.2026: an attempt starts when its hold is created within the window, so a hold
    * created before the 24-hour limit may be paid for its five minutes even after the limit (T−24 stays
-   * strict: no hold outlives it).
+   * strict: no hold outlives it). A precondition by the hold's state: the registration itself (openCollection)
+   * still refuses DEPARTURE_CHANGED or LEGAL_TERMS_CHANGED once newer terms are published (migration 0025);
+   * releaseStaleHold then frees the seats at once and the buyer accepts the current terms.
    */
   readonly canPayCurrentHold: boolean;
   /**

@@ -9,6 +9,7 @@ import type pg from 'pg';
 
 import { createUser } from '../src/admin/operator.js';
 import { openCollection, recordBankEvidence } from '../src/bank-operations.js';
+import { currentTermsOf } from '../src/bank-operations.js';
 import type { Catalog } from '../src/catalog.js';
 import {
   checkoutSessionCookie, forgetPurchaseOnDevice, issueCheckoutIntent, issueResumeCode, markResumePrompted, openCheckoutSession,
@@ -26,6 +27,7 @@ const KEY = resumeCodeKey(randomBytes(32).toString('base64'));
 
 let db: TestDb;
 let catalog: Catalog;
+const legalArgs = () => [catalog.terms.ref, catalog.terms.hash, catalog.pdConsent.ref, catalog.pdConsent.hash];
 let adult: number;
 let manager: string;
 
@@ -152,13 +154,13 @@ describe('A2b-12: only a session bound to the purchase resumes or pays it (G-RES
     const a = await buy();
     const stranger = await session();
     assert.equal(await resumeView(db.pool, a.purchaseRef, stranger), null);
-    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, stranger, 'alfa', 'mikluha-test'), { ok: false, refusal: 'PURCHASE_NOT_OWNED' });
+    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, stranger, 'alfa', 'mikluha-test', currentTermsOf(catalog)), { ok: false, refusal: 'PURCHASE_NOT_OWNED' });
     assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef, stranger), { ok: false, refusal: 'PURCHASE_NOT_OWNED' });
     for (const sql of [`SELECT * FROM fn_purchase_rehold('${a.purchaseRef}')`, `SELECT * FROM fn_bank_operation_open('${a.purchaseRef}', 'alfa', 'x')`]) {
       await assert.rejects(db.pool.query(sql), /permission denied/);
     }
-    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [a.purchaseRef, tokenSha256(stranger)]), /PURCHASE_NOT_OWNED/);
-    assert.equal((await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test')).ok, true);
+    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold_current($1, $2, $3, $4, $5, $6)', [a.purchaseRef, tokenSha256(stranger), ...legalArgs()]), /PURCHASE_NOT_OWNED/);
+    assert.equal((await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test', currentTermsOf(catalog))).ok, true);
   });
 });
 
@@ -172,7 +174,7 @@ describe('A2b-12: the return dialog follows server state (G-RESUME-01, v1.9.1 §
     assert.deepEqual(await sessionPurchases(db.pool, a.token), [{ purchaseRef: a.purchaseRef, promptDue: true }]);
     assert.equal(await markResumePrompted(db.pool, a.purchaseRef, a.token), true);
     assert.equal(await markResumePrompted(db.pool, a.purchaseRef, a.token), false, 'shown once');
-    const op = await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test');
+    const op = await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test', currentTermsOf(catalog));
     assert.ok(op.ok);
     v = (await resumeView(db.pool, a.purchaseRef, a.token))!;
     assert.deepEqual([v.state, v.holdExpiresAt, v.promptDue], ['PAYMENT_IN_PROGRESS', null, false]);
@@ -186,7 +188,7 @@ describe('A2b-12: the return dialog follows server state (G-RESUME-01, v1.9.1 §
     assert.equal((await resumeView(db.pool, a.purchaseRef, a.token))!.state, 'CLOSED');
 
     const b = await buy();
-    const paid = await openCollection(db.pool, b.purchaseRef, b.token, 'alfa', 'mikluha-test');
+    const paid = await openCollection(db.pool, b.purchaseRef, b.token, 'alfa', 'mikluha-test', currentTermsOf(catalog));
     assert.ok(paid.ok);
     await recordBankEvidence(db.pool, paid.bankOperationRef, { source: 'CALLBACK', observed: 'SUCCEEDED', provider: 'alfa',
       merchantAccount: 'mikluha-test', providerOperationId: 'alfa-b', amountKopecks: adult, currency: 'RUB', payload: 'ok' });
@@ -252,7 +254,7 @@ describe('review of PR #88: codes need the server key; a repeat after 8B erasure
     assert.ok(first.ok);
     const again = await reserveNativePurchase(deps(), request(token, key));
     assert.ok(again.ok && again.replayed && again.purchaseRef === first.purchaseRef);
-    const op = await openCollection(db.pool, first.purchaseRef, token, 'alfa', 'mikluha-test');
+    const op = await openCollection(db.pool, first.purchaseRef, token, 'alfa', 'mikluha-test', currentTermsOf(catalog));
     assert.ok(op.ok);
     await recordBankEvidence(db.pool, op.bankOperationRef, { source: 'CALLBACK', observed: 'FAILED', provider: 'alfa',
       merchantAccount: 'mikluha-test', payload: 'failed-8b' });
@@ -285,7 +287,7 @@ describe('review 2 of PR #88: forgetting is not final for an authorized code; a 
     assert.ok(v !== null, 'the code restores access in the same browser');
     assert.deepEqual([v.state, v.promptDue], ['HOLD_ACTIVE', true]);
     assert.deepEqual(await sessionPurchases(db.pool, a.token), [{ purchaseRef: a.purchaseRef, promptDue: true }]);
-    assert.equal((await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test')).ok, true);
+    assert.equal((await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test', currentTermsOf(catalog))).ok, true);
     // History keeps the forgotten link; one live link per purchase and session; forgetting again works.
     const links = (await db.owner.query(`SELECT bound_via, forgotten_at IS NOT NULL AS forgotten FROM purchase_session_binding b
       JOIN purchase p ON p.id = b.purchase_id WHERE p.purchase_ref = $1 ORDER BY bound_at`, [a.purchaseRef])).rows;
@@ -296,7 +298,7 @@ describe('review 2 of PR #88: forgetting is not final for an authorized code; a 
 
   test('a new hold made just before the 24-hour limit is shown as held until it ends; a new attempt is then refused', async () => {
     const a = await buy();
-    const op = await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test');
+    const op = await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test', currentTermsOf(catalog));
     assert.ok(op.ok);
     await recordBankEvidence(db.pool, op.bankOperationRef, { source: 'CALLBACK', observed: 'FAILED', provider: 'alfa',
       merchantAccount: 'mikluha-test', payload: 'failed-boundary' });
@@ -317,7 +319,7 @@ describe('review 2 of PR #88: forgetting is not final for an authorized code; a 
     assert.deepEqual([v.state, v.holdExpiresAt, v.retryWindowOpen, v.canPayCurrentHold, v.cycleStateEligible], ['CLOSED', null, false, false, false]);
     // Before the limit, a released purchase may still start a new attempt.
     const b = await buy();
-    const opB = await openCollection(db.pool, b.purchaseRef, b.token, 'alfa', 'mikluha-test');
+    const opB = await openCollection(db.pool, b.purchaseRef, b.token, 'alfa', 'mikluha-test', currentTermsOf(catalog));
     assert.ok(opB.ok);
     await recordBankEvidence(db.pool, opB.bankOperationRef, { source: 'CALLBACK', observed: 'FAILED', provider: 'alfa',
       merchantAccount: 'mikluha-test', payload: 'failed-b' });
@@ -332,7 +334,7 @@ describe('review 3 of PR #88: the resume view promises only what the commands do
     let v = (await resumeView(db.pool, a.purchaseRef, a.token))!;
     assert.deepEqual([v.state, v.retryWindowOpen, v.canPayCurrentHold, v.cycleStateEligible], ['HOLD_ACTIVE', true, true, false]);
     assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef, a.token), { ok: false, refusal: 'REHOLD_NOT_ALLOWED' });
-    const op = await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test');
+    const op = await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test', currentTermsOf(catalog));
     assert.ok(op.ok);
     await recordBankEvidence(db.pool, op.bankOperationRef, { source: 'REGISTRATION_RESPONSE', observed: 'REGISTERED', provider: 'alfa',
       merchantAccount: 'mikluha-test', providerOperationId: 'alfa-in-progress', payload: 'registered' });
@@ -342,7 +344,7 @@ describe('review 3 of PR #88: the resume view promises only what the commands do
     v = (await resumeView(db.pool, a.purchaseRef, a.token))!;
     assert.deepEqual([v.state, v.retryWindowOpen, v.canPayCurrentHold, v.cycleStateEligible], ['PAYMENT_IN_PROGRESS', true, false, false]);
     assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef, a.token), { ok: false, refusal: 'REHOLD_NOT_ALLOWED' });
-    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, a.token, 'sbp', 'mikluha-test'), { ok: false, refusal: 'HOLD_ALREADY_FENCED' });
+    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, a.token, 'sbp', 'mikluha-test', currentTermsOf(catalog)), { ok: false, refusal: 'HOLD_ALREADY_FENCED' });
   });
 
   test('a hold that expired before maintain() ran: RELEASED, a new cycle is offered and the retry starts it at once', async () => {
@@ -351,7 +353,7 @@ describe('review 3 of PR #88: the resume view promises only what the commands do
       WHERE closed_at IS NULL AND purchase_id = (SELECT id FROM purchase WHERE purchase_ref = $1)`, [a.purchaseRef]);
     const v = (await resumeView(db.pool, a.purchaseRef, a.token))!;
     assert.deepEqual([v.state, v.holdExpiresAt, v.canPayCurrentHold, v.cycleStateEligible], ['RELEASED', null, false, true]);
-    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test'), { ok: false, refusal: 'HOLD_EXPIRED' },
+    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test', currentTermsOf(catalog)), { ok: false, refusal: 'HOLD_EXPIRED' },
       'no payment on the expired hold');
     const retry = await retryNativePurchasePayment(deps(), a.purchaseRef, a.token);
     assert.ok(retry.ok, JSON.stringify(retry));
@@ -368,7 +370,7 @@ describe('review 3 of PR #88: the resume view promises only what the commands do
 
 describe('review 4 of PR #88: the final retry answer and the attempt that starts before the 24-hour limit', () => {
   const failHold = async (r: { purchaseRef: string; token: string }, payload: string) => {
-    const op = await openCollection(db.pool, r.purchaseRef, r.token, 'alfa', 'mikluha-test');
+    const op = await openCollection(db.pool, r.purchaseRef, r.token, 'alfa', 'mikluha-test', currentTermsOf(catalog));
     assert.ok(op.ok);
     await recordBankEvidence(db.pool, op.bankOperationRef, { source: 'CALLBACK', observed: 'FAILED', provider: 'alfa',
       merchantAccount: 'mikluha-test', payload });
@@ -412,7 +414,7 @@ describe('review 4 of PR #88: the final retry answer and the attempt that starts
     const v = (await resumeView(db.pool, a.purchaseRef, a.token))!;
     assert.deepEqual([v.state, v.retryWindowOpen, v.canPayCurrentHold], ['HOLD_ACTIVE', false, true]);
     // The attempt began with the hold: the bank registers it now, past the limit, and it completes.
-    const op = await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test');
+    const op = await openCollection(db.pool, a.purchaseRef, a.token, 'alfa', 'mikluha-test', currentTermsOf(catalog));
     assert.ok(op.ok, JSON.stringify(op));
     const reg = await recordBankEvidence(db.pool, op.bankOperationRef, { source: 'REGISTRATION_RESPONSE', observed: 'REGISTERED',
       provider: 'alfa', merchantAccount: 'mikluha-test', providerOperationId: 'alfa-after-limit', payload: 'reg-after-limit' });

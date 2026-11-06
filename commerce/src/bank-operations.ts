@@ -49,24 +49,39 @@ export interface RecordedEvidence {
   readonly applicationPending: boolean;
 }
 
-export type OpenRefusal = 'HOLD_NOT_OPEN' | 'HOLD_EXPIRED' | 'HOLD_ALREADY_FENCED' | 'PURCHASE_CLOSED' | 'PURCHASE_UNKNOWN' | 'PURCHASE_NOT_OWNED';
+export type OpenRefusal = 'HOLD_NOT_OPEN' | 'HOLD_EXPIRED' | 'HOLD_ALREADY_FENCED' | 'PURCHASE_CLOSED' | 'PURCHASE_UNKNOWN' | 'PURCHASE_NOT_OWNED'
+  | 'DEPARTURE_CHANGED' | 'LEGAL_TERMS_CHANGED';
 const OPEN_REFUSALS = ['HOLD_NOT_OPEN', 'HOLD_EXPIRED', 'HOLD_ALREADY_FENCED', 'PURCHASE_CLOSED', 'PURCHASE_UNKNOWN',
-  'PURCHASE_NOT_OWNED'] as const satisfies readonly OpenRefusal[];
+  'PURCHASE_NOT_OWNED', 'DEPARTURE_CHANGED', 'LEGAL_TERMS_CHANGED'] as const satisfies readonly OpenRefusal[];
+
+/**
+ * The offer and PD consent releases published now (code-owned until TOUR-59). The database compares them
+ * with the purchase's current revision before any payment starts (migration 0025).
+ */
+export interface CurrentTerms {
+  readonly termsRef: string; readonly termsHash: string; readonly pdConsentRef: string; readonly pdConsentHash: string;
+}
+export const currentTermsOf = (catalog: { terms: { ref: string; hash: string }; pdConsent: { ref: string; hash: string } }): CurrentTerms =>
+  ({ termsRef: catalog.terms.ref, termsHash: catalog.terms.hash, pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash });
+const termsArgs = (t: CurrentTerms) => [t.termsRef, t.termsHash, t.pdConsentRef, t.pdConsentHash];
 
 export const payloadSha256 = (payload: string | Uint8Array) => createHash('sha256').update(payload).digest('hex');
 
 /**
  * Record the collection of the purchase's open payment cycle, before the bank registration. The
  * returned reference is the operation's identity towards the bank (its order number). Only a browser
- * session bound to the purchase may start it (migration 0023, G-RESUME-02).
+ * session bound to the purchase may start it (migration 0023, G-RESUME-02). An operation already
+ * registered on the cycle is returned as is; a new one is refused once the departure, offer or PD consent
+ * has a newer release than the purchase's current revision (migration 0025, OWNER A2b-10 decision).
  */
 export async function openCollection(pool: pg.Pool | pg.PoolClient, purchaseRef: string, sessionToken: string, provider: string,
-  merchantAccount: string):
+  merchantAccount: string, terms: CurrentTerms):
   Promise<{ readonly ok: true; readonly bankOperationRef: string; readonly holdRef: string; readonly amountKopecks: number;
             readonly currency: string; readonly replayed: boolean } | { readonly ok: false; readonly refusal: OpenRefusal }> {
   try {
     const r = (await pool.query<{ bank_operation_ref: string; hold_ref: string; amount_kopecks: string; currency: string; replayed: boolean }>(
-      'SELECT * FROM fn_bank_operation_open_owned($1, $2, $3, $4)', [purchaseRef, tokenSha256(sessionToken), provider, merchantAccount])).rows[0]!;
+      'SELECT * FROM fn_bank_operation_open_current($1, $2, $3, $4, $5, $6, $7, $8)',
+      [purchaseRef, tokenSha256(sessionToken), provider, merchantAccount, ...termsArgs(terms)])).rows[0]!;
     return { ok: true, bankOperationRef: r.bank_operation_ref, holdRef: r.hold_ref, amountKopecks: Number(r.amount_kopecks),
       currency: r.currency, replayed: r.replayed };
   } catch (e) {
@@ -74,6 +89,16 @@ export async function openCollection(pool: pg.Pool | pg.PoolClient, purchaseRef:
     if (refusal === undefined) throw e;
     return { ok: false, refusal };
   }
+}
+
+/**
+ * After DEPARTURE_CHANGED or LEGAL_TERMS_CHANGED: release the live, unfenced hold at once instead of
+ * waiting out its five minutes. Idempotent; false when there is nothing to release (no open hold, an
+ * operation already registered, or the terms are current after all).
+ */
+export async function releaseStaleHold(pool: pg.Pool | pg.PoolClient, purchaseRef: string, sessionToken: string, terms: CurrentTerms): Promise<boolean> {
+  return (await pool.query<{ r: boolean }>('SELECT fn_purchase_hold_release_stale($1, $2, $3, $4, $5, $6) AS r',
+    [purchaseRef, tokenSha256(sessionToken), ...termsArgs(terms)])).rows[0]!.r;
 }
 
 /** Record one piece of evidence about an operation; the database decides what it changes. */

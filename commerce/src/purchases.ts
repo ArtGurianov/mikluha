@@ -323,7 +323,8 @@ export type RetryRefusal = 'SALES_CLOSED' | 'BOOKING_CUTOFF_REACHED' | 'NOT_ENOU
 /** The database enforces every one of these itself (fn_purchase_rehold); the checks above only answer earlier. */
 const RETRY_REFUSALS = ['NOT_ENOUGH_SEATS', 'MINORS_NOT_ALLOWED', 'MINOR_SALES_PAUSED', 'TICKET_TYPE_NOT_ALLOWED',
   'MINORS_WITHOUT_ADULT', 'REHOLD_NOT_ALLOWED', 'PURCHASE_CLOSED', 'RETRY_WINDOW_CLOSED', 'SALES_CLOSED', 'BOOKING_CUTOFF_REACHED',
-  'DEPARTURE_NOT_OPEN', 'DEPARTURE_NOT_LISTED', 'DEPARTURE_CHANGED', 'PURCHASE_NOT_OWNED'] as const satisfies readonly RetryRefusal[];
+  'DEPARTURE_NOT_OPEN', 'DEPARTURE_NOT_LISTED', 'DEPARTURE_CHANGED', 'PURCHASE_NOT_OWNED',
+  'LEGAL_TERMS_CHANGED'] as const satisfies readonly RetryRefusal[];
 
 /**
  * A new payment cycle of the same purchase after the bank proved the previous attempt unpaid, or the
@@ -341,7 +342,7 @@ export async function retryNativePurchasePayment(deps: OrderDeps, purchaseRef: s
 /**
  * The final answer to «can this session start a new payment cycle now?» (review 4 of PR #88): the very
  * path of retryNativePurchasePayment — ownership, sales switch, departure, T−24, legal terms, then
- * fn_purchase_rehold_owned with its quota, pause, minors, group, revision and window checks — run in a
+ * fn_purchase_rehold_current with the legal releases, then quota, pause, minors, group, revision and window checks — run in a
  * transaction that is rolled back, so nothing is held or changed. ResumeView.cycleStateEligible is only
  * the cycle-state precondition; the interface offers «Повторить оплату» on this answer. It may still
  * change before the buyer clicks (quota, sales switch); the real retry decides again.
@@ -375,22 +376,16 @@ async function retryOrPreview(deps: OrderDeps, purchaseRef: string, sessionToken
     if (typeof departure === 'string') return refuse(departure);
     const cutoff = bookingCutoff(departure.startsOn, departure.contract.departure.departureTime, departure.timezone);
     if (cutoff <= now) return refuse('BOOKING_CUTOFF_REACHED');
-    // OWNER decision 2 (06.11.2026, Stage A): no new attempt under an offer or PD consent that has been
-    // replaced since the buyer accepted it; the buyer accepts the current terms in a new purchase. The
-    // current legal release is code-owned (catalog) until TOUR-59 moves it into the database, so this
-    // check is the application's; the departure's own revision is checked by fn_purchase_rehold.
-    const accepted = (await client.query<{ legal_release_ref: string; legal_release_hash: string; pd_consent_ref: string; pd_consent_hash: string }>(
-      `SELECT o.legal_release_ref, o.legal_release_hash, o.pd_consent_ref, o.pd_consent_hash FROM purchase p
-         JOIN orders o ON o.id = p.origin_order_id WHERE p.purchase_ref = $1`, [purchaseRef])).rows[0]!;
-    if (accepted.legal_release_ref !== deps.catalog.terms.ref || accepted.legal_release_hash !== deps.catalog.terms.hash
-        || accepted.pd_consent_ref !== deps.catalog.pdConsent.ref || accepted.pd_consent_hash !== deps.catalog.pdConsent.hash) {
-      return refuse('LEGAL_TERMS_CHANGED');
-    }
+    // OWNER decision 2 (06.11.2026): no new attempt under an offer or PD consent replaced since the buyer
+    // accepted it. Since migration 0025 the database compares the releases published now (code-owned until
+    // TOUR-59, passed here) with the purchase's CURRENT revision, so no service path skips it (G-RETRY-03).
     let holdRef: string;
     let reservedUntil: Date;
     try {
-      const held = (await client.query<{ hold_ref: string; expires_at: Date }>('SELECT hold_ref, expires_at FROM fn_purchase_rehold_owned($1, $2)',
-        [purchaseRef, tokenSha256(sessionToken)])).rows[0]!;
+      const held = (await client.query<{ hold_ref: string; expires_at: Date }>(
+        'SELECT hold_ref, expires_at FROM fn_purchase_rehold_current($1, $2, $3, $4, $5, $6)',
+        [purchaseRef, tokenSha256(sessionToken), deps.catalog.terms.ref, deps.catalog.terms.hash, deps.catalog.pdConsent.ref,
+          deps.catalog.pdConsent.hash])).rows[0]!;
       holdRef = held.hold_ref;
       reservedUntil = held.expires_at;
     } catch (e) {

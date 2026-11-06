@@ -20,7 +20,7 @@ import { createCommerceServer, readiness, routes } from './dist/server.js';
 const identity = await readBuildIdentity('/app/identity/identity.json');
 assert.equal(identity.sourceCommit, process.env.QUALIFICATION_SOURCE_COMMIT, 'image must identify the declared exact HEAD');
 const migrations = readMigrations('./migrations');
-const bundledHead=24, forwardHead=bundledHead+1;
+const bundledHead=25, forwardHead=bundledHead+1;
 assert.equal(migrations.length, bundledHead, 'review this qualification when the real baseline advances');
 const owner = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await owner.connect();

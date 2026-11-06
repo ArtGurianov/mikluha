@@ -34,6 +34,11 @@ seats and the minimum age are the departure document's `minorTerms`, written onl
 a PRICED_SLOTS order accepts them in `mikluha.order-contract/2`, checked against the published terms at insert. The pause
 of minors' sales stays a separate switch.
 
+Migration 0025 (OWNER A2b-10 decision, contract §17): no payment starts under terms replaced since the buyer accepted them.
+`openCollection` and the retry pass the current offer and PD consent releases; the database compares them and the departure
+version with the purchase's current revision, after replaying an operation already registered (which always completes on its
+own terms). `releaseStaleHold` frees a stale, unfenced hold at once.
+
 Build context is the repository root: `docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=<40-hex> .`.
 `pnpm build` clears old output before compiling. The runtime includes `src/` output only;
 `test/retired` and `test-fixtures/catalog` preserve historical evidence outside the image.
