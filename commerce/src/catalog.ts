@@ -89,6 +89,29 @@ function str(doc: Record<string, unknown>, key: string, where: string): string {
   return v;
 }
 
+/**
+ * A valid IANA zone in its exact published spelling, or a refusal. Never substitutes a default: a
+ * missing or invalid site timezone stops the catalog instead of silently becoming Europe/Moscow.
+ *
+ * ICU may report a current IANA name under an older one (Europe/Kyiv -> Europe/Kiev,
+ * Asia/Kolkata -> Asia/Calcutta), so equality with ICU's resolved name is not the test. Accepted:
+ * ICU accepts the zone, the spelling follows IANA's Area/Location form (each segment starts with an
+ * upper-case letter and is not shouted), and the value is not merely a case variant of the name ICU
+ * resolved. The explicitly configured value is preserved as written.
+ */
+const TZ_SEGMENT = /^[A-Z][A-Za-z0-9_+-]*$/;
+const TZ_UPPER_SEGMENT = /^(?:[A-Z]{1,3}|GMT[+-]\d{1,2})$/;
+export function ianaTimezone(value: string, where: string): string {
+  const refuse = () => new Error(`CATALOG_INVALID: ${where} timezone`);
+  const segments = value.split('/');
+  if (segments.length < 2 || !segments.every((s) => TZ_SEGMENT.test(s) && (/[a-z]/.test(s) || TZ_UPPER_SEGMENT.test(s)))) throw refuse();
+  let resolved: string;
+  try { resolved = new Intl.DateTimeFormat('en-US', { timeZone: value }).resolvedOptions().timeZone; }
+  catch { throw refuse(); }
+  if (resolved !== value && resolved.toLowerCase() === value.toLowerCase()) throw refuse();
+  return value;
+}
+
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 const lines = (v: unknown): string[] => (text(v) ?? '').split('\n').map((l) => l.trim()).filter((l) => l !== '');
 const record = (v: unknown): Record<string, unknown> =>
@@ -137,7 +160,7 @@ export function departureContract(raw: unknown): DepartureContract | null {
 
 export function loadSiteRelease(contentDir: string): Catalog {
   const settings = load(join(contentDir, 'site-settings.yml'));
-  const timezone = str(settings, 'timezone', 'site-settings');
+  const timezone = ianaTimezone(str(settings, 'timezone', 'site-settings'), 'site-settings');
   const departures = new Map<string, Departure>();
   const artifact = (slug: string): BookingTerms => {
     const page = load(join(contentDir, 'legal', `${slug}.yml`));
