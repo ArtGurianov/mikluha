@@ -29,6 +29,11 @@ a purchase need a session bound to it (or bound by a one-time email code); a pur
 `CHECKOUT_RESUME_CODE_KEY` (a server key outside PostgreSQL, to be set in Coolify when TOUR-28/99 wire the route). No route or
 cookie is wired yet.
 
+Migration 0024 (Track A / A2b-8 for TOUR-28/35/65, contract §16): the child price, the permission to sell minors'
+seats and the minimum age are the departure document's `minorTerms`, written only by its publication (audited, versioned);
+a PRICED_SLOTS order accepts them in `mikluha.order-contract/2`, checked against the published terms at insert. The pause
+of minors' sales stays a separate switch.
+
 Build context is the repository root: `docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=<40-hex> .`.
 `pnpm build` clears old output before compiling. The runtime includes `src/` output only;
 `test/retired` and `test-fixtures/catalog` preserve historical evidence outside the image.

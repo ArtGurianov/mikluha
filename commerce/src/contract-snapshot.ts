@@ -14,6 +14,18 @@ import type { Bookable, Departure } from './catalog.js';
 import { canonical, type Json } from './snapshot.js';
 
 export const CONTRACT_SNAPSHOT_SCHEMA = 'mikluha.order-contract/1';
+/**
+ * Version 2 (migration 0024, A2b-8): schema /1 plus the minor terms of the published departure the
+ * buyer accepts (child price, permission, minimum age). Every PRICED_SLOTS order carries it.
+ */
+export const CONTRACT_SNAPSHOT_SCHEMA_V2 = 'mikluha.order-contract/2';
+
+/** The departure's published minor terms (OWNER 3/6A): written only by its publication. */
+export interface MinorTerms {
+  readonly allowed: boolean;
+  readonly minAge: number | null;
+  readonly childPriceKopecks: number | null;
+}
 
 export interface ContractSnapshot {
   readonly schema: typeof CONTRACT_SNAPSHOT_SCHEMA;
@@ -53,16 +65,28 @@ export function buildContractSnapshot(departure: Bookable, timezone: string): Co
   };
 }
 
+export interface ContractSnapshotV2 extends Omit<ContractSnapshot, 'schema'> {
+  readonly schema: typeof CONTRACT_SNAPSHOT_SCHEMA_V2;
+  readonly minorTerms: MinorTerms;
+}
+
+/** What a buyer of priced seats accepts now: /1 plus the published minor terms. */
+export function buildPricedContractSnapshot(departure: Bookable, timezone: string, minorTerms: MinorTerms): ContractSnapshotV2 {
+  return { ...buildContractSnapshot(departure, timezone), schema: CONTRACT_SNAPSHOT_SCHEMA_V2,
+    minorTerms: { allowed: minorTerms.allowed, minAge: minorTerms.minAge, childPriceKopecks: minorTerms.childPriceKopecks } };
+}
+
 /** `sha256:<hex>` of the snapshot's canonical form. */
-export function contractSnapshotHash(snapshot: ContractSnapshot): string {
+export function contractSnapshotHash(snapshot: ContractSnapshot | ContractSnapshotV2): string {
   return `sha256:${createHash('sha256').update(canonical(snapshot as unknown as Json), 'utf8').digest('hex')}`;
 }
 
 /** Independent JCS integrity check. SQL validates shape/hash format; a future DB-backed document
  * writer must invoke this verifier before trusting a stored digest. */
-export function contractSnapshotIntact(snapshot: unknown, hash: string | null): snapshot is ContractSnapshot {
+export function contractSnapshotIntact(snapshot: unknown, hash: string | null): snapshot is ContractSnapshot | ContractSnapshotV2 {
   if (snapshot === null || typeof snapshot !== 'object' || hash === null) return false;
-  if ((snapshot as { schema?: unknown }).schema !== CONTRACT_SNAPSHOT_SCHEMA) return false;
+  const schema = (snapshot as { schema?: unknown }).schema;
+  if (schema !== CONTRACT_SNAPSHOT_SCHEMA && schema !== CONTRACT_SNAPSHOT_SCHEMA_V2) return false;
   try {
     return contractSnapshotHash(snapshot as ContractSnapshot) === hash;
   } catch {
