@@ -98,5 +98,9 @@
   {
     "version": 25,
     "file": "0025_payment_start_terms_guard.sql"
+  },
+  {
+    "version": 26,
+    "file": "0026_seat_money_ledger_and_deposits.sql"
   }
 ]

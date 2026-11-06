@@ -50,9 +50,19 @@ export interface RecordedEvidence {
 }
 
 export type OpenRefusal = 'HOLD_NOT_OPEN' | 'HOLD_EXPIRED' | 'HOLD_ALREADY_FENCED' | 'PURCHASE_CLOSED' | 'PURCHASE_UNKNOWN' | 'PURCHASE_NOT_OWNED'
-  | 'DEPARTURE_CHANGED' | 'LEGAL_TERMS_CHANGED';
+  | 'DEPARTURE_CHANGED' | 'LEGAL_TERMS_CHANGED' | 'DEPOSIT_WINDOW_CLOSED' | 'DEPOSIT_NOT_AVAILABLE' | 'BALANCE_WINDOW_CLOSED'
+  | 'NOTHING_DUE' | 'BALANCE_PAYMENT_IN_FLIGHT' | 'BALANCE_APPLICATION_PENDING' | 'BALANCE_SETTLEMENT_PENDING';
 const OPEN_REFUSALS = ['HOLD_NOT_OPEN', 'HOLD_EXPIRED', 'HOLD_ALREADY_FENCED', 'PURCHASE_CLOSED', 'PURCHASE_UNKNOWN',
-  'PURCHASE_NOT_OWNED', 'DEPARTURE_CHANGED', 'LEGAL_TERMS_CHANGED'] as const satisfies readonly OpenRefusal[];
+  'PURCHASE_NOT_OWNED', 'DEPARTURE_CHANGED', 'LEGAL_TERMS_CHANGED', 'DEPOSIT_WINDOW_CLOSED', 'DEPOSIT_NOT_AVAILABLE',
+  'BALANCE_WINDOW_CLOSED', 'NOTHING_DUE', 'BALANCE_PAYMENT_IN_FLIGHT', 'BALANCE_APPLICATION_PENDING',
+  'BALANCE_SETTLEMENT_PENDING'] as const satisfies readonly OpenRefusal[];
+
+/**
+ * What a payment pays (migration 0026, MK-C01): FULL the whole purchase and DEPOSIT the seats' deposits
+ * (min(nominal, price) each; only before T−72, and only when less than the whole price), both on the
+ * open payment cycle; BALANCE what is still owed on confirmed seats, without a cycle, before T−24.
+ */
+export type PaymentPurpose = 'FULL' | 'DEPOSIT' | 'BALANCE';
 
 /**
  * The offer and PD consent releases published now (code-owned until TOUR-59). The database compares them
@@ -75,13 +85,17 @@ export const payloadSha256 = (payload: string | Uint8Array) => createHash('sha25
  * has a newer release than the purchase's current revision (migration 0025, OWNER A2b-10 decision).
  */
 export async function openCollection(pool: pg.Pool | pg.PoolClient, purchaseRef: string, sessionToken: string, provider: string,
-  merchantAccount: string, terms: CurrentTerms):
-  Promise<{ readonly ok: true; readonly bankOperationRef: string; readonly holdRef: string; readonly amountKopecks: number;
+  merchantAccount: string, terms: CurrentTerms, purpose: PaymentPurpose = 'FULL'):
+  Promise<{ readonly ok: true; readonly bankOperationRef: string; readonly holdRef: string | null; readonly amountKopecks: number;
             readonly currency: string; readonly replayed: boolean } | { readonly ok: false; readonly refusal: OpenRefusal }> {
   try {
-    const r = (await pool.query<{ bank_operation_ref: string; hold_ref: string; amount_kopecks: string; currency: string; replayed: boolean }>(
-      'SELECT * FROM fn_bank_operation_open_current($1, $2, $3, $4, $5, $6, $7, $8)',
-      [purchaseRef, tokenSha256(sessionToken), provider, merchantAccount, ...termsArgs(terms)])).rows[0]!;
+    // Money already confirmed for this purchase but not yet in the ledger is applied first, in its own
+    // committed statement: a refusal of the open below rolls back only the open (review 2 of PR #91).
+    // Call with a pool, not inside an outer transaction, so this step commits on its own.
+    if (purpose === 'BALANCE') await pool.query('SELECT fn_purchase_apply_due($1)', [purchaseRef]);
+    const r = (await pool.query<{ bank_operation_ref: string; hold_ref: string | null; amount_kopecks: string; currency: string; replayed: boolean }>(
+      'SELECT * FROM fn_bank_operation_open_payment($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [purchaseRef, tokenSha256(sessionToken), provider, merchantAccount, ...termsArgs(terms), purpose])).rows[0]!;
     return { ok: true, bankOperationRef: r.bank_operation_ref, holdRef: r.hold_ref, amountKopecks: Number(r.amount_kopecks),
       currency: r.currency, replayed: r.replayed };
   } catch (e) {
@@ -110,6 +124,21 @@ export async function recordBankEvidence(pool: pg.Pool | pg.PoolClient, bankOper
       ev.amountKopecks ?? null, ev.currency ?? null, ev.providerEventId ?? null, payloadSha256(ev.payload)])).rows[0]!;
   return { status: r.status, effect: r.effect, seatEffect: r.seat_effect, confirmed: r.confirmed, noSeat: r.no_seat,
     settlementCaseRef: r.settlement_case_ref, replayed: r.replayed, applicationPending: r.application_pending };
+}
+
+export interface PurchaseMoney {
+  readonly totalKopecks: number; readonly depositTotalKopecks: number; readonly paidKopecks: number; readonly refundedKopecks: number;
+  readonly balanceDueKopecks: number; readonly depositUntil: Date; readonly balanceDueAt: Date; readonly depositOffered: boolean;
+}
+
+/** The purchase's money by the ledger (migration 0026): no personal data. */
+export async function purchaseMoney(pool: pg.Pool | pg.PoolClient, purchaseRef: string): Promise<PurchaseMoney | null> {
+  const r = (await pool.query<{ total_kopecks: string; deposit_total_kopecks: string; paid_kopecks: string; refunded_kopecks: string;
+    balance_due_kopecks: string; deposit_until: Date; balance_due_at: Date; deposit_offered: boolean }>(
+    'SELECT * FROM purchase_money WHERE purchase_ref = $1', [purchaseRef])).rows[0];
+  return r === undefined ? null : { totalKopecks: Number(r.total_kopecks), depositTotalKopecks: Number(r.deposit_total_kopecks),
+    paidKopecks: Number(r.paid_kopecks), refundedKopecks: Number(r.refunded_kopecks), balanceDueKopecks: Number(r.balance_due_kopecks),
+    depositUntil: r.deposit_until, balanceDueAt: r.balance_due_at, depositOffered: r.deposit_offered };
 }
 
 /** Retry seat applications that failed unexpectedly (maintain()). */
