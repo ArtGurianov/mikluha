@@ -14,6 +14,14 @@ purchase), occupancy and the 31/30 counters; companions,
 invitations and participants as identities without PD; roles OWNER/MANAGER/EDITOR plus MODERATOR_CABINET/LEGAL_HOLD
 grants (`admin-operator capability grant|revoke`). Not wired to a public route; not applied to any database.
 
+Migration 0022 (Track A / A2b-1 for TOUR-77, contract §14): the bank operation registry (`src/bank-operations.ts`).
+One operation per payment cycle, recorded and fencing the cycle before the bank registration; authenticated evidence
+(registration, callback, read-back, transport error as UNKNOWN) is kept once by its payload hash and matched with the
+operation (provider, merchant account, provider operation, amount, currency) before the seats change. Money the seats
+cannot absorb (`NEWER_CYCLE_EXISTS`, `PURCHASE_CLOSED_LATE_PAYMENT`, no free seat) stays a fact and opens one settlement
+case for TOUR-27; refunds are OWNER-only (`refund.execute`). The service no longer calls 0021's fence and outcome
+functions directly. No provider transport, no bank operation, not applied to any database.
+
 Build context is the repository root: `docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=<40-hex> .`.
 `pnpm build` clears old output before compiling. The runtime includes `src/` output only;
 `test/retired` and `test-fixtures/catalog` preserve historical evidence outside the image.

@@ -82,5 +82,9 @@
   {
     "version": 21,
     "file": "0021_priced_seat_slots_groups_and_staff_roles.sql"
+  },
+  {
+    "version": 22,
+    "file": "0022_bank_operations.sql"
   }
 ]
