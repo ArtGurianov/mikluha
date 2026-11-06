@@ -12,6 +12,7 @@ import { contractSnapshotIntact } from './dist/contract-snapshot.js';
 import { reserve, setSalesOpen, maintain } from './dist/orders.js';
 import { createRetiredCheckoutHandler } from './dist/retired-checkout.js';
 import { reserveNativePurchase } from './dist/purchases.js';
+import { issueCheckoutIntent, openCheckoutSession } from './dist/checkout-session.js';
 import { SchemaAdmission, schemaWorker } from './dist/schema-admission.js';
 import { schemaReadiness } from './dist/schema-readiness.js';
 import { createCommerceServer, readiness, routes } from './dist/server.js';
@@ -19,7 +20,7 @@ import { createCommerceServer, readiness, routes } from './dist/server.js';
 const identity = await readBuildIdentity('/app/identity/identity.json');
 assert.equal(identity.sourceCommit, process.env.QUALIFICATION_SOURCE_COMMIT, 'image must identify the declared exact HEAD');
 const migrations = readMigrations('./migrations');
-const bundledHead=22, forwardHead=bundledHead+1;
+const bundledHead=23, forwardHead=bundledHead+1;
 assert.equal(migrations.length, bundledHead, 'review this qualification when the real baseline advances');
 const owner = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await owner.connect();
@@ -98,7 +99,12 @@ try {
   assert.equal(result.ok, true);
   // The bundled native purchase path (priced seats, migration 0021) also runs unchanged on the forward schema.
   // Real clock: the database decides the hold's five minutes and T−24 by its own clock (migration 0021).
+  // Migration 0023: a browser session and a server-issued checkout intent precede the purchase.
+  const checkoutSession = await openCheckoutSession(pool);
+  const checkoutIntent = await issueCheckoutIntent(pool, checkoutSession.token);
+  assert.equal(checkoutIntent.ok, true);
   const purchase = await reserveNativePurchase({ pool, catalog, log: () => {} }, {
+    session: { token: checkoutSession.token }, checkoutIntent: { key: checkoutIntent.key },
     departureSlug: 'proof-departure', buyer: { fullName: 'Анна Покупатель', phone: '+79039075547', email: 'proof@example.invalid' },
     tickets: { adults: 2, teens: 0, children: 0 }, ageTermsConfirmed: true, termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
     pdConsentConfirmed: true, pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash });

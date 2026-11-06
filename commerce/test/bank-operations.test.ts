@@ -5,6 +5,7 @@ import { after, before, beforeEach, describe, test } from 'node:test';
 
 import { applyDueBankOperations, openCollection, pendingBankOperations, recordBankEvidence, type BankEvidence } from '../src/bank-operations.js';
 import { createUser } from '../src/admin/operator.js';
+import { issueCheckoutIntent, openCheckoutSession } from '../src/checkout-session.js';
 import type { Catalog } from '../src/catalog.js';
 import { maintain, setSalesOpen, type OrderDeps } from '../src/orders.js';
 import { reserveNativePurchase, retryNativePurchasePayment, type NativePurchaseRequest } from '../src/purchases.js';
@@ -21,17 +22,23 @@ let adult: number;
 const staff = { owner: '', manager: '' };
 
 const deps = (): OrderDeps => ({ pool: db.pool, catalog, log: () => undefined, allowDemo: false });
+const sessions = new Map<string, string>();
+const sessionOf = (purchaseRef: string) => sessions.get(purchaseRef)!;
 async function buy(adults = 1) {
-  const req: NativePurchaseRequest = {
+  const s = await openCheckoutSession(db.pool);
+  const intent = await issueCheckoutIntent(db.pool, s.token);
+  assert.ok(intent.ok);
+  const req: NativePurchaseRequest = { session: { token: s.token }, checkoutIntent: { key: intent.key },
     departureSlug: SLUG, buyer: { fullName: 'Анна Покупатель', phone: '+7 903 907-55-47', email: 'buyer@example.ru' },
     tickets: { adults, teens: 0, children: 0 }, ageTermsConfirmed: true, termsRef: catalog.terms.ref, termsHash: catalog.terms.hash,
     pdConsentConfirmed: true, pdConsentRef: catalog.pdConsent.ref, pdConsentHash: catalog.pdConsent.hash };
   const r = await reserveNativePurchase(deps(), req);
   assert.ok(r.ok, JSON.stringify(r));
+  sessions.set(r.purchaseRef, s.token);
   return r as Extract<typeof r, { ok: true }>;
 }
 async function open(purchaseRef: string) {
-  const r = await openCollection(db.pool, purchaseRef, PROVIDER, ACCOUNT);
+  const r = await openCollection(db.pool, purchaseRef, sessionOf(purchaseRef), PROVIDER, ACCOUNT);
   assert.ok(r.ok, JSON.stringify(r));
   return r as Extract<typeof r, { ok: true }>;
 }
@@ -76,7 +83,7 @@ describe('A2b-1: one identity per payment cycle, recorded before the bank', () =
     assert.deepEqual([first.amountKopecks, first.currency, first.replayed], [2 * adult, 'RUB', false]);
     const again = await open(a.purchaseRef);
     assert.deepEqual([again.bankOperationRef, again.holdRef, again.replayed], [first.bankOperationRef, first.holdRef, true]);
-    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, 'sbp', ACCOUNT), { ok: false, refusal: 'HOLD_ALREADY_FENCED' });
+    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, sessionOf(a.purchaseRef), 'sbp', ACCOUNT), { ok: false, refusal: 'HOLD_ALREADY_FENCED' });
     const hold = (await db.owner.query('SELECT attempt_ref, fenced_at FROM seat_hold WHERE hold_ref = $1', [first.holdRef])).rows[0];
     assert.equal(hold.attempt_ref, first.bankOperationRef);
     assert.ok(hold.fenced_at);
@@ -112,7 +119,7 @@ describe('A2b-1: UNKNOWN, read-back and the outcome', () => {
     const unknown = await says(ref, 2 * adult, { source: 'DISPATCH_ERROR', observed: 'UNKNOWN', provider: undefined, merchantAccount: undefined,
       providerOperationId: undefined, amountKopecks: undefined, currency: undefined });
     assert.deepEqual([unknown.status, unknown.effect], ['UNKNOWN', 'STATUS_CHANGED']);
-    assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef), { ok: false, refusal: 'REHOLD_NOT_ALLOWED' });
+    assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef, sessionOf(a.purchaseRef)), { ok: false, refusal: 'REHOLD_NOT_ALLOWED' });
     await ageRetryWindow(a.purchaseRef);
     await maintain(db.pool, () => undefined, new Date(Date.now() + 3 * 3_600_000));
     assert.deepEqual([await orderStatus(a.orderRef), ...(await states(a.purchaseRef))], ['RESERVED', 'HELD', 'HELD']);
@@ -166,7 +173,7 @@ describe('A2b-1: money the seats cannot absorb stays a fact (G-LATE-CLOSED, NEWE
     const a = await buy();
     const first = (await open(a.purchaseRef)).bankOperationRef;
     await says(first, adult, { observed: 'FAILED' });
-    assert.equal((await retryNativePurchasePayment(deps(), a.purchaseRef)).ok, true);
+    assert.equal((await retryNativePurchasePayment(deps(), a.purchaseRef, sessionOf(a.purchaseRef))).ok, true);
     const second = (await open(a.purchaseRef)).bankOperationRef;
     await says(second, adult, { observed: 'FAILED' });
     const late = await says(first, adult);
@@ -259,7 +266,7 @@ describe('review of PR #87: a refund settles only what it returned (TOUR-27)', (
     const a = await buy();
     const first = (await open(a.purchaseRef)).bankOperationRef;
     await says(first, adult, { observed: 'FAILED' });
-    assert.equal((await retryNativePurchasePayment(deps(), a.purchaseRef)).ok, true);
+    assert.equal((await retryNativePurchasePayment(deps(), a.purchaseRef, sessionOf(a.purchaseRef))).ok, true);
     const second = (await open(a.purchaseRef)).bankOperationRef;
     await says(second, adult);
     const late = await says(first, adult);

@@ -22,6 +22,13 @@ cannot absorb (`NEWER_CYCLE_EXISTS`, `PURCHASE_CLOSED_LATE_PAYMENT`, no free sea
 case for TOUR-27; refunds are OWNER-only (`refund.execute`). The service no longer calls 0021's fence and outcome
 functions directly. No provider transport, no bank operation, not applied to any database.
 
+Migration 0023 (Track A / A2b-11, A2b-12 for TOUR-28/99, contract §15): an ordinary checkout needs a browser session
+(`__Host-` cookie token, stored as SHA-256) and a server-issued checkout intent consumed once (`src/checkout-session.ts`);
+a double click or lost response returns the same purchase, another request is `IDEMPOTENCY_CONFLICT`. Retrying and paying
+a purchase need a session bound to it (or bound by a one-time email code); a purchaseRef alone is refused. Resume codes are stored only as HMAC-SHA256 under
+`CHECKOUT_RESUME_CODE_KEY` (a server key outside PostgreSQL, to be set in Coolify when TOUR-28/99 wire the route). No route or
+cookie is wired yet.
+
 Build context is the repository root: `docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=<40-hex> .`.
 `pnpm build` clears old output before compiling. The runtime includes `src/` output only;
 `test/retired` and `test-fixtures/catalog` preserve historical evidence outside the image.
