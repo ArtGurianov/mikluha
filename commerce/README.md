@@ -39,6 +39,11 @@ Migration 0025 (OWNER A2b-10 decision, contract §17): no payment starts under t
 version with the purchase's current revision, after replaying an operation already registered (which always completes on its
 own terms). `releaseStaleHold` frees a stale, unfenced hold at once.
 
+Migration 0026 (Track A / A2b-2 for TOUR-78, MK-C01, contract §18): the departure's nominal deposit (default 5 000 ₽, set by
+its publication) is frozen in the pricing basis; a seat's deposit is min(nominal, price). Payments have a purpose (FULL,
+DEPOSIT before T−72, BALANCE before T−24); every confirmed collection is allocated per seat once (`seat_money_allocation`,
+views `seat_money`, `purchase_money`, `purchaseMoney()`).
+
 Build context is the repository root: `docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=<40-hex> .`.
 `pnpm build` clears old output before compiling. The runtime includes `src/` output only;
 `test/retired` and `test-fixtures/catalog` preserve historical evidence outside the image.
