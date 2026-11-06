@@ -113,7 +113,7 @@ export async function resetOrders(owner: pg.Client): Promise<void> {
   await owner.query('BEGIN');
   try {
     await owner.query('SET LOCAL session_replication_role = replica');
-    await owner.query('TRUNCATE seat_invitation, companion_assignment, seat_participant, seat_slot_event, purchase_revision_line, seat_slot, seat_hold, pricing_basis, purchase_group_member, purchase_group_link, purchase_group, purchase_revision_participant, purchase_revision, purchase, execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
+    await owner.query('TRUNCATE bank_refund_allocation, bank_operation_application, bank_settlement_case, bank_operation_evidence, bank_operation, seat_invitation, companion_assignment, seat_participant, seat_slot_event, purchase_revision_line, seat_slot, seat_hold, pricing_basis, purchase_group_member, purchase_group_link, purchase_group, purchase_revision_participant, purchase_revision, purchase, execution_change_notice, order_eis_event, order_eis, email_outbox, order_document, order_event, order_passenger, order_contact, orders');
     await owner.query('COMMIT');
   } catch (e) { await owner.query('ROLLBACK'); throw e; }
 }

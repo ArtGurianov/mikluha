@@ -205,12 +205,13 @@ describe('publication has a disjoint database authority', () => {
       'GRANT EXECUTE ON FUNCTION fn_publish_tour(uuid, int, int, text) TO admin_app',
     ]) await denied(db.admin, sql);
     // Inspect every executable SECURITY DEFINER entry point: only login/enrolment/session/account
-    // locking, upload preparation, draft commands and (0021) staff commands that check the signed-in
+    // locking, upload preparation, draft commands and (0021, 0022) staff commands that check the signed-in
     // account's permission in the database remain; none may trampoline to a publication command.
     const functions = (await db.admin.query(`SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
       WHERE n.nspname = 'public' AND p.prosecdef AND has_function_privilege(current_user, p.oid, 'EXECUTE') ORDER BY 1`)).rows;
     assert.deepEqual(functions.map(r => r.proname), ['fn_admin_lock_account', 'fn_admin_login',
-      'fn_admin_minor_sales_pause', 'fn_admin_session_rotate', 'fn_admin_totp_begin', 'fn_companion_assign_staff', 'fn_companion_revoke_staff',
+      'fn_admin_minor_sales_pause', 'fn_admin_session_rotate', 'fn_admin_totp_begin', 'fn_bank_refund_open', 'fn_bank_settlement_resolve',
+      'fn_companion_assign_staff', 'fn_companion_revoke_staff',
       'fn_create_content_item', 'fn_create_departure', 'fn_create_tour', 'fn_departure_affected_orders', 'fn_group_link_issue',
       'fn_group_link_revoke', 'fn_media_enqueue', 'fn_save_content_draft', 'fn_save_departure_draft', 'fn_save_tour_draft',
       'fn_seat_slot_assign_no_seat', 'fn_staff_permitted']);

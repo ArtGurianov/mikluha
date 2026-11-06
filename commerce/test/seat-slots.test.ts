@@ -13,6 +13,7 @@ import { createUser, grantCapability, revokeCapability, setDisabled } from '../s
 import type { Catalog } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { schemaHead } from '../src/migrate.js';
+import { recordBankEvidence } from '../src/bank-operations.js';
 import { maintain, MAX_SEATS_PER_REQUEST, setSalesOpen, type OrderDeps } from '../src/orders.js';
 import { reserveNativePurchase, reserveUniformNativePurchase, retryNativePurchasePayment, SEAT_HOLD_MINUTES,
   type NativePurchaseRequest } from '../src/purchases.js';
@@ -43,24 +44,36 @@ async function buy(over: Partial<NativePurchaseRequest> = {}, now?: Date) {
 }
 const slots = async (purchaseRef: string) => (await db.owner.query(
   'SELECT * FROM seat_slot_current WHERE purchase_ref = $1 ORDER BY position', [purchaseRef])).rows;
-let attempts = 0;
-const attempt = () => `alfa:attempt-${++attempts}`;
-/** TOUR-77's calls, synthetic: record the attempt before registration, then the bank's outcome. */
-const fence = (purchaseRef: string, att: string | null) => db.pool.query('SELECT fn_purchase_hold_fence($1, $2) AS r', [purchaseRef, att]);
-const confirmed = async (purchaseRef: string, att: string) =>
-  (await db.pool.query('SELECT * FROM fn_purchase_payment_confirmed($1, $2)', [purchaseRef, att])).rows[0];
-const failed = (purchaseRef: string, att: string) => db.pool.query('SELECT fn_purchase_payment_failed($1, $2) AS n', [purchaseRef, att]);
+const PROVIDER = 'alfa';
+const ACCOUNT = 'mikluha-test';
+/**
+ * TOUR-77's calls, synthetic (migration 0022): the bank operation is recorded and fences the cycle
+ * before registration; the attempt is that operation's reference. r = the hold, att = the operation.
+ */
+const fence = (purchaseRef: string, provider = PROVIDER) => db.pool.query(
+  'SELECT hold_ref AS r, bank_operation_ref AS att FROM fn_bank_operation_open($1, $2, $3)', [purchaseRef, provider, ACCOUNT]);
+let payloads = 0;
+/** The bank's authenticated answer about an operation, matching it (as TOUR-77 would record it). */
+async function bankSays(att: string, observed: 'SUCCEEDED' | 'FAILED', payload = `payload-${++payloads}`) {
+  const op = (await db.owner.query('SELECT amount_kopecks, currency FROM bank_operation WHERE bank_operation_ref = $1', [att])).rows[0];
+  return recordBankEvidence(db.pool, att, { source: 'CALLBACK', observed, provider: PROVIDER, merchantAccount: ACCOUNT,
+    providerOperationId: `alfa-order-${att}`, amountKopecks: op === undefined ? 1 : Number(op.amount_kopecks), currency: op?.currency ?? 'RUB', payload });
+}
+/** What a success changed in the seats (nothing, when it changed no status). */
+const confirmed = async (_purchaseRef: string, att: string) => {
+  const r = await bankSays(att, 'SUCCEEDED');
+  return r.effect === 'STATUS_CHANGED' ? { confirmed: r.confirmed, no_seat: r.noSeat } : { confirmed: 0, no_seat: 0 };
+};
+const failed = (_purchaseRef: string, att: string) => bankSays(att, 'FAILED');
 /** A paid cycle: fence and confirm. Returns the attempt. */
 async function pay(purchaseRef: string) {
-  const att = attempt();
-  await fence(purchaseRef, att);
+  const att: string = (await fence(purchaseRef)).rows[0].att;
   assert.equal((await confirmed(purchaseRef, att)).no_seat, 0);
   return att;
 }
 /** A proven failure of a recorded attempt. Returns the attempt (a late success may follow). */
 async function fail(purchaseRef: string) {
-  const att = attempt();
-  await fence(purchaseRef, att);
+  const att: string = (await fence(purchaseRef)).rows[0].att;
   await failed(purchaseRef, att);
   return att;
 }
@@ -136,8 +149,8 @@ beforeEach(async () => {
 });
 
 describe('migration 0021 and the limit of six', () => {
-  test('0021 is the head; UNIFORM revisions keep their hashes; seven tourists fit one UNIFORM purchase', async () => {
-    assert.equal(schemaHead(MIGRATIONS_DIR), 21);
+  test('0021 is installed; UNIFORM revisions keep their hashes; seven tourists fit one UNIFORM purchase', async () => {
+    assert.ok(schemaHead(MIGRATIONS_DIR) >= 21);
     assert.equal(MAX_SEATS_PER_REQUEST, 500);
     const r = await reserveUniformNativePurchase(deps(), {
       departureSlug: SLUG, contact: { phone: '+79039075547', email: 'ivan@example.ru' },
@@ -322,7 +335,7 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
   test('a lapsed hold frees its seats; a fenced one keeps them; the order ends after the retry window', async () => {
     const a = await buy({ tickets: { adults: 2, teens: 0, children: 0 } });
     const b = await buy({ tickets: { adults: 3, teens: 0, children: 0 } });
-    assert.match((await fence(b.purchaseRef, 'alfa:reg-1')).rows[0].r, /^sh-[0-9a-f]{20}$/);
+    assert.match((await fence(b.purchaseRef)).rows[0].r, /^sh-[0-9a-f]{20}$/);
     await lapse(a.purchaseRef);
     await lapse(b.purchaseRef);
     assert.equal(await taken(), 3);
@@ -336,7 +349,7 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
     const statuses = (await db.owner.query('SELECT status FROM orders ORDER BY created_at')).rows.map((o) => o.status);
     assert.deepEqual(statuses, ['EXPIRED', 'RESERVED']);
     assert.deepEqual((await retryNativePurchasePayment(deps(), a.purchaseRef)), { ok: false, refusal: 'PURCHASE_CLOSED' });
-    await assert.rejects(fence(b.purchaseRef, null), /BANK_OPERATION_REQUIRED/);
+    await assert.rejects(fence(b.purchaseRef, 'ALFA!'), /BANK_OPERATION_INVALID/);
   });
 
   test('review: an expired, unfenced hold is never confirmed after another buyer took the seats', async () => {
@@ -346,8 +359,9 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
     assert.equal(await taken(), 0);
     const b = await buy({ tickets: { adults: 12, teens: 0, children: 0 } });
     // No attempt can be recorded after the hold lapsed, so no outcome can ever confirm it.
-    await assert.rejects(fence(a.purchaseRef, attempt()), /HOLD_EXPIRED/);
-    for (const att of ['alfa:attempt-forged', 'alfa:attempt-1']) await assert.rejects(confirmed(a.purchaseRef, att), /ATTEMPT_UNKNOWN/);
+    await assert.rejects(fence(a.purchaseRef), /HOLD_EXPIRED/);
+    assert.equal(Number((await db.owner.query('SELECT count(*) AS n FROM bank_operation')).rows[0].n), 0, 'no operation for a lapsed hold');
+    for (const att of ['alfa:attempt-forged', 'bo-00000000000000000000']) await assert.rejects(confirmed(a.purchaseRef, att), /BANK_OPERATION_UNKNOWN/);
     // Not even the owner's DML confirms a seat whose hold did not close PAID.
     await assert.rejects(db.owner.query("UPDATE seat_slot SET state = 'CONFIRMED' WHERE purchase_id = (SELECT id FROM purchase WHERE purchase_ref = $1)",
       [a.purchaseRef]), /SEAT_SLOT_TRANSITION_INVALID/);
@@ -358,14 +372,17 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
 
   test('review: outcomes bind to the recorded attempt; UNKNOWN keeps the seats; no forged release or no-seat', async () => {
     const a = await buy({ tickets: { adults: 2, teens: 0, children: 0 } });
-    await assert.rejects(confirmed(a.purchaseRef, 'alfa:never-recorded'), /ATTEMPT_UNKNOWN/);
-    await assert.rejects(failed(a.purchaseRef, 'alfa:never-recorded'), /ATTEMPT_UNKNOWN/);
-    const att = attempt();
-    const hold = (await fence(a.purchaseRef, att)).rows[0].r;
-    assert.equal((await fence(a.purchaseRef, att)).rows[0].r, hold, 'recording the same attempt again is idempotent');
-    await assert.rejects(fence(a.purchaseRef, attempt()), /HOLD_ALREADY_FENCED/);
-    await assert.rejects(failed(a.purchaseRef, 'alfa:other'), /ATTEMPT_UNKNOWN/);
-    await assert.rejects(confirmed(a.purchaseRef, 'alfa:other'), /ATTEMPT_UNKNOWN/);
+    await assert.rejects(confirmed(a.purchaseRef, 'alfa:never-recorded'), /BANK_OPERATION_UNKNOWN/);
+    await assert.rejects(failed(a.purchaseRef, 'alfa:never-recorded'), /BANK_OPERATION_UNKNOWN/);
+    // Since 0022 the service reaches 0021's fence and outcomes only through a bank operation.
+    for (const sql of ["SELECT fn_purchase_hold_fence('mp-x', 'alfa:x')", "SELECT * FROM fn_purchase_payment_confirmed('mp-x', 'alfa:x')",
+      "SELECT fn_purchase_payment_failed('mp-x', 'alfa:x')"]) await assert.rejects(db.pool.query(sql), /permission denied/);
+    const opened = (await fence(a.purchaseRef)).rows[0];
+    const att: string = opened.att;
+    assert.deepEqual((await fence(a.purchaseRef)).rows[0], opened, 'recording the same attempt again is idempotent');
+    await assert.rejects(fence(a.purchaseRef, 'sbp'), /HOLD_ALREADY_FENCED/);
+    await assert.rejects(failed(a.purchaseRef, 'bo-ffffffffffffffffffff'), /BANK_OPERATION_UNKNOWN/);
+    await assert.rejects(confirmed(a.purchaseRef, 'bo-ffffffffffffffffffff'), /BANK_OPERATION_UNKNOWN/);
     // UNKNOWN: past its five minutes, maintenance releases nothing; nobody can release or re-attribute the seats.
     await lapse(a.purchaseRef);
     await maintain(db.pool, () => undefined, new Date(Date.now() + 2 * 3_600_000));
@@ -381,7 +398,10 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
     await assert.rejects(db.pool.query("UPDATE seat_slot SET state = 'RELEASED'"), /permission denied/);
     assert.deepEqual(await confirmed(a.purchaseRef, att), { confirmed: 2, no_seat: 0 });
     assert.deepEqual(await confirmed(a.purchaseRef, att), { confirmed: 0, no_seat: 0 }, 'a repeated confirmation changes nothing');
-    await assert.rejects(failed(a.purchaseRef, att), /ATTEMPT_UNKNOWN/);
+    // A failure after the bank confirmed the money changes nothing: contradictory evidence, manual settlement.
+    const contradiction = await failed(a.purchaseRef, att);
+    assert.deepEqual([contradiction.status, contradiction.effect, contradiction.settlementCaseRef !== null], ['SUCCEEDED', 'CONTRADICTORY', true]);
+    assert.deepEqual((await slots(a.purchaseRef)).map((s) => s.state), ['CONFIRMED', 'CONFIRMED']);
   });
 
   test('review: a confirmed seat cannot be cancelled by any service login without a TOUR-79 amendment', async () => {
@@ -411,7 +431,8 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
     assert.notEqual(second, first);
     assert.deepEqual((await slots(a.purchaseRef)).map((s) => s.state), ['CONFIRMED', 'CONFIRMED']);
     // The earlier attempt's late success is a double collection: manual reconciliation, no seat change.
-    await assert.rejects(confirmed(a.purchaseRef, first), /NEWER_CYCLE_EXISTS/);
+    const double = await bankSays(first, 'SUCCEEDED');
+    assert.deepEqual([double.status, double.seatEffect, double.settlementCaseRef !== null], ['SUCCEEDED', 'NEWER_CYCLE_EXISTS', true]);
     const holds = (await db.owner.query(`SELECT cycle, outcome, attempt_ref FROM seat_hold h JOIN purchase p ON p.id = h.purchase_id
       WHERE p.purchase_ref = $1 ORDER BY cycle`, [a.purchaseRef])).rows;
     assert.deepEqual(holds, [{ cycle: 1, outcome: 'PAYMENT_FAILED', attempt_ref: first }, { cycle: 2, outcome: 'PAID', attempt_ref: second }]);
@@ -461,7 +482,13 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
       /NO_SEAT_AVAILABLE/);
     await cancelByAmendment(bs[1].seat_slot_ref);
     await db.admin.query('SELECT fn_seat_slot_assign_no_seat($1, $2, $3)', [staff.owner, aSlot.seat_slot_ref, 'seat freed by cancellation']);
-    await db.pool.query('SELECT fn_seat_slot_refund_settled($1, $2)', [(await slots(e.purchaseRef))[1].seat_slot_ref, 'alfa:refund-1']);
+    // The no-seat refund settles only with a refund the bank confirmed for that purchase (0022).
+    const eSlot = (await slots(e.purchaseRef))[1].seat_slot_ref;
+    await assert.rejects(db.pool.query('SELECT fn_seat_slot_refund_settled($1, $2)', [eSlot, 'alfa:refund-1']), /REFUND_NOT_CONFIRMED/);
+    const refund = (await db.admin.query('SELECT fn_bank_refund_open($1, $2, $3, $4) AS r', [staff.owner, lateE, adult, 'no seat'])).rows[0].r;
+    await assert.rejects(db.pool.query('SELECT fn_seat_slot_refund_settled($1, $2)', [eSlot, refund]), /REFUND_NOT_CONFIRMED/);
+    await bankSays(refund, 'SUCCEEDED');
+    await db.pool.query('SELECT fn_seat_slot_refund_settled($1, $2)', [eSlot, refund]);
     p = await projection();
     assert.deepEqual([Number(p.confirmed_seats), Number(p.paid_no_seat), Number(p.paid_seat_claims), p.over_quota], [12, 0, 12, false]);
     const events = (await db.owner.query(`SELECT from_state, to_state, actor, bank_operation_ref FROM seat_slot_event e
@@ -685,7 +712,7 @@ describe('OWNER decisions of 06.11.2026', () => {
       VALUES ($1, 'BOOKING_CONFIRMATION', 'buyer@example.ru', $2, $3, 'PENDING', now(), now())`, [orderId, 'a'.repeat(43), `slots-${a.orderRef}`]);
     // A purchase whose attempt is UNKNOWN is not closed, so nothing of it is erased.
     const unknown = await buy();
-    await fence(unknown.purchaseRef, attempt());
+    await fence(unknown.purchaseRef);
     // A purchase under a legal hold closes but keeps its data.
     const held = await buy();
     await fail(held.purchaseRef);
@@ -717,7 +744,9 @@ describe('OWNER decisions of 06.11.2026', () => {
     assert.deepEqual([m.expired, m.erased], [1, 1]);
     assert.equal(await orderStatus(a.orderRef), 'EXPIRED');
     // The bank now reports the old attempt paid: room exists, but the closed purchase gets no seat.
-    await assert.rejects(confirmed(a.purchaseRef, late), /PURCHASE_CLOSED_LATE_PAYMENT/);
+    const lateMoney = await bankSays(late, 'SUCCEEDED');
+    assert.deepEqual([lateMoney.status, lateMoney.seatEffect, lateMoney.settlementCaseRef !== null],
+      ['SUCCEEDED', 'PURCHASE_CLOSED_LATE_PAYMENT', true], 'the money is kept as a fact and goes to manual settlement');
     assert.deepEqual((await slots(a.purchaseRef)).map((x) => x.state), ['RELEASED']);
     assert.equal((await projection()).paid_seat_claims, '0');
     // Within the window (the order still open) a late success is still decided by the database.
@@ -730,8 +759,7 @@ describe('OWNER decisions of 06.11.2026', () => {
     const a = await buy();
     await fail(a.purchaseRef);
     const b = await buy();
-    const registered = attempt();
-    await fence(b.purchaseRef, registered);
+    const registered: string = (await fence(b.purchaseRef)).rows[0].att;
     // The organizer publishes a new revision of the departure (test-only: copy of the current one).
     await asOwnerWithoutTriggers(`INSERT INTO departure_revision (departure_id, version, draft_revision, document, document_sha256, published_by, login_role, published_at)
       SELECT r.departure_id, r.version + 1, r.draft_revision, r.document, r.document_sha256, r.published_by, r.login_role, now()

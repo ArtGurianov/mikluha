@@ -310,6 +310,10 @@ export async function reserveOrder(deps: OrderDeps, req: BookingRequest, native:
  * free again), then personal data past its retention is erased. Returns what it did, as counts.
  */
 export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date()): Promise<{ expired: number; erased: number; contractsErased: number }> {
+  // Bank outcomes already recorded whose seat application failed unexpectedly (migration 0022): applied
+  // first, in their own transaction and lock order, so an unpaid order is never closed past them.
+  const applied = (await pool.query<{ n: number }>('SELECT fn_bank_operations_apply_due() AS n')).rows[0]!.n;
+  if (applied > 0) log('bank_operations_applied', { applied });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
