@@ -157,8 +157,8 @@ describe('0025: registration and publication serialize on the departure', () => 
     let opRef: string;
     try {
       await c.query('BEGIN');
-      opRef = (await c.query('SELECT bank_operation_ref FROM fn_bank_operation_open_current($1, $2, $3, $4, $5, $6, $7, $8)',
-        [a.purchaseRef, tokenSha256(a.token), 'alfa', 'mikluha-test', t.termsRef, t.termsHash, t.pdConsentRef, t.pdConsentHash])).rows[0].bank_operation_ref;
+      opRef = (await c.query('SELECT bank_operation_ref FROM fn_bank_operation_open_payment($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+        [a.purchaseRef, tokenSha256(a.token), 'alfa', 'mikluha-test', t.termsRef, t.termsHash, t.pdConsentRef, t.pdConsentHash, 'FULL'])).rows[0].bank_operation_ref;
       const pub = await lockedPublisher();
       let published = false;
       const publication = pub.lockAndPublish().then(() => { published = true; });

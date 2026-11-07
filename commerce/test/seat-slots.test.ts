@@ -65,8 +65,8 @@ const ACCOUNT = 'mikluha-test';
  * before registration; the attempt is that operation's reference. r = the hold, att = the operation.
  */
 const fence = (purchaseRef: string, provider = PROVIDER) => db.pool.query(
-  'SELECT hold_ref AS r, bank_operation_ref AS att FROM fn_bank_operation_open_current($1, $2, $3, $4, $5, $6, $7, $8)',
-  [purchaseRef, tokenSha256(sessionOf(purchaseRef)), provider, ACCOUNT, ...legalArgs()]);
+  'SELECT hold_ref AS r, bank_operation_ref AS att FROM fn_bank_operation_open_payment($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+  [purchaseRef, tokenSha256(sessionOf(purchaseRef)), provider, ACCOUNT, ...legalArgs(), 'FULL']);
 let payloads = 0;
 /** The bank's authenticated answer about an operation, matching it (as TOUR-77 would record it). */
 async function bankSays(att: string, observed: 'SUCCEEDED' | 'FAILED', payload = `payload-${++payloads}`) {
