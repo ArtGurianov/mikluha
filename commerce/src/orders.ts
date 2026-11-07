@@ -314,6 +314,10 @@ export async function maintain(pool: pg.Pool, log: Logger, now: Date = new Date(
   // first, in their own transaction and lock order, so an unpaid order is never closed past them.
   const applied = (await pool.query<{ n: number }>('SELECT fn_bank_operations_apply_due() AS n')).rows[0]!.n;
   if (applied > 0) log('bank_operations_applied', { applied });
+  // Amendment proposals past their time close EXPIRED (migration 0027), their own statement, so the closing
+  // is kept whatever follows; one with a bank operation in flight never expires.
+  const amendmentsExpired = (await pool.query<{ n: number }>('SELECT fn_amendments_close_due() AS n')).rows[0]!.n;
+  if (amendmentsExpired > 0) log('amendments_expired', { expired: amendmentsExpired });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

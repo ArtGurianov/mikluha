@@ -173,6 +173,9 @@ describe('A2b-2: deposit, balance and the ledger', () => {
     try {
       await db.owner.query('SET LOCAL session_replication_role = replica');
       await db.owner.query("UPDATE departure SET starts_on = (now() AT TIME ZONE timezone)::date + 1, departure_time = '00:00' WHERE id = $1", [ids[SLUG]]);
+      // Since 0027 the deadline is frozen in the purchase's revision (A2b-3 §5.6): the clock reaching it is simulated there.
+      await db.owner.query(`UPDATE purchase_revision r SET balance_due_at = clock_timestamp() - interval '1 minute' FROM purchase p
+        WHERE p.purchase_ref = $1 AND r.purchase_id = p.id AND r.revision = p.current_revision`, [a.purchaseRef]);
       await db.owner.query('COMMIT');
     } catch (e) { await db.owner.query('ROLLBACK'); throw e; }
     try {

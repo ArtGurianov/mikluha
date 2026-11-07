@@ -44,6 +44,15 @@ its publication) is frozen in the pricing basis; a seat's deposit is min(nominal
 DEPOSIT before T−72, BALANCE before T−24); every confirmed collection is allocated per seat once (`seat_money_allocation`,
 views `seat_money`, `purchase_money`, `purchaseMoney()`).
 
+Migration 0027 (Track A / A2b-3a for TOUR-79, contract `docs/plans/2026-11-07-a2b-3-purchase-amendments-contract.md`,
+OWNER decisions Q2–Q6 of 07.11.2026): purchase amendments in `src/amendments.ts`. Staff propose a ticket type correction or a
+participant replacement; the buyer consents to the candidate hash the database recomputes (own session or one-time link) and
+the revision is written atomically; staff record partial cancellations and full terminations, effective at once. STALE and
+EXPIRED come back as values and are kept; `maintain()` closes expired proposals. A seat's money is held in lots per source
+collection; overpayment moves between active seats keeping its source; cancelled seats' money is never offset but settled by
+lot-based cases (refunds through the source collection, OWNER retentions, automatic closing); a contradicted refund opens
+REFUND_CONTRADICTED with the bank fact and freezes the money until its exact split. Debt deadlines are frozen per revision.
+
 Build context is the repository root: `docker build -f commerce/Dockerfile --build-arg SOURCE_COMMIT=<40-hex> .`.
 `pnpm build` clears old output before compiling. The runtime includes `src/` output only;
 `test/retired` and `test-fixtures/catalog` preserve historical evidence outside the image.
