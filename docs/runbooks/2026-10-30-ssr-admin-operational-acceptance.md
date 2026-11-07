@@ -146,6 +146,12 @@ Flexperiment и общий control plane не изменяются.
 
 ### 2.1 Одноразовая acceptance БД
 
+Сохранённый после прежней приёмки acceptance на schema19 содержит synthetic legal
+history: guard 0020 его не пропустит. Повторная приёмка schema20 требует отдельной
+чистой одноразовой БД/volume без импорта этой истории, по отдельному resource GO.
+Не очищать старый volume, не удалять legal rows и не обходить guard. См.
+[правило retained acceptance](phase-a-operations.md#retained-acceptance-and-schema20).
+
 Все synthetic OWNER/EDITOR, TOTP, audit, legal publications, faulty/outage/media
 проверки раздела 3 выполняются **только** в отдельной acceptance БД. До начала
 зафиксировать её DB/cluster/volume ID, synthetic key generation, internal network
@@ -384,3 +390,9 @@ NOT PUBLISHED: ожидается «Документ временно недос
 NOT PUBLISHED до собственного успешного read-back. Итог: две review.3 редакции
 PUBLISHED только после выполнения выше; sales legal package NOT ACCEPTED,
 **sales CLOSED, domain NO-GO**. Публикация не закрывает автоматически все TOUR.
+
+Следующий отдельный domain GO выполняется по
+[чек-листу публичной доступности](phase-a-operations.md#domain-cutover-checklist--separate-owner-go):
+обе legal-страницы должны быть доступны анонимно до допуска остального публичного
+SSR/сбора данных, с отдельным внешним HTTPS read-back. Приватный акт публикации
+01.11.2026 не заменяет этого свидетельства.
