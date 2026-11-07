@@ -210,11 +210,14 @@ describe('publication has a disjoint database authority', () => {
     const functions = (await db.admin.query(`SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
       WHERE n.nspname = 'public' AND p.prosecdef AND has_function_privilege(current_user, p.oid, 'EXECUTE') ORDER BY 1`)).rows;
     assert.deepEqual(functions.map(r => r.proname), ['fn_admin_lock_account', 'fn_admin_login',
-      'fn_admin_minor_sales_pause', 'fn_admin_session_rotate', 'fn_admin_totp_begin', 'fn_bank_refund_open', 'fn_bank_settlement_resolve',
+      'fn_admin_minor_sales_pause', 'fn_admin_session_rotate', 'fn_admin_totp_begin',
+      // 0027: amendment and lot-settlement commands, each checking the staff permission in the database.
+      'fn_amendment_propose_correction', 'fn_amendment_propose_replacement', 'fn_amendment_record_cancellation', 'fn_amendment_withdraw',
+      'fn_bank_refund_open', 'fn_bank_settlement_resolve',
       'fn_companion_assign_staff', 'fn_companion_revoke_staff',
       'fn_create_content_item', 'fn_create_departure', 'fn_create_tour', 'fn_departure_affected_orders', 'fn_group_link_issue',
-      'fn_group_link_revoke', 'fn_media_enqueue', 'fn_save_content_draft', 'fn_save_departure_draft', 'fn_save_tour_draft',
-      'fn_seat_slot_assign_no_seat', 'fn_staff_permitted']);
+      'fn_group_link_revoke', 'fn_media_enqueue', 'fn_refund_contradiction_resolve', 'fn_save_content_draft', 'fn_save_departure_draft',
+      'fn_save_tour_draft', 'fn_seat_slot_assign_no_seat', 'fn_settlement_lot_retain', 'fn_settlement_refund_open', 'fn_staff_permitted']);
   });
 
   test('publisher cannot authenticate, draft, manage accounts or reach commerce; startup rejects merged capabilities', async () => {

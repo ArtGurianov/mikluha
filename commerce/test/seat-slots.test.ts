@@ -13,6 +13,7 @@ import { createUser, grantCapability, revokeCapability, setDisabled } from '../s
 import type { Catalog } from '../src/catalog.js';
 import { MIGRATIONS_DIR } from '../src/config.js';
 import { schemaHead } from '../src/migrate.js';
+import { recordCancellation, retainSettlementLot } from '../src/amendments.js';
 import { recordBankEvidence } from '../src/bank-operations.js';
 import { issueCheckoutIntent, openCheckoutSession, tokenSha256 } from '../src/checkout-session.js';
 import { maintain, MAX_SEATS_PER_REQUEST, setSalesOpen, type OrderDeps } from '../src/orders.js';
@@ -113,10 +114,21 @@ const ageRetryWindow = (purchaseRef: string) => asOwnerWithoutTriggers(
 const orderStatus = async (orderRef: string) => (await db.owner.query('SELECT status FROM orders WHERE order_ref = $1', [orderRef])).rows[0].status;
 
 /**
- * Stand-in for a future TOUR-79 amendment revision (contract A2b-3): 0021 gives no service login a
- * way to cancel a confirmed seat, so only this disposable database's owner can.
+ * A TOUR-79 cancellation (migration 0027, A2b-3): recorded by a manager, effective at once. The seat's money
+ * goes to its settlement case, which the OWNER closes here by a retention so the next cancellation of the
+ * same purchase is not held by it (the money itself is 0027's tests' subject).
  */
-const cancelByAmendment = (slotRef: string) => db.owner.query("UPDATE seat_slot SET state = 'CANCELLED' WHERE seat_slot_ref = $1", [slotRef]);
+const cancelByAmendment = async (slotRef: string) => {
+  const purchaseRef = (await db.owner.query('SELECT p.purchase_ref FROM seat_slot s JOIN purchase p ON p.id = s.purchase_id WHERE s.seat_slot_ref = $1',
+    [slotRef])).rows[0].purchase_ref;
+  const r = await recordCancellation(db.admin, staff.manager, purchaseRef, [slotRef],
+    { initiator: 'BUYER', reason: 'test cancellation', evidenceRef: 'mail-1', idempotencyKey: `cancel-${slotRef}` });
+  assert.ok(r.ok, JSON.stringify(r));
+  if (r.caseRef === null) return;
+  const lots = (await db.owner.query(`SELECT l.id, l.amount_kopecks FROM settlement_case_lot l JOIN bank_settlement_case k ON k.id = l.case_id
+    WHERE k.case_ref = $1`, [r.caseRef])).rows;
+  for (const lot of lots) await retainSettlementLot(db.admin, staff.owner, r.caseRef, Number(lot.id), Number(lot.amount_kopecks), 'test', 'act-1');
+};
 const projection = async (slug = SLUG) =>
   (await db.pool.query('SELECT * FROM departure_seat_projection WHERE slug = $1', [slug])).rows[0];
 const taken = async (now = new Date(), slug = SLUG) =>

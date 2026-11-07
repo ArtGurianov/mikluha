@@ -102,5 +102,9 @@
   {
     "version": 26,
     "file": "0026_seat_money_ledger_and_deposits.sql"
+  },
+  {
+    "version": 27,
+    "file": "0027_purchase_amendments.sql"
   }
 ]
