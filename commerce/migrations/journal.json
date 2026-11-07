@@ -94,5 +94,9 @@
   {
     "version": 24,
     "file": "0024_minor_terms_in_departure_publication.sql"
+  },
+  {
+    "version": 25,
+    "file": "0025_payment_start_terms_guard.sql"
   }
 ]

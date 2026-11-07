@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
 import { applyDueBankOperations, openCollection, pendingBankOperations, recordBankEvidence, type BankEvidence } from '../src/bank-operations.js';
+import { currentTermsOf } from '../src/bank-operations.js';
 import { createUser } from '../src/admin/operator.js';
 import { issueCheckoutIntent, openCheckoutSession } from '../src/checkout-session.js';
 import type { Catalog } from '../src/catalog.js';
@@ -18,6 +19,7 @@ const ACCOUNT = 'mikluha-test';
 
 let db: TestDb;
 let catalog: Catalog;
+const legalArgs = () => [catalog.terms.ref, catalog.terms.hash, catalog.pdConsent.ref, catalog.pdConsent.hash];
 let adult: number;
 const staff = { owner: '', manager: '' };
 
@@ -38,7 +40,7 @@ async function buy(adults = 1) {
   return r as Extract<typeof r, { ok: true }>;
 }
 async function open(purchaseRef: string) {
-  const r = await openCollection(db.pool, purchaseRef, sessionOf(purchaseRef), PROVIDER, ACCOUNT);
+  const r = await openCollection(db.pool, purchaseRef, sessionOf(purchaseRef), PROVIDER, ACCOUNT, currentTermsOf(catalog));
   assert.ok(r.ok, JSON.stringify(r));
   return r as Extract<typeof r, { ok: true }>;
 }
@@ -83,7 +85,7 @@ describe('A2b-1: one identity per payment cycle, recorded before the bank', () =
     assert.deepEqual([first.amountKopecks, first.currency, first.replayed], [2 * adult, 'RUB', false]);
     const again = await open(a.purchaseRef);
     assert.deepEqual([again.bankOperationRef, again.holdRef, again.replayed], [first.bankOperationRef, first.holdRef, true]);
-    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, sessionOf(a.purchaseRef), 'sbp', ACCOUNT), { ok: false, refusal: 'HOLD_ALREADY_FENCED' });
+    assert.deepEqual(await openCollection(db.pool, a.purchaseRef, sessionOf(a.purchaseRef), 'sbp', ACCOUNT, currentTermsOf(catalog)), { ok: false, refusal: 'HOLD_ALREADY_FENCED' });
     const hold = (await db.owner.query('SELECT attempt_ref, fenced_at FROM seat_hold WHERE hold_ref = $1', [first.holdRef])).rows[0];
     assert.equal(hold.attempt_ref, first.bankOperationRef);
     assert.ok(hold.fenced_at);

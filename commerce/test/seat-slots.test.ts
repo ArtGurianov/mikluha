@@ -27,6 +27,7 @@ const CHILD_PRICE = 2_000_000;
 
 let db: TestDb;
 let catalog: Catalog;
+const legalArgs = () => [catalog.terms.ref, catalog.terms.hash, catalog.pdConsent.ref, catalog.pdConsent.hash];
 let adult: number;
 let departureId: string;
 const staff: Record<'owner' | 'manager' | 'editor', string> = { owner: '', manager: '', editor: '' };
@@ -64,8 +65,8 @@ const ACCOUNT = 'mikluha-test';
  * before registration; the attempt is that operation's reference. r = the hold, att = the operation.
  */
 const fence = (purchaseRef: string, provider = PROVIDER) => db.pool.query(
-  'SELECT hold_ref AS r, bank_operation_ref AS att FROM fn_bank_operation_open_owned($1, $2, $3, $4)',
-  [purchaseRef, tokenSha256(sessionOf(purchaseRef)), provider, ACCOUNT]);
+  'SELECT hold_ref AS r, bank_operation_ref AS att FROM fn_bank_operation_open_current($1, $2, $3, $4, $5, $6, $7, $8)',
+  [purchaseRef, tokenSha256(sessionOf(purchaseRef)), provider, ACCOUNT, ...legalArgs()]);
 let payloads = 0;
 /** The bank's authenticated answer about an operation, matching it (as TOUR-77 would record it). */
 async function bankSays(att: string, observed: 'SUCCEEDED' | 'FAILED', payload = `payload-${++payloads}`) {
@@ -478,7 +479,7 @@ describe('payment cycles, occupancy and the paid-no-seat exception (3A)', () => 
     await maintain(db.pool, () => undefined);
     assert.equal((await slots(d.purchaseRef))[0].state, 'RELEASED');
     assert.equal((await retryNativePurchasePayment(deps(), d.purchaseRef, sessionOf(d.purchaseRef))).ok, true);
-    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [d.purchaseRef, tokenSha256(sessionOf(d.purchaseRef))]), /REHOLD_NOT_ALLOWED/);
+    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold_current($1, $2, $3, $4, $5, $6)', [d.purchaseRef, tokenSha256(sessionOf(d.purchaseRef)), ...legalArgs()]), /REHOLD_NOT_ALLOWED/);
   });
 
   test('31/30: a late success with no room is a claim, not occupancy; the database decides, the owner assigns a freed seat', async () => {
@@ -527,7 +528,7 @@ describe('review 2: the database, not the caller, decides admission and time', (
   test('a direct SQL retry as commerce_app cannot pass a closed switch, a closed departure, T−24 or the retry window', async () => {
     const a = await buy({ tickets: { adults: 2, teens: 0, children: 0 } });
     await fail(a.purchaseRef);
-    const rehold = () => db.pool.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [a.purchaseRef, tokenSha256(sessionOf(a.purchaseRef))]);
+    const rehold = () => db.pool.query('SELECT * FROM fn_purchase_rehold_current($1, $2, $3, $4, $5, $6)', [a.purchaseRef, tokenSha256(sessionOf(a.purchaseRef)), ...legalArgs()]);
     await setSalesOpen(db.operator, false, 'test', 'closed');
     try { await assert.rejects(rehold(), /SALES_CLOSED/); }
     finally { await setSalesOpen(db.operator, true, 'test', 'reopen'); }
@@ -593,7 +594,7 @@ describe('review 2: the database, not the caller, decides admission and time', (
       await closer.query('BEGIN');
       assert.equal((await closer.query('SELECT id FROM fn_priced_document_orders_close() AS id')).rows.length, 1);
       let settled = false;
-      const retry = db.pool.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [a.purchaseRef, tokenSha256(sessionOf(a.purchaseRef))]).finally(() => { settled = true; });
+      const retry = db.pool.query('SELECT * FROM fn_purchase_rehold_current($1, $2, $3, $4, $5, $6)', [a.purchaseRef, tokenSha256(sessionOf(a.purchaseRef)), ...legalArgs()]).finally(() => { settled = true; });
       await new Promise((r) => setTimeout(r, 300));
       assert.equal(settled, false, 'the retry waits for the closure');
       await closer.query('COMMIT');
@@ -606,7 +607,7 @@ describe('review 2: the database, not the caller, decides admission and time', (
     const retrier = await db.pool.connect();
     try {
       await retrier.query('BEGIN');
-      await retrier.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [b.purchaseRef, tokenSha256(sessionOf(b.purchaseRef))]);
+      await retrier.query('SELECT * FROM fn_purchase_rehold_current($1, $2, $3, $4, $5, $6)', [b.purchaseRef, tokenSha256(sessionOf(b.purchaseRef)), ...legalArgs()]);
       await ageRetryWindow(b.purchaseRef);
       assert.equal((await maintain(db.pool, () => undefined)).expired, 0, 'the closure skips the order the retry holds');
       await retrier.query('COMMIT');
@@ -790,7 +791,7 @@ describe('OWNER decisions of 06.11.2026', () => {
         FROM departure_revision r JOIN departure d ON d.id = r.departure_id AND r.version = d.published_version WHERE d.id = $1`, [departureId]);
     await asOwnerWithoutTriggers('UPDATE departure SET published_version = published_version + 1 WHERE id = $1', [departureId]);
     assert.deepEqual(await retryNativePurchasePayment(deps(), a.purchaseRef, sessionOf(a.purchaseRef)), { ok: false, refusal: 'DEPARTURE_CHANGED' });
-    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold_owned($1, $2)', [a.purchaseRef, tokenSha256(sessionOf(a.purchaseRef))]), /DEPARTURE_CHANGED/);
+    await assert.rejects(db.pool.query('SELECT * FROM fn_purchase_rehold_current($1, $2, $3, $4, $5, $6)', [a.purchaseRef, tokenSha256(sessionOf(a.purchaseRef)), ...legalArgs()]), /DEPARTURE_CHANGED/);
     // The attempt registered before the change completes on the terms it was registered under.
     assert.deepEqual(await confirmed(b.purchaseRef, registered), { confirmed: 1, no_seat: 0 });
     // New legal terms published: a purchase accepted under the old offer cannot start a new attempt.
